@@ -6,6 +6,8 @@ process_sf.py Si 178195 178216 sf_178195_Si2InDiam.cfg
 
 """
 import sys
+sys.path.append('/SNS/REF_L/shared/autoreduce')
+
 import os
 if len(sys.argv) < 5:
     print("\nUsage: python process_sf.py <incident medium> <first run> <last run> <cfg file name>")
@@ -31,11 +33,14 @@ if len(_dir)>0 and not os.path.isdir(_dir):
     sys.exit(0)
 print("Output file: %s" % _fpath)
 
-import mantid
-from mantid.simpleapi import *
 
-LRDirectBeamSort(RunList=range(first_run,last_run+1), ComputeScalingFactors=True, 
-    OrderDirectBeamsByRunNumber=True,
-    SlitTolerance=0.06,
-    IncidentMedium=sys.argv[1], UseLowResCut=False, TOFSteps=50,
-    ScalingFactorFile=_fpath)
+from sf_calculator import ScalingFactor
+
+sf = ScalingFactor(run_list=range(first_run,last_run+1),
+                   sort_by_runs=True,
+                   sf_file=_fpath,
+                   tof_step=200,
+                   medium=sys.argv[1],
+                   slit_tolerance=0.06)
+sf.execute()
+
