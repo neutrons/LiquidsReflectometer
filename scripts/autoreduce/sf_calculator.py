@@ -141,10 +141,21 @@ class ScalingFactor(object):
         counts = np.sum(p_vs_t, axis=1)
 
         avg = np.average(counts)
-        peaks, props = find_peaks(counts, threshold=0.1*avg, width=3)
+
+        peaks, props = find_peaks(counts, threshold=0.01*avg, width=3)
         width = peak_widths(counts, peaks, rel_height=0.5)
+
+        _peak_index = 0
+        _peak_max = 0
+        if len(peaks)>0:
+            for i in range(len(peaks)):
+                if counts[peaks[i]] > _peak_max:
+                    _peak_index = i
+                    _peak_max = counts[peaks[i]]
+
         try:
-            peak = [np.int(np.floor(peaks[0]-2.0*width[0])), np.int(np.floor(peaks[0]+2.0*width[0]))]
+            peak = [np.int(np.floor(peaks[_peak_index]-2.0*width[0][_peak_index])),
+                    np.int(np.floor(peaks[_peak_index]+2.0*width[0][_peak_index]))]
         except:
             print(counts)
             print(avg)
