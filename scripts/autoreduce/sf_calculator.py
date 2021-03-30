@@ -97,7 +97,7 @@ def sorter_function(r1, r2):
 class ScalingFactor(object):
 
     def __init__(self, run_list, sort_by_runs=True, sf_file='test.cfg', tof_step=200,
-                 medium='Si', slit_tolerance=0.06):
+                 medium='Si', slit_tolerance=0.06, dry_run=False):
         self._run_list = run_list
         self._sort_by_runs = sort_by_runs
         self._sf_file = sf_file
@@ -105,6 +105,7 @@ class ScalingFactor(object):
         self._use_low_res_cut = False
         self._incident_medium = medium
         self._slit_tolerance = slit_tolerance
+        self._dry_run = dry_run
 
     def execute(self):
         lr_data = []
@@ -142,24 +143,30 @@ class ScalingFactor(object):
 
         avg = np.average(counts)
 
-        peaks, props = find_peaks(counts, threshold=0.01*avg, width=3)
-        width = peak_widths(counts, peaks, rel_height=0.5)
+        # Crop pixels on each side where background can create a peak
+        _crop=25
+        peaks, props = find_peaks(counts[_crop:-_crop],
+                                  threshold=None,
+                                  width=3,
+                                  prominence=0.5*avg)
+        width = peak_widths(counts[_crop:-_crop], peaks, rel_height=0.05)
 
         _peak_index = 0
         _peak_max = 0
         if len(peaks)>0:
             for i in range(len(peaks)):
-                if counts[peaks[i]] > _peak_max:
+                if counts[peaks[i]+_crop] > _peak_max:
                     _peak_index = i
-                    _peak_max = counts[peaks[i]]
+                    _peak_max = counts[peaks[i]+_crop]
 
         try:
-            peak = [np.int(np.floor(peaks[_peak_index]-2.0*width[0][_peak_index])),
-                    np.int(np.floor(peaks[_peak_index]+2.0*width[0][_peak_index]))]
+            peak = [np.int(np.floor(peaks[_peak_index]+_crop-2.0*width[0][_peak_index])),
+                    np.int(np.floor(peaks[_peak_index]+_crop+2.0*width[0][_peak_index]))]
         except:
             print(counts)
             print(avg)
             print(peaks)
+            print(props)
             raise
 
         return peak, [0, 255]
@@ -236,13 +243,14 @@ class ScalingFactor(object):
             summary += "      TOF: %s\n\n" % tof_range
 
             # Compute the scaling factors
-            LRScalingFactors(DirectBeamRuns=direct_beam_runs,
-                             TOFRange=tof_range, TOFSteps=self._tof_steps,
-                             SignalPeakPixelRange=peak_ranges,
-                             SignalBackgroundPixelRange=bck_ranges,
-                             LowResolutionPixelRange=x_ranges,
-                             IncidentMedium=self._incident_medium,
-                             SlitTolerance=self._slit_tolerance,
-                             ScalingFactorFile=self._sf_file)
+            if not self._dry_run:
+                LRScalingFactors(DirectBeamRuns=direct_beam_runs,
+                                 TOFRange=tof_range, TOFSteps=self._tof_steps,
+                                 SignalPeakPixelRange=peak_ranges,
+                                 SignalBackgroundPixelRange=bck_ranges,
+                                 LowResolutionPixelRange=x_ranges,
+                                 IncidentMedium=self._incident_medium,
+                                 SlitTolerance=self._slit_tolerance,
+                                 ScalingFactorFile=self._sf_file)
 
             print(summary)
