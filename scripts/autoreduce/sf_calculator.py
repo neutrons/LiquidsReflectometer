@@ -134,6 +134,7 @@ class ScalingFactor(object):
             Find the peak in y
             TODO: find peak in x
         """
+        SaveNexusProcessed(InputWorkspace=ws, Filename=f'/tmp/{ws}.nxs')
         y=ws.extractY()
         x=ws.extractX()
         y = np.reshape(y, (256, 304, y.shape[1]))
