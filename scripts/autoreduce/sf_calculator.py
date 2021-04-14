@@ -2,7 +2,6 @@
     Scaling factor calculation for automated reduction
 """
 from mantid.simpleapi import *
-import matplotlib.pyplot as plt
 import numpy as np
 
 from mantid.api import *
@@ -10,7 +9,6 @@ from mantid.kernel import *
 import functools
 
 from scipy.signal import find_peaks, peak_widths
-from typing import List, Tuple
 
 
 THI_TOLERANCE = 0.002
@@ -123,25 +121,14 @@ class ScalingFactor(object):
         else:
             lr_data_sorted = sorted(lr_data, key=functools.cmp_to_key(sorter_function))
 
-        # Set the output properties
-        run_numbers = [r.getRunNumber() for r in lr_data_sorted]
-        ws_names = [str(r) for r in lr_data_sorted]
-
         # Compute the scaling factors if requested
         self._compute_scaling_factors(lr_data_sorted)
 
-    def find_peak_new(self, ws, crop=25, factor=1.) -> Tuple[List[int], List[int]]:
-        """Find peak by Mantid FindPeaks
-
-        - factor: float
-            peak width multiplication factor to peak range
-
-        Assumption
-        1. The maximum count is belonged to a READ peak
-        2. 
+    def find_peak(self, ws, crop=25, factor=1.):
+        """
+            Find peak in y using Mantid's peak finder
         """
         # Sum detector counts into 1D
-        # x = ws.extractX()
         y = ws.extractY()
         y = np.reshape(y, (256, 304, y.shape[1]))
         p_vs_t = np.sum(y, axis=0)
@@ -150,72 +137,41 @@ class ScalingFactor(object):
         # Max index as the "observed" peak center
         max_index = np.argmax(signal)
 
-        # Fit peak by Gaussian
-        # create workspace
-        import datetime
-        now = datetime.datetime.now()
-        ws_name = f'REL{now.hour:02}{now.minute:02}{now.second:02}{now.microsecond:04}.dat'
-        CreateWorkspace(DataX=np.arange(len(signal)), DataY=signal, DataE=np.sqrt(signal), OutputWorkspace=ws_name)
+        # Fit peak with a Gaussian
+        _data_ws = CreateWorkspace(DataX=np.arange(len(signal)), DataY=signal, DataE=np.sqrt(signal))
 
-        # prepare fitting
-        model_ws_name = f'{ws_name}_model'
-        param_ws_name = f'{ws_name}_parameter'
-        peak_ws_name = f'{ws_name}_peaks'
+        model_ws_name = "__model"
+        param_ws_name = "__params"
+        peak_ws_name = "__peaks"
 
-        FitPeaks(InputWorkspace=ws_name,
-                 OutputWorkspace=peak_ws_name,
-                 PeakCenters=f'{max_index}',
-                 FitWindowBoundaryList=f'{crop},{signal.shape[0]-crop}',
-                 HighBackground=False,
-                 ConstrainPeakPositions=False,
-                 FittedPeaksWorkspace=model_ws_name,
-                 OutputPeakParametersWorkspace=param_ws_name,
-                 RawPeakParameters=False)
+        # FitPeaks returns [OutputWorkspace, FittedPeaksWorkspace, OutputPeakParametersWorkspace]
+        _peak_ws = FitPeaks(InputWorkspace=_data_ws,
+                            OutputWorkspace=peak_ws_name,
+                            PeakCenters=f'{max_index}',
+                            FitWindowBoundaryList=f'{crop},{signal.shape[0]-crop}',
+                            HighBackground=False,
+                            ConstrainPeakPositions=False,
+                            FittedPeaksWorkspace=model_ws_name,
+                            OutputPeakParametersWorkspace=param_ws_name,
+                            RawPeakParameters=False)
 
         # Retrieve value
         peak_width = mtd[param_ws_name].cell(0, 3)
         peak_center = mtd[param_ws_name].cell(0, 2)
+        peak = [round(peak_center - factor * peak_width), round(peak_center + factor * peak_width)]
 
-        print(f'[INFO FIT]{ws}: Max = {max_index}, Peak center = {peak_center}, Width = {peak_width}')
-
-        # Form output
-        peak = [peak_center - factor * peak_width, peak_center + factor * peak_width]
-
-        # Export fitting result
-        model_ws = mtd[model_ws_name]
-        data_ws = mtd[ws_name]
-        f_name = f'{str(ws_name).split(".")[0]}.png'
-        plt.figure(figsize=(10, 8))
-        plt.plot(data_ws.readX(0), data_ws.readY(0), color='black', label='Counts')
-        plt.plot(model_ws.readX(0), model_ws.readY(0), color='red', linestyle='-.', label='Fitted Gaussian')
-        plt.plot([peak_center, peak_center], [0, np.max(signal)], color='green')
-        plt.plot([peak_center - 0.5 * peak_width, peak_center + 0.5 * peak_width],
-                 [0.5 * np.max(signal), 0.5 * np.max(signal)],
-                 color='green')
-        plt.plot([peak[0], peak[1]], [0., 0., ], color='green', linewidth=2)
-        plt.xlim(120, 160)
-        plt.title(f'{ws_name}: center @ {peak_center} width = {peak_width}')
-        plt.legend()
-        # plt.show()
-        plt.savefig(f_name)
-        plt.close()
-        import time
-        time.sleep(0.1)
-
-        # TODO Delete workspaces
+        # Delete workspaces
         for ws_name in [peak_ws_name, model_ws_name, param_ws_name]:
             DeleteWorkspace(ws_name)
 
         return peak, [0, 255]
 
-    def find_peak(self, ws):
+    def find_peak_scipy(self, ws):
         """
             Find the peak in y
             TODO: find peak in x
         """
-        # SaveNexusProcessed(InputWorkspace=ws, Filename=f'/tmp/{ws}.nxs')
         y=ws.extractY()
-        x=ws.extractX()
         y = np.reshape(y, (256, 304, y.shape[1]))
 
         p_vs_t = np.sum(y, axis=0)
@@ -238,11 +194,8 @@ class ScalingFactor(object):
                 if counts[peaks[i]+_crop] > _peak_max:
                     _peak_index = i
                     _peak_max = counts[peaks[i]+_crop]
-                    print(f'[VZ DEBUG] _peak_max = {_peak_max} from {peaks[i]} + {_crop} =  {peaks[i]+_crop}')
 
         try:
-            print(f'[VZ DEBUG] _peak_index = {_peak_index}, peak position = {peaks[_peak_index]}, width = {width[0][_peak_index]}')
-
             peak = [np.int(np.floor(peaks[_peak_index]+_crop-2.0*width[0][_peak_index])),
                     np.int(np.floor(peaks[_peak_index]+_crop+2.0*width[0][_peak_index]))]
         except:
@@ -251,17 +204,6 @@ class ScalingFactor(object):
             print(peaks)
             print(props)
             raise
-
-        # FIXME DEBUG Output data set to fit
-        import datetime
-
-        content = ''
-        for i in range(len(counts)):
-            content += f'{i:-5}    {counts[i]:-10}\n'
-        now = datetime.datetime.now()
-        f_name = f'{now.hour:02}{now.minute:02}{now.second:02}{now.microsecond:04}.dat'
-        with open(f_name, 'w') as dat:
-            dat.write(content)
 
         return peak, [0, 255]
         
@@ -304,9 +246,6 @@ class ScalingFactor(object):
             for run in g:
                 print("processing: %g" % run.getRunNumber())
                 peak, low_res = self.find_peak(run)
-                
-                peak2, _ = self.find_peak_new(run)
-                print(f'[............ OUTPUT] run {run}: peak = {peak2}')
 
                 att = run.getRun().getProperty('vAtt').value[0]-1
                 wl = run.getRun().getProperty('LambdaRequest').value[0]
@@ -319,8 +258,8 @@ class ScalingFactor(object):
                 bck_ranges.append(int(peak[0])-3)
                 bck_ranges.append(int(peak[1])+3)
 
-                summary += "%10s wl=%5s thi=%5s att=%s %5s,%5s %5s,%5s ... ... (%5s, %5s)\n" % \
-                    (run.getRunNumber(), wl, thi, att, peak[0], peak[1], low_res[0], low_res[1], round(peak2[0]), round(peak2[1]))
+                summary += "%10s wl=%5s thi=%5s att=%s %5s,%5s %5s,%5s\n" % \
+                    (run.getRunNumber(), wl, thi, att, peak[0], peak[1], low_res[0], low_res[1])
 
             # Determine TOF range from first file
             sample = g[0].getInstrument().getSample()
