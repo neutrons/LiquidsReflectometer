@@ -157,3 +157,12 @@ if os.path.isfile(default_file_name):
                y_title="Reflectivity", y_log=True, show_dx=False)
 
 
+#-------------------------------------------------------------------------
+# Pre-processing for ML
+import ml_bl4b as ml
+_processed_name = "REF_L_%sr.txt" % first_run_of_set
+ml.smooth_and_rebin(os.path.join(output_dir, default_file_name),
+                    "reference_183493.txt",
+                    os.path.join(output_dir, 'ml', _processed_name))
+
+
