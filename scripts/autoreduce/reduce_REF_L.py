@@ -26,6 +26,7 @@ from mantid.simpleapi import *
 try:
     from sf_calculator import ScalingFactor
     DIRECT_BEAM_CALC_AVAILABLE = True
+    logger.notice("sf_calculator available")
 except:
     import scipy
     logger.notice("Scaling factor calculation upgrade not available: scipy=%s" % scipy.__version__)
@@ -97,6 +98,7 @@ else:
 data_type = ws.getRun().getProperty("data_type").value[0]
 
 if data_type == 1 and DIRECT_BEAM_CALC_AVAILABLE:
+    logger.notice("Computing scaling factors")
     sequence_number = ws.getRun().getProperty("sequence_number").value[0]
     first_run_of_set = ws.getRun().getProperty("sequence_id").value[0]
     incident_medium = ws.getRun().getProperty("incident_medium").value[0]
@@ -109,7 +111,9 @@ if data_type == 1 and DIRECT_BEAM_CALC_AVAILABLE:
                        medium=incident_medium,
                        slit_tolerance=0.06,
                        sf_file=_fpath)
+    sf.execute()
 else:
+    logger.notice("Automated reduction")
     output = LRAutoReduction(#Filename=event_file_path,
                              InputWorkspace=ws,
                              ScaleToUnity=NORMALIZE_TO_UNITY,
