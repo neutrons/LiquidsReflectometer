@@ -1,8 +1,18 @@
 # Rebin and smooth the reflectivity curve to prepare it for ML
 import sys
+import os
 from mantid.simpleapi import *
 
 def smooth_and_rebin(file_path, reference, output_file):
+    """
+        Pre-process reflectivity data to be used as input to an ML
+        process to predict a structure.
+    """
+    # Check that the output directory exists
+    _dir = os.path.dirname(output_file)
+    if not os.path.isdir(_dir):
+        os.makedirs(_dir)
+
     ws = Load(file_path)
     ws_ref = Load(reference)
     
