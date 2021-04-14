@@ -2,7 +2,6 @@
     Scaling factor calculation for automated reduction
 """
 from mantid.simpleapi import *
-import matplotlib.pyplot as plt
 import numpy as np
 
 from mantid.api import *
@@ -122,20 +121,57 @@ class ScalingFactor(object):
         else:
             lr_data_sorted = sorted(lr_data, key=functools.cmp_to_key(sorter_function))
 
-        # Set the output properties
-        run_numbers = [r.getRunNumber() for r in lr_data_sorted]
-        ws_names = [str(r) for r in lr_data_sorted]
-
         # Compute the scaling factors if requested
         self._compute_scaling_factors(lr_data_sorted)
 
-    def find_peak(self, ws):
+    def find_peak(self, ws, crop=25, factor=1.):
+        """
+            Find peak in y using Mantid's peak finder
+        """
+        # Sum detector counts into 1D
+        y = ws.extractY()
+        y = np.reshape(y, (256, 304, y.shape[1]))
+        p_vs_t = np.sum(y, axis=0)
+        signal = np.sum(p_vs_t, axis=1)
+
+        # Max index as the "observed" peak center
+        max_index = np.argmax(signal)
+
+        # Fit peak with a Gaussian
+        _data_ws = CreateWorkspace(DataX=np.arange(len(signal)), DataY=signal, DataE=np.sqrt(signal))
+
+        model_ws_name = "__model"
+        param_ws_name = "__params"
+        peak_ws_name = "__peaks"
+
+        # FitPeaks returns [OutputWorkspace, FittedPeaksWorkspace, OutputPeakParametersWorkspace]
+        _peak_ws = FitPeaks(InputWorkspace=_data_ws,
+                            OutputWorkspace=peak_ws_name,
+                            PeakCenters=f'{max_index}',
+                            FitWindowBoundaryList=f'{crop},{signal.shape[0]-crop}',
+                            HighBackground=False,
+                            ConstrainPeakPositions=False,
+                            FittedPeaksWorkspace=model_ws_name,
+                            OutputPeakParametersWorkspace=param_ws_name,
+                            RawPeakParameters=False)
+
+        # Retrieve value
+        peak_width = mtd[param_ws_name].cell(0, 3)
+        peak_center = mtd[param_ws_name].cell(0, 2)
+        peak = [round(peak_center - factor * peak_width), round(peak_center + factor * peak_width)]
+
+        # Delete workspaces
+        for ws_name in [peak_ws_name, model_ws_name, param_ws_name]:
+            DeleteWorkspace(ws_name)
+
+        return peak, [0, 255]
+
+    def find_peak_scipy(self, ws):
         """
             Find the peak in y
             TODO: find peak in x
         """
         y=ws.extractY()
-        x=ws.extractX()
         y = np.reshape(y, (256, 304, y.shape[1]))
 
         p_vs_t = np.sum(y, axis=0)
@@ -210,6 +246,7 @@ class ScalingFactor(object):
             for run in g:
                 print("processing: %g" % run.getRunNumber())
                 peak, low_res = self.find_peak(run)
+
                 att = run.getRun().getProperty('vAtt').value[0]-1
                 wl = run.getRun().getProperty('LambdaRequest').value[0]
                 thi = run.getRun().getProperty('thi').value[0]
