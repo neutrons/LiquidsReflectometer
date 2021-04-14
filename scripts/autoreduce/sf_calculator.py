@@ -8,8 +8,6 @@ from mantid.api import *
 from mantid.kernel import *
 import functools
 
-from scipy.signal import find_peaks, peak_widths
-
 
 THI_TOLERANCE = 0.002
 
@@ -171,6 +169,8 @@ class ScalingFactor(object):
             Find the peak in y
             TODO: find peak in x
         """
+        from scipy.signal import find_peaks, peak_widths
+
         y=ws.extractY()
         y = np.reshape(y, (256, 304, y.shape[1]))
 
