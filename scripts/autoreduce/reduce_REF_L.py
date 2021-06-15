@@ -10,13 +10,12 @@ import sys
 import os
 import json
 import warnings
-warnings.simplefilter('ignore', RuntimeWarning)
+warnings.simplefilter('ignore')
 
 
 if ("MANTIDPATH" in os.environ):
     del os.environ["MANTIDPATH"]
-#sys.path.insert(0,"/opt/mantid50/bin")
-#sys.path.insert(1,"/opt/mantid50/lib")
+
 sys.path.insert(0,"/opt/mantidnightly/bin")
 sys.path.insert(1,"/opt/mantidnightly/lib")
 
@@ -132,37 +131,43 @@ else:
 #-------------------------------------------------------------------------
 # Produce plot for the web monitor
 default_file_name = 'REFL_%s_combined_data_auto.txt' % first_run_of_set
-if os.path.isfile(default_file_name):
+default_file_path = os.path.join(output_dir, default_file_name)
+if os.path.isfile(default_file_path):
     print("Loading %s" % os.path.join(output_dir, default_file_name))
     reflectivity = LoadAscii(Filename=os.path.join(output_dir, default_file_name), Unit="MomentumTransfer")
 
+    plotting_ready = True
     try:
         from postprocessing.publish_plot import plot1d
     except ImportError:
-        from finddata.publish_plot import plot1d
+        from finddata.publish_plot import plot1d, _determine_config_file, publish_plot
+        if _determine_config_file(None) is None:
+            plotting_ready = False
+
     x = reflectivity.readX(0)
     y = reflectivity.readY(0)
     dy = reflectivity.readE(0)
     dx = reflectivity.readDx(0)
-    
+
     if int(run_number) - first_run_of_set < 10:
         for r in range(0, 10):
-            if os.path.isfile('REFL_%s_%s_%s_auto.nxs' % (first_run_of_set, r+1, first_run_of_set+r)):
-                plot1d(first_run_of_set+r, [[x, y, dy, dx]], instrument='REF_L', 
-                       x_title=u"Q (1/A)", x_log=True,
-                       y_title="Reflectivity", y_log=True, show_dx=False)
+            reduced_file_name = 'REFL_%s_%s_%s_auto.nxs' % (first_run_of_set, r+1, first_run_of_set+r)
+            reduced_file_path = os.path.join(output_dir, reduced_file_name)
+            if os.path.isfile(reduced_file_path):
+                # Look to see whether submitting the plot is enabled
+                if plotting_ready:
+                    plot1d(first_run_of_set+r, [[x, y, dy, dx]], instrument='REF_L', 
+                           x_title=u"Q (1/A)", x_log=True,
+                           y_title="Reflectivity", y_log=True, show_dx=False)
+                else:
+                    plot_div = plot1d(first_run_of_set+r, [[x, y, dy, dx]], instrument='REF_L', 
+                                      x_title=u"q (1/A)", x_log=True,
+                                      y_title="Reflectivity", y_log=True, show_dx=False, publish=False)
+                    publish_plot('REF_L', first_run_of_set+r, files={'file': plot_div},
+                                 config="/SNS/REF_L/shared/.livedata.conf")
+
     else:
         plot1d(run_number, [[x, y, dy, dx]], instrument='REF_L', 
                x_title=u"Q (1/A)", x_log=True,
                y_title="Reflectivity", y_log=True, show_dx=False)
-
-
-#-------------------------------------------------------------------------
-# Pre-processing for ML
-import ml_bl4b as ml
-_processed_name = "REF_L_%sr.txt" % first_run_of_set
-ml.smooth_and_rebin(os.path.join(output_dir, default_file_name),
-                    "reference_183493.txt",
-                    os.path.join(output_dir, 'ml', _processed_name))
-
 

@@ -7,6 +7,7 @@ all:
 install:
 	cp -R scripts/autoreduce/*.py $(prefix)/autoreduce
 	cp -R scripts/shared/*.py $(prefix)
+	cp -R scripts/shared/.*.conf $(prefix)
 
 
 .PHONY: install

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """
 Example:
 
@@ -10,7 +10,7 @@ sys.path.append('/SNS/REF_L/shared/autoreduce')
 
 import os
 if len(sys.argv) < 5:
-    print("\nUsage: python process_sf.py <incident medium> <first run> <last run> <cfg file name>")
+    print("\nUsage: python3 process_sf.py <incident medium> <first run> <last run> <cfg file name>")
     print("\nExample:\n   python process_sf.py Si 178195 178216 /SNS/REF_L/shared/autoreduce/sf_178195_Si2InDiam.cfg")
     sys.exit(0)
 
