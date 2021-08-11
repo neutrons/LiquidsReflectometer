@@ -1,0 +1,9 @@
+BL4B:CS:Autoreduce:Sequence:Total,BL4B:CS:Autoreduce:Sequence:Num,BL4B:Mot:s1:Y:Gap,BL4B:Mot:si:Y:Gap,+p BL4B:Mot:ths,+p BL4B:Mot:tthd,+p BL4B:Mot:s1:Y:Center,+p BL4B:Mot:s1:X:Gap,+p BL4B:Mot:si:Y:Center,+p BL4B:Mot:si:X:Gap,+p BL4B:Mot:s3:Y:Gap,+p BL4B:Chop:Gbl:WavelengthReq,Comment,Wait For,Value
+8,1,0.39,0.25,-0.6,-1.2,0,20,0,20,20,15,,BL4B:Det:Neutrons,6000
+,2,0.39,0.25,-0.6,-1.2,0,20,0,20,20,12.386,,BL4B:Det:Neutrons,6000
+,3,0.39,0.25,-0.6,-1.2,0,20,0,20,20,9.74,,BL4B:Det:Neutrons,6000
+,4,0.39,0.25,-0.6,-1.2,0,20,0,20,20,7.043,,BL4B:Det:Neutrons,6000
+,5,0.39,0.25,-0.6,-1.2,0,20,0,20,20,4.25,,BL4B:Det:Neutrons,18000
+,6,0.76895,0.492916666666667,-1.183,-2.366,0,20,0,20,20,4.25,,BL4B:Det:Neutrons,18000
+,7,1.52295,0.97625,-2.343,-4.686,0,20,0,20,30,4.25,,BL4B:Det:Neutrons,36000
+,8,3.01535,1.93291666666667,-4.639,-9.278,0,20,0,20,30,4.25,,BL4B:Det:Neutrons,72000

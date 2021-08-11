@@ -1,0 +1,22 @@
+BL4B:CS:Autoreduce:Sequence:Total,BL4B:CS:ExpPl:IncidentMedium,BL4B:CS:Autoreduce:Sequence:Num,BL4B:Mot:s1:Y:Gap,BL4B:Mot:si:Y:Gap,+p BL4B:Mot:ths,+p BL4B:Mot:tthd,+p BL4B:Mot:s1:Y:Center,+p BL4B:Mot:s1:X:Gap,+p BL4B:Mot:si:Y:Center,+p BL4B:Mot:si:X:Gap,+p BL4B:Mot:s3:Y:Gap,+p BL4B:Chop:Gbl:WavelengthReq,+p BL4B:Mot:att,Comment,Wait For,Value
+20,Si2InDisk,1,0.39,0.25,0,0,0,20,0,20,10,15,15,,BL4B:Det:Neutrons,300000
+,Si2InDisk,2,0.39,0.25,0,0,0,20,0,20,10,12.386,15,,BL4B:Det:Neutrons,300000
+,Si2InDisk,3,0.39,0.25,0,0,0,18.598,0,18.598,10,9.74,15,,BL4B:Det:Neutrons,300000
+,Si2InDisk,4,0.39,0.25,0,0,0,18.598,0,18.598,10,9.74,64.5,,BL4B:Det:Neutrons,300000
+,Si2InDisk,5,0.39,0.25,0,0,0,20,0,20,10,9.74,64.5,,BL4B:Det:Neutrons,300000
+,Si2InDisk,6,0.39,0.25,0,0,0,6.397,0,6.397,10,7.043,15,,BL4B:Det:Neutrons,300000
+,Si2InDisk,7,0.39,0.25,0,0,0,6.397,0,6.397,10,7.043,64.5,,BL4B:Det:Neutrons,300000
+,Si2InDisk,8,0.39,0.25,0,0,0,19.951,0,19.951,10,7.043,64.5,,BL4B:Det:Neutrons,300000
+,Si2InDisk,9,0.39,0.25,0,0,0,3.009,0,3.009,10,4.25,15,,BL4B:Det:Neutrons,300000
+,Si2InDisk,10,0.39,0.25,0,0,0,3.009,0,3.009,10,4.25,64.5,,BL4B:Det:Neutrons,300000
+,Si2InDisk,11,0.39,0.25,0,0,0,8.78,0,8.78,10,4.25,64.5,,BL4B:Det:Neutrons,300000
+,Si2InDisk,12,0.39,0.25,0,0,0,8.78,0,8.78,10,4.25,114,,BL4B:Det:Neutrons,300000
+,Si2InDisk,13,0.39,0.25,0,0,0,20,0,20,10,4.25,114,,BL4B:Det:Neutrons,300000
+,Si2InDisk,14,0.769,0.493,0,0,0,12.486,0,12.486,10,4.25,114,,BL4B:Det:Neutrons,300000
+,Si2InDisk,15,0.769,0.493,0,0,0,12.486,0,12.486,10,4.25,163.5,,BL4B:Det:Neutrons,300000
+,Si2InDisk,16,0.769,0.493,0,0,0,20,0,20,10,4.25,163.5,,BL4B:Det:Neutrons,300000
+,Si2InDisk,17,1.523,0.976,0,0,0,16.396,0,16.396,30,4.25,163.5,,BL4B:Det:Neutrons,300000
+,Si2InDisk,18,1.523,0.976,0,0,0,16.396,0,16.396,30,4.25,213,,BL4B:Det:Neutrons,300000
+,Si2InDisk,19,1.523,0.976,0,0,0,20,0,20,30,4.25,213,,BL4B:Det:Neutrons,300000
+,Si2InDisk,20,3.015,1.932,0,0,0,20,0,20,30,4.25,213,,BL4B:Det:Neutrons,300000
+1,DB completed,1,0.2,0.2,0,0,0,10,0,10,1,15,15,,BL4B:Det:Neutrons,1

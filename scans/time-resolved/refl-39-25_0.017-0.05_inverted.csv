@@ -1,0 +1,2 @@
+BL4B:CS:Autoreduce:Sequence:Total,BL4B:CS:Autoreduce:Sequence:Num,BL4B:Mot:s1:Y:Gap,BL4B:Mot:si:Y:Gap,BL4B:Mot:s3:Y:Gap,+p BL4B:Mot:ths,+p BL4B:Mot:tthd,+p BL4B:Mot:s1:Y:Center,+p BL4B:Mot:s1:X:Gap,+p BL4B:Mot:si:Y:Center,+p BL4B:Mot:si:X:Gap,+p BL4B:Mot:s3:Y:Center,+p BL4B:Chop:Gbl:WavelengthReq,Comment,Wait For,Value
+1,1,0.39,0.25,10,-0.6,-1.2,0,20,0,20,0,4.25,,BL4B:Det:Neutrons,18000
