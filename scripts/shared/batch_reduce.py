@@ -4,17 +4,6 @@ import os
 import time
 import subprocess
 
-def local_submission(cmd, out_log, out_err):
-    cmd = "%s %s %s %s/" % (configuration.python_executable, script, input_file, output_dir)
-    logFile=open(out_log, "w")
-    errFile=open(out_err, "w")
-    if configuration.comm_only is False:
-        proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE,
-                                stdout=logFile, stderr=errFile, universal_newlines = True,
-                                cwd=output_dir)
-        proc.communicate()
-    logFile.close()
-    errFile.close()
 
 if len(sys.argv) < 4:
     print("\nUsage: python3 batch_reduce.py <IPTS> <first run> <last run>")
