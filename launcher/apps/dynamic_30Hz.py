@@ -86,16 +86,19 @@ class Dynamic30Hz(QWidget):
     def template_selection(self):
         _template_file, _ = QFileDialog.getOpenFileName(self, 'Open file',
                                                         '', 'Template file (*.xml)')
-        self.template_path.setText(_template_file)
+        if os.path.isfile(_template_file):
+            self.template_path.setText(_template_file)
 
     def ref_selection(self):
         _ref_file, _ = QFileDialog.getOpenFileName(self, 'Open file',
                                                    '', '60Hz reference file (*.txt)')
-        self.ref_path.setText(_ref_file)
+        if os.path.isfile(_ref_file):
+            self.ref_path.setText(_ref_file)
 
     def output_dir_selection(self):
         _dir = QFileDialog.getExistingDirectory(None, 'Select a folder:', '', QFileDialog.ShowDirsOnly)
-        self.output_dir_label.setText(_dir)
+        if os.path.isdir(_dir):
+            self.output_dir_label.setText(_dir)
 
     def read_settings(self):
         _template_file = self.settings.value("template", TEMPLATE_DIRECTIVE)
@@ -152,7 +155,6 @@ class Dynamic30Hz(QWidget):
         msgBox.setText(text)
         msgBox.setWindowTitle("Invalid inputs")
         msgBox.setStandardButtons(QMessageBox.Ok)
-        returnValue = msgBox.exec()
 
     def reduce(self):
         if not self.check_inputs():
@@ -162,8 +164,8 @@ class Dynamic30Hz(QWidget):
         self.save_settings()
 
         print("Reduce!")
-        # python3 template_reduction.py <meas_run_30Hz> <ref_run_30Hz> <ref_data_60Hz> <template_30Hz> <time_interval> <output_dir>
-        subprocess.run(['python3', 'scripts/template_reduction.py',
+        # python3 template_reduction.py dynamic30Hz <meas_run_30Hz> <ref_run_30Hz> <ref_data_60Hz> <template_30Hz> <time_interval> <output_dir>
+        subprocess.run(['python3', 'scripts/template_reduction.py', 'dynamic30Hz',
                         self.data_run_number_ledit.text(),
                         self.ref_run_number_ledit.text(),
                         self.ref_path.text(),

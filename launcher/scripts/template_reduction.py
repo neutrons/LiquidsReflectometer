@@ -1,6 +1,7 @@
 import sys
 import os
 import numpy as np
+import argparse
 
 from matplotlib import pyplot as plt
 
@@ -311,21 +312,50 @@ def plot_slices(reduced, title, time_interval, file_path, offset=10):
     plt.show()
     plt.savefig(file_path)
 
+
 if __name__ == "__main__":
-    if len(sys.argv) < 7:
-        print("\nUsage: python3 template_reduction.py <meas_run_30Hz> <ref_run_30Hz> <ref_data_60Hz> <template_30Hz> <time_interval> <output_dir>")
-        print("%s" % str(sys.argv))
-        sys.exit(0)
+    parser = argparse.ArgumentParser(add_help=True)
 
-    meas_30Hz = sys.argv[1]
-    ref_run_30Hz = sys.argv[2]
-    ref_data_60Hz = sys.argv[3]
-    template_30Hz = sys.argv[4]
-    time_interval = sys.argv[5]
-    output_dir = sys.argv[6]
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
 
-    print("Measured run to reduce: %s" % meas_30Hz)
-    reduced = reduce_30Hz_slices(meas_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz,
-                                 time_interval=float(time_interval), output_dir=output_dir, scan_index=1)
+    # Time-resolved at 30Hz
+    dynanic30_parser = subparsers.add_parser('dynamic30Hz', help='Reduce time-resolved 30Hz [-h for help]')
+    dynanic30_parser.add_argument('meas_run_30Hz', type=int,
+                             help='Run number for the data to be processed')
+    dynanic30_parser.add_argument('ref_run_30Hz', type=int,
+                             help='Run number for the reference 30Hz data, measured at the same settings as the data to be processed')
+    dynanic30_parser.add_argument('ref_data_60Hz', type=str,
+                             help='Reference R(Q), measured at 60Hz')
+    dynanic30_parser.add_argument('template_30Hz', type=str,
+                             help='File path for the 30Hz reduction template')
+    dynanic30_parser.add_argument('time_interval', type=float,
+                             help='Time interval to use, in seconds')
+    dynanic30_parser.add_argument('output_dir', type=str,
+                             help='Output directory')
+    dynanic30_parser.add_argument('--scan_index', type=int, dest='scan_index',
+                                  help='Template scan index', required=False, default=1)
 
-    print("DONE")
+    # Time-resolved at 60Hz
+    dynanic60_parser = subparsers.add_parser('dynamic60Hz', help='Reduce time-resolved 60Hz [-h for help]')
+    dynanic60_parser.add_argument('meas_run_60Hz', type=int,
+                             help='Run number for the data to be processed')
+    dynanic60_parser.add_argument('template_60Hz', type=str,
+                             help='File path for the 60Hz reduction template')
+    dynanic60_parser.add_argument('time_interval', type=float,
+                             help='Time interval to use, in seconds')
+    dynanic60_parser.add_argument('output_dir', type=str,
+                             help='Output directory')
+    dynanic60_parser.add_argument('--scan_index', type=int, dest='scan_index',
+                                  help='Template scan index', required=True, default=1)
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    if args.command=='dynamic30Hz':
+        print("Time-resolved reduction at 30Hz: run %s" % args.meas_run_30Hz)
+        reduced = reduce_30Hz_slices(args.meas_run_30Hz, args.ref_run_30Hz, args.ref_data_60Hz, args.template_30Hz,
+                                     time_interval=args.time_interval, output_dir=args.output_dir, scan_index=args.scan_index)
+    elif args.command=='dynamic60Hz':
+        print("Time-resolved reduction at 60Hz: run %s" % args.meas_run_60Hz)
+        reduced = reduce_60Hz_slices(args.meas_run_60Hz, args.template_60Hz,
+                                     time_interval=args.time_interval, output_dir=args.output_dir, scan_index=args.scan_index)
