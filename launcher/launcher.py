@@ -11,6 +11,7 @@ from qtpy.QtWidgets import (QApplication, QWidget, QGridLayout,
 
 from apps.dynamic_60Hz import Dynamic60Hz
 from apps.dynamic_30Hz import Dynamic30Hz
+from apps.xrr import XRR
 
 REFERENCE_DIRECTIVE = "Click to choose a 60Hz reference R(Q) file"
 TEMPLATE_DIRECTIVE = "Click to choose a 30Hz template"
@@ -29,13 +30,18 @@ class ReductionInterface(QTabWidget):
 
         # 60Hz time-resolved
         self.time_60Hz_tab = Dynamic60Hz()
-        self.addTab(self.time_60Hz_tab,"Time-resolved 60Hz")
-        self.setTabText(0,"Time-resolved 60Hz")
+        self.addTab(self.time_60Hz_tab, "Time-resolved 60Hz")
+        self.setTabText(0, "Time-resolved 60Hz")
 
+        # 30 Hz time-resolved
         self.time_30Hz_tab = Dynamic30Hz()
-        self.addTab(self.time_30Hz_tab,"Time-resolved 30Hz")
-        self.setTabText(1,"Time-resolved 30Hz")
+        self.addTab(self.time_30Hz_tab, "Time-resolved 30Hz")
+        self.setTabText(1, "Time-resolved 30Hz")
 
+        # XRR reduction
+        self.xrr_tab = XRR()
+        self.addTab(self.xrr_tab, "XRR processing")
+        self.setTabText(2, "XRR processing")
 
 if __name__ == '__main__':
     app = QApplication([])

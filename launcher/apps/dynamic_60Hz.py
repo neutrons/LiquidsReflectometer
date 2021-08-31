@@ -25,7 +25,7 @@ class Dynamic60Hz(QWidget):
         self.settings = QtCore.QSettings()
 
         # 30Hz template file
-        self.choose_template = QPushButton('template')
+        self.choose_template = QPushButton('Template')
         layout.addWidget(self.choose_template, 1, 1)
 
         self.template_path = QLabel(self)
