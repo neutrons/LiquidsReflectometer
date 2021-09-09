@@ -35,7 +35,7 @@ def read_template(template_file, sequence_number):
     return data_set
 
 
-def reduce_with_mantid(ws, data_set, apply_scaling_factor=False):
+def reduce_with_mantid(ws, data_set, apply_db=False, apply_scaling_factor=False):
     """
         @param ws: Mantid workspace
         @param data_set: template object
@@ -46,9 +46,14 @@ def reduce_with_mantid(ws, data_set, apply_scaling_factor=False):
         "SignalPeakPixelRange": data_set.DataPeakPixels,
         "SubtractSignalBackground": data_set.DataBackgroundFlag,
         "SignalBackgroundPixelRange": data_set.DataBackgroundRoi[:2],
-        "NormFlag": False,
+        "NormFlag": apply_db,
+        "NormPeakPixelRange": data_set.NormPeakPixels,
+        "SubtractNormBackground": data_set.NormBackgroundFlag,
+        "NormBackgroundPixelRange": data_set.NormBackgroundRoi[:2],
         "LowResDataAxisPixelRangeFlag": data_set.data_x_range_flag,
         "LowResDataAxisPixelRange": data_set.data_x_range,
+        "LowResNormAxisPixelRangeFlag": data_set.norm_x_range_flag,
+        "LowResNormAxisPixelRange": data_set.norm_x_range,
         "TOFRange": data_set.DataTofRange,
         "TOFSteps": 40,
         "ApplyScalingFactor": apply_scaling_factor,
@@ -115,23 +120,41 @@ def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, sca
 
     # Identify the bins we need to overlap with the 30Hz measurement
     # The assumption is that the binning is the same
-    _q_idx_ref = np.asarray(np.where((data_60Hz[0] > r_ref[0][0]-0.1*(r_ref[0][1]-r_ref[0][0])) \
-                                     & (data_60Hz[0] < r_ref[0][-1]+0.1*(r_ref[0][-1]-r_ref[0][-2]))))[0]
-    _q_idx_meas = np.asarray(np.where(r_ref[0] <= data_60Hz[0][-1]))[0]
+    _tolerance = 0.0001
+    _max_q = min(r_ref[0].max(), r_meas[0].max())
+    _min_q = max(r_ref[0].min(), r_meas[0].min())
     
+    print("60Hz:      %g %g" % (data_60Hz[0].min(), data_60Hz[0].max()))
+    print("Ref 30Hz:  %g %g" % (r_meas[0].min(), r_meas[0].max()))
+    print("Meas 30Hz: %g %g" % (r_ref[0].min(), r_ref[0].max()))
+    
+    _q_idx_60 = np.asarray(np.where((data_60Hz[0] > _min_q-_tolerance) & (data_60Hz[0] < _max_q+_tolerance)))[0]
+    _q_idx_meas30 = np.asarray(np.where((r_meas[0] > _min_q-_tolerance) & (r_meas[0] < _max_q+_tolerance)))[0]
+    _q_idx_ref30 = np.asarray(np.where((r_ref[0] > _min_q-_tolerance) & (r_ref[0] < _max_q+_tolerance)))[0]
+
+    if not data_60Hz[0][_q_idx_60].shape[0] == r_meas[0][_q_idx_ref30].shape[0]:
+        print("60Hz reference may have been reduced with different binning!")
+
     # Confirm identical binning
-    _sum = np.sum(data_60Hz[0][_q_idx_ref]-r_ref[0][_q_idx_meas])
+    _sum = np.sum(data_60Hz[0][_q_idx_60]-r_ref[0][_q_idx_ref30])
     if _sum > r_ref[0][0]/100:
-        print("Binning not identical!")
+        print("Binning 60Hz and ref 30Hz not identical!")
+        
 
-    r_q_final = r_meas[1][_q_idx_meas]/r_ref[1][_q_idx_meas]*data_60Hz[1][_q_idx_ref]
+    _sum = np.sum(data_60Hz[0][_q_idx_60]-r_meas[0][_q_idx_meas30])
+    if _sum > r_ref[0][0]/100:
+        print("Binning 60Hz and meas 30Hz not identical!")
+    
+    r_q_final = r_meas[1][_q_idx_meas30]/r_ref[1][_q_idx_ref30]*data_60Hz[1][_q_idx_60]
 
-    dr_q_final = np.sqrt((r_meas[2][_q_idx_meas]/r_ref[1][_q_idx_meas]*data_60Hz[1][_q_idx_ref])**2 \
-                         +(r_meas[1][_q_idx_meas]/r_ref[1][_q_idx_meas]*data_60Hz[2][_q_idx_ref])**2 \
-                         +(r_meas[1][_q_idx_meas]/r_ref[1][_q_idx_meas]**2*data_60Hz[1][_q_idx_ref]*r_ref[2][_q_idx_meas])**2)
+    dr_q_final = np.sqrt((r_meas[2][_q_idx_meas30]/r_ref[1][_q_idx_ref30]*data_60Hz[1][_q_idx_60])**2 \
+                         +(r_meas[1][_q_idx_meas30]/r_ref[1][_q_idx_ref30]*data_60Hz[2][_q_idx_60])**2 \
+                         +(r_meas[1][_q_idx_meas30]/r_ref[1][_q_idx_ref30]**2*data_60Hz[1][_q_idx_60]*r_ref[2][_q_idx_ref30])**2)
 
-    print("Q range: %s - %s" % (r_meas[0][0], r_meas[0][_q_idx_meas][-1]))
-    return np.asarray([r_meas[0][_q_idx_meas], r_q_final, dr_q_final])
+    print("Q range: %s - %s" % (r_meas[0][0], r_meas[0][_q_idx_meas30][-1]))
+    q = r_meas[0][_q_idx_meas30]
+    _idx = (r_q_final > 0) & (r_q_final < np.inf)
+    return np.asarray([q[_idx], r_q_final[_idx], dr_q_final[_idx]])
 
 
 def reduce_30Hz_slices(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, 
@@ -214,7 +237,8 @@ def reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30
         try:
             _reduced = reduce_30Hz_from_ws(tmpws, ref_ws_30Hz, data_60Hz, template_data, scan_index=scan_index)
             reduced.append(_reduced)
-            np.savetxt(os.path.join(output_dir, 'r%s_t%g.txt' % (meas_run_30Hz, total_time)), _reduced.T)
+            _filename = 'r{0}_t{1:06d}.txt'.format(meas_run_30Hz, int(total_time))
+            np.savetxt(os.path.join(output_dir, _filename), _reduced.T)
         except:
             print(sys.exc_info()[0])
         total_time += time_interval
@@ -277,7 +301,8 @@ def reduce_60Hz_slices_ws(meas_ws, template_file,
         try:
             _reduced = reduce_with_mantid(tmpws, template_data, apply_scaling_factor=True)
             reduced.append(_reduced)
-            np.savetxt(os.path.join(output_dir, 'r%s_t%g.txt' % (meas_run, total_time)), _reduced.T)
+            _filename = 'r{0}_t{1:06d}.txt'.format(meas_run, int(total_time))
+            np.savetxt(os.path.join(output_dir, _filename), _reduced.T)
         except:
             print(sys.exc_info()[0])
         total_time += time_interval

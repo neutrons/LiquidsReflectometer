@@ -2,7 +2,7 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Terminal=false
+Terminal=true
 Icon[en_US]=mate-panel-launcher
 Name[en_US]=NR Launcher
 Exec=/SNS/REF_L/shared/launcher/nr_launcher.sh

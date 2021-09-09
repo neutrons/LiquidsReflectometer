@@ -96,7 +96,9 @@ class Dynamic30Hz(QWidget):
             self.ref_path.setText(_ref_file)
 
     def output_dir_selection(self):
-        _dir = QFileDialog.getExistingDirectory(None, 'Select a folder:', '', QFileDialog.ShowDirsOnly)
+        _dir = QFileDialog.getExistingDirectory(None, 'Select a folder:',
+                                                self.output_dir_label.text(),
+                                                QFileDialog.ShowDirsOnly)
         if os.path.isdir(_dir):
             self.output_dir_label.setText(_dir)
 
