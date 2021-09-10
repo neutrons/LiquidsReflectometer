@@ -52,7 +52,8 @@ class XRR(QWidget):
 
     def data_selection(self):
         _data_file, _ = QFileDialog.getOpenFileName(self, 'Open file',
-                                                    '', 'Rigaku data file (*.ras)')
+                                                    self.data_path.text(),
+                                                    'Rigaku data file (*.ras)')
         if os.path.isfile(_data_file):
             self.data_path.setText(_data_file)
 

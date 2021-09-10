@@ -85,13 +85,15 @@ class Dynamic30Hz(QWidget):
 
     def template_selection(self):
         _template_file, _ = QFileDialog.getOpenFileName(self, 'Open file',
-                                                        '', 'Template file (*.xml)')
+                                                        self.template_path.text(),
+                                                        'Template file (*.xml)')
         if os.path.isfile(_template_file):
             self.template_path.setText(_template_file)
 
     def ref_selection(self):
         _ref_file, _ = QFileDialog.getOpenFileName(self, 'Open file',
-                                                   '', '60Hz reference file (*.txt)')
+                                                   self.ref_path.text(),
+                                                   '60Hz reference file (*.txt)')
         if os.path.isfile(_ref_file):
             self.ref_path.setText(_ref_file)
 
