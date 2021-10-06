@@ -76,10 +76,14 @@ def reduce_with_mantid(ws, data_set, apply_db=False, apply_scaling_factor=False)
     _q_mtd = quartz_ws.readX(0)
     _r_mtd = quartz_ws.readY(0)
     _dr_mtd = quartz_ws.readE(0)
-    return np.asarray([_q_mtd, _r_mtd, _dr_mtd])
+
+    # Q resolution
+    dq = 0.0004 + 0.025*_q_mtd
+
+    return np.asarray([_q_mtd, _r_mtd, _dr_mtd, dq])
 
 
-def reduce_30Hz(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, scan_index=1):
+def reduce_30Hz(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, scan_index=1, template_reference=None):
     """
         Perform 30Hz reduction
         @param meas_run_30Hz: run number of the data we want to reduce
@@ -100,10 +104,11 @@ def reduce_30Hz(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, scan_
     # Load the 60Hz reference data
     data_60Hz = np.loadtxt(ref_data_60Hz).T
 
-    return reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, scan_index=scan_index)
+    return reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data,
+                               scan_index=scan_index, template_reference=template_reference)
 
 
-def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, scan_index=1):
+def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, scan_index=1, template_reference=None):
     """
         Perform 30Hz reduction
         @param meas_ws_30Hz: Mantid workspace of the data we want to reduce
@@ -113,7 +118,10 @@ def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, sca
         @param scan_index: scan index to use within the template.
     """
     # Reduce the quartz at 30Hz
-    r_ref = reduce_with_mantid(ref_ws_30Hz, template_data)
+    if template_reference is None:
+        r_ref = reduce_with_mantid(ref_ws_30Hz, template_data)
+    else:
+        r_ref = reduce_with_mantid(ref_ws_30Hz, template_reference)
 
     # Reduce the sample data at 30Hz
     r_meas = reduce_with_mantid(meas_ws_30Hz, template_data)
@@ -154,16 +162,20 @@ def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, sca
     print("Q range: %s - %s" % (r_meas[0][0], r_meas[0][_q_idx_meas30][-1]))
     q = r_meas[0][_q_idx_meas30]
     _idx = (r_q_final > 0) & (r_q_final < np.inf)
-    return np.asarray([q[_idx], r_q_final[_idx], dr_q_final[_idx]])
+
+    # Q resolution
+    dq = 0.0004 + 0.025*q[_idx]
+    return np.asarray([q[_idx], r_q_final[_idx], dr_q_final[_idx], dq])
 
 
 def reduce_30Hz_slices(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, 
-                       time_interval, output_dir, scan_index=1, create_plot=True):
+                       time_interval, output_dir, scan_index=1, create_plot=True, template_reference=None):
 
     meas_ws_30Hz = api.LoadEventNexus("REF_L_%s" % meas_run_30Hz)
 
     return reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, 
-                                 time_interval, output_dir, scan_index=scan_index, create_plot=create_plot)
+                                 time_interval, output_dir, scan_index=scan_index, create_plot=create_plot,
+                                template_reference=template_reference)
 
 def reduce_60Hz_slices(meas_run, template_file,
                        time_interval, output_dir, scan_index=1, create_plot=True):
@@ -174,7 +186,8 @@ def reduce_60Hz_slices(meas_run, template_file,
                                  time_interval, output_dir, scan_index=scan_index, create_plot=create_plot)
 
 def reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, 
-                          time_interval, output_dir, scan_index=1, create_plot=True):
+                          time_interval, output_dir, scan_index=1, create_plot=True,
+                          template_reference=None):
     """
         Perform 30Hz reduction
         @param meas_ws_30Hz: workspace of the data we want to reduce
@@ -235,7 +248,8 @@ def reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30
         tmpws = api.mtd[name]
         print("workspace %s has %d events" % (name, tmpws.getNumberEvents()))
         try:
-            _reduced = reduce_30Hz_from_ws(tmpws, ref_ws_30Hz, data_60Hz, template_data, scan_index=scan_index)
+            _reduced = reduce_30Hz_from_ws(tmpws, ref_ws_30Hz, data_60Hz, template_data,
+                                           scan_index=scan_index, template_reference=template_reference)
             reduced.append(_reduced)
             _filename = 'r{0}_t{1:06d}.txt'.format(meas_run_30Hz, int(total_time))
             np.savetxt(os.path.join(output_dir, _filename), _reduced.T)
@@ -320,7 +334,7 @@ def plot_slices(reduced, title, time_interval, file_path, offset=10):
     total_time = 0
     _running_offset = 1.
     for _data in reduced:
-        qz, refl, d_refl = _data
+        qz, refl, d_refl, _ = _data
 
         plt.errorbar(qz, refl*_running_offset, yerr=d_refl*_running_offset, markersize=4, marker='o',
                      label='T=%g s' % total_time)
