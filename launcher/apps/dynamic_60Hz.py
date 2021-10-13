@@ -94,7 +94,7 @@ class Dynamic60Hz(QWidget):
             _template_file = TEMPLATE_DIRECTIVE
         self.template_path.setText(_template_file)
 
-        _out_dir = self.settings.value("output_dir", OUTPUT_DIR_DIRECTIVE)
+        _out_dir = self.settings.value("60Hz_output_dir", OUTPUT_DIR_DIRECTIVE)
         if len(_out_dir.strip()) == 0:
             _out_dir = OUTPUT_DIR_DIRECTIVE
         self.output_dir_label.setText(_out_dir)
@@ -113,7 +113,7 @@ class Dynamic60Hz(QWidget):
         self.settings.setValue('60Hz_data_run_number', self.data_run_number_ledit.text())
         self.settings.setValue('60Hz_time_slice', self.time_slice_ledit.text())
         self.settings.setValue('60Hz_scan_index', self.idx_ledit.text())
-        self.settings.setValue('output_dir', self.output_dir_label.text())
+        self.settings.setValue('60Hz_output_dir', self.output_dir_label.text())
 
     def check_inputs(self):
         error = None

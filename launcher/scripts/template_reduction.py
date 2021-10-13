@@ -373,6 +373,8 @@ if __name__ == "__main__":
                              help='Output directory')
     dynanic30_parser.add_argument('--scan_index', type=int, dest='scan_index',
                                   help='Template scan index', required=False, default=1)
+    dynanic30_parser.add_argument('--no-plot', dest='create_plot', action='store_false')
+    dynanic30_parser.set_defaults(create_plot=True)
 
     # Time-resolved at 60Hz
     dynanic60_parser = subparsers.add_parser('dynamic60Hz', help='Reduce time-resolved 60Hz [-h for help]')
@@ -393,7 +395,8 @@ if __name__ == "__main__":
     if args.command=='dynamic30Hz':
         print("Time-resolved reduction at 30Hz: run %s" % args.meas_run_30Hz)
         reduced = reduce_30Hz_slices(args.meas_run_30Hz, args.ref_run_30Hz, args.ref_data_60Hz, args.template_30Hz,
-                                     time_interval=args.time_interval, output_dir=args.output_dir, scan_index=args.scan_index)
+                                     time_interval=args.time_interval, output_dir=args.output_dir,
+                                     scan_index=args.scan_index, create_plot=args.create_plot)
     elif args.command=='dynamic60Hz':
         print("Time-resolved reduction at 60Hz: run %s" % args.meas_run_60Hz)
         reduced = reduce_60Hz_slices(args.meas_run_60Hz, args.template_60Hz,

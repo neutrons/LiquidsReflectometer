@@ -49,7 +49,7 @@ class Dynamic30Hz(QWidget):
 
         # 30Hz data to process
         self.data_run_number_ledit = QtWidgets.QLineEdit()
-        self.data_run_number_ledit.setValidator(QtGui.QIntValidator())
+        #self.data_run_number_ledit.setValidator(QtGui.QIntValidator())
         layout.addWidget(self.data_run_number_ledit, 4, 1)
         self.data_run_number_label = QLabel(self)
         self.data_run_number_label.setText("Enter a 30Hz run number to reduce")
@@ -105,37 +105,37 @@ class Dynamic30Hz(QWidget):
             self.output_dir_label.setText(_dir)
 
     def read_settings(self):
-        _template_file = self.settings.value("template", TEMPLATE_DIRECTIVE)
+        _template_file = self.settings.value("30Hz_template", TEMPLATE_DIRECTIVE)
         if len(_template_file.strip()) == 0:
             _template_file = TEMPLATE_DIRECTIVE
         self.template_path.setText(_template_file)
 
-        _ref_file = self.settings.value("reference", REFERENCE_DIRECTIVE)
+        _ref_file = self.settings.value("30Hz_reference", REFERENCE_DIRECTIVE)
         if len(_ref_file.strip()) == 0:
             _ref_file = REFERENCE_DIRECTIVE
         self.ref_path.setText(_ref_file)
 
-        _out_dir = self.settings.value("output_dir", OUTPUT_DIR_DIRECTIVE)
+        _out_dir = self.settings.value("30Hz_output_dir", OUTPUT_DIR_DIRECTIVE)
         if len(_out_dir.strip()) == 0:
             _out_dir = OUTPUT_DIR_DIRECTIVE
         self.output_dir_label.setText(_out_dir)
 
-        _ref_run = self.settings.value("ref_run_number", '')
+        _ref_run = self.settings.value("30Hz_ref_run_number", '')
         self.ref_run_number_ledit.setText(_ref_run)
 
-        _data_run = self.settings.value("data_run_number", '')
+        _data_run = self.settings.value("30Hz_data_run_number", '')
         self.data_run_number_ledit.setText(_data_run)
 
-        _interval = self.settings.value("time_slice", '')
+        _interval = self.settings.value("30Hz_time_slice", '')
         self.time_slice_ledit.setText(_interval)
 
     def save_settings(self):
-        self.settings.setValue('template', self.template_path.text())
-        self.settings.setValue('reference', self.ref_path.text())
-        self.settings.setValue('ref_run_number', self.ref_run_number_ledit.text())
-        self.settings.setValue('data_run_number', self.data_run_number_ledit.text())
-        self.settings.setValue('time_slice', self.time_slice_ledit.text())
-        self.settings.setValue('output_dir', self.output_dir_label.text())
+        self.settings.setValue('30Hz_template', self.template_path.text())
+        self.settings.setValue('30Hz_reference', self.ref_path.text())
+        self.settings.setValue('30Hz_ref_run_number', self.ref_run_number_ledit.text())
+        self.settings.setValue('30Hz_data_run_number', self.data_run_number_ledit.text())
+        self.settings.setValue('30Hz_time_slice', self.time_slice_ledit.text())
+        self.settings.setValue('30Hz_output_dir', self.output_dir_label.text())
 
     def check_inputs(self):
         error = None
@@ -160,6 +160,21 @@ class Dynamic30Hz(QWidget):
         msgBox.setWindowTitle("Invalid inputs")
         msgBox.setStandardButtons(QMessageBox.Ok)
 
+    def parse_run_list(self, text):
+        """
+            Parse the run list string and expand it.
+        """
+        run_list = []
+        for _r in text.split(','):
+            try:
+                run_list.append(int(_r))
+            except:
+                sub_toks = _r.split('-')
+                if len(sub_toks) == 2:
+                    run_list.extend(range(int(sub_toks[0]), int(sub_toks[1])+1))
+
+        return run_list
+
     def reduce(self):
         if not self.check_inputs():
             print("Invalid inputs found")
@@ -168,11 +183,17 @@ class Dynamic30Hz(QWidget):
         self.save_settings()
 
         print("Reduce!")
-        # python3 template_reduction.py dynamic30Hz <meas_run_30Hz> <ref_run_30Hz> <ref_data_60Hz> <template_30Hz> <time_interval> <output_dir>
-        subprocess.run(['python3', 'scripts/template_reduction.py', 'dynamic30Hz',
-                        self.data_run_number_ledit.text(),
-                        self.ref_run_number_ledit.text(),
-                        self.ref_path.text(),
-                        self.template_path.text(),
-                        self.time_slice_ledit.text(), self.output_dir_label.text()])
 
+        run_list = self.parse_run_list(self.data_run_number_ledit.text())
+        for run in run_list:
+            # python3 template_reduction.py dynamic30Hz <meas_run_30Hz> <ref_run_30Hz> <ref_data_60Hz> <template_30Hz> <time_interval> <output_dir>
+            args = ['python3', 'scripts/template_reduction.py', 'dynamic30Hz',
+                    str(run),
+                    self.ref_run_number_ledit.text(),
+                    self.ref_path.text(),
+                    self.template_path.text(),
+                    self.time_slice_ledit.text(),
+                    self.output_dir_label.text()]
+            if not run == run_list[-1]:
+                args.append('--no-plot')
+            subprocess.run(args)
