@@ -1,0 +1,3 @@
+BL4B:CS:Autoreduce:Sequence:Total,BL4B:CS:Autoreduce:Sequence:Num,+p BL4B:Mot:ths,+p BL4B:Mot:tthd,+p BL4B:Mot:s1:Y:Gap,+p BL4B:Mot:s1:X:Gap,+p BL4B:Mot:si:Y:Gap,+p BL4B:Mot:si:X:Gap,+p BL4B:Mot:s3:Y:Gap,+p BL4B:Chop:Gbl:WavelengthReq,Comment,Wait For,Value
+2,1,-0.72,-1.2,0.39,20,0.25,20,40,15,,seconds,300
+,2,0,0,0.39,20,0.25,20,40,15,,seconds,300
