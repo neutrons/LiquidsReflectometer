@@ -96,6 +96,9 @@ else:
 # Determine whether this is data or whether we need to compute scaling factors
 data_type = ws.getRun().getProperty("data_type").value[0]
 
+# Set the constant term of the resolution
+SetInstrumentParameter(ws, ParameterName="dq-constant", Value="0.0", ParameterType="Number")
+
 if data_type == 1 and DIRECT_BEAM_CALC_AVAILABLE:
     logger.notice("Computing scaling factors")
     sequence_number = ws.getRun().getProperty("sequence_number").value[0]
