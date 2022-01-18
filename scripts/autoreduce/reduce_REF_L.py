@@ -136,6 +136,13 @@ else:
 default_file_name = 'REFL_%s_combined_data_auto.txt' % first_run_of_set
 default_file_path = os.path.join(output_dir, default_file_name)
 if os.path.isfile(default_file_path):
+    # Set flag to announce that the data is available
+    try:
+        ipts = ws.getRun().getProperty("experiment_identifier").value
+        ipts_number = ipts.split('-')[1]
+        os.system("/SNS/software/nses/bin/confirm-data -s Yes BL-4B %s 1 Auto" % ipts_number)
+    except:
+        logger.notice("Could not set data availability")
     print("Loading %s" % os.path.join(output_dir, default_file_name))
     reflectivity = LoadAscii(Filename=os.path.join(output_dir, default_file_name), Unit="MomentumTransfer")
 
