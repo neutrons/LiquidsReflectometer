@@ -108,6 +108,38 @@ def reduce_30Hz(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, scan_
                                scan_index=scan_index, template_reference=template_reference)
 
 
+def compute_resolution(ws, default_dq=0.03):
+    """
+        Compute the Q resolution from the meta data.
+        @param default_dq: resolution to use if we can't compute it
+    """
+
+    # We can't compute the resolution if the value of xi is not in the logs.
+    # Since it was not always logged, check for it here.
+    if not ws.getRun().hasProperty("BL4B:Mot:xi.RBV"):
+        print("Could not find BL4B:Mot:xi.RBV: using supplied dQ/Q")
+        return default_dq
+
+    # Xi reference would be the position of xi if the si slit were to be positioned
+    # at the sample. The distance from the sample to si is then xi_reference - xi.
+    xi_reference = 445
+    if ws.getInstrument().hasParameter("xi-reference"):
+        ws.getInstrument().getNumberParameter("xi-reference")[0]
+
+    # Distance between the s1 and the sample
+    s1_sample_distance = 1485
+    if ws.getInstrument().hasParameter("s1-sample-distance"):
+        ws.getInstrument().getNumberParameter("s1-sample-distance")[0]
+
+    s1h = abs(ws.getRun().getProperty("S1VHeight").value[0])
+    ths = abs(ws.getRun().getProperty("ths").value[0])
+    xi = abs(ws.getRun().getProperty("BL4B:Mot:xi.RBV").value[0])
+    sample_si_distance = xi_reference - xi
+    slit_distance = s1_sample_distance - sample_si_distance
+    dq_over_q = s1h / slit_distance * 180 / 3.1416 / ths
+    return dq_over_q
+
+
 def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, scan_index=1, template_reference=None):
     """
         Perform 30Hz reduction
@@ -164,7 +196,13 @@ def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, sca
     _idx = (r_q_final > 0) & (r_q_final < np.inf)
 
     # Q resolution
-    dq = 0.0004 + 0.025*q[_idx]
+    #   Assume a constant term of 0 unless it is specified
+    dq0 = 0
+    if meas_ws_30Hz.getInstrument().hasParameter("dq-constant"):
+        dq0 = meas_ws_30Hz.getInstrument().getNumberParameter("dq-constant")[0]
+    dq_slope = compute_resolution(meas_ws_30Hz)
+    print("Resolution: %g + %g Q" % (dq0, dq_slope))
+    dq = dq0 + dq_slope * q[_idx]
     return np.asarray([q[_idx], r_q_final[_idx], dr_q_final[_idx], dq])
 
 
