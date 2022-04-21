@@ -39,7 +39,7 @@ class Dynamic30Hz(QWidget):
         self.ref_path = QLabel(self)
         layout.addWidget(self.ref_path, 2, 2)
 
-        # 30Hz reference run number    
+        # 30Hz reference run number
         self.ref_run_number_ledit = QtWidgets.QLineEdit()
         self.ref_run_number_ledit.setValidator(QtGui.QIntValidator())
         layout.addWidget(self.ref_run_number_ledit, 3, 1)

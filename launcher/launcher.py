@@ -14,6 +14,7 @@ from apps.dynamic_30Hz import Dynamic30Hz
 from apps.xrr import XRR
 from apps.reduction import Reduction
 from apps.refracted import Refracted
+from apps.sld_calculator import SLD
 
 REFERENCE_DIRECTIVE = "Click to choose a 60Hz reference R(Q) file"
 TEMPLATE_DIRECTIVE = "Click to choose a 30Hz template"
@@ -54,11 +55,17 @@ class ReductionInterface(QTabWidget):
         self.addTab(self.xrr_tab, "XRR processing")
         self.setTabText(tab_id, "XRR processing")
 
-        # Refracted beam analysis
+        # SLD calculator
         tab_id += 1
-        self.refracted_tab = Refracted()
-        self.addTab(self.refracted_tab, "Refraction analysis")
-        self.setTabText(tab_id, "Refraction analysis")
+        self.sld_tab = SLD()
+        self.addTab(self.sld_tab, "SLD calculator")
+        self.setTabText(tab_id, "SLD calculator")
+
+        # Refracted beam analysis
+        #tab_id += 1
+        #self.refracted_tab = Refracted()
+        #self.addTab(self.refracted_tab, "Refraction analysis")
+        #self.setTabText(tab_id, "Refraction analysis")
 
 if __name__ == '__main__':
     app = QApplication([])
