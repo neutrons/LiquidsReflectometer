@@ -46,9 +46,6 @@ run_number = run_number.replace('.nxs.h5', '')
 # Wavelength below which we don't need the absolute normalization
 WL_CUTOFF = 10.0  
 
-# Default primary fraction range to be used if it is not defined in the template
-PRIMARY_FRACTION_RANGE = [5, 290]
-
 NORMALIZE_TO_UNITY = False
 
 # Allowed values: ['DirectBeam', 'WithReference']
@@ -120,12 +117,11 @@ else:
                              InputWorkspace=ws,
                              ScaleToUnity=NORMALIZE_TO_UNITY,
                              ScalingWavelengthCutoff=WL_CUTOFF,
-                             PrimaryFractionRange=PRIMARY_FRACTION_RANGE,
                              OutputDirectory=output_dir,
                              SlitTolerance=0.06,
                              ReadSequenceFromFile=True,
                              OrderDirectBeamsByRunNumber=True,
-                             TemplateFile=template_file, FindPeaks=False,
+                             TemplateFile=template_file,
                              NormalizationType=NORMALIZATION_TYPE,
                              Refl1DModelParameters=REFL1D_PARS)
     first_run_of_set=int(output[1])
