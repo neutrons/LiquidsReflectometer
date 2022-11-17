@@ -72,18 +72,21 @@ def thread_function():
                 #ax.set_xscale('log')
                 
                 # Difference between this chunk and the previous
-                ax2.clear()
+                
                 if previous_data:
-                    y_delta = y-y_prev
-                    ax2.step(x_prev, y_delta, where='mid', label='Previous')
                     n_previous_events = previous_data.getNumberEvents()
-                    ax2.set_title('Difference from previous [%g -> %g events]' % (n_previous_events, n_events))
-                    ax2.set_xlabel('TOF')
-                    ax2.set_ylabel('Events')
+                    if n_events > n_previous_events:
+                        ax2.clear()
+                        y_delta = y-y_prev
+                        ax2.step(x_prev, y_delta, where='mid', label='Previous')
+                        ax2.set_title('Difference from previous [%g -> %g events]' % (n_previous_events, n_events))
+                        ax2.set_xlabel('TOF')
+                        ax2.set_ylabel('Events')
                 else:
+                    ax2.clear()
                     ax2.set_title('No data yet')
 
-                plt.pause(1)
+                plt.pause(10)
                 #plt.savefig('/SNS/REF_L/shared/livedata.png')
         
                 DeleteWorkspace('tof_')

@@ -13,23 +13,16 @@ import warnings
 warnings.simplefilter('ignore')
 
 
-if ("MANTIDPATH" in os.environ):
-    del os.environ["MANTIDPATH"]
+#if ("MANTIDPATH" in os.environ):
+#    del os.environ["MANTIDPATH"]
 
-sys.path.insert(0,"/opt/mantidnightly/bin")
-sys.path.insert(1,"/opt/mantidnightly/lib")
+#sys.path.insert(0,"/opt/mantidnightly/bin")
+#sys.path.insert(1,"/opt/mantidnightly/lib")
+
+CONDA_ENV = 'mantid-dev'
 
 import mantid
 from mantid.simpleapi import *
-
-try:
-    from sf_calculator import ScalingFactor
-    DIRECT_BEAM_CALC_AVAILABLE = True
-    logger.notice("sf_calculator available")
-except:
-    import scipy
-    logger.notice("Scaling factor calculation upgrade not available: scipy=%s" % scipy.__version__)
-    DIRECT_BEAM_CALC_AVAILABLE = False
 
 event_file_path=sys.argv[1]
 output_dir=sys.argv[2]
@@ -48,10 +41,6 @@ WL_CUTOFF = 10.0
 
 NORMALIZE_TO_UNITY = False
 
-# Allowed values: ['DirectBeam', 'WithReference']
-NORMALIZATION_TYPE = "WithReference"
-#NORMALIZATION_TYPE = "DirectBeam"
-
 # Allowed values: dict or ""
 # D2O
 REFL1D_PARS = json.dumps(dict(back_sld=6.4,
@@ -60,29 +49,28 @@ REFL1D_PARS = json.dumps(dict(back_sld=6.4,
                               layers=[],
                               scale=1.0,
                               background=0.0))
-# Quartz
-#REFL1D_PARS = json.dumps(dict(back_sld=4.09,
-#                              back_roughness=4.28,
-#                              front_sld=0,
-#                              layers=[],
-#                              scale=0.9169,
-#                              background=3.753e-07))
 #-------------------------------------------------------------------------
 
+# Load data for auto-reduction
+ws = LoadEventNexus(Filename=event_file_path)
 
 # Locate the template file
-# If no template file is available, the automated reduction will generate one
 template_file = ""
-if os.path.isfile("template.xml"):
-    template_file = "template.xml"
-elif os.path.isfile(os.path.join(output_dir, "template.xml")):
-    template_file = os.path.join(output_dir, "template.xml")
-elif os.path.isfile("/SNS/REF_L/shared/autoreduce/template.xml"):
-    template_file = "/SNS/REF_L/shared/autoreduce/template.xml"
+default_template_path = os.path.join(output_dir, "template.xml")
+
+# Read tthd to determine the geometry
+tthd = ws.getRun().getProperty("tthd").value[0]
+if tthd > 0:
+    template_path = os.path.join(output_dir, "template_up.xml")
+else:
+    template_path = os.path.join(output_dir, "template_down.xml")
+
+if os.path.isfile(template_path):
+    template_file = template_path
+elif os.path.isfile(default_template_path):
+    template_file = default_template_path
 
 print("Using template: %s" % template_file)
-# Run the auto-reduction
-ws = LoadEventNexus(Filename=event_file_path)
 
 # Check the measurement geometry
 if ws.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
@@ -96,36 +84,18 @@ data_type = ws.getRun().getProperty("data_type").value[0]
 # Set the constant term of the resolution
 SetInstrumentParameter(ws, ParameterName="dq-constant", Value="0.0", ParameterType="Number")
 
-if data_type == 1 and DIRECT_BEAM_CALC_AVAILABLE:
-    logger.notice("Computing scaling factors")
-    sequence_number = ws.getRun().getProperty("sequence_number").value[0]
-    first_run_of_set = ws.getRun().getProperty("sequence_id").value[0]
-    incident_medium = ws.getRun().getProperty("incident_medium").value[0]
-
-    _fpath = os.path.join(output_dir, "sf_%s_%s_auto.cfg" % (first_run_of_set, incident_medium))
-
-    sf = ScalingFactor(run_list=range(first_run_of_set, first_run_of_set + sequence_number),
-                       sort_by_runs=True,
-                       tof_step=200,
-                       medium=incident_medium,
-                       slit_tolerance=0.06,
-                       sf_file=_fpath)
-    sf.execute()
-else:
-    logger.notice("Automated reduction")
-    output = LRAutoReduction(#Filename=event_file_path,
-                             InputWorkspace=ws,
-                             ScaleToUnity=NORMALIZE_TO_UNITY,
-                             ScalingWavelengthCutoff=WL_CUTOFF,
-                             OutputDirectory=output_dir,
-                             SlitTolerance=0.06,
-                             ReadSequenceFromFile=True,
-                             OrderDirectBeamsByRunNumber=True,
-                             TemplateFile=template_file,
-                             NormalizationType=NORMALIZATION_TYPE,
-                             Refl1DModelParameters=REFL1D_PARS)
-    first_run_of_set=int(output[1])
-
+output = LRAutoReduction(#Filename=event_file_path,
+                         InputWorkspace=ws,
+                         ScaleToUnity=NORMALIZE_TO_UNITY,
+                         ScalingWavelengthCutoff=WL_CUTOFF,
+                         OutputDirectory=output_dir,
+                         SlitTolerance=0.07,
+                         ReadSequenceFromFile=True,
+                         OrderDirectBeamsByRunNumber=True,
+                         TemplateFile=template_file,
+                         NormalizationType=NORMALIZATION_TYPE,
+                         Refl1DModelParameters=REFL1D_PARS)
+first_run_of_set=int(output[1])
 
 #-------------------------------------------------------------------------
 # Produce plot for the web monitor

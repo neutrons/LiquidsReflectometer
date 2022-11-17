@@ -51,8 +51,8 @@ def process_xrr(data_file, output_dir=None):
         print("Could not find wavelength, using %g A" % wl)
 
     # Points below q_min and above q_max will be cut
-    q_min = 0.005
-    q_max = 0.6
+    q_min = 0.03
+    q_max = 0.5
 
     ttheta = data[0]
     counts = data[1]
@@ -65,14 +65,14 @@ def process_xrr(data_file, output_dir=None):
     r = counts[_q_idx]
 
     # R(q) will be normalized to the average between q_min and norm_q_max
-    norm_q_max = 0.01
+    norm_q_max = 0.04
     _q_idx = (q > q_min) & (q < norm_q_max)
     _norm = np.sum(r[_q_idx])/len(q[_q_idx])
     print("Norm %g" % _norm)
     r /= _norm
-    err = r * 0.05
-
-    _rq_data = np.asarray([q, r, err]).T
+    err = r * 0.1
+    dq = np.ones(len(q)) * 0.002
+    _rq_data = np.asarray([q, r, err, dq]).T
 
     # Choose a base name for the output files
     _name, _ext = os.path.splitext(data_file)
