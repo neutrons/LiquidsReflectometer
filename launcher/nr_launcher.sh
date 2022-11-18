@@ -1,3 +1,3 @@
 #!/bin/bash
-source /opt/anaconda/bin/activate /SNS/users/m2d/anaconda/envs/quicknxs
+source /opt/anaconda/bin/activate /opt/anaconda/envs/refl1d
 cd /SNS/REF_L/shared/launcher; python launcher.py
