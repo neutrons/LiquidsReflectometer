@@ -19,7 +19,7 @@ warnings.simplefilter('ignore')
 #sys.path.insert(0,"/opt/mantidnightly/bin")
 #sys.path.insert(1,"/opt/mantidnightly/lib")
 
-CONDA_ENV = 'mantid-dev'
+CONDA_ENV = 'mantid'
 
 import mantid
 from mantid.simpleapi import *

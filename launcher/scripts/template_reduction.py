@@ -241,7 +241,10 @@ def reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30
 
     # Reduce the quartz at 30Hz
     print("Reading reference data at 30Hz")
-    ref_ws_30Hz = api.LoadEventNexus("REF_L_%s" % ref_run_30Hz)
+    if os.path.isfile(ref_run_30Hz):
+        ref_ws_30Hz = api.LoadEventNexus(ref_run_30Hz)
+    else:
+        ref_ws_30Hz = api.LoadEventNexus("REF_L_%s" % ref_run_30Hz)
 
     # Reduce the sample data at 30Hz
     print("Reading sample data at 30Hz")
@@ -399,7 +402,7 @@ if __name__ == "__main__":
     dynanic30_parser = subparsers.add_parser('dynamic30Hz', help='Reduce time-resolved 30Hz [-h for help]')
     dynanic30_parser.add_argument('meas_run_30Hz', type=int,
                              help='Run number for the data to be processed')
-    dynanic30_parser.add_argument('ref_run_30Hz', type=int,
+    dynanic30_parser.add_argument('ref_run_30Hz', type=str,
                              help='Run number for the reference 30Hz data, measured at the same settings as the data to be processed')
     dynanic30_parser.add_argument('ref_data_60Hz', type=str,
                              help='Reference R(Q), measured at 60Hz')
