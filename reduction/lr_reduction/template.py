@@ -8,15 +8,14 @@ import mantid
 from mantid.api import *
 import mantid.simpleapi as api
 from mantid.kernel import *
-from reduction_gui.reduction.reflectometer.refl_data_series import DataSeries
-from reduction_gui.reduction.reflectometer.refl_data_script import DataSets
 
 from functools import reduce 
 
 from . import event_reduction
-
+from . import reduction_template_reader
 
 TOLERANCE = 0.02
+
 
 def read_template(template_file, sequence_number):
     """
@@ -25,16 +24,13 @@ def read_template(template_file, sequence_number):
     """
     fd = open(template_file, "r")
     xml_str = fd.read()
-    s = DataSeries()
-    s.from_xml(xml_str)
-
-    if len(s.data_sets) >= sequence_number:
-        data_set = s.data_sets[sequence_number - 1]
-    elif len(s.data_sets) > 0:
-        data_set = s.data_sets[0]
+    data_sets = reduction_template_reader.from_xml(xml_str)
+    if len(data_sets) >= sequence_number:
+        data_set = data_sets[sequence_number - 1]
+    elif len(data_sets) > 0:
+        data_set = data_sets[0]
     else:
         raise RuntimeError("Invalid reduction template")
-
     return data_set
 
 
@@ -134,12 +130,16 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
     return a, b, a_error, b_error
 
 
-def process_from_template(run_number, template_path, q_summing=False):
+def process_from_template(run_number, template_path, q_summing=False,
+                          tof_weighted=False, bck_in_q=False, clean=False):
     # Load data
-    ws_sc = api.LoadEventNexus("REF_L_%s" % run_number)
-    return process_from_template_ws(ws_sc, template_path, q_summing=q_summing)
+    ws_sc = api.Load("REF_L_%s" % run_number)
+    return process_from_template_ws(ws_sc, template_path, q_summing=q_summing,
+                                    tof_weighted=tof_weighted, bck_in_q=bck_in_q,
+                                    clean=clean)
 
-def process_from_template_ws(ws_sc, template_path, q_summing=False):
+def process_from_template_ws(ws_sc, template_path, q_summing=False,
+                             tof_weighted=False, bck_in_q=False, clean=False):
     # Get the sequence number
     sequence_number = 1
     if ws_sc.getRun().hasProperty("sequence_number"):
@@ -152,7 +152,7 @@ def process_from_template_ws(ws_sc, template_path, q_summing=False):
     ws_db = api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
 
     # Get the angle offset
-    offset=template_data.angle_offset
+    offset = template_data.angle_offset
 
     thi_value = ws_sc.getRun()['thi'].value[0]
     theta = np.fabs(ws_sc.getRun()['ths'].value[0]) + offset
@@ -162,16 +162,16 @@ def process_from_template_ws(ws_sc, template_path, q_summing=False):
     theta = theta * np.pi / 180.
 
     # Get the reduction parameters from the template
-    peak = template_data.DataPeakPixels
-    peak_bck = [template_data.DataBackgroundRoi[0], template_data.DataBackgroundRoi[1]]
+    peak = template_data.data_peak_range
+    peak_bck = [template_data.background_roi[0], template_data.background_roi[1]]
     peak_center = (peak[0]+peak[1])/2.0
     low_res = template_data.data_x_range
 
-    norm_peak = template_data.NormPeakPixels
+    norm_peak = template_data.norm_peak_range
     norm_low_res = template_data.norm_x_range
-    norm_bck = [template_data.NormBackgroundRoi[0], template_data.NormBackgroundRoi[1]]
+    norm_bck = [template_data.norm_background_roi[0], template_data.norm_background_roi[1]]
 
-    [tof_min, tof_max] = template_data.DataTofRange
+    [tof_min, tof_max] = template_data.tof_range
     q_min = template_data.q_min
     q_step = -template_data.q_step
     
@@ -190,14 +190,12 @@ def process_from_template_ws(ws_sc, template_path, q_summing=False):
     a, b, err_a, err_b = scaling_factor(template_data.scaling_factor_file, ws_sc)
 
     # R(Q)
-    qz, refl, d_refl = event_refl.specular(q_summing=q_summing)
+    qz, refl, d_refl = event_refl.specular(q_summing=q_summing, tof_weighted=tof_weighted,
+                                           bck_in_q=bck_in_q, clean=clean)
     qz_mid = (qz[:-1] + qz[1:])/2.0
     _tof = 4*np.pi*np.sin(event_refl.theta)*event_refl.constant/qz
-    _tof_mid = (_tof[1:] + _tof[:-1])/2.0    
-    
-    #qz_mid, refl, d_refl = event_refl.clean_specular(q_summing=True, weighted=True)
-    #_tof_mid = 4*np.pi*np.sin(event_refl.theta)*event_refl.constant/qz_mid
-    
+    _tof_mid = (_tof[1:] + _tof[:-1])/2.0
+
     a_q = _tof_mid*b + a
     d_a_q = np.sqrt(_tof_mid**2 * err_b**2 + err_a**2)
 
@@ -205,51 +203,6 @@ def process_from_template_ws(ws_sc, template_path, q_summing=False):
     refl /= a_q
 
     return qz_mid, refl, d_refl
-
-
-def reduce_with_mantid(ws, data_set, apply_db=False, apply_scaling_factor=False):
-    """
-        @param ws: Mantid workspace
-        @param data_set: template object
-    """
-    kwargs = {
-        "InputWorkspace": ws,
-        "NormalizationRunNumber": str(data_set.norm_file),
-        "SignalPeakPixelRange": data_set.DataPeakPixels,
-        "SubtractSignalBackground": data_set.DataBackgroundFlag,
-        "SignalBackgroundPixelRange": data_set.DataBackgroundRoi[:2],
-        "NormFlag": apply_db,
-        "NormPeakPixelRange": data_set.NormPeakPixels,
-        "SubtractNormBackground": data_set.NormBackgroundFlag,
-        "NormBackgroundPixelRange": data_set.NormBackgroundRoi[:2],
-        "LowResDataAxisPixelRangeFlag": data_set.data_x_range_flag,
-        "LowResDataAxisPixelRange": data_set.data_x_range,
-        "LowResNormAxisPixelRangeFlag": data_set.norm_x_range_flag,
-        "LowResNormAxisPixelRange": data_set.norm_x_range,
-        "TOFRange": data_set.DataTofRange,
-        "TOFSteps": 40,
-        "ApplyScalingFactor": apply_scaling_factor,
-        "GeometryCorrectionFlag": False,
-        "QMin": data_set.q_min,
-        "QStep": data_set.q_step,
-        "AngleOffset": data_set.angle_offset,
-        "AngleOffsetError": data_set.angle_offset_error,
-        "SlitsWidthFlag": data_set.slits_width_flag,
-        "ApplyPrimaryFraction": False,
-        #"PrimaryFractionRange": [5,295],
-        "SlitTolerance": 0.06,
-        "OutputWorkspace": 'reflectivity_%s' % str(ws)
-    }
-
-    if apply_scaling_factor:
-        kwargs["ScalingFactorFile"] = data_set.scaling_factor_file
-        kwargs["IncidentMediumSelected"] = data_set.incident_medium_list[data_set.incident_medium_index_selected]
-
-    quartz_ws = api.LiquidsReflectometryReduction(**kwargs)
-    _q_mtd = quartz_ws.readX(0)
-    _r_mtd = quartz_ws.readY(0)
-    _dr_mtd = quartz_ws.readE(0)
-    return np.asarray([_q_mtd, _r_mtd, _dr_mtd])
 
 
 def reduce_30Hz(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, scan_index=1):
@@ -272,8 +225,9 @@ def reduce_30Hz(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, scan_
 
     # Load the 60Hz reference data
     data_60Hz = np.loadtxt(ref_data_60Hz).T
-    
+
     return reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, scan_index=scan_index)
+
 
 def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, scan_index=1):
     """
@@ -285,21 +239,21 @@ def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, sca
         @param scan_index: scan index to use within the template.
     """
     # Reduce the quartz at 30Hz
-    r_ref = reduce_with_mantid(ref_ws_30Hz, template_data)
+    r_ref = process_from_template_ws(ref_ws_30Hz, template_data)
 
     # Reduce the sample data at 30Hz
-    r_meas = reduce_with_mantid(meas_ws_30Hz, template_data)
+    r_meas = process_from_template_ws(meas_ws_30Hz, template_data)
 
     # Identify the bins we need to overlap with the 30Hz measurement
     # The assumption is that the binning is the same
     _tolerance = 0.0001
     _max_q = min(r_ref[0].max(), r_meas[0].max())
     _min_q = max(r_ref[0].min(), r_meas[0].min())
-    
+
     print("60Hz:      %g %g" % (data_60Hz[0].min(), data_60Hz[0].max()))
     print("Ref 30Hz:  %g %g" % (r_meas[0].min(), r_meas[0].max()))
     print("Meas 30Hz: %g %g" % (r_ref[0].min(), r_ref[0].max()))
-    
+
     _q_idx_60 = np.asarray(np.where((data_60Hz[0] > _min_q-_tolerance) & (data_60Hz[0] < _max_q+_tolerance)))[0]
     _q_idx_meas30 = np.asarray(np.where((r_meas[0] > _min_q-_tolerance) & (r_meas[0] < _max_q+_tolerance)))[0]
     _q_idx_ref30 = np.asarray(np.where((r_ref[0] > _min_q-_tolerance) & (r_ref[0] < _max_q+_tolerance)))[0]
@@ -311,12 +265,11 @@ def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, sca
     _sum = np.sum(data_60Hz[0][_q_idx_60]-r_ref[0][_q_idx_ref30])
     if _sum > r_ref[0][0]/100:
         print("Binning 60Hz and ref 30Hz not identical!")
-        
 
     _sum = np.sum(data_60Hz[0][_q_idx_60]-r_meas[0][_q_idx_meas30])
     if _sum > r_ref[0][0]/100:
         print("Binning 60Hz and meas 30Hz not identical!")
-    
+
     r_q_final = r_meas[1][_q_idx_meas30]/r_ref[1][_q_idx_ref30]*data_60Hz[1][_q_idx_60]
 
     dr_q_final = np.sqrt((r_meas[2][_q_idx_meas30]/r_ref[1][_q_idx_ref30]*data_60Hz[1][_q_idx_60])**2 \
@@ -394,6 +347,7 @@ def reduce_30Hz_slices(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz
 
     return reduced
 
+
 def plot_slices(reduced, title, time_interval, file_path, offset=1):
     fig, ax = plt.subplots(figsize=(6,6))
 
@@ -418,21 +372,3 @@ def plot_slices(reduced, title, time_interval, file_path, offset=1):
     ax.set_xscale('log')
     plt.show()
     plt.savefig(file_path)
-
-
-def convert_template_to_json(template_file, json_path):
-    fd = open(template_file, "r")
-    xml_str = fd.read()
-    s = DataSeries()
-    s.from_xml(xml_str)
-
-    if len(s.data_sets) >= sequence_number:
-        data_set = s.data_sets[sequence_number - 1]
-    elif len(s.data_sets) > 0:
-        data_set = s.data_sets[0]
-    else:
-        raise RuntimeError("Invalid reduction template")
-
-
-def write_json_template(json_path, data_dict):
-    pass
