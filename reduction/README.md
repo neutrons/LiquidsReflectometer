@@ -24,3 +24,4 @@ constant-Q binning or not, and can estimate the background in both pixel-TOF spa
  - Write ORSO writer
  - Output xml/json with parameters used (like the autoreduction)
  - Write auto-reduction wrapper to leave partial results on disk and combine them
+ - Abstract out distances

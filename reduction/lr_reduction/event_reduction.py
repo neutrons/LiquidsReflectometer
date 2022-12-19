@@ -87,8 +87,6 @@ class EventReflectivity(object):
             :param q_min: value of largest q point
             :param tof_range: TOF range,or None
             :param theta: theta scattering angle in radians
-            :param sample_length: sample size, for resolution calculation
-        
         """
         if instrument in [self.INSTRUMENT_4A, self.INSTRUMENT_4B]:
             self.instrument = instrument
@@ -397,7 +395,7 @@ class EventReflectivity(object):
                 wl_list = evt_list.getTofs() / self.constant
                 x_distance = _pixel_width * (peak_position - j)
                 delta_theta_f = np.arctan(x_distance / self.det_distance) / 2.0
-                qz=4.0*np.pi/wl_list * np.sin(theta + delta_theta_f) * np.cos(delta_theta_f)
+                qz=4.0*np.pi/wl_list * np.sin(theta + delta_theta_f)
 
                 if wl_dist is not None and wl_bins is not None:
                     wl_weights = 1.0/np.interp(wl_list, wl_bins, wl_dist, np.inf, np.inf)
@@ -417,8 +415,8 @@ class EventReflectivity(object):
             delta_theta_f0 = np.arctan(x0 / self.det_distance) / 2.0
             delta_theta_f1 = np.arctan(x1 / self.det_distance) / 2.0
 
-            qz_max = 4.0*np.pi/self.tof_range[1]*self.constant * np.sin(theta + delta_theta_f0) * np.cos(delta_theta_f0)
-            qz_min = 4.0*np.pi/self.tof_range[1]*self.constant * np.sin(theta + delta_theta_f1) * np.cos(delta_theta_f1)
+            qz_max = 4.0*np.pi/self.tof_range[1]*self.constant * np.sin(theta + delta_theta_f0)
+            qz_min = 4.0*np.pi/self.tof_range[1]*self.constant * np.sin(theta + delta_theta_f1)
             mid_point = (qz_max + qz_min)/2.0
             print("Qz range: ", qz_min, mid_point, qz_max)
             self.summing_threshold = mid_point
