@@ -138,8 +138,9 @@ def process_from_template(run_number, template_path, q_summing=False,
                                     tof_weighted=tof_weighted, bck_in_q=bck_in_q,
                                     clean=clean)
 
+
 def process_from_template_ws(ws_sc, template_path, q_summing=False,
-                             tof_weighted=False, bck_in_q=False, clean=False):
+                             tof_weighted=False, bck_in_q=False, clean=False, info=False):
     # Get the sequence number
     sequence_number = 1
     if ws_sc.getRun().hasProperty("sequence_number"):
@@ -154,6 +155,7 @@ def process_from_template_ws(ws_sc, template_path, q_summing=False,
     # Get the angle offset
     offset = template_data.angle_offset
 
+    # If we run in theta-theta geometry, we'll need thi
     thi_value = ws_sc.getRun()['thi'].value[0]
     theta = np.fabs(ws_sc.getRun()['ths'].value[0]) + offset
     _wl = ws_sc.getRun()['LambdaRequest'].value[0]
@@ -201,6 +203,12 @@ def process_from_template_ws(ws_sc, template_path, q_summing=False,
 
     d_refl = np.sqrt(d_refl**2/a_q**2 + refl**2*d_a_q**2/a_q**4)
     refl /= a_q
+
+    # We can optionally return details about the reduction process
+    if info:
+        meta_data = event_refl.to_dict()
+        meta_data['scaling_factors'] = dict(a=a, err_a=err_a, b=b, err_b=err_b)
+        return qz_mid, refl, d_refl, meta_data
 
     return qz_mid, refl, d_refl
 

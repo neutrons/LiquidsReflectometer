@@ -10,9 +10,10 @@ mantid.kernel.config.setLogLevel(3)
 
 from lr_reduction import template
 from lr_reduction import event_reduction
+from lr_reduction import workflow
 
 
-def test_full_reduction():
+def no_test_full_reduction():
     """
         Test the fill reduction chain
     """
@@ -59,3 +60,20 @@ def test_full_reduction():
     assert(len(ref_data[1]) == len(refl_all))
     assert(np.sum(ref_data[1]-refl_all) == 0)
 
+
+def test_reduce_workflow():
+    ws = mtd_api.Load("REF_L_198409")
+    template_path = 'data/template.xml'
+    workflow.reduce(ws, template_path, output_dir='/tmp')
+
+    
+    
+def test_template_processing():
+    """
+        Test that we can read and write a template
+    """
+    template_path = 'data/template.xml'
+    ws = mtd_api.Load("REF_L_198409")
+    workflow.process_template(ws, template_path, '/tmp')
+    template_data = template.read_template('/tmp/REF_L_198409_auto_template.xml', 1)
+    assert(template_data.data_files[0] == 198409)

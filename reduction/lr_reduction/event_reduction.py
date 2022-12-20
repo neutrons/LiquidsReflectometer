@@ -2,10 +2,10 @@
     Event based reduction for the Liquids Reflectometer
 """
 import sys
+import time
 
 import mantid
 import mantid.simpleapi as api
-mantid.kernel.config.setLogLevel(3)
 
 import numpy as np
 
@@ -183,6 +183,32 @@ class EventReflectivity(object):
         output += "Q: %s %s\n" % (self.q_min, self.q_max)
         output += "Theta = %s" % self.theta
         return output
+
+    def to_dict(self):
+        """
+            Returns meta-data to be used/stored.
+        """
+        start_time = self._ws_sc.getRun().getProperty("start_time").value
+        experiment = self._ws_sc.getRun().getProperty("experiment_identifier").value
+        run_number = self._ws_sc.getRun().getProperty("run_number").value
+        sequence_number = int(self._ws_sc.getRun().getProperty("sequence_number").value[0])
+        sequence_id = int(self._ws_sc.getRun().getProperty("sequence_id").value[0])
+        run_title = self._ws_sc.getTitle()
+
+        if self._ws_db:
+            norm_run = self._ws_db.getRunNumber()
+        else:
+            norm_run = 0
+
+        dq0 = 0
+        dq_over_q = compute_resolution(self._ws_sc)
+        return dict(wl_min=self.wl_range[0], wl_max=self.wl_range[1],
+                    q_min=self.q_min, q_max=self.q_max, theta=self.theta,
+                    start_time=start_time, experiment=experiment, run_number=run_number,
+                    run_title=run_title, norm_run=norm_run, time=time.ctime(),
+                    dq0=dq0, dq_over_q=dq_over_q, sequence_number=sequence_number,
+                    sequence_id=sequence_id)
+
 
     def specular(self, q_summing=False, tof_weighted=False, bck_in_q=False, clean=False):
         """

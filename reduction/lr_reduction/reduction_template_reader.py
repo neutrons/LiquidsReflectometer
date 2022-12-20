@@ -8,7 +8,7 @@ import xml.dom.minidom
 class ReductionParameters(object):
 
     def __init__(self):
-        # Signal seleciton
+        # Signal selection
         self.data_peak_range = [140, 150]
         self.subtract_background = True
         self.background_roi = [137, 153,100, 200]
@@ -245,7 +245,7 @@ def getIntElement(dom, tag, default=None):
 def getIntList(dom, tag, default=[]):
     value = getContent(dom, tag)
     if value is not None and len(value.strip()) > 0:
-        return map(int, value.split(','))
+        return list(map(int, value.split(',')))
     else:
         return default
 
@@ -256,7 +256,7 @@ def getFloatElement(dom, tag, default=None):
 def getFloatList(dom, tag, default=[]):
     value = getContent(dom, tag)
     if value is not None and len(value.strip()) > 0:
-        return map(float, value.split(','))
+        return list(map(float, value.split(',')))
     else:
         return default
 
