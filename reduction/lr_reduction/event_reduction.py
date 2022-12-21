@@ -209,7 +209,6 @@ class EventReflectivity(object):
                     dq0=dq0, dq_over_q=dq_over_q, sequence_number=sequence_number,
                     sequence_id=sequence_id)
 
-
     def specular(self, q_summing=False, tof_weighted=False, bck_in_q=False, clean=False):
         """
             Compute specular reflectivity.

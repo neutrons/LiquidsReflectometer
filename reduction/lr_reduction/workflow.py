@@ -37,9 +37,10 @@ def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap
 
     # Save partial results
     coll = output.RunCollection()
-    npts = len(qz_mid)
-    coll.add(qz_mid[pre_cut:npts-post_cut], refl[pre_cut:npts-post_cut],
-             d_refl[pre_cut:npts-post_cut], meta_data=meta_data)
+    idx = np.fabs(refl) > 0
+    npts = len(qz_mid[idx])
+    coll.add(qz_mid[idx][pre_cut:npts-post_cut], refl[idx][pre_cut:npts-post_cut],
+             d_refl[idx][pre_cut:npts-post_cut], meta_data=meta_data)
     coll.save_ascii(os.path.join(output_dir, 'REFL_%s_%s_%s_partial.txt' % (meta_data['sequence_id'],
                                                                             meta_data['sequence_number'],
                                                                             meta_data['run_number'])),
@@ -48,8 +49,7 @@ def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap
     # Assemble partial results into a single R(q)
     seq_list, run_list = assemble_results(meta_data['sequence_id'], output_dir)
 
-    # Save template (xml and json)
-    # TODO: save a copy of the template that include all the partial data found 
+    # Save template
     write_template(seq_list, run_list, template_file, output_dir)
 
 
@@ -65,7 +65,6 @@ def assemble_results(first_run, output_dir):
     file_list = sorted(os.listdir(output_dir))
     for item in file_list:
         if item.startswith("REFL_%s" % first_run) and item.endswith('partial.txt'):
-            print(item)
             toks = item.split('_')
             if not len(toks) == 5:
                 continue
@@ -91,9 +90,9 @@ def write_template(seq_list, run_list, template_file, output_dir):
 
         new_data_sets = []
         for i in range(len(seq_list)):
-            if len(data_sets) > seq_list[i]:
-                data_sets[seq_list[i]].data_files = [run_list[i]]
-                new_data_sets.append(data_sets[seq_list[i]])
+            if len(data_sets) >= seq_list[i]:
+                data_sets[seq_list[i]-1].data_files = [run_list[i]]
+                new_data_sets.append(data_sets[seq_list[i]-1])
             else:
                 print("Too few entries [%s] in template for sequence number %s" % (len(data_sets), seq_list[i]))
 

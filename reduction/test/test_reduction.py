@@ -13,7 +13,7 @@ from lr_reduction import event_reduction
 from lr_reduction import workflow
 
 
-def no_test_full_reduction():
+def test_full_reduction():
     """
         Test the fill reduction chain
     """
@@ -62,18 +62,24 @@ def no_test_full_reduction():
 
 
 def test_reduce_workflow():
-    ws = mtd_api.Load("REF_L_198409")
     template_path = 'data/template.xml'
-    workflow.reduce(ws, template_path, output_dir='/tmp')
+    output_dir = '/tmp'
+    for i in range(198409, 198417):
+        ws = mtd_api.Load("REF_L_%s" % i)
+        workflow.reduce(ws, template_path, output_dir=output_dir,
+                        pre_cut=1, post_cut=1, average_overlap=False)
 
+    reduced_path = 'data/reference_rq.txt'
+    if os.path.isfile(reduced_path):
+        _data = np.loadtxt(reduced_path).T
     
-    
-def test_template_processing():
-    """
-        Test that we can read and write a template
-    """
-    template_path = 'data/template.xml'
-    ws = mtd_api.Load("REF_L_198409")
-    workflow.process_template(ws, template_path, '/tmp')
-    template_data = template.read_template('/tmp/REF_L_198409_auto_template.xml', 1)
-    assert(template_data.data_files[0] == 198409)
+    reduced_path = os.path.join(output_dir, 'REFL_198409_combined_data_auto.txt')
+    if os.path.isfile(reduced_path):
+        _refl = np.loadtxt(reduced_path).T
+
+    for i in range(3):
+        assert(np.fabs(np.sum((_data[i]-_refl[i])/_refl[i])/len(_refl[i])) < 1e-10)
+
+    # The reference was computed with a constant dq/q but our approach recalculates
+    # it for each run, so we expect a small discrepancy within 1%.
+    assert(np.sum((_data[3]-_refl[3])/_refl[3])/len(_refl[3]) < 0.01)

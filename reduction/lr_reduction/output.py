@@ -18,6 +18,9 @@ class RunCollection():
         self.d_qz_all = []
 
     def add(self, q, r, dr, meta_data, dq=None):
+        """
+            Add a partial R(q) to the collection
+        """
         if dq is None:
             resolution = meta_data['dq_over_q']
             dq = resolution * q
@@ -33,7 +36,6 @@ class RunCollection():
         d_qz_all = []
 
         for item in self.collection:
-            
             idx = np.fabs(item['r']) > 0
             qz_mid = item['q'][idx]
             refl = item['r'][idx]
@@ -74,17 +76,13 @@ class RunCollection():
                     fd.write("# Run start time: %s\n" % _meta['start_time'])
                     fd.write("# Reduction time: %s\n" % _meta['time'])
                     if meta_as_json:
-                        for k in _meta.keys():
-                            if type(_meta[k]) == np.int32:
-                                print(k)
-                                
                         fd.write("# Meta:%s\n" % json.dumps(_meta))
                     fd.write("# DataRun   NormRun   TwoTheta(deg)  LambdaMin(A)   ")
                     fd.write("LambdaMax(A) Qmin(1/A)    Qmax(1/A)    SF_A         SF_B\n")
                     fd.write("")
-                if 'sf' in _meta:
-                    a = _meta['sf']['a']
-                    b = _meta['sf']['b']
+                if 'scaling_factors' in _meta:
+                    a = _meta['scaling_factors']['a']
+                    b = _meta['scaling_factors']['b']
                 else:
                     a = 1
                     b = 0
@@ -92,7 +90,6 @@ class RunCollection():
                               _meta['wl_min'], _meta['wl_max'], _meta['q_min'], _meta['q_max'],
                               a, b)
                 fd.write("# %-9s %-9s %-14.6g %-14.6g %-12.6g %-12.6s %-12.6s %-12.6s %-12.6s\n" % value_list)
-
                 initial_entry_written = True
 
             # Write R(q)
@@ -103,6 +100,9 @@ class RunCollection():
                 fd.write('%20.16f  %20.16f  %20.16f  %20.16f\n' % (self.qz_all[i], self.refl_all[i], self.d_refl_all[i], self.d_qz_all[i]))
 
     def add_from_file(self, file_path):
+        """
+            Read a partial result file and add it to the collection
+        """
         _q, _r, _dr, _dq, _meta = read_file(file_path)
         self.add(_q, _r, _dr, _meta, dq=_dq)
 
