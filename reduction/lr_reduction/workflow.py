@@ -52,6 +52,9 @@ def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap
     # Save template
     write_template(seq_list, run_list, template_file, output_dir)
 
+    # Return the sequence identifier
+    return seq_list[0]
+
 
 def assemble_results(first_run, output_dir):
     """

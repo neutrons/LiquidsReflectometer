@@ -12,6 +12,9 @@ import json
 import warnings
 warnings.simplefilter('ignore')
 
+# New reduction code
+sys.path.append("/SNS/REF_L/shared/reduction")
+
 
 #if ("MANTIDPATH" in os.environ):
 #    del os.environ["MANTIDPATH"]
@@ -26,6 +29,18 @@ from mantid.simpleapi import *
 
 event_file_path=sys.argv[1]
 output_dir=sys.argv[2]
+
+old_version = True
+if len(sys.argv) > 3 and sys.argv[3] == 'new':
+    old_version = False
+
+template_file = None
+if len(sys.argv) > 4:
+    template_file = sys.argv[4]
+
+avg_overlap = True
+if len(sys.argv) > 5:
+    avg_overlap = sys.argv[5]
 
 event_file = os.path.split(event_file_path)[-1]
 # The legacy format is REF_L_xyz_event.nxs
@@ -55,20 +70,20 @@ REFL1D_PARS = json.dumps(dict(back_sld=6.4,
 ws = LoadEventNexus(Filename=event_file_path)
 
 # Locate the template file
-template_file = ""
-default_template_path = os.path.join(output_dir, "template.xml")
+if template_file is None:
+    default_template_path = os.path.join(output_dir, "template.xml")
 
-# Read tthd to determine the geometry
-tthd = ws.getRun().getProperty("tthd").value[0]
-if tthd > 0:
-    template_path = os.path.join(output_dir, "template_up.xml")
-else:
-    template_path = os.path.join(output_dir, "template_down.xml")
-
-if os.path.isfile(template_path):
-    template_file = template_path
-elif os.path.isfile(default_template_path):
-    template_file = default_template_path
+    # Read tthd to determine the geometry
+    tthd = ws.getRun().getProperty("tthd").value[0]
+    if tthd > 0:
+        template_path = os.path.join(output_dir, "template_up.xml")
+    else:
+        template_path = os.path.join(output_dir, "template_down.xml")
+    
+    if os.path.isfile(template_path):
+        template_file = template_path
+    elif os.path.isfile(default_template_path):
+        template_file = default_template_path
 
 print("Using template: %s" % template_file)
 
@@ -84,18 +99,26 @@ data_type = ws.getRun().getProperty("data_type").value[0]
 # Set the constant term of the resolution
 SetInstrumentParameter(ws, ParameterName="dq-constant", Value="0.0", ParameterType="Number")
 
-output = LRAutoReduction(#Filename=event_file_path,
-                         InputWorkspace=ws,
-                         ScaleToUnity=NORMALIZE_TO_UNITY,
-                         ScalingWavelengthCutoff=WL_CUTOFF,
-                         OutputDirectory=output_dir,
-                         SlitTolerance=0.07,
-                         ReadSequenceFromFile=True,
-                         OrderDirectBeamsByRunNumber=True,
-                         TemplateFile=template_file,
-                         NormalizationType=NORMALIZATION_TYPE,
-                         Refl1DModelParameters=REFL1D_PARS)
-first_run_of_set=int(output[1])
+if old_version:
+    output = LRAutoReduction(#Filename=event_file_path,
+                             InputWorkspace=ws,
+                             ScaleToUnity=NORMALIZE_TO_UNITY,
+                             ScalingWavelengthCutoff=WL_CUTOFF,
+                             OutputDirectory=output_dir,
+                             SlitTolerance=0.07,
+                             ReadSequenceFromFile=True,
+                             OrderDirectBeamsByRunNumber=True,
+                             TemplateFile=template_file,
+                             NormalizationType=NORMALIZATION_TYPE,
+                             Refl1DModelParameters=REFL1D_PARS)
+    first_run_of_set=int(output[1])
+    
+else:
+    from lr_reduction import workflow
+    first_run_of_set = workflow.reduce(ws, template_file,
+                                           output_dir, pre_cut=1, post_cut=1, 
+                                           average_overlap=avg_overlap,
+                                           q_summing=False, bck_in_q=False)
 
 #-------------------------------------------------------------------------
 # Produce plot for the web monitor

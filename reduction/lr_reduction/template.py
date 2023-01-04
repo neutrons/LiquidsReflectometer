@@ -211,6 +211,9 @@ def process_from_template_ws(ws_sc, template_path, q_summing=False,
     if info:
         meta_data = event_refl.to_dict()
         meta_data['scaling_factors'] = dict(a=a, err_a=err_a, b=b, err_b=err_b)
+        meta_data['q_summing'] = q_summing
+        meta_data['tof_weighted'] = tof_weighted
+        meta_data['bck_in_q'] = bck_in_q
         return qz_mid, refl, d_refl, meta_data
 
     return qz_mid, refl, d_refl

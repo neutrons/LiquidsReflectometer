@@ -72,9 +72,16 @@ class RunCollection():
                 _meta = item['info']
                 if not initial_entry_written:
                     fd.write("# Experiment %s Run %s\n" % (_meta['experiment'], _meta['run_number']))
+                    fd.write("# Reduction v2 [2023]\n")
                     fd.write("# Run title: %s\n" % _meta['run_title'])
                     fd.write("# Run start time: %s\n" % _meta['start_time'])
                     fd.write("# Reduction time: %s\n" % _meta['time'])
+                    if 'q_summing' in _meta:
+                        fd.write("# Q summing: %s\n" % _meta['q_summing'])
+                    if 'tof_weighted' in _meta:
+                        fd.write("# TOF weighted: %s\n" % _meta['tof_weighted'])
+                    if 'bck_in_q' in _meta:
+                        fd.write("# Bck in Q: %s\n" % _meta['bck_in_q'])
                     if meta_as_json:
                         fd.write("# Meta:%s\n" % json.dumps(_meta))
                     fd.write("# DataRun   NormRun   TwoTheta(deg)  LambdaMin(A)   ")
