@@ -151,7 +151,9 @@ if os.path.isfile(default_file_path):
         for r in range(0, 10):
             reduced_file_name = 'REFL_%s_%s_%s_auto.nxs' % (first_run_of_set, r+1, first_run_of_set+r)
             reduced_file_path = os.path.join(output_dir, reduced_file_name)
-            if os.path.isfile(reduced_file_path):
+            reduced_file_name2 = 'REFL_%s_%s_%s_partial.txt' % (first_run_of_set, r+1, first_run_of_set+r)
+            reduced_file_path2 = os.path.join(output_dir, reduced_file_name2)
+            if os.path.isfile(reduced_file_path) or os.path.isfile(reduced_file_path2):
                 # Look to see whether submitting the plot is enabled
                 if plotting_ready:
                     plot1d(first_run_of_set+r, [[x, y, dy, dx]], instrument='REF_L', 
