@@ -31,11 +31,11 @@ def get_q_binning(q_min=0.001, q_max=0.15, q_step=-0.02):
         Determine Q binning
     """
     if q_step > 0:
-        n_steps = np.int((q_max-q_min)/q_step)
+        n_steps = int((q_max-q_min)/q_step)
         return q_min + np.asarray([q_step * i for i in range(n_steps)])
     else:
         _step = 1.0+np.abs(q_step)
-        n_steps = np.int(np.log(q_max/q_min)/np.log(_step))
+        n_steps = int(np.log(q_max/q_min)/np.log(_step))
         return q_min * np.asarray([_step**i for i in range(n_steps)])
 
 def quicknxs_scale(theta, peak, low_res, norm_peak, norm_low_res):

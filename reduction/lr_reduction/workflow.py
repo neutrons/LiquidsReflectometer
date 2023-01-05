@@ -13,7 +13,7 @@ from . import reduction_template_reader
 from . import output
 
 
-def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap=True,
+def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap=False,
            q_summing=False, bck_in_q=False):
     """
         Function called by reduce_REFL.py, which lives in /SNS/REF_L/shared/autoreduce
@@ -47,7 +47,7 @@ def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap
                     meta_as_json=True)
 
     # Assemble partial results into a single R(q)
-    seq_list, run_list = assemble_results(meta_data['sequence_id'], output_dir)
+    seq_list, run_list = assemble_results(meta_data['sequence_id'], output_dir, average_overlap)
 
     # Save template
     write_template(seq_list, run_list, template_file, output_dir)
@@ -56,14 +56,14 @@ def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap
     return seq_list[0]
 
 
-def assemble_results(first_run, output_dir):
+def assemble_results(first_run, output_dir, average_overlap=False):
     """
         Find related runs and assemble them in one R(q) data set
     """
     # Keep track of sequence IDs and run numbers so we can make a new template
     seq_list = []
     run_list = []
-    coll = output.RunCollection()
+    coll = output.RunCollection(average_overlap=average_overlap)
 
     file_list = sorted(os.listdir(output_dir))
     for item in file_list:

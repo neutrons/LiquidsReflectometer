@@ -59,6 +59,43 @@ class RunCollection():
         self.d_refl_all = np.take_along_axis(d_refl_all, idx, axis=None)
         self.d_qz_all = np.take_along_axis(d_qz_all, idx, axis=None)
 
+        if self.average_overlap:
+            # New full list of points
+            qz_all = [self.qz_all[0]]
+            refl_all = [self.refl_all[0]]
+            d_refl_all = [self.d_refl_all[0]]
+            d_qz_all = [self.d_qz_all[0]]
+
+            # Average information for groups of points
+            qz = self.qz_all[0]
+            total = self.refl_all[0]
+            err2 = self.d_refl_all[0]**2
+            dq = self.d_qz_all[0]
+            npts = 1.
+
+            for i in range(1, len(self.qz_all)):
+                if (self.qz_all[i] - qz)/qz > 0.000001:
+                    # Store the previous point
+                    qz_all.append(qz)
+                    refl_all.append(total/npts)
+                    d_refl_all.append(np.sqrt(err2)/npts)
+                    d_qz_all .append(dq)
+
+                    # Start a new point
+                    qz = self.qz_all[i]
+                    total = self.refl_all[i]
+                    err2 = self.d_refl_all[i]**2
+                    dq = self.d_qz_all[i]
+                    npts = 1.
+                else:
+                    total += self.refl_all[i]
+                    err2 += self.d_refl_all[i]**2
+                    npts += 1.
+            self.qz_all = np.asarray(qz_all)
+            self.refl_all = np.asarray(refl_all)
+            self.d_refl_all = np.asarray(d_refl_all)
+            self.d_qz_all = np.asarray(d_qz_all)
+
     def save_ascii(self, file_path, meta_as_json=False):
         """
             Save R(Q) in ascii format

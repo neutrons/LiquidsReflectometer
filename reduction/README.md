@@ -34,3 +34,4 @@ It can read and write the LR standard output files.
  - Create time-resolved config file as part of the output so that we can easily run it again
  - Add extra options to template, like q-summing, pre/post-cut, etc...
  - Make sure we can average overlap
+ - Add alternate output directory

@@ -38,7 +38,7 @@ template_file = None
 if len(sys.argv) > 4:
     template_file = sys.argv[4]
 
-avg_overlap = True
+avg_overlap = False
 if len(sys.argv) > 5:
     avg_overlap = sys.argv[5]
 
@@ -112,7 +112,6 @@ if old_version:
                              NormalizationType=NORMALIZATION_TYPE,
                              Refl1DModelParameters=REFL1D_PARS)
     first_run_of_set=int(output[1])
-    
 else:
     from lr_reduction import workflow
     first_run_of_set = workflow.reduce(ws, template_file,
