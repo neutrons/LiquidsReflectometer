@@ -343,17 +343,39 @@ class EventReflectivity(object):
             their position on the detector and place in the proper Q bin.
         """
         q_bins = self.q_bins if q_bins is None else q_bins
-        # Left side
-        _left = [bck[0], peak[0]-1]
-        refl_bck, d_refl_bck = self._roi_integration(peak=_left,
-                                                     low_res=low_res, q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins)
-        # Right side
-        _right = [peak[1]+1, bck[1]]
-        _refl_bck, _d_refl_bck = self._roi_integration(peak=_right,
-                                                       low_res=low_res, q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins)
 
-        refl_bck = (refl_bck + _refl_bck)/2.0
-        d_refl_bck = np.sqrt(d_refl_bck**2 + _d_refl_bck**2)/2.0
+        # Background on the left of the peak only. We allow the user to overlap the peak on the right,
+        # but only use the part left of the peak.
+        if bck[0] < peak[0]-1 and bck[1] < peak[1]+1:
+            right_side = min(bck[1], peak[0]-1)
+            _left = [bck[0], right_side]
+            print("Left side background: [%s, %s]" % (_left[0], _left[1]))
+            refl_bck, d_refl_bck = self._roi_integration(peak=_left, low_res=low_res,
+                                                         q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins)
+        # Background on the right of the peak only. We allow the user to overlap the peak on the left,
+        # but only use the part right of the peak.
+        elif bck[0] > peak[0]-1 and bck[1] > peak[1]+1:
+            left_side = max(bck[0], peak[1]+1)
+            _right = [left_side, bck[1]]
+            print("Right side background: [%s, %s]" % (_right[0], _right[1]))
+            refl_bck, d_refl_bck = self._roi_integration(peak=_right, low_res=low_res,
+                                                         q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins)
+        # Background on both sides
+        elif bck[0] < peak[0]-1 and bck[1] > peak[1]+1:
+            _left = [bck[0], peak[0]-1]
+            refl_bck, d_refl_bck = self._roi_integration(peak=_left, low_res=low_res,
+                                                         q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins)
+            _right = [peak[1]+1, bck[1]]
+            _refl_bck, _d_refl_bck = self._roi_integration(peak=_right, low_res=low_res,
+                                                           q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins)
+            print("Background on both sides: [%s %s] [%s %s]" % (_left[0], _left[1], _right[0], _right[1]))
+
+            refl_bck = (refl_bck + _refl_bck)/2.0
+            d_refl_bck = np.sqrt(d_refl_bck**2 + _d_refl_bck**2)/2.0
+        else:
+            print("Invalid background: [%s %s]" % (bck[0], bck[1]))
+            refl_bck = np.zeros(q_bins.shape[0]-1)
+            d_refl_bck = refl_bck
 
         # At this point we have integrated the region of interest and obtain the average per
         # pixel, so unless that's what we want we need to multiply by the number of pixels
