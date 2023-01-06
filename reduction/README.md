@@ -30,8 +30,6 @@ It can read and write the LR standard output files.
 
 ### To-do list
  - Abstract out distances
- - Background away from peak (one side, or two sides)
- - Background of zero wide doesn't work
  - Create time-resolved config file as part of the output so that we can easily run it again
  - Add extra options to template, like q-summing, pre/post-cut, etc...
  - Add alternate output directory
