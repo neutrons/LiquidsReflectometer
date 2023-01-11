@@ -71,14 +71,17 @@ class Dynamic30Hz(QWidget):
         layout.addWidget(self.output_dir_label, 6, 2)
 
         # Process button
-        self.perform_reduction = QPushButton('Reduce')
-        layout.addWidget(self.perform_reduction, 7, 1)
+        self.perform_reduction_old = QPushButton('Reduce [old]')
+        layout.addWidget(self.perform_reduction_old, 7, 1)
+        self.perform_reduction = QPushButton('Reduce [new]')
+        layout.addWidget(self.perform_reduction, 7, 2)
 
         # connections
         self.choose_template.clicked.connect(self.template_selection)
         self.choose_ref.clicked.connect(self.ref_selection)
         self.choose_output_dir.clicked.connect(self.output_dir_selection)
-        self.perform_reduction.clicked.connect(self.reduce)
+        self.perform_reduction_old.clicked.connect(self.reduce_old)
+        self.perform_reduction.clicked.connect(self.reduce_new)
 
         # Populate from previous session
         self.read_settings()
@@ -175,7 +178,13 @@ class Dynamic30Hz(QWidget):
 
         return run_list
 
-    def reduce(self):
+    def reduce_old(self):
+        return self.reduce(reduction_script='scripts/template_reduction.py')
+
+    def reduce_new(self):
+        return self.reduce(reduction_script='scripts/time_resolved_reduction.py')
+
+    def reduce(self, reduction_script='scripts/time_resolved_reduction.py'):
         if not self.check_inputs():
             print("Invalid inputs found")
             return
@@ -187,7 +196,7 @@ class Dynamic30Hz(QWidget):
         run_list = self.parse_run_list(self.data_run_number_ledit.text())
         for run in run_list:
             # python3 template_reduction.py dynamic30Hz <meas_run_30Hz> <ref_run_30Hz> <ref_data_60Hz> <template_30Hz> <time_interval> <output_dir>
-            args = ['python3', 'scripts/template_reduction.py', 'dynamic30Hz',
+            args = ['python3', reduction_script, 'dynamic30Hz',
                     str(run),
                     self.ref_run_number_ledit.text(),
                     self.ref_path.text(),

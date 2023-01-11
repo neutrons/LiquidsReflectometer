@@ -36,12 +36,12 @@ def test_full_reduction():
             first_run = run_number
             resolution = event_reduction.compute_resolution(ws_sc)
 
-        idx = np.fabs(refl) > 0
-        qz_mid = qz_mid[idx][pre_cut:-post_cut]
-        refl = refl[idx][pre_cut:-post_cut]
-        d_refl = d_refl[idx][pre_cut:-post_cut]
+        npts = len(qz_mid)
+        qz_mid = qz_mid[pre_cut:npts-post_cut]
+        refl = refl[pre_cut:npts-post_cut]
+        d_refl = d_refl[pre_cut:npts-post_cut]
 
-        for i in range(len(qz_mid)-1, -1, -1):
+        for i in range(len(qz_mid)):
             qz_all.append(qz_mid[i])
             refl_all.append(refl[i])
             d_refl_all.append(d_refl[i])
@@ -58,7 +58,7 @@ def test_full_reduction():
     assert(resolution == 0.02785205863936946)
     ref_data = np.loadtxt('data/reference_rq.txt').T
     assert(len(ref_data[1]) == len(refl_all))
-    assert(np.sum(ref_data[1]-refl_all) == 0)
+    assert(np.fabs(np.sum(ref_data[1]-refl_all)) < 1e-10)
 
 
 def test_reduce_workflow():
@@ -78,7 +78,7 @@ def test_reduce_workflow():
         _refl = np.loadtxt(reduced_path).T
 
     for i in range(3):
-        assert(np.fabs(np.sum((_data[i]-_refl[i])/_refl[i])/len(_refl[i])) < 1e-10)
+        assert(np.fabs(np.sum(_data[i]-_refl[i])) < 1e-10)
 
     # The reference was computed with a constant dq/q but our approach recalculates
     # it for each run, so we expect a small discrepancy within 1%.

@@ -209,7 +209,8 @@ class EventReflectivity(object):
                     dq0=dq0, dq_over_q=dq_over_q, sequence_number=sequence_number,
                     sequence_id=sequence_id)
 
-    def specular(self, q_summing=False, tof_weighted=False, bck_in_q=False, clean=False):
+    def specular(self, q_summing=False, tof_weighted=False, bck_in_q=False,
+                 clean=False, normalize=True):
         """
             Compute specular reflectivity.
 
@@ -218,32 +219,32 @@ class EventReflectivity(object):
             :param q_summing: turns on constant-Q binning
             :param tof_weighted: if True, binning will be done by weighting each event to the DB distribution
             :param bck_in_q: if True, the background will be estimated in Q space using the constant-Q binning approach
+            :param clean: if True, and Q summing is True, then leading artifact will be removed
+            :param normalize: if True, and tof_weighted is False, normalization will be skipped
         """
         if tof_weighted:
             self.specular_weighted(q_summing=q_summing, bck_in_q=bck_in_q)
         else:
-            self.specular_unweighted(q_summing=q_summing)
+            self.specular_unweighted(q_summing=q_summing, normalize=normalize)
 
-        if clean:
-            # Remove leading zeros
-            idx = np.nonzero(self.refl)
-            refl = self.refl[idx]
-            d_refl = self.d_refl[idx]
-            qz_mid = (self.q_bins[:-1] + self.q_bins[1:])/2.0
-            qz_mid = qz_mid[idx]
-    
-            # Remove leading artifact from the wavelength coverage
-            if self.summing_threshold:
-                idx = qz_mid > self.summing_threshold
-                refl = refl[idx][1:]
-                d_refl = d_refl[idx][1:]
-                qz_mid = qz_mid[idx][1:]
-    
-            return qz_mid, refl, d_refl
+        # Remove leading zeros
+        r = np.trim_zeros(self.refl, 'f')
+        trim = len(self.refl) - len(r)
+        self.refl = self.refl[trim:]
+        self.d_refl = self.d_refl[trim:]
+        self.q_bins = self.q_bins[trim:]
+
+        # Remove leading artifact from the wavelength coverage
+        if clean and self.summing_threshold:
+            print("Summing threshold: %g" % self.summing_threshold)
+            idx = self.q_bins > self.summing_threshold
+            self.refl = self.refl[idx][1:]
+            self.d_refl = self.d_refl[idx][1:]
+            self.q_bins = self.q_bins[idx][1:]
 
         return self.q_bins, self.refl, self.d_refl
 
-    def specular_unweighted(self, q_summing=False):
+    def specular_unweighted(self, q_summing=False, normalize=True):
         """
             Simple specular reflectivity calculation. This is the same approach as the
             original LR reduction, which sums up pixels without constant-Q binning.
@@ -254,18 +255,6 @@ class EventReflectivity(object):
         refl, d_refl = self._reflectivity(self._ws_sc, peak_position=self.specular_pixel,
                                           peak=self.signal_peak, low_res=self.signal_low_res,
                                           theta=self.theta, q_summing=q_summing)
-        # Since this approach does not involve constant-Q binning, and since the transform
-        # from TOF to Q is the same across the TOF range for a given run (constant angle),
-        # we can bin the DB according to the same transform instead of binning and dividing in TOF.
-        # This is mathematically equivalent and convenient in terms of abstraction for later
-        # use for the constant-Q calculation elsewhere in the code.
-        norm, d_norm = self._reflectivity(self._ws_db, peak_position=0,
-                                          peak=self.norm_peak, low_res=self.norm_low_res,
-                                          theta=self.theta, q_summing=False)
-
-        # Direct beam background could be added here. The effect will be negligible.
-
-        db_bins = norm>0
 
         # Remove background
         if self.signal_bck is not None:
@@ -273,16 +262,27 @@ class EventReflectivity(object):
             refl -= refl_bck
             d_refl = np.sqrt(d_refl**2 + d_refl_bck**2)
 
-            self.refl_bck = refl_bck[db_bins]/norm[db_bins]
-            self.d_refl_bck = np.sqrt(d_refl_bck[db_bins]**2 / norm[db_bins]**2 + refl_bck[db_bins]**2 * d_norm[db_bins]**2 / norm[db_bins]**4)
+        if normalize:
+            # Since this approach does not involve constant-Q binning, and since the transform
+            # from TOF to Q is the same across the TOF range for a given run (constant angle),
+            # we can bin the DB according to the same transform instead of binning and dividing in TOF.
+            # This is mathematically equivalent and convenient in terms of abstraction for later
+            # use for the constant-Q calculation elsewhere in the code.
+            norm, d_norm = self._reflectivity(self._ws_db, peak_position=0,
+                                              peak=self.norm_peak, low_res=self.norm_low_res,
+                                              theta=self.theta, q_summing=False)
 
-        refl[db_bins] = refl[db_bins]/norm[db_bins]
-        d_refl[db_bins] = np.sqrt(d_refl[db_bins]**2 / norm[db_bins]**2 + refl[db_bins]**2 * d_norm[db_bins]**2 / norm[db_bins]**4)
+            # Direct beam background could be added here. The effect will be negligible.
 
-        # Clean up points where we have no direct beam
-        zero_db = [not v for v in db_bins]
-        refl[zero_db] = 0
-        d_refl[zero_db] = 0
+            db_bins = norm>0
+
+            refl[db_bins] = refl[db_bins]/norm[db_bins]
+            d_refl[db_bins] = np.sqrt(d_refl[db_bins]**2 / norm[db_bins]**2 + refl[db_bins]**2 * d_norm[db_bins]**2 / norm[db_bins]**4)
+
+            # Clean up points where we have no direct beam
+            zero_db = [not v for v in db_bins]
+            refl[zero_db] = 0
+            d_refl[zero_db] = 0
 
         self.refl = refl
         self.d_refl = d_refl
@@ -290,7 +290,9 @@ class EventReflectivity(object):
 
     def specular_weighted(self, q_summing=True, bck_in_q=False):
         """
-
+            Compute reflectivity by weighting each event by flux.
+            This allows for summing in Q and to estimate the background in either Q
+            or pixels next to the peak.
         """
         # Event weights for normalization
         db_charge = self._ws_db.getRun()['gd_prtn_chrg'].value
@@ -304,7 +306,8 @@ class EventReflectivity(object):
                                           theta=self.theta, q_summing=q_summing, wl_dist=wl_dist, wl_bins=wl_middle)
 
         if self.signal_bck is not None:
-            refl_bck, d_refl_bck = self.bck_subtraction(wl_dist=wl_dist, wl_bins=wl_middle)
+            refl_bck, d_refl_bck = self.bck_subtraction(wl_dist=wl_dist, wl_bins=wl_middle,
+                                                        q_summing=bck_in_q)
             refl -= refl_bck
             d_refl = np.sqrt(d_refl**2 + d_refl_bck**2)
 
@@ -351,7 +354,8 @@ class EventReflectivity(object):
             _left = [bck[0], right_side]
             print("Left side background: [%s, %s]" % (_left[0], _left[1]))
             refl_bck, d_refl_bck = self._roi_integration(peak=_left, low_res=low_res,
-                                                         q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins)
+                                                         q_bins=q_bins, wl_dist=wl_dist,
+                                                         wl_bins=wl_bins, q_summing=q_summing)
         # Background on the right of the peak only. We allow the user to overlap the peak on the left,
         # but only use the part right of the peak.
         elif bck[0] > peak[0]-1 and bck[1] > peak[1]+1:
@@ -359,15 +363,18 @@ class EventReflectivity(object):
             _right = [left_side, bck[1]]
             print("Right side background: [%s, %s]" % (_right[0], _right[1]))
             refl_bck, d_refl_bck = self._roi_integration(peak=_right, low_res=low_res,
-                                                         q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins)
+                                                         q_bins=q_bins, wl_dist=wl_dist,
+                                                         wl_bins=wl_bins, q_summing=q_summing)
         # Background on both sides
         elif bck[0] < peak[0]-1 and bck[1] > peak[1]+1:
             _left = [bck[0], peak[0]-1]
             refl_bck, d_refl_bck = self._roi_integration(peak=_left, low_res=low_res,
-                                                         q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins)
+                                                         q_bins=q_bins, wl_dist=wl_dist,
+                                                         wl_bins=wl_bins, q_summing=q_summing)
             _right = [peak[1]+1, bck[1]]
             _refl_bck, _d_refl_bck = self._roi_integration(peak=_right, low_res=low_res,
-                                                           q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins)
+                                                           q_bins=q_bins, wl_dist=wl_dist,
+                                                           wl_bins=wl_bins, q_summing=q_summing)
             print("Background on both sides: [%s %s] [%s %s]" % (_left[0], _left[1], _right[0], _right[1]))
 
             refl_bck = (refl_bck + _refl_bck)/2.0
@@ -387,13 +394,14 @@ class EventReflectivity(object):
 
         return refl_bck, d_refl_bck
 
-    def bck_subtraction(self, normalize_to_single_pixel=False, q_bins=None, wl_dist=None, wl_bins=None):
+    def bck_subtraction(self, normalize_to_single_pixel=False, q_bins=None, wl_dist=None, wl_bins=None,
+                        q_summing=False):
         """
             Higher-level call for background subtraction. Hides the ranges needed to define the ROI.
         """
         return self._bck_subtraction(self.signal_peak, self.signal_bck, self.signal_low_res,
                                      normalize_to_single_pixel=normalize_to_single_pixel, q_bins=q_bins,
-                                     wl_dist=wl_dist, wl_bins=wl_bins)
+                                     wl_dist=wl_dist, wl_bins=wl_bins, q_summing=q_summing)
 
     def slice(self, x_min=0.002, x_max=0.004, x_bins=None, z_bins=None,
               refl=None, d_refl=None, normalize=False):

@@ -36,17 +36,11 @@ class RunCollection():
         d_qz_all = []
 
         for item in self.collection:
-            idx = np.fabs(item['r']) > 0
-            qz_mid = item['q'][idx]
-            refl = item['r'][idx]
-            d_refl = item['dr'][idx]
-            d_qz = item['dq'][idx]
-
-            for i in range(len(qz_mid)-1, -1, -1):
-                qz_all.append(qz_mid[i])
-                refl_all.append(refl[i])
-                d_refl_all.append(d_refl[i])
-                d_qz_all.append(d_qz[i])
+            for i in range(len(item['q'])):
+                qz_all.append(item['q'][i])
+                refl_all.append(item['r'][i])
+                d_refl_all.append(item['dr'][i])
+                d_qz_all.append(item['dq'][i])
 
         qz_all = np.asarray(qz_all)
         refl_all = np.asarray(refl_all)

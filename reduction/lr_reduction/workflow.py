@@ -37,10 +37,9 @@ def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap
 
     # Save partial results
     coll = output.RunCollection()
-    idx = np.fabs(refl) > 0
-    npts = len(qz_mid[idx])
-    coll.add(qz_mid[idx][pre_cut:npts-post_cut], refl[idx][pre_cut:npts-post_cut],
-             d_refl[idx][pre_cut:npts-post_cut], meta_data=meta_data)
+    npts = len(qz_mid)
+    coll.add(qz_mid[pre_cut:npts-post_cut], refl[pre_cut:npts-post_cut],
+             d_refl[pre_cut:npts-post_cut], meta_data=meta_data)
     coll.save_ascii(os.path.join(output_dir, 'REFL_%s_%s_%s_partial.txt' % (meta_data['sequence_id'],
                                                                             meta_data['sequence_number'],
                                                                             meta_data['run_number'])),
