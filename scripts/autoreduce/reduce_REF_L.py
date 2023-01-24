@@ -47,7 +47,7 @@ run_number = run_number.replace('.nxs.h5', '')
 # The new reduction will be used by default starting
 # with the experiment starting on Jan 24, 2023
 # so that old that can be re-reduced with the same templates
-old_version = run_number < 201577
+old_version = True #int(run_number) < 201578
 if len(sys.argv) > 3 and sys.argv[3] == 'new':
     old_version = False
 if len(sys.argv) > 3 and sys.argv[3] == 'old':

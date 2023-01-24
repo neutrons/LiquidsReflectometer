@@ -91,7 +91,7 @@ class EventReflectivity(object):
         if instrument in [self.INSTRUMENT_4A, self.INSTRUMENT_4B]:
             self.instrument = instrument
         else:
-            self.instrument = self.INSTRUMENT_4A
+            self.instrument = self.INSTRUMENT_4B
         self.signal_peak = signal_peak
         self.signal_bck = signal_bck
         self.norm_peak = norm_peak
@@ -455,7 +455,7 @@ class EventReflectivity(object):
                 # Gravity correction
                 d_theta = self.gravity_correction(ws, wl_list)
 
-                x_distance = _pixel_width * (peak_position - j)
+                x_distance = _pixel_width * (j - peak_position)
                 delta_theta_f = np.arctan(x_distance / self.det_distance) / 2.0
                 qz=4.0*np.pi/wl_list * np.sin(theta + delta_theta_f - d_theta)
                 qz = np.fabs(qz)
@@ -587,7 +587,7 @@ class EventReflectivity(object):
             k = 2.0 * np.pi / wl_list
             wl_weights = 1.0/np.interp(wl_list, wl_bins, wl_dist, np.inf, np.inf)
 
-            x_distance = float(peak_position-j) * self.pixel_width
+            x_distance = float(j-peak_position) * self.pixel_width
             delta_theta_f = np.arctan(x_distance / self.det_distance)
             theta_f = theta + delta_theta_f
 
