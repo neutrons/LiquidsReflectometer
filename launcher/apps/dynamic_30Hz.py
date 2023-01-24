@@ -75,6 +75,8 @@ class Dynamic30Hz(QWidget):
         layout.addWidget(self.perform_reduction_old, 7, 1)
         self.perform_reduction = QPushButton('Reduce [new]')
         layout.addWidget(self.perform_reduction, 7, 2)
+        self.perform_reduction_q = QPushButton('Reduce [Const-Q binning]')
+        layout.addWidget(self.perform_reduction_q, 8, 2)
 
         # connections
         self.choose_template.clicked.connect(self.template_selection)
@@ -82,6 +84,7 @@ class Dynamic30Hz(QWidget):
         self.choose_output_dir.clicked.connect(self.output_dir_selection)
         self.perform_reduction_old.clicked.connect(self.reduce_old)
         self.perform_reduction.clicked.connect(self.reduce_new)
+        self.perform_reduction_q.clicked.connect(self.reduce_q)
 
         # Populate from previous session
         self.read_settings()
@@ -183,8 +186,11 @@ class Dynamic30Hz(QWidget):
 
     def reduce_new(self):
         return self.reduce(reduction_script='scripts/time_resolved_reduction.py')
+ 
+    def reduce_q(self):
+        return self.reduce(reduction_script='scripts/time_resolved_reduction.py', q_summing=True)
 
-    def reduce(self, reduction_script='scripts/time_resolved_reduction.py'):
+    def reduce(self, reduction_script='scripts/time_resolved_reduction.py', q_summing=False):
         if not self.check_inputs():
             print("Invalid inputs found")
             return
@@ -205,4 +211,6 @@ class Dynamic30Hz(QWidget):
                     self.output_dir_label.text()]
             if not run == run_list[-1]:
                 args.append('--no-plot')
+            if q_summing:
+                args.append('--qsumming')
             subprocess.run(args)

@@ -44,7 +44,7 @@ def quicknxs_scale(theta, peak, low_res, norm_peak, norm_low_res):
     """
     quicknxs_scale = (float(norm_peak[1])-float(norm_peak[0])) * (float(norm_low_res[1])-float(norm_low_res[0]))
     quicknxs_scale /= (float(peak[1])-float(peak[0])) * (float(low_res[1])-float(low_res[0]))
-    _scale = 0.005 / np.sin(theta) if theta > 0.0002 else 1.0
+    _scale = 0.005 / np.fabs(np.sin(theta)) if theta > 0.0002 else 1.0
     quicknxs_scale *= _scale
     return quicknxs_scale
 
@@ -148,9 +148,9 @@ class EventReflectivity(object):
             self.wl_range = [self.tof_range[0] / self.constant, self.tof_range[1] /  self.constant]
 
         if self.q_min is None:
-            self.q_min = 4.0*np.pi/self.wl_range[1] * np.sin(self.theta)
+            self.q_min = 4.0*np.pi/self.wl_range[1] * np.fabs(np.sin(self.theta))
         if self.q_max is None:
-            self.q_max = 4.0*np.pi/self.wl_range[0] * np.sin(self.theta)
+            self.q_max = 4.0*np.pi/self.wl_range[0] * np.fabs(np.sin(self.theta))
 
         # Q binning to use
         self.q_bins = get_q_binning(self.q_min, self.q_max, self.q_step)
@@ -171,9 +171,12 @@ class EventReflectivity(object):
     def extract_meta_data_4B(self):
         """
             4B-specific meta data
+
+            Distance from source to sample was 13.63 meters prior to the source
+            to detector distance being determined with Bragg edges to be 15.75 m. 
         """
         self.det_distance = 1.83
-        source_sample_distance = 13.63
+        source_sample_distance = 15.75 - self.det_distance # 13.63
         self.source_detector_distance = source_sample_distance + self.det_distance
 
     def __repr__(self):
@@ -448,9 +451,14 @@ class EventReflectivity(object):
                     continue
 
                 wl_list = evt_list.getTofs() / self.constant
+
+                # Gravity correction
+                d_theta = self.gravity_correction(ws, wl_list)
+
                 x_distance = _pixel_width * (peak_position - j)
                 delta_theta_f = np.arctan(x_distance / self.det_distance) / 2.0
-                qz=4.0*np.pi/wl_list * np.sin(theta + delta_theta_f)
+                qz=4.0*np.pi/wl_list * np.sin(theta + delta_theta_f - d_theta)
+                qz = np.fabs(qz)
 
                 if wl_dist is not None and wl_bins is not None:
                     wl_weights = 1.0/np.interp(wl_list, wl_bins, wl_dist, np.inf, np.inf)
@@ -470,8 +478,8 @@ class EventReflectivity(object):
             delta_theta_f0 = np.arctan(x0 / self.det_distance) / 2.0
             delta_theta_f1 = np.arctan(x1 / self.det_distance) / 2.0
 
-            qz_max = 4.0*np.pi/self.tof_range[1]*self.constant * np.sin(theta + delta_theta_f0)
-            qz_min = 4.0*np.pi/self.tof_range[1]*self.constant * np.sin(theta + delta_theta_f1)
+            qz_max = 4.0*np.pi/self.tof_range[1]*self.constant * np.fabs(np.sin(theta + delta_theta_f0))
+            qz_min = 4.0*np.pi/self.tof_range[1]*self.constant * np.fabs(np.sin(theta + delta_theta_f1))
             mid_point = (qz_max + qz_min)/2.0
             print("Qz range: ", qz_min, mid_point, qz_max)
             self.summing_threshold = mid_point
@@ -584,6 +592,7 @@ class EventReflectivity(object):
             theta_f = theta + delta_theta_f
 
             qz = k * (np.sin(theta_f) + np.sin(theta))
+            qz = np.fabs(qz)
             qx = k * (np.cos(theta_f) - np.cos(theta))
             ki_z = k * np.sin(theta)
             kf_z = k * np.sin(theta_f)
@@ -611,26 +620,83 @@ class EventReflectivity(object):
 
         return refl, d_refl_sq
 
+    def gravity_correction(self, ws, wl_list):
+        """
+            Gravity correction for each event
+        """
+        # Xi reference would be the position of xi if the si slit were to be positioned
+        # at the sample. The distance from the sample to si is then xi_reference - xi.
+        xi_reference = 445
+        if ws.getInstrument().hasParameter("xi-reference"):
+            xi_reference = ws.getInstrument().getNumberParameter("xi-reference")[0]
 
-def compute_resolution(ws):
+        # Distance between the s1 and the sample
+        s1_sample_distance = 1485
+        if ws.getInstrument().hasParameter("s1-sample-distance"):
+            s1_sample_distance = ws.getInstrument().getNumberParameter("s1-sample-distance")[0]
+
+        xi = 310
+        if ws.getInstrument().hasParameter("BL4B:Mot:xi.RBV"):
+            xi = abs(ws.getRun().getProperty("BL4B:Mot:xi.RBV").value[0])
+
+        sample_si_distance = xi_reference - xi
+        slit_distance = s1_sample_distance - sample_si_distance
+
+        # Angle of the incident beam on a horizontal sample
+        theta_in=-4.0
+
+        # Calculation from the ILL paper. This works for inclined beams.
+        # Calculated theta is the angle on the sample
+
+        g = 9.8067                        # m/s^2
+        h = 6.6260715e-34                 # Js=kg m^2/s
+        mn = 1.67492749804e-27            # kg
+
+        v = h/(mn*wl_list*1e-10)
+        k = g/(2*v**2)
+
+        # Define the sample position as x=0, y=0. increasing x is towards moderator
+        xs=0
+
+        # positions of slits
+        x1 = sample_si_distance / 1000
+        x2 = (sample_si_distance + slit_distance) / 1000
+
+        #height of slits determined by incident theta, y=0 is the sample height
+        y1=x1*np.tan(theta_in*np.pi/180)
+        y2=x2*np.tan(theta_in*np.pi/180)
+
+        # This is the location of the top of the parabola
+        x0=(y1-y2+k*(x1**2-x2**2))/(2*k*(x1-x2))
+
+        # Angle is arctan(dy/dx) at sample
+        theta_sample = np.arctan(2*k*(x0-xs)) * 180/np.pi
+
+        return (theta_sample-theta_in) * np.pi / 180.0
+
+
+def compute_resolution(ws, default_dq=0.027):
     """
         Compute the Q resolution from the meta data.
     """
     # We can't compute the resolution if the value of xi is not in the logs.
     # Since it was not always logged, check for it here.
     if not ws.getRun().hasProperty("BL4B:Mot:xi.RBV"):
-        return None
+        # For old data, the resolution can't be computed, so use
+        # the standard value for the instrument
+        print("Could not find BL4B:Mot:xi.RBV: using supplied dQ/Q")
+        return default_dq
 
     # Xi reference would be the position of xi if the si slit were to be positioned
     # at the sample. The distance from the sample to si is then xi_reference - xi.
     xi_reference = 445
     if ws.getInstrument().hasParameter("xi-reference"):
-        ws.getInstrument().getNumberParameter("xi-reference")[0]
+        xi_reference = ws.getInstrument().getNumberParameter("xi-reference")[0]
 
     # Distance between the s1 and the sample
     s1_sample_distance = 1485
     if ws.getInstrument().hasParameter("s1-sample-distance"):
-        ws.getInstrument().getNumberParameter("s1-sample-distance")[0]
+        s1_sample_distance = ws.getInstrument().getNumberParameter("s1-sample-distance")[0]
 
     s1h = abs(ws.getRun().getProperty("S1VHeight").value[0])
     ths = abs(ws.getRun().getProperty("ths").value[0])

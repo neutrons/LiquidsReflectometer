@@ -30,10 +30,6 @@ from mantid.simpleapi import *
 event_file_path=sys.argv[1]
 output_dir=sys.argv[2]
 
-old_version = True
-if len(sys.argv) > 3 and sys.argv[3] == 'new':
-    old_version = False
-
 template_file = None
 if len(sys.argv) > 4:
     template_file = sys.argv[4]
@@ -48,6 +44,14 @@ event_file = os.path.split(event_file_path)[-1]
 run_number = event_file.split('_')[2]
 run_number = run_number.replace('.nxs.h5', '')
 
+# The new reduction will be used by default starting
+# with the experiment starting on Jan 24, 2023
+# so that old that can be re-reduced with the same templates
+old_version = run_number < 201577
+if len(sys.argv) > 3 and sys.argv[3] == 'new':
+    old_version = False
+if len(sys.argv) > 3 and sys.argv[3] == 'old':
+    old_version = True
 
 # Reduction options
 #-------------------------------------------------------------------------

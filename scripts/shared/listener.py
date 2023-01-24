@@ -33,6 +33,7 @@ def thread_function():
     ax = plt.subplot(2, 1, 1)
     ax2 = plt.subplot(2, 1, 2)
     previous_data = None
+    previous_delta = None
 
     while is_alive:
         if LIVE_DATA_WS in mtd:
@@ -52,7 +53,8 @@ def thread_function():
                 y = tof.readY(0)
                 
                 ax.clear()
-                ax.step(x, y, where='mid', label='Current')
+                total = np.sum(y)
+                ax.step(x, y/total, where='mid', label='Total')
                 
                 if previous_data:
                     tof_previous_data = Rebin(previous_data, [ws.getTofMin(), 300, ws.getTofMax()],
@@ -62,12 +64,13 @@ def thread_function():
                     x_prev = (x_prev[1:]+x_prev[:-1])/2.0
                     y_prev = tof_previous_data.readY(0)
                
-                    ax.step(x_prev, y_prev, where='mid')
+                    total = np.sum(y_prev)
+                    ax.step(x_prev, y_prev/total, where='mid')
 
                 ax.set_title('%g events | %s' % (n_events, time.ctime()))
                 ax.set_xlabel('TOF')
                 ax.set_ylabel('Events')
-                ax.legend(['current', 'previous'])
+                ax.legend(['Total', 'Previous'])
                 #ax.set_yscale('log')
                 #ax.set_xscale('log')
                 
@@ -75,13 +78,21 @@ def thread_function():
                 
                 if previous_data:
                     n_previous_events = previous_data.getNumberEvents()
-                    if n_events > n_previous_events:
+                    if n_events > n_previous_events:              
                         ax2.clear()
                         y_delta = y-y_prev
-                        ax2.step(x_prev, y_delta, where='mid', label='Previous')
+                        total_d = np.sum(y_delta)
+                        #ax2.step(x_prev, y_prev/total, where='mid', label='Total')
+                        ax2.step(x_prev, y_delta/total_d, where='mid', label='Difference')
+                                            
+                        if previous_delta is not None:
+                            ax2.step(x_prev, previous_delta, where='mid', label='Previous Diff')
+                        previous_delta = y_delta/total_d
+                        
                         ax2.set_title('Difference from previous [%g -> %g events]' % (n_previous_events, n_events))
                         ax2.set_xlabel('TOF')
                         ax2.set_ylabel('Events')
+                        ax2.legend(['Difference', 'Previous diff'])
                 else:
                     ax2.clear()
                     ax2.set_title('No data yet')

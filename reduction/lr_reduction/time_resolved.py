@@ -15,6 +15,8 @@ from mantid.kernel import *
 mantid.kernel.config.setLogLevel(3)
 
 from . import template
+from .event_reduction import compute_resolution
+
 
 def reduce_30Hz(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, scan_index=1, template_reference=None):
     """
@@ -41,39 +43,8 @@ def reduce_30Hz(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, scan_
                                scan_index=scan_index, template_reference=template_reference)
 
 
-def compute_resolution(ws, default_dq=0.03):
-    """
-        Compute the Q resolution from the meta data.
-        @param default_dq: resolution to use if we can't compute it
-    """
-
-    # We can't compute the resolution if the value of xi is not in the logs.
-    # Since it was not always logged, check for it here.
-    if not ws.getRun().hasProperty("BL4B:Mot:xi.RBV"):
-        print("Could not find BL4B:Mot:xi.RBV: using supplied dQ/Q")
-        return default_dq
-
-    # Xi reference would be the position of xi if the si slit were to be positioned
-    # at the sample. The distance from the sample to si is then xi_reference - xi.
-    xi_reference = 445
-    if ws.getInstrument().hasParameter("xi-reference"):
-        ws.getInstrument().getNumberParameter("xi-reference")[0]
-
-    # Distance between the s1 and the sample
-    s1_sample_distance = 1485
-    if ws.getInstrument().hasParameter("s1-sample-distance"):
-        ws.getInstrument().getNumberParameter("s1-sample-distance")[0]
-
-    s1h = abs(ws.getRun().getProperty("S1VHeight").value[0])
-    ths = abs(ws.getRun().getProperty("ths").value[0])
-    xi = abs(ws.getRun().getProperty("BL4B:Mot:xi.RBV").value[0])
-    sample_si_distance = xi_reference - xi
-    slit_distance = s1_sample_distance - sample_si_distance
-    dq_over_q = s1h / slit_distance * 180 / 3.1416 / ths
-    return dq_over_q
-
-
-def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, scan_index=1, template_reference=None):
+def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, scan_index=1,
+                        template_reference=None, q_summing=False):
     """
         Perform 30Hz reduction
         @param meas_ws_30Hz: Mantid workspace of the data we want to reduce
@@ -84,12 +55,15 @@ def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, sca
     """
     # Reduce the reference at 30Hz
     if template_reference is None:
-        r_ref = template.process_from_template_ws(ref_ws_30Hz, template_data, normalize=False)
+        r_ref = template.process_from_template_ws(ref_ws_30Hz, template_data,
+                                                  q_summing=q_summing, normalize=False)
     else:
-        r_ref = template.process_from_template_ws(ref_ws_30Hz, template_reference, normalize=False)
+        r_ref = template.process_from_template_ws(ref_ws_30Hz, template_reference,
+                                                  q_summing=q_summing, normalize=False)
 
     # Reduce the sample data at 30Hz
-    r_meas = template.process_from_template_ws(meas_ws_30Hz, template_data, normalize=False)
+    r_meas = template.process_from_template_ws(meas_ws_30Hz, template_data,
+                                               q_summing=q_summing, normalize=False)
 
     # Identify the bins we need to overlap with the 30Hz measurement
     # The assumption is that the binning is the same
@@ -124,6 +98,7 @@ def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, sca
                          +(r_meas[1][_q_idx_meas30]/r_ref[1][_q_idx_ref30]**2*data_60Hz[1][_q_idx_60]*r_ref[2][_q_idx_ref30])**2)
 
     print("Q range: %s - %s" % (r_meas[0][0], r_meas[0][_q_idx_meas30][-1]))
+    print("Constant-Q binning: %s" % str(q_summing))
     q = r_meas[0][_q_idx_meas30]
     # Skip infinite points if they exist, and skip the first point which
     # often has binning artifact
@@ -141,13 +116,14 @@ def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, sca
 
 
 def reduce_30Hz_slices(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, 
-                       time_interval, output_dir, scan_index=1, create_plot=True, template_reference=None):
+                       time_interval, output_dir, scan_index=1, create_plot=True,
+                       template_reference=None, q_summing=False):
 
     meas_ws_30Hz = api.LoadEventNexus("REF_L_%s" % meas_run_30Hz)
 
     return reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, 
                                  time_interval, output_dir, scan_index=scan_index, create_plot=create_plot,
-                                template_reference=template_reference)
+                                 template_reference=template_reference, q_summing=False)
 
 def reduce_60Hz_slices(meas_run, template_file,
                        time_interval, output_dir, scan_index=1, create_plot=True):
@@ -159,7 +135,7 @@ def reduce_60Hz_slices(meas_run, template_file,
 
 def reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, 
                           time_interval, output_dir, scan_index=1, create_plot=True,
-                          template_reference=None):
+                          template_reference=None, q_summing=False):
     """
         Perform 30Hz reduction
         @param meas_ws_30Hz: workspace of the data we want to reduce
@@ -174,7 +150,7 @@ def reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30
                    ref_run_30Hz=ref_run_30Hz, ref_data_60Hz=ref_data_60Hz,
                    template_30Hz=template_30Hz, time_interval=time_interval,
                    output_dir=output_dir, scan_index=scan_index,
-                   template_reference=template_reference)
+                   template_reference=template_reference, q_summing=q_summing)
     with open(os.path.join(output_dir, 'options.json'), 'w') as fp:
         json.dump(options, fp)
 
@@ -233,7 +209,8 @@ def reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30
         print("workspace %s has %d events" % (name, tmpws.getNumberEvents()))
         try:
             _reduced = reduce_30Hz_from_ws(tmpws, ref_ws_30Hz, data_60Hz, template_data,
-                                           scan_index=scan_index, template_reference=template_reference)
+                                           scan_index=scan_index, template_reference=template_reference,
+                                           q_summing=q_summing)
             # Remove first point
             reduced.append(_reduced)
             _filename = 'r{0}_t{1:06d}.txt'.format(meas_run_30Hz, int(total_time))

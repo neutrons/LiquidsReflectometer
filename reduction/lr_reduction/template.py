@@ -158,16 +158,17 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     # Load normalization run
     ws_db = api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
 
-    # Get the angle offset
-    offset = template_data.angle_offset
-
     # If we run in theta-theta geometry, we'll need thi
     thi_value = ws_sc.getRun()['thi'].value[0]
-    theta = np.fabs(ws_sc.getRun()['ths'].value[0]) + offset
-    _wl = ws_sc.getRun()['LambdaRequest'].value[0]
-    print('wl=%g; ths=%g; offset=%g' % (_wl, theta, offset))
+    ths_value = ws_sc.getRun()['ths'].value[0]
 
-    theta = theta * np.pi / 180.
+    # NOTE: An offset is no longer used be default. To use itm we can use
+    # the EventReflectivity directly.
+
+    _wl = ws_sc.getRun()['LambdaRequest'].value[0]
+    print('wl=%g; ths=%g; thi=%g; No offset' % (_wl, ths_value, thi_value))
+
+    theta = ths_value * np.pi / 180.
 
     # Get the reduction parameters from the template
     peak = template_data.data_peak_range

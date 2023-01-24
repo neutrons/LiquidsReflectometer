@@ -29,6 +29,8 @@ if __name__ == "__main__":
                                   help='Template scan index', required=False, default=1)
     dynanic30_parser.add_argument('--no-plot', dest='create_plot', action='store_false')
     dynanic30_parser.set_defaults(create_plot=True)
+    dynanic30_parser.add_argument('--qsumming', dest='q_summing', action='store_true')
+    dynanic30_parser.set_defaults(q_summing=False)
 
     # Parse arguments
     args = parser.parse_args()
@@ -37,4 +39,5 @@ if __name__ == "__main__":
         print("Time-resolved reduction at 30Hz: run %s" % args.meas_run_30Hz)
         reduced = time_resolved.reduce_30Hz_slices(args.meas_run_30Hz, args.ref_run_30Hz, args.ref_data_60Hz, args.template_30Hz,
                                               time_interval=args.time_interval, output_dir=args.output_dir,
-                                              scan_index=args.scan_index, create_plot=args.create_plot)
+                                              scan_index=args.scan_index, create_plot=args.create_plot,
+                                              q_summing=args.q_summing)
