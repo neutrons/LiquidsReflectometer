@@ -36,7 +36,11 @@ if len(sys.argv) > 4:
 
 avg_overlap = False
 if len(sys.argv) > 5:
-    avg_overlap = sys.argv[5]
+    avg_overlap = sys.argv[5].lower() == 'true'
+
+const_q = False
+if len(sys.argv) > 6:
+    const_q = sys.argv[6].lower() == 'true'
 
 event_file = os.path.split(event_file_path)[-1]
 # The legacy format is REF_L_xyz_event.nxs
@@ -117,11 +121,13 @@ if old_version:
                              Refl1DModelParameters=REFL1D_PARS)
     first_run_of_set=int(output[1])
 else:
+    print("Average overlap: %s" % avg_overlap)
+    print("Constant-Q binning: %s" % const_q)
     from lr_reduction import workflow
     first_run_of_set = workflow.reduce(ws, template_file,
                                            output_dir, pre_cut=1, post_cut=1, 
                                            average_overlap=avg_overlap,
-                                           q_summing=False, bck_in_q=False)
+                                           q_summing=const_q, bck_in_q=False)
 
 #-------------------------------------------------------------------------
 # Produce plot for the web monitor

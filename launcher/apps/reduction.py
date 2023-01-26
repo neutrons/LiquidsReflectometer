@@ -55,18 +55,27 @@ class Reduction(QWidget):
         self.select_version_check.setChecked(False)
         layout.addWidget(self.select_version_check, 5, 2)
 
+        # Select const-q binning
+        self.const_q_label = QLabel(self)
+        self.const_q_label.setText("Constant-Q binning")
+        self.const_q_label.setAlignment(QtCore.Qt.AlignRight)
+        layout.addWidget(self.const_q_label, 6, 1)
+        self.const_q_check = QtWidgets.QCheckBox()
+        self.const_q_check.setChecked(False)
+        layout.addWidget(self.const_q_check, 6, 2)
+
         # Select how to treat overlap
         self.average_overlapp_label = QLabel(self)
         self.average_overlapp_label.setText("Average overlapping points")
         self.average_overlapp_label.setAlignment(QtCore.Qt.AlignRight)
-        layout.addWidget(self.average_overlapp_label, 6, 1)
+        layout.addWidget(self.average_overlapp_label, 7, 1)
         self.average_overlapp_check = QtWidgets.QCheckBox()
         self.average_overlapp_check.setChecked(True)
-        layout.addWidget(self.average_overlapp_check, 6, 2)
+        layout.addWidget(self.average_overlapp_check, 7, 2)
 
         # Process button
         self.perform_reduction = QPushButton('Reduce')
-        layout.addWidget(self.perform_reduction, 7, 1)
+        layout.addWidget(self.perform_reduction, 8, 1)
 
         # connections
         self.choose_template.clicked.connect(self.template_selection)
@@ -81,6 +90,8 @@ class Reduction(QWidget):
         use_old = self.select_version_check.isChecked()
         self.average_overlapp_check.setEnabled(not use_old)
         self.average_overlapp_label.setEnabled(not use_old)
+        self.const_q_check.setEnabled(not use_old)
+        self.const_q_label.setEnabled(not use_old)
 
     def template_selection(self):
         _template_file, _ = QFileDialog.getOpenFileName(self, 'Open file',
@@ -105,6 +116,8 @@ class Reduction(QWidget):
         self.select_version_check.setChecked(_use_old=='true')
         _avg = self.settings.value("reduction_avg_overlap", "true")
         self.average_overlapp_check.setChecked(_avg=='true')
+        _const_q = self.settings.value("reduction_const_q", "false")
+        self.const_q_check.setChecked(_const_q=='true')
 
     def save_settings(self):
         self.settings.setValue('reduction_template', self.template_path.text())
@@ -112,6 +125,7 @@ class Reduction(QWidget):
         self.settings.setValue('reduction_last_run_number', self.last_run_number_ledit.text())
         self.settings.setValue('reduction_use_old', self.select_version_check.isChecked())
         self.settings.setValue('reduction_avg_overlap', self.average_overlapp_check.isChecked())
+        self.settings.setValue('reduction_const_q', self.const_q_check.isChecked())
 
     def check_inputs(self):
         error = None
@@ -157,6 +171,7 @@ class Reduction(QWidget):
             options.append('new')
             options.append(self.template_path.text())
             options.append(str(self.average_overlapp_check.isChecked()))
+            options.append(str(self.const_q_check.isChecked()))
         else:
             options.append('old')
             options.append(self.template_path.text())

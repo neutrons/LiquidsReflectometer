@@ -35,8 +35,14 @@ avg_overlap = True
 if len(sys.argv) > 6:
     avg_overlap = sys.argv[6]
 
+const_q = False
+if len(sys.argv) > 7:
+    const_q = sys.argv[7]
+
 print("Using new version: %s" % new_version)
 print("Using template: %s" % template_file)
+print("  Average overlap: %s" % avg_overlap)
+print("  Constant-Q binning: %s" % const_q)
 
 t_0 = time.time()
 for r in range(first_run, last_run+1):
@@ -47,11 +53,12 @@ for r in range(first_run, last_run+1):
     else:
         print("Processing %s" % _data_file_path)
         if new_version:
-            cmd = "%s /SNS/REF_L/shared/autoreduce/reduce_REF_L.py %s %s new %s %s" % (PYTHON_CMD,
+            cmd = "%s /SNS/REF_L/shared/autoreduce/reduce_REF_L.py %s %s new %s %s %s" % (PYTHON_CMD,
                                                                                          _data_file_path,
                                                                                          _output_dir,
                                                                                          template_file,
-                                                                                         avg_overlap)
+                                                                                         avg_overlap,
+                                                                                         const_q)
         else:
             if template_file is not None:
                 cmd = "%s /SNS/REF_L/shared/autoreduce/reduce_REF_L.py %s %s old %s" % (PYTHON_CMD,
