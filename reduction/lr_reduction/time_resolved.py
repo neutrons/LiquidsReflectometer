@@ -67,29 +67,31 @@ def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, sca
 
     # Identify the bins we need to overlap with the 30Hz measurement
     # The assumption is that the binning is the same
-    _tolerance = 0.0001
     _max_q = min(r_ref[0].max(), r_meas[0].max())
     _min_q = max(r_ref[0].min(), r_meas[0].min())
 
-    print("60Hz:      %g %g" % (data_60Hz[0].min(), data_60Hz[0].max()))
-    print("Ref 30Hz:  %g %g" % (r_meas[0].min(), r_meas[0].max()))
-    print("Meas 30Hz: %g %g" % (r_ref[0].min(), r_ref[0].max()))
+    _binning_60hz = (data_60Hz[0][1]-data_60Hz[0][0])/data_60Hz[0][0]
+    _binning_ref = (r_ref[0][1]-r_ref[0][0])/r_ref[0][0]
+    _binning_meas = (r_meas[0][1]-r_meas[0][0])/r_meas[0][0]
 
-    _q_idx_60 = np.asarray(np.where((data_60Hz[0] > _min_q-_tolerance) & (data_60Hz[0] < _max_q+_tolerance)))[0]
-    _q_idx_meas30 = np.asarray(np.where((r_meas[0] > _min_q-_tolerance) & (r_meas[0] < _max_q+_tolerance)))[0]
-    _q_idx_ref30 = np.asarray(np.where((r_ref[0] > _min_q-_tolerance) & (r_ref[0] < _max_q+_tolerance)))[0]
+    if not _binning_60hz == _binning_ref:
+        print("ERROR: The binning of the 60 Hz reference is not the same as the dynamic template")
 
-    if not data_60Hz[0][_q_idx_60].shape[0] == r_meas[0][_q_idx_ref30].shape[0]:
-        print("60Hz reference may have been reduced with different binning!")
+    # The tolerance will be half a bin
+    _tolerance = _binning_ref/2.0
 
-    # Confirm identical binning
-    _sum = np.sum(data_60Hz[0][_q_idx_60]-r_ref[0][_q_idx_ref30])
-    if _sum > r_ref[0][0]/100:
-        print("Binning 60Hz and ref 30Hz not identical!")
+    print("60Hz:      %g %g    [%g]" % (data_60Hz[0].min(), data_60Hz[0].max(), _binning_60hz))
+    print("Ref 30Hz:  %g %g    [%g]" % (r_meas[0].min(), r_meas[0].max(), _binning_ref))
+    print("Meas 30Hz: %g %g    [%g]" % (r_ref[0].min(), r_ref[0].max(), _binning_meas))
 
-    _sum = np.sum(data_60Hz[0][_q_idx_60]-r_meas[0][_q_idx_meas30])
-    if _sum > r_ref[0][0]/100:
-        print("Binning 60Hz and meas 30Hz not identical!")
+    _q_idx_60 = np.asarray(np.where((data_60Hz[0] > _min_q*(1-_tolerance)) & (data_60Hz[0] < _max_q*(1+_tolerance))))[0]
+    _q_idx_meas30 = np.asarray(np.where((r_meas[0] > _min_q*(1-_tolerance)) & (r_meas[0] < _max_q*(1+_tolerance))))[0]
+    _q_idx_ref30 = np.asarray(np.where((r_ref[0] > _min_q*(1-_tolerance)) & (r_ref[0] < _max_q*(1+_tolerance))))[0]
+
+    if not data_60Hz[0][_q_idx_60].shape[0] == r_ref[0][_q_idx_ref30].shape[0]:
+        print("\n\n60Hz reference may have been reduced with different binning!")
+        print("Array sizes: %g %g %g" % (len(_q_idx_60), len(_q_idx_meas30), len(_q_idx_ref30)))
+        print("Remember to average overlapping points!\n\n")
 
     r_q_final = r_meas[1][_q_idx_meas30]/r_ref[1][_q_idx_ref30]*data_60Hz[1][_q_idx_60]
 
@@ -100,9 +102,9 @@ def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, sca
     print("Q range: %s - %s" % (r_meas[0][0], r_meas[0][_q_idx_meas30][-1]))
     print("Constant-Q binning: %s" % str(q_summing))
     q = r_meas[0][_q_idx_meas30]
-    # Skip infinite points if they exist, and skip the first point which
+    # Skip infinite points if they exist, and skip the first two points which
     # often has binning artifact
-    _idx = (q > r_meas[0][0]) & (r_q_final < np.inf)
+    _idx = (q > r_meas[0][1]) & (r_q_final < np.inf) & (q < r_meas[0][-2]) 
 
     # Q resolution
     #   Assume a constant term of 0 unless it is specified
