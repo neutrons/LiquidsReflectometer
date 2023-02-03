@@ -35,3 +35,5 @@ It can read and write the LR standard output files.
  - Launcher: Add alternate output directory
  - Launcher: Add time-resolved option to use the new reduction
  - Test bck in Q
+ - Add option to skip background subtraction
+ - Remove direct beam background

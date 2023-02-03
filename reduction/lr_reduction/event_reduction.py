@@ -78,7 +78,7 @@ class EventReflectivity(object):
             :param signal_peak: pixel min and max for the specular peak
             :param signal_bck: pixel range of the background [if None, the background won't be subtracted]
             :param norm_peak: pixel range of the direct beam peak
-            :param norm_bck: pixel range of the direct beam background [if None, the background won't be subtracted]
+            :param norm_bck: direct background subtraction is not used [deprecated]
             :param specular_pixel: pixel of the specular peak
             :param signal_low_res: pixel range of the specular peak out of the scattering plane
             :param norm_low_res: pixel range of the direct beam out of the scattering plane
@@ -95,7 +95,7 @@ class EventReflectivity(object):
         self.signal_peak = signal_peak
         self.signal_bck = signal_bck
         self.norm_peak = norm_peak
-        self.norm_bck = norm_bck
+        self.norm_bck = None
         self.signal_low_res = signal_low_res
         self.norm_low_res = norm_low_res
         self.specular_pixel = specular_pixel

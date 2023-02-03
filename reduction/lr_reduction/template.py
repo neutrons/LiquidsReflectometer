@@ -172,13 +172,16 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
 
     # Get the reduction parameters from the template
     peak = template_data.data_peak_range
-    peak_bck = [template_data.background_roi[0], template_data.background_roi[1]]
+    if template_data.subtract_background:
+        peak_bck = [template_data.background_roi[0], template_data.background_roi[1]]
+    else:
+        peak_bck = None
     peak_center = (peak[0]+peak[1])/2.0
     low_res = template_data.data_x_range
 
     norm_peak = template_data.norm_peak_range
     norm_low_res = template_data.norm_x_range
-    norm_bck = [template_data.norm_background_roi[0], template_data.norm_background_roi[1]]
+    norm_bck = None
 
     [tof_min, tof_max] = template_data.tof_range
     q_min = template_data.q_min
