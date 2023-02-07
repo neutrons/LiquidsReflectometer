@@ -145,7 +145,7 @@ def process_from_template(run_number, template_path, q_summing=False,
 
 def process_from_template_ws(ws_sc, template_data, q_summing=False,
                              tof_weighted=False, bck_in_q=False, clean=False,
-                             info=False, normalize=True):
+                             info=False, normalize=True, theta_value=None, ws_db=None):
     # Get the sequence number
     sequence_number = 1
     if ws_sc.getRun().hasProperty("sequence_number"):
@@ -156,7 +156,8 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
         template_data = read_template(template_data, sequence_number)
 
     # Load normalization run
-    ws_db = api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
+    if ws_db is None:
+        ws_db = api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
 
     # If we run in theta-theta geometry, we'll need thi
     thi_value = ws_sc.getRun()['thi'].value[0]
@@ -168,7 +169,10 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     _wl = ws_sc.getRun()['LambdaRequest'].value[0]
     print('wl=%g; ths=%g; thi=%g; No offset' % (_wl, ths_value, thi_value))
 
-    theta = ths_value * np.pi / 180.
+    if theta_value is not None:
+        theta = theta_value * np.pi / 180.
+    else:
+        theta = ths_value * np.pi / 180.
 
     # Get the reduction parameters from the template
     peak = template_data.data_peak_range

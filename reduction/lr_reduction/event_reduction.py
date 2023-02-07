@@ -64,6 +64,8 @@ class EventReflectivity(object):
     THETAF_VS_WL = 4
     INSTRUMENT_4A = 0
     INSTRUMENT_4B = 1
+    DEFAULT_4B_SAMPLE_DET_DISTANCE = 1.83
+    DEFAULT_4B_SOURCE_DET_DISTANCE = 15.75
 
     def __init__(self, scattering_workspace, direct_workspace,
                  signal_peak, signal_bck, norm_peak, norm_bck,
@@ -175,8 +177,8 @@ class EventReflectivity(object):
             Distance from source to sample was 13.63 meters prior to the source
             to detector distance being determined with Bragg edges to be 15.75 m. 
         """
-        self.det_distance = 1.83
-        source_sample_distance = 15.75 - self.det_distance # 13.63
+        self.det_distance = self.DEFAULT_4B_SAMPLE_DET_DISTANCE
+        source_sample_distance = self.DEFAULT_4B_SOURCE_DET_DISTANCE - self.det_distance # 13.63
         self.source_detector_distance = source_sample_distance + self.det_distance
 
     def __repr__(self):
@@ -455,6 +457,7 @@ class EventReflectivity(object):
                 # Gravity correction
                 d_theta = self.gravity_correction(ws, wl_list)
 
+                # Sign will depend on reflect up or down
                 x_distance = _pixel_width * (j - peak_position)
                 delta_theta_f = np.arctan(x_distance / self.det_distance) / 2.0
                 qz=4.0*np.pi/wl_list * np.sin(theta + delta_theta_f - d_theta)
@@ -587,6 +590,7 @@ class EventReflectivity(object):
             k = 2.0 * np.pi / wl_list
             wl_weights = 1.0/np.interp(wl_list, wl_bins, wl_dist, np.inf, np.inf)
 
+            #TODO: Sign with depend on reflect up or down
             x_distance = float(j-peak_position) * self.pixel_width
             delta_theta_f = np.arctan(x_distance / self.det_distance)
             theta_f = theta + delta_theta_f

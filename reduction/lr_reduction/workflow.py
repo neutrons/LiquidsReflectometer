@@ -3,6 +3,7 @@
 """
 import sys
 import os
+import json
 import numpy as np
 
 import mantid
@@ -11,6 +12,7 @@ import mantid.simpleapi as mtd_api
 from . import template
 from . import reduction_template_reader
 from . import output
+from . import event_reduction
 
 
 def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap=False,
@@ -102,3 +104,108 @@ def write_template(seq_list, run_list, template_file, output_dir):
     xml_str = reduction_template_reader.to_xml(new_data_sets)
     with open(os.path.join(output_dir, 'REFL_%s_auto_template.xml' % run_list[0]), 'w') as fd:
         fd.write(xml_str)
+
+
+def reduce_fixed_two_theta(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap=False,
+           q_summing=False, bck_in_q=False, peak_width=10, offset_from_first=True):
+    """
+    """
+    from . import peak_finding
+
+    print("\nProcessing: %s" % ws.getRunNumber())
+    # Get the sequence number
+    sequence_number = 1
+    sequence_id = 1
+    if ws.getRun().hasProperty("sequence_number"):
+        sequence_number = ws.getRun().getProperty("sequence_number").value[0]
+        sequence_id = ws.getRun().getProperty("sequence_id").value[0]
+
+    # Theta value that we are aiming for
+    ths_value = ws.getRun()['ths'].value[0]
+
+    # Read template so we can load the direct beam run
+    template_data = template.read_template(template_file, sequence_number)
+
+    # Load normalization run
+    ws_db = mtd_api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
+
+    # Look for parameters that might have been determined earlier for this measurement
+    # TODO: save the direct beam center too
+    options_file = os.path.join(output_dir, 'REFL_%s_options.json' % sequence_id)
+    if offset_from_first and sequence_number > 1 and os.path.isfile(options_file):
+        with open(options_file, 'r') as fd:
+            options = json.load(fd)
+        twotheta = 2*ths_value + options['twotheta_offset']
+        pixel_offset = options['pixel_offset']
+    else:
+        # Fit direct beam position
+        x_min=template_data.norm_peak_range[0]-25
+        x_max=template_data.norm_peak_range[1]+25
+        tof, _x, _y = peak_finding.process_data(ws_db, summed=True, tof_step=200)
+        peak_center = np.argmax(_y)
+        db_center, db_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min, x_max=x_max, center=peak_center)
+        print("    DB center: %g\t Width: %g from [%g %g]" % (db_center, db_width,
+                                                              template_data.norm_peak_range[0],
+                                                              template_data.norm_peak_range[1]))
+
+        # Fit the reflected beam position
+        x_min=template_data.data_peak_range[0]-peak_width
+        x_max=template_data.data_peak_range[1]+peak_width
+        tof, _x, _y = peak_finding.process_data(ws, summed=True, tof_step=200)
+        peak_center = np.argmax(_y)
+        sc_center, sc_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min, x_max=x_max, center=peak_center)
+        pixel_offset = sc_center - (template_data.data_peak_range[1] + template_data.data_peak_range[0])/2.0
+        print("    SC center: %g\t Width: %g" % (sc_center, sc_width))
+
+        pixel_width = float(ws.getInstrument().getNumberParameter("pixel-width")[0]) / 1000.0
+        sample_det_distance = event_reduction.EventReflectivity.DEFAULT_4B_SAMPLE_DET_DISTANCE
+        twotheta = np.arctan((db_center-sc_center)*pixel_width / sample_det_distance) / 2.0 * 180 / np.pi
+
+        # To test, we offset by ths
+        twotheta += 2.0 * ths_value
+
+        # If this is the first angle, keep the value for later
+        options = dict(twotheta_offset = twotheta - 2*ths_value,
+                       pixel_offset = pixel_offset)
+        with open(options_file, 'w') as fp:
+            json.dump(options, fp)
+    print("    Two-theta = %g" % twotheta)
+
+    # Modify the template with the fitted results
+    print("    Template peak: [%g %g]" % (template_data.data_peak_range[0],
+                                          template_data.data_peak_range[1]))
+
+    template_data.data_peak_range = np.rint(np.asarray(template_data.data_peak_range) + pixel_offset).astype(int)
+    template_data.background_roi = np.rint(np.asarray(template_data.background_roi) + pixel_offset).astype(int)
+    print("    New peak:      [%g %g]" % (template_data.data_peak_range[0],
+                                          template_data.data_peak_range[1]))
+    print("    New bck:       [%g %g]" % (template_data.background_roi[0],
+                                          template_data.background_roi[1]))
+
+    # Call the reduction using the template
+    qz_mid, refl, d_refl, meta_data = template.process_from_template_ws(ws, template_data,
+                                                                        q_summing=q_summing,
+                                                                        tof_weighted=q_summing,
+                                                                        bck_in_q=bck_in_q, info=True,
+                                                                        theta_value = twotheta/2.0,
+                                                                        ws_db = ws_db)
+
+    # Save partial results
+    coll = output.RunCollection()
+    npts = len(qz_mid)
+    coll.add(qz_mid[pre_cut:npts-post_cut], refl[pre_cut:npts-post_cut],
+             d_refl[pre_cut:npts-post_cut], meta_data=meta_data)
+    coll.save_ascii(os.path.join(output_dir, 'REFL_%s_%s_%s_partial.txt' % (meta_data['sequence_id'],
+                                                                            meta_data['sequence_number'],
+                                                                            meta_data['run_number'])),
+                    meta_as_json=True)
+
+    # Assemble partial results into a single R(q)
+    seq_list, run_list = assemble_results(meta_data['sequence_id'], output_dir, average_overlap)
+
+    # Save template
+    write_template(seq_list, run_list, template_file, output_dir)
+
+    # Return the sequence identifier
+    return run_list[0]
+
