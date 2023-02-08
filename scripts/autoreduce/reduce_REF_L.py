@@ -22,7 +22,7 @@ sys.path.append("/SNS/REF_L/shared/reduction")
 #sys.path.insert(0,"/opt/mantidnightly/bin")
 #sys.path.insert(1,"/opt/mantidnightly/lib")
 
-CONDA_ENV = 'mantid'
+CONDA_ENV = 'quicknxs'
 
 import mantid
 from mantid.simpleapi import *
@@ -51,7 +51,7 @@ run_number = run_number.replace('.nxs.h5', '')
 # The new reduction will be used by default starting
 # with the experiment starting on Jan 24, 2023
 # so that old that can be re-reduced with the same templates
-old_version = True #int(run_number) < 201578
+old_version = int(run_number) < 202553
 if len(sys.argv) > 3 and sys.argv[3] == 'new':
     old_version = False
 if len(sys.argv) > 3 and sys.argv[3] == 'old':
@@ -124,10 +124,16 @@ else:
     print("Average overlap: %s" % avg_overlap)
     print("Constant-Q binning: %s" % const_q)
     from lr_reduction import workflow
-    first_run_of_set = workflow.reduce(ws, template_file,
-                                           output_dir, pre_cut=1, post_cut=1, 
-                                           average_overlap=avg_overlap,
-                                           q_summing=const_q, bck_in_q=False)
+    if False:
+        first_run_of_set = workflow.reduce(ws, template_file,
+                                               output_dir, pre_cut=1, post_cut=1, 
+                                               average_overlap=avg_overlap,
+                                               q_summing=const_q, bck_in_q=False)
+    else:
+        first_run_of_set = workflow.reduce_fixed_two_theta(ws, template_file,
+                                                           output_dir, pre_cut=1, post_cut=1, 
+                                                           average_overlap=avg_overlap,
+                                                           q_summing=const_q, bck_in_q=False)
 
 #-------------------------------------------------------------------------
 # Produce plot for the web monitor

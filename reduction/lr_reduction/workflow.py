@@ -130,7 +130,6 @@ def reduce_fixed_two_theta(ws, template_file, output_dir, pre_cut=1, post_cut=1,
     ws_db = mtd_api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
 
     # Look for parameters that might have been determined earlier for this measurement
-    # TODO: save the direct beam center too
     options_file = os.path.join(output_dir, 'REFL_%s_options.json' % sequence_id)
     if offset_from_first and sequence_number > 1 and os.path.isfile(options_file):
         with open(options_file, 'r') as fd:
@@ -162,7 +161,7 @@ def reduce_fixed_two_theta(ws, template_file, output_dir, pre_cut=1, post_cut=1,
         twotheta = np.arctan((db_center-sc_center)*pixel_width / sample_det_distance) / 2.0 * 180 / np.pi
 
         # To test, we offset by ths
-        twotheta += 2.0 * ths_value
+        #twotheta += 2.0 * ths_value
 
         # If this is the first angle, keep the value for later
         options = dict(twotheta_offset = twotheta - 2*ths_value,
