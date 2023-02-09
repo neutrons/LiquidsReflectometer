@@ -37,4 +37,5 @@ It can read and write the LR standard output files.
  - Test bck in Q
  - Add option to skip background subtraction
  - Remove direct beam background
- - Constant-q binning: sign of delta pixel may depend on whether we reflect up or down 
+ - Constant-q binning: sign of delta pixel may depend on whether we reflect up or down
+ - Capture tthd when calibrating for fixed tthd so that we can use the calibration if tthd is moved

@@ -70,7 +70,7 @@ def assemble_results(first_run, output_dir, average_overlap=False):
     for item in file_list:
         if item.startswith("REFL_%s" % first_run) and item.endswith('partial.txt'):
             toks = item.split('_')
-            if not len(toks) == 5:
+            if not len(toks) == 5 or int(toks[2]) == 0:
                 continue
             seq_list.append(int(toks[2]))
             run_list.append(int(toks[3]))
@@ -128,14 +128,16 @@ def reduce_fixed_two_theta(ws, template_file, output_dir, pre_cut=1, post_cut=1,
 
     # Load normalization run
     ws_db = mtd_api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
+    tthd_value = ws.getRun()['tthd'].value[0]
 
     # Look for parameters that might have been determined earlier for this measurement
     options_file = os.path.join(output_dir, 'REFL_%s_options.json' % sequence_id)
     if offset_from_first and sequence_number > 1 and os.path.isfile(options_file):
         with open(options_file, 'r') as fd:
             options = json.load(fd)
-        twotheta = 2*ths_value + options['twotheta_offset']
         pixel_offset = options['pixel_offset']
+        tthd_calibration = options['tthd_db']
+        twotheta = 2*ths_value + options['twotheta_offset']
     else:
         # Fit direct beam position
         x_min=template_data.norm_peak_range[0]-25
@@ -160,12 +162,16 @@ def reduce_fixed_two_theta(ws, template_file, output_dir, pre_cut=1, post_cut=1,
         sample_det_distance = event_reduction.EventReflectivity.DEFAULT_4B_SAMPLE_DET_DISTANCE
         twotheta = np.arctan((db_center-sc_center)*pixel_width / sample_det_distance) / 2.0 * 180 / np.pi
 
-        # To test, we offset by ths
-        #twotheta += 2.0 * ths_value
+        # Store the tthd of the direct beam and account for the fact that it may be
+        # different from our reflected beam for this calibration data.
+        # This will allow us to be compatible with both fixed and moving detector arm.
+        tthd_db = ws_db.getRun()['tthd'].value[0]
+        twotheta = twotheta + tthd_value - tthd_db
 
         # If this is the first angle, keep the value for later
         options = dict(twotheta_offset = twotheta - 2*ths_value,
-                       pixel_offset = pixel_offset)
+                       pixel_offset = pixel_offset,
+                       tthd_db = tthd_db, tthd_sc = tthd_value)
         with open(options_file, 'w') as fp:
             json.dump(options, fp)
     print("    Two-theta = %g" % twotheta)

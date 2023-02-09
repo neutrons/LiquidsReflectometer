@@ -22,7 +22,7 @@ sys.path.append("/SNS/REF_L/shared/reduction")
 #sys.path.insert(0,"/opt/mantidnightly/bin")
 #sys.path.insert(1,"/opt/mantidnightly/lib")
 
-CONDA_ENV = 'quicknxs'
+CONDA_ENV = 'mantid'
 
 import mantid
 from mantid.simpleapi import *
@@ -107,6 +107,12 @@ data_type = ws.getRun().getProperty("data_type").value[0]
 # Set the constant term of the resolution
 SetInstrumentParameter(ws, ParameterName="dq-constant", Value="0.0", ParameterType="Number")
 
+# Determine whether we have to go through the legacy reduction to
+# process direct beams
+if not old_version and ws.getRun().hasProperty("data_type"):
+    data_type = ws.getRun().getProperty("data_type").value[0]
+    old_version = not data_type == 0
+
 if old_version:
     output = LRAutoReduction(#Filename=event_file_path,
                              InputWorkspace=ws,
@@ -124,7 +130,7 @@ else:
     print("Average overlap: %s" % avg_overlap)
     print("Constant-Q binning: %s" % const_q)
     from lr_reduction import workflow
-    if False:
+    if True:
         first_run_of_set = workflow.reduce(ws, template_file,
                                                output_dir, pre_cut=1, post_cut=1, 
                                                average_overlap=avg_overlap,
