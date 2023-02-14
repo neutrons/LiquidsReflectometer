@@ -154,5 +154,9 @@ def read_file(file_path):
         for l in fd.readlines():
             if l.startswith("# Meta:"):
                 _meta = json.loads(l[len("# Meta:"):-1])
-    _q, _r, _dr, _dq = np.loadtxt(file_path).T
+    try:
+        _q, _r, _dr, _dq = np.loadtxt(file_path).T
+    except:
+        print("Could not read file. It may have no points")
+        _q = _r = _dr = _dq = []
     return _q, _r, _dr, _dq, _meta

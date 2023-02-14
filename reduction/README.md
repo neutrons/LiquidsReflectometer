@@ -39,3 +39,5 @@ It can read and write the LR standard output files.
  - Remove direct beam background
  - Constant-q binning: sign of delta pixel may depend on whether we reflect up or down
  - Capture tthd when calibrating for fixed tthd so that we can use the calibration if tthd is moved
+ - In template.process_from_template_ws(), we should fit the peak center when doing const-q binning
+   instead of taking the center of the peak range.

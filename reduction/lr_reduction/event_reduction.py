@@ -193,7 +193,10 @@ class EventReflectivity(object):
         """
             Returns meta-data to be used/stored.
         """
-        start_time = self._ws_sc.getRun().getProperty("start_time").value
+        if self._ws_sc.getRun().hasProperty("start_time"):
+            start_time = self._ws_sc.getRun().getProperty("start_time").value
+        else:
+            start_time = 'live'
         experiment = self._ws_sc.getRun().getProperty("experiment_identifier").value
         run_number = self._ws_sc.getRun().getProperty("run_number").value
         sequence_number = int(self._ws_sc.getRun().getProperty("sequence_number").value[0])
@@ -240,12 +243,14 @@ class EventReflectivity(object):
         self.q_bins = self.q_bins[trim:]
 
         # Remove leading artifact from the wavelength coverage
+        # Remember that q_bins is longer than refl by 1 because
+        # it contains bin boundaries
         if clean and self.summing_threshold:
             print("Summing threshold: %g" % self.summing_threshold)
             idx = self.q_bins > self.summing_threshold
-            self.refl = self.refl[idx][1:]
-            self.d_refl = self.d_refl[idx][1:]
-            self.q_bins = self.q_bins[idx][1:]
+            self.refl = self.refl[idx[:-1]]
+            self.d_refl = self.d_refl[idx[:-1]]
+            self.q_bins = self.q_bins[idx]
 
         return self.q_bins, self.refl, self.d_refl
 
@@ -300,7 +305,7 @@ class EventReflectivity(object):
             or pixels next to the peak.
         """
         # Event weights for normalization
-        db_charge = self._ws_db.getRun()['gd_prtn_chrg'].value
+        db_charge = self._ws_db.getRun().getProtonCharge()
         wl_events = self._get_events(self._ws_db, self.norm_peak, self.norm_low_res)
         wl_dist, wl_bins = np.histogram(wl_events, bins=60)
         wl_dist = wl_dist/db_charge/(wl_bins[1]-wl_bins[0])
@@ -434,7 +439,7 @@ class EventReflectivity(object):
         """
             Assumes that the input workspace is normalized by proton charge.
         """
-        charge = ws.getRun()['gd_prtn_chrg'].value
+        charge = ws.getRun().getProtonCharge()
         _q_bins = self.q_bins if q_bins is None else q_bins
 
         refl = np.zeros(len(_q_bins)-1)
@@ -548,7 +553,7 @@ class EventReflectivity(object):
 
         _refl, _d_refl = self._off_specular(self._ws_sc, wl_dist, wl_middle, qx_bins, qz_bins,
                                             self.specular_pixel, self.theta, x_axis=x_axis)
-        db_charge = self._ws_db.getRun()['gd_prtn_chrg'].value
+        db_charge = self._ws_db.getRun().getProtonCharge()
         _refl *= db_charge * (wl_bins[1]-wl_bins[0])
         _d_refl *= db_charge * (wl_bins[1]-wl_bins[0])
 
@@ -572,7 +577,7 @@ class EventReflectivity(object):
         return qx_bins, qz_bins, _refl, _d_refl
 
     def _off_specular(self, ws, wl_dist, wl_bins, x_bins, z_bins, peak_position, theta, x_axis=None):
-        charge = ws.getRun()['gd_prtn_chrg'].value
+        charge = ws.getRun().getProtonCharge()
         refl = np.zeros([len(x_bins)-1, len(z_bins)-1])
         counts = np.zeros([len(x_bins)-1, len(z_bins)-1])
 

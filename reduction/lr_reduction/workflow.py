@@ -16,7 +16,7 @@ from . import event_reduction
 
 
 def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap=False,
-           q_summing=False, bck_in_q=False):
+           q_summing=False, bck_in_q=False, is_live=False):
     """
         Function called by reduce_REFL.py, which lives in /SNS/REF_L/shared/autoreduce
         and is called by the automated reduction workflow.
@@ -35,6 +35,7 @@ def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap
     qz_mid, refl, d_refl, meta_data = template.process_from_template_ws(ws, template_file,
                                                                         q_summing=q_summing,
                                                                         tof_weighted=q_summing,
+                                                                        clean=q_summing,
                                                                         bck_in_q=bck_in_q, info=True)
 
     # Save partial results
@@ -48,7 +49,8 @@ def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap
                     meta_as_json=True)
 
     # Assemble partial results into a single R(q)
-    seq_list, run_list = assemble_results(meta_data['sequence_id'], output_dir, average_overlap)
+    seq_list, run_list = assemble_results(meta_data['sequence_id'], output_dir,
+                                          average_overlap, is_live=is_live)
 
     # Save template
     write_template(seq_list, run_list, template_file, output_dir)
@@ -57,7 +59,7 @@ def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap
     return run_list[0]
 
 
-def assemble_results(first_run, output_dir, average_overlap=False):
+def assemble_results(first_run, output_dir, average_overlap=False, is_live=False):
     """
         Find related runs and assemble them in one R(q) data set
     """
@@ -76,9 +78,14 @@ def assemble_results(first_run, output_dir, average_overlap=False):
             run_list.append(int(toks[3]))
 
             # Read the partial data and add to a collection
-            coll.add_from_file(os.path.join(output_dir, item))
+            _, _, _, _, _meta = output.read_file(os.path.join(output_dir, item))
+            if is_live or not _meta['start_time'] == "live":
+                coll.add_from_file(os.path.join(output_dir, item))
 
-    coll.save_ascii(os.path.join(output_dir, 'REFL_%s_combined_data_auto.txt' % first_run))
+    output_file_name = 'REFL_%s_combined_data_auto.txt' % first_run
+    if is_live:
+        output_file_name = 'REFL_%s_live_estimate.txt' % first_run
+    coll.save_ascii(os.path.join(output_dir, output_file_name))
 
     return seq_list, run_list
 

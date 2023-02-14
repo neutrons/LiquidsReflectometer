@@ -180,6 +180,8 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
         peak_bck = [template_data.background_roi[0], template_data.background_roi[1]]
     else:
         peak_bck = None
+
+    #TODO: Fit this peak
     peak_center = (peak[0]+peak[1])/2.0
     low_res = template_data.data_x_range
 
