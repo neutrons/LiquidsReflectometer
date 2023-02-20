@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import sys
 import os
+import json
 import subprocess
 
 from qtpy import QtWidgets, QtGui, QtCore
@@ -75,8 +76,10 @@ class Dynamic30Hz(QWidget):
         layout.addWidget(self.perform_reduction_old, 7, 1)
         self.perform_reduction = QPushButton('Reduce [new]')
         layout.addWidget(self.perform_reduction, 7, 2)
-        self.perform_reduction_q = QPushButton('Reduce [Const-Q binning]')
-        layout.addWidget(self.perform_reduction_q, 8, 2)
+        #self.perform_reduction_q = QPushButton('Reduce [Const-Q binning]')
+        #layout.addWidget(self.perform_reduction_q, 8, 2)
+        self.load_settings = QPushButton('Load settings')
+        layout.addWidget(self.load_settings, 8, 2)
 
         # connections
         self.choose_template.clicked.connect(self.template_selection)
@@ -84,10 +87,43 @@ class Dynamic30Hz(QWidget):
         self.choose_output_dir.clicked.connect(self.output_dir_selection)
         self.perform_reduction_old.clicked.connect(self.reduce_old)
         self.perform_reduction.clicked.connect(self.reduce_new)
-        self.perform_reduction_q.clicked.connect(self.reduce_q)
+        #self.perform_reduction_q.clicked.connect(self.reduce_q)
+        self.load_settings.clicked.connect(self.load_settings_from_file)
 
         # Populate from previous session
         self.read_settings()
+
+    def load_settings_from_file(self):
+        """
+            Load the reduction options from a json file produced as the output
+            of an earlier reduction. This file is saved in the same directory
+            as the time-resolved reflectivity curves.
+        """
+        _settings_file, _ = QFileDialog.getOpenFileName(self, 'Open file',
+                                                        self.output_dir_label.text(),
+                                                        'Settings file (*.json)')
+
+        if os.path.isfile(_settings_file):
+            with open(_settings_file, 'r') as fd:
+                options = json.load(fd)
+
+                if 'template_30Hz' in options:
+                    self.template_path.setText(options['template_30Hz'])
+
+                if 'ref_data_60Hz' in options:
+                    self.ref_path.setText(options['ref_data_60Hz'])
+
+                if 'output_dir' in options:
+                    self.output_dir_label.setText(options['output_dir'])
+
+                if 'ref_run_30Hz' in options:
+                    self.ref_run_number_ledit.setText(str(options['ref_run_30Hz']))
+
+                if 'meas_run_30Hz' in options:
+                    self.data_run_number_ledit.setText(str(options['meas_run_30Hz']))
+
+                if 'time_interval' in options:
+                    self.time_slice_ledit.setText(str(options['time_interval']))
 
     def template_selection(self):
         _template_file, _ = QFileDialog.getOpenFileName(self, 'Open file',
