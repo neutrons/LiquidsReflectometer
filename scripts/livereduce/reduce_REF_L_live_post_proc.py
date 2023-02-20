@@ -62,8 +62,8 @@ if False and LIVE_DATA_WS in mtd_api.mtd:
                                            average_overlap=False,
                                            q_summing=False, bck_in_q=False, is_live=True)
 
-            reduced_data = os.path.join(output_dir, 'REFL_%s_combined_data_auto.txt' % first_run_of_set)
-            #reduced_data = os.path.join(output_dir, 'REFL_%s_live_estimate.txt' % first_run_of_set)
+            #reduced_data = os.path.join(output_dir, 'REFL_%s_combined_data_auto.txt' % first_run_of_set)
+            reduced_data = os.path.join(output_dir, 'REFL_%s_live_estimate.txt' % first_run_of_set)
             r = _data = np.loadtxt(reduced_data).T
             if plotting_ready:
                 plot_div = plot1d(run_number, [[r[0], r[1], r[2], r[3]]], instrument='REF_L', 

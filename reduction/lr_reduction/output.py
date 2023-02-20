@@ -4,6 +4,7 @@
 import json
 import numpy as np
 
+from . import VERSION
 
 class RunCollection():
     """
@@ -103,7 +104,7 @@ class RunCollection():
                 _meta = item['info']
                 if not initial_entry_written:
                     fd.write("# Experiment %s Run %s\n" % (_meta['experiment'], _meta['run_number']))
-                    fd.write("# Reduction v2 [2023]\n")
+                    fd.write("# Reduction %s\n" % VERSION)
                     fd.write("# Run title: %s\n" % _meta['run_title'])
                     fd.write("# Run start time: %s\n" % _meta['start_time'])
                     fd.write("# Reduction time: %s\n" % _meta['time'])

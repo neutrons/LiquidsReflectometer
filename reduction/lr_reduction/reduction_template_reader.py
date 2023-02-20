@@ -2,7 +2,10 @@
     RefRed template reader.
     Adapted from Mantid code.
 """
+import time
 import xml.dom.minidom
+
+from . import VERSION
 
 
 class ReductionParameters(object):
@@ -282,10 +285,15 @@ def to_xml(data_sets):
     """
         Create XML from the current data.
     """
-    _xml  = "<DataSeries>\n"
+    _xml = "<Reduction>\n"
+    _xml += "    <instrument_name>REFL</instrument_name>\n"
+    _xml += "    <timestamp>%s</timestamp>\n" % time.ctime()
+    _xml += "    <version>%s</version>\n" % VERSION
+    _xml  += "<DataSeries>\n"
     for item in data_sets:
         _xml += item.to_xml()
     _xml += "</DataSeries>\n"
+    _xml += "</Reduction>\n"
     return _xml
 
 def from_xml(xml_str):
