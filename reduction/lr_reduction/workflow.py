@@ -109,7 +109,7 @@ def write_template(seq_list, run_list, template_file, output_dir):
 
     # Save the template that was used
     xml_str = reduction_template_reader.to_xml(new_data_sets)
-    with open(os.path.join(output_dir, 'REFL_%s_auto_template.xml' % run_list[0]), 'w') as fd:
+    with open(os.path.join(output_dir, 'REF_L_%s_auto_template.xml' % run_list[0]), 'w') as fd:
         fd.write(xml_str)
 
 

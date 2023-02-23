@@ -30,7 +30,6 @@ It can read and write the LR standard output files.
 
 ### To-do list
  - Abstract out distances
- - Create time-resolved config file as part of the output so that we can easily run it again
  - Add extra options to template, like q-summing, pre/post-cut, etc...
  - Launcher: Add alternate output directory
  - Launcher: Add time-resolved option to use the new reduction
