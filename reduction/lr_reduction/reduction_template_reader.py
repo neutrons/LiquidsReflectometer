@@ -61,6 +61,10 @@ class ReductionParameters(object):
         self.overlap_lowest_error = True
         self.overlap_mean_value = False
 
+    def from_dict(self, data_dict):
+        for k, v in data_dict.items():
+            setattr(self, k, v)
+
     def to_xml(self):
         """
             Create XML from the current data.

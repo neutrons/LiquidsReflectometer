@@ -132,15 +132,19 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
 
 
 def process_from_template(run_number, template_path, q_summing=False,
-                          tof_weighted=False, bck_in_q=False, clean=False):
+                          tof_weighted=False, bck_in_q=False, clean=False, info=False):
     """
         The clean option removes leading zeros and the drop when doing q-summing
     """
+    # For backward compatibility, consider the case of a list of run numbers to be added
+    if ',' in str(run_number):
+        list_of_runs = str(run_number).split(',')
+        run_number = '+'.join(list_of_runs)
     # Load data
     ws_sc = api.Load("REF_L_%s" % run_number)
     return process_from_template_ws(ws_sc, template_path, q_summing=q_summing,
                                     tof_weighted=tof_weighted, bck_in_q=bck_in_q,
-                                    clean=clean)
+                                    clean=clean, info=info)
 
 
 def process_from_template_ws(ws_sc, template_data, q_summing=False,

@@ -177,9 +177,15 @@ class EventReflectivity(object):
             Distance from source to sample was 13.63 meters prior to the source
             to detector distance being determined with Bragg edges to be 15.75 m. 
         """
-        self.det_distance = self.DEFAULT_4B_SAMPLE_DET_DISTANCE
-        source_sample_distance = self.DEFAULT_4B_SOURCE_DET_DISTANCE - self.det_distance # 13.63
-        self.source_detector_distance = source_sample_distance + self.det_distance
+        if self._ws_sc.getInstrument().hasParameter("sample-det-distance"):
+            self.det_distance = self._ws_sc.getInstrument().getNumberParameter("sample-det-distance")[0]
+        else:
+            self.det_distance = self.DEFAULT_4B_SAMPLE_DET_DISTANCE
+
+        if self._ws_sc.getInstrument().hasParameter("source-det-distance"):
+            self.source_detector_distance = self._ws_sc.getInstrument().getNumberParameter("source-det-distance")[0]
+        else:
+            self.source_detector_distance = self.DEFAULT_4B_SOURCE_DET_DISTANCE
 
     def __repr__(self):
         output = "sample-det: %s\n" % self.det_distance
