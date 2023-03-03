@@ -56,10 +56,10 @@ class RunCollection():
 
         if self.average_overlap:
             # New full list of points
-            qz_all = [self.qz_all[0]]
-            refl_all = [self.refl_all[0]]
-            d_refl_all = [self.d_refl_all[0]]
-            d_qz_all = [self.d_qz_all[0]]
+            qz_all = []
+            refl_all = []
+            d_refl_all = []
+            d_qz_all = []
 
             # Average information for groups of points
             qz = self.qz_all[0]
