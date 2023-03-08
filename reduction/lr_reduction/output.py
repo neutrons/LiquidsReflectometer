@@ -4,7 +4,7 @@
 import json
 import numpy as np
 
-from . import VERSION
+from . import __version__ as VERSION
 
 class RunCollection():
     """

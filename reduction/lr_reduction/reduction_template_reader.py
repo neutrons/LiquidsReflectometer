@@ -5,7 +5,14 @@
 import time
 import xml.dom.minidom
 
-from . import VERSION
+from . import __version__ as VERSION
+
+# Get the mantid version being used, if available
+try:
+    import mantid
+    MANTID_VERSION = mantid.__version__
+except:
+    MANTID_VERSION = "None"
 
 
 class ReductionParameters(object):
@@ -293,6 +300,8 @@ def to_xml(data_sets):
     _xml += "    <instrument_name>REFL</instrument_name>\n"
     _xml += "    <timestamp>%s</timestamp>\n" % time.ctime()
     _xml += "    <version>%s</version>\n" % VERSION
+    _xml += "    <mantid_version>%s</mantid_version>\n" % MANTID_VERSION
+    _xml += "    <generator>lr_reduction-%s</generator>\n" % VERSION
     _xml  += "<DataSeries>\n"
     for item in data_sets:
         _xml += item.to_xml()
