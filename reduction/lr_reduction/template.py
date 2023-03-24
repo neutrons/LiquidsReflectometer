@@ -131,7 +131,7 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
     return a, b, a_error, b_error
 
 
-def process_from_template(run_number, template_path, q_summing=False,
+def process_from_template(run_number, template_path, q_summing=False, normalize=True,
                           tof_weighted=False, bck_in_q=False, clean=False, info=False):
     """
         The clean option removes leading zeros and the drop when doing q-summing
@@ -144,7 +144,7 @@ def process_from_template(run_number, template_path, q_summing=False,
     ws_sc = api.Load("REF_L_%s" % run_number)
     return process_from_template_ws(ws_sc, template_path, q_summing=q_summing,
                                     tof_weighted=tof_weighted, bck_in_q=bck_in_q,
-                                    clean=clean, info=info)
+                                    clean=clean, info=info, normalize=normalize)
 
 
 def process_from_template_ws(ws_sc, template_data, q_summing=False,
@@ -160,7 +160,7 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
         template_data = read_template(template_data, sequence_number)
 
     # Load normalization run
-    if ws_db is None:
+    if ws_db is None and normalize:
         ws_db = api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
 
     # If we run in theta-theta geometry, we'll need thi
@@ -225,6 +225,9 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     
         d_refl = np.sqrt(d_refl**2/a_q**2 + refl**2*d_a_q**2/a_q**4)
         refl /= a_q
+    else:
+        a = b = 1
+        err_a = err_b = 0
 
     # We can optionally return details about the reduction process
     if info:

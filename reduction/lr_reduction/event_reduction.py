@@ -115,9 +115,12 @@ class EventReflectivity(object):
             self._ws_sc = api.CropWorkspace(InputWorkspace=scattering_workspace,
                                             XMin=tof_range[0], XMax=tof_range[1],
                                             OutputWorkspace='_'+str(scattering_workspace))
-            self._ws_db = api.CropWorkspace(InputWorkspace=direct_workspace,
-                                            XMin=tof_range[0], XMax=tof_range[1],
-                                            OutputWorkspace='_'+str(direct_workspace))
+            if direct_workspace is not None:
+                self._ws_db = api.CropWorkspace(InputWorkspace=direct_workspace,
+                                                XMin=tof_range[0], XMax=tof_range[1],
+                                                OutputWorkspace='_'+str(direct_workspace))
+            else:
+                self._ws_db = None
         else:
             self._ws_sc = scattering_workspace
             self._ws_db = direct_workspace
