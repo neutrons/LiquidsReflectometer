@@ -133,12 +133,12 @@ else:
     from lr_reduction import workflow
     if True:
         first_run_of_set = workflow.reduce(ws, template_file,
-                                               output_dir, pre_cut=1, post_cut=1, 
+                                               output_dir, pre_cut=0, post_cut=0,
                                                average_overlap=avg_overlap,
                                                q_summing=const_q, bck_in_q=False)
     else:
         first_run_of_set = workflow.reduce_fixed_two_theta(ws, template_file,
-                                                           output_dir, pre_cut=1, post_cut=1, 
+                                                           output_dir, pre_cut=0, post_cut=0,
                                                            average_overlap=avg_overlap,
                                                            q_summing=const_q, bck_in_q=False)
 

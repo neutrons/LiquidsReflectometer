@@ -60,14 +60,6 @@ class ReductionParameters(object):
         self.incident_medium_list = ['air']
         self.incident_medium_index_selected = 0
 
-        # 4th column of ASCII file (q resolution)
-        self.fourth_column_dq0 = 0.000
-        self.fourth_column_dq_over_q = 0.027
-
-        # How to treat overlap values
-        self.overlap_lowest_error = True
-        self.overlap_mean_value = False
-
     def from_dict(self, data_dict):
         for k, v in data_dict.items():
             setattr(self, k, v)
@@ -113,8 +105,6 @@ class ReductionParameters(object):
         _xml += "<q_min>%s</q_min>\n" % str(self.q_min)
         _xml += "<q_step>%s</q_step>\n" % str(self.q_step)
         _xml += "<auto_q_binning>%s</auto_q_binning>\n" % str(self.auto_q_binning)
-        _xml += "<overlap_lowest_error>%s</overlap_lowest_error>\n" % str(self.overlap_lowest_error)
-        _xml += "<overlap_mean_value>%s</overlap_mean_value>\n" % str(self.overlap_mean_value)
 
         # Angle offset
         _xml += "<angle_offset>%s</angle_offset>\n" % str(self.angle_offset)
@@ -128,11 +118,6 @@ class ReductionParameters(object):
         # Incident medium
         _xml += "<incident_medium_list>%s</incident_medium_list>\n" % str(self.incident_medium_list[0])
         _xml += "<incident_medium_index_selected>%s</incident_medium_index_selected>\n" % str(self.incident_medium_index_selected)
-
-        # Fourth column (q resolution)
-        _xml += "<fourth_column_flag>True</fourth_column_flag>\n"
-        _xml += "<fourth_column_dq0>%s</fourth_column_dq0>\n" % str(self.fourth_column_dq0)
-        _xml += "<fourth_column_dq_over_q>%s</fourth_column_dq_over_q>\n" % str(self.fourth_column_dq_over_q)
 
         _xml += "</RefLData>\n"
 
@@ -210,10 +195,6 @@ class ReductionParameters(object):
         self.q_step = getFloatElement(instrument_dom, "q_step", default=self.q_step)
         self.auto_q_binning = getBoolElement(instrument_dom, "auto_q_binning", default=False)
 
-        # overlap_lowest_error
-        self.overlap_lowest_error = getBoolElement(instrument_dom, "overlap_lowest_error", default=True)
-        self.overlap_mean_value = getBoolElement(instrument_dom, "overlap_mean_value", default=False)
-
         # Angle offset
         self.angle_offset = getFloatElement(instrument_dom, "angle_offset", default=self.angle_offset)
         self.angle_offset_error = getFloatElement(instrument_dom, "angle_offset_error",
@@ -231,10 +212,6 @@ class ReductionParameters(object):
         else:
             self.incident_medium_list = ['H2O']
             self.incident_medium_index_selected = 0
-
-        # Fourth column (q resolution)
-        self.fourth_column_dq0 = getFloatElement(instrument_dom, "fourth_column_dq0")
-        self.fourth_column_dq_over_q = getFloatElement(instrument_dom, "fourth_column_dq_over_q")
 
 
 ###### Utility functions to read XML content ########################

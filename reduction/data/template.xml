@@ -45,7 +45,6 @@
    <norm_lambda_requested>15.0</norm_lambda_requested>
    <norm_dataset>198399</norm_dataset>
    <auto_q_binning>False</auto_q_binning>
-   <overlap_lowest_error>True</overlap_lowest_error>
    <angle_offset>0.01</angle_offset>
    <angle_offset_error>0.001</angle_offset_error>
    <q_step>0.02</q_step>
@@ -54,9 +53,6 @@
    <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
-   <fourth_column_flag>True</fourth_column_flag>
-   <fourth_column_dq0>0.0004</fourth_column_dq0>
-   <fourth_column_dq_over_q>0.023</fourth_column_dq_over_q>
    <slits_width_flag>True</slits_width_flag>
   </RefLData>
   <RefLData>
@@ -96,7 +92,6 @@
    <norm_lambda_requested>12.386</norm_lambda_requested>
    <norm_dataset>198400</norm_dataset>
    <auto_q_binning>False</auto_q_binning>
-   <overlap_lowest_error>True</overlap_lowest_error>
    <angle_offset>0.01</angle_offset>
    <angle_offset_error>0.001</angle_offset_error>
    <q_step>0.02</q_step>
@@ -105,9 +100,6 @@
    <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
-   <fourth_column_flag>True</fourth_column_flag>
-   <fourth_column_dq0>0.0004</fourth_column_dq0>
-   <fourth_column_dq_over_q>0.023</fourth_column_dq_over_q>
    <slits_width_flag>True</slits_width_flag>
   </RefLData>
   <RefLData>
@@ -147,7 +139,6 @@
    <norm_lambda_requested>9.74</norm_lambda_requested>
    <norm_dataset>198401</norm_dataset>
    <auto_q_binning>False</auto_q_binning>
-   <overlap_lowest_error>True</overlap_lowest_error>
    <angle_offset>0.01</angle_offset>
    <angle_offset_error>0.001</angle_offset_error>
    <q_step>0.02</q_step>
@@ -156,9 +147,6 @@
    <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
-   <fourth_column_flag>True</fourth_column_flag>
-   <fourth_column_dq0>0.0004</fourth_column_dq0>
-   <fourth_column_dq_over_q>0.023</fourth_column_dq_over_q>
    <slits_width_flag>True</slits_width_flag>
   </RefLData>
   <RefLData>
@@ -198,7 +186,6 @@
    <norm_lambda_requested>7.043</norm_lambda_requested>
    <norm_dataset>198402</norm_dataset>
    <auto_q_binning>False</auto_q_binning>
-   <overlap_lowest_error>True</overlap_lowest_error>
    <angle_offset>0.01</angle_offset>
    <angle_offset_error>0.001</angle_offset_error>
    <q_step>0.02</q_step>
@@ -207,9 +194,6 @@
    <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
-   <fourth_column_flag>True</fourth_column_flag>
-   <fourth_column_dq0>0.0004</fourth_column_dq0>
-   <fourth_column_dq_over_q>0.023</fourth_column_dq_over_q>
    <slits_width_flag>True</slits_width_flag>
   </RefLData>
   <RefLData>
@@ -249,7 +233,6 @@
    <norm_lambda_requested>4.25</norm_lambda_requested>
    <norm_dataset>198403</norm_dataset>
    <auto_q_binning>False</auto_q_binning>
-   <overlap_lowest_error>True</overlap_lowest_error>
    <angle_offset>0.01</angle_offset>
    <angle_offset_error>0.001</angle_offset_error>
    <q_step>0.02</q_step>
@@ -258,9 +241,6 @@
    <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
-   <fourth_column_flag>True</fourth_column_flag>
-   <fourth_column_dq0>0.0004</fourth_column_dq0>
-   <fourth_column_dq_over_q>0.023</fourth_column_dq_over_q>
    <slits_width_flag>True</slits_width_flag>
   </RefLData>
   <RefLData>
@@ -300,7 +280,6 @@
    <norm_lambda_requested>4.25</norm_lambda_requested>
    <norm_dataset>198403</norm_dataset>
    <auto_q_binning>False</auto_q_binning>
-   <overlap_lowest_error>True</overlap_lowest_error>
    <angle_offset>0.01</angle_offset>
    <angle_offset_error>0.001</angle_offset_error>
    <q_step>0.02</q_step>
@@ -309,9 +288,6 @@
    <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
-   <fourth_column_flag>True</fourth_column_flag>
-   <fourth_column_dq0>0.0004</fourth_column_dq0>
-   <fourth_column_dq_over_q>0.023</fourth_column_dq_over_q>
    <slits_width_flag>True</slits_width_flag>
   </RefLData>
   <RefLData>
@@ -351,7 +327,6 @@
    <norm_lambda_requested>4.25</norm_lambda_requested>
    <norm_dataset>198403</norm_dataset>
    <auto_q_binning>False</auto_q_binning>
-   <overlap_lowest_error>True</overlap_lowest_error>
    <angle_offset>0.01</angle_offset>
    <angle_offset_error>0.001</angle_offset_error>
    <q_step>0.02</q_step>
@@ -360,9 +335,6 @@
    <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
-   <fourth_column_flag>True</fourth_column_flag>
-   <fourth_column_dq0>0.0004</fourth_column_dq0>
-   <fourth_column_dq_over_q>0.023</fourth_column_dq_over_q>
    <slits_width_flag>True</slits_width_flag>
   </RefLData>
   <RefLData>
@@ -402,7 +374,6 @@
    <norm_lambda_requested>4.25</norm_lambda_requested>
    <norm_dataset>198403</norm_dataset>
    <auto_q_binning>False</auto_q_binning>
-   <overlap_lowest_error>True</overlap_lowest_error>
    <angle_offset>0.01</angle_offset>
    <angle_offset_error>0.001</angle_offset_error>
    <q_step>0.02</q_step>
@@ -411,9 +382,6 @@
    <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
-   <fourth_column_flag>True</fourth_column_flag>
-   <fourth_column_dq0>0.0004</fourth_column_dq0>
-   <fourth_column_dq_over_q>0.023</fourth_column_dq_over_q>
    <slits_width_flag>True</slits_width_flag>
   </RefLData>
   </DataSeries>
