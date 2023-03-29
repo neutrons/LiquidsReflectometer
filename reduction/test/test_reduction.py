@@ -72,7 +72,7 @@ def test_reduce_workflow():
     reduced_path = 'data/reference_rq.txt'
     if os.path.isfile(reduced_path):
         _data = np.loadtxt(reduced_path).T
-    
+
     reduced_path = os.path.join(output_dir, 'REFL_198409_combined_data_auto.txt')
     if os.path.isfile(reduced_path):
         _refl = np.loadtxt(reduced_path).T

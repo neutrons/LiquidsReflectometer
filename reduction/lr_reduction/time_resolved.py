@@ -74,8 +74,9 @@ def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, sca
     _binning_ref = (r_ref[0][1]-r_ref[0][0])/r_ref[0][0]
     _binning_meas = (r_meas[0][1]-r_meas[0][0])/r_meas[0][0]
 
-    if not _binning_60hz == _binning_ref:
+    if not np.fabs(_binning_60hz - _binning_ref) < 1e-5:
         print("ERROR: The binning of the 60 Hz reference is not the same as the dynamic template")
+        print("   %s <> %s" % (_binning_60hz, _binning_ref))
 
     # The tolerance will be half a bin
     _tolerance = _binning_ref/2.0
