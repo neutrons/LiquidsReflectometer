@@ -651,7 +651,7 @@ class EventReflectivity(object):
         # Distance between the s1 and the sample
         s1_sample_distance = 1485
         if ws.getInstrument().hasParameter("s1-sample-distance"):
-            s1_sample_distance = ws.getInstrument().getNumberParameter("s1-sample-distance")[0]
+            s1_sample_distance = ws.getInstrument().getNumberParameter("s1-sample-distance")[0]*1000
 
         xi = 310
         if ws.getInstrument().hasParameter("BL4B:Mot:xi.RBV"):
@@ -714,7 +714,7 @@ def compute_resolution(ws, default_dq=0.027):
     # Distance between the s1 and the sample
     s1_sample_distance = 1485
     if ws.getInstrument().hasParameter("s1-sample-distance"):
-        s1_sample_distance = ws.getInstrument().getNumberParameter("s1-sample-distance")[0]
+        s1_sample_distance = ws.getInstrument().getNumberParameter("s1-sample-distance")[0]*1000
 
     s1h = abs(ws.getRun().getProperty("S1VHeight").value[0])
     ths = abs(ws.getRun().getProperty("ths").value[0])
