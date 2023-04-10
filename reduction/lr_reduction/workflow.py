@@ -15,7 +15,7 @@ from . import output
 from . import event_reduction
 
 
-def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap=False,
+def reduce(ws, template_file, output_dir, average_overlap=False,
            q_summing=False, bck_in_q=False, is_live=False):
     """
         Function called by reduce_REFL.py, which lives in /SNS/REF_L/shared/autoreduce
@@ -24,8 +24,6 @@ def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap
         If average_overlap is used, overlapping points will be averaged, otherwise they
         will be left in the final data file.
 
-        :param pre_cut: number of points to cut at the start of the distribution
-        :param post_cut: number of points to cut at the end of the distribution
         :param average_overlap: if True, the overlapping points will be averaged
         :param q_summing: if True, constant-Q binning will be used
         :param bck_in_q: if True, and constant-Q binning is used, the background will be estimated
@@ -40,9 +38,7 @@ def reduce(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap
 
     # Save partial results
     coll = output.RunCollection()
-    npts = len(qz_mid)
-    coll.add(qz_mid[pre_cut:npts-post_cut], refl[pre_cut:npts-post_cut],
-             d_refl[pre_cut:npts-post_cut], meta_data=meta_data)
+    coll.add(qz_mid, refl, d_refl, meta_data=meta_data)
     coll.save_ascii(os.path.join(output_dir, 'REFL_%s_%s_%s_partial.txt' % (meta_data['sequence_id'],
                                                                             meta_data['sequence_number'],
                                                                             meta_data['run_number'])),
@@ -113,7 +109,7 @@ def write_template(seq_list, run_list, template_file, output_dir):
         fd.write(xml_str)
 
 
-def reduce_fixed_two_theta(ws, template_file, output_dir, pre_cut=1, post_cut=1, average_overlap=False,
+def reduce_fixed_two_theta(ws, template_file, output_dir, average_overlap=False,
            q_summing=False, bck_in_q=False, peak_width=10, offset_from_first=True):
     """
     """
@@ -204,9 +200,7 @@ def reduce_fixed_two_theta(ws, template_file, output_dir, pre_cut=1, post_cut=1,
 
     # Save partial results
     coll = output.RunCollection()
-    npts = len(qz_mid)
-    coll.add(qz_mid[pre_cut:npts-post_cut], refl[pre_cut:npts-post_cut],
-             d_refl[pre_cut:npts-post_cut], meta_data=meta_data)
+    coll.add(qz_mid, refl, d_refl, meta_data=meta_data)
     coll.save_ascii(os.path.join(output_dir, 'REFL_%s_%s_%s_partial.txt' % (meta_data['sequence_id'],
                                                                             meta_data['sequence_number'],
                                                                             meta_data['run_number'])),

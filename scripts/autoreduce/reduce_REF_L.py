@@ -16,13 +16,6 @@ warnings.simplefilter('ignore')
 # New reduction code
 sys.path.append("/SNS/REF_L/shared/reduction")
 
-
-#if ("MANTIDPATH" in os.environ):
-#    del os.environ["MANTIDPATH"]
-
-#sys.path.insert(0,"/opt/mantidnightly/bin")
-#sys.path.insert(1,"/opt/mantidnightly/lib")
-
 CONDA_ENV = 'mantid'
 
 import mantid
@@ -49,31 +42,12 @@ event_file = os.path.split(event_file_path)[-1]
 run_number = event_file.split('_')[2]
 run_number = run_number.replace('.nxs.h5', '')
 
-# The new reduction will be used by default starting
-# with the experiment starting on Jan 24, 2023
-# so that old that can be re-reduced with the same templates
-old_version = True #int(run_number) < 202553
+# The new reduction will be used by default starting in June 2023
+old_version = False
 if len(sys.argv) > 3 and sys.argv[3] == 'new':
     old_version = False
 if len(sys.argv) > 3 and sys.argv[3] == 'old':
     old_version = True
-
-# Reduction options
-#-------------------------------------------------------------------------
-# Wavelength below which we don't need the absolute normalization
-WL_CUTOFF = 10.0  
-
-NORMALIZE_TO_UNITY = False
-
-# Allowed values: dict or ""
-# D2O
-REFL1D_PARS = json.dumps(dict(back_sld=6.4,
-                              back_roughness=2.7,
-                              front_sld=0,
-                              layers=[],
-                              scale=1.0,
-                              background=0.0))
-#-------------------------------------------------------------------------
 
 # Load data for auto-reduction
 ws = LoadEventNexus(Filename=event_file_path)
@@ -96,17 +70,8 @@ if template_file is None:
 
 print("Using template: %s" % template_file)
 
-# Check the measurement geometry
-if ws.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
-    NORMALIZATION_TYPE = "WithReference"
-else:
-    NORMALIZATION_TYPE = "DirectBeam"
-
-# Determine whether this is data or whether we need to compute scaling factors
-data_type = ws.getRun().getProperty("data_type").value[0]
-
-# Set the constant term of the resolution
-SetInstrumentParameter(ws, ParameterName="dq-constant", Value="0.0", ParameterType="Number")
+# Check the measurement geometry. This will be useful later
+#if ws.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
 
 # Determine whether we have to go through the legacy reduction to
 # process direct beams
@@ -115,30 +80,27 @@ if not old_version and ws.getRun().hasProperty("data_type"):
     old_version = not data_type == 0
 
 if old_version:
+    SetInstrumentParameter(ws, ParameterName="dq-constant", Value="0.0", ParameterType="Number")
     output = LRAutoReduction(#Filename=event_file_path,
                              InputWorkspace=ws,
-                             ScaleToUnity=NORMALIZE_TO_UNITY,
-                             ScalingWavelengthCutoff=WL_CUTOFF,
+                             ScaleToUnity=False,
+                             ScalingWavelengthCutoff=10,
                              OutputDirectory=output_dir,
                              SlitTolerance=0.07,
                              ReadSequenceFromFile=True,
                              OrderDirectBeamsByRunNumber=True,
-                             TemplateFile=template_file,
-                             NormalizationType=NORMALIZATION_TYPE,
-                             Refl1DModelParameters=REFL1D_PARS)
+                             TemplateFile=template_file)
     first_run_of_set=int(output[1])
 else:
     print("Average overlap: %s" % avg_overlap)
     print("Constant-Q binning: %s" % const_q)
     from lr_reduction import workflow
     if True:
-        first_run_of_set = workflow.reduce(ws, template_file,
-                                               output_dir, pre_cut=0, post_cut=0,
-                                               average_overlap=avg_overlap,
-                                               q_summing=const_q, bck_in_q=False)
+        first_run_of_set = workflow.reduce(ws, template_file, output_dir,
+                                           average_overlap=avg_overlap,
+                                           q_summing=const_q, bck_in_q=False)
     else:
-        first_run_of_set = workflow.reduce_fixed_two_theta(ws, template_file,
-                                                           output_dir, pre_cut=0, post_cut=0,
+        first_run_of_set = workflow.reduce_fixed_two_theta(ws, template_file, output_dir,
                                                            average_overlap=avg_overlap,
                                                            q_summing=const_q, bck_in_q=False)
 

@@ -40,6 +40,10 @@ class ReductionParameters(object):
         self.data_files = [0]
         self.norm_file = 0
 
+        # Clean up options: cut first and last points as needed
+        self.pre_cut = 1
+        self.post_cut = 1
+
         # Q range
         self.q_min = 0.001
         self.q_step = 0.001
@@ -102,6 +106,8 @@ class ReductionParameters(object):
         _xml += "<norm_dataset>%s</norm_dataset>\n" % str(self.norm_file)
 
         # Q cut
+        _xml += "<pre_cut>%s</pre_cut>\n" % str(self.pre_cut)
+        _xml += "<post_cut>%s</post_cut>\n" % str(self.post_cut)
         _xml += "<q_min>%s</q_min>\n" % str(self.q_min)
         _xml += "<q_step>%s</q_step>\n" % str(self.q_step)
         _xml += "<auto_q_binning>%s</auto_q_binning>\n" % str(self.auto_q_binning)
@@ -191,6 +197,8 @@ class ReductionParameters(object):
         self.norm_file = getIntElement(instrument_dom, "norm_dataset")
 
         # Q cut
+        self.pre_cut = getIntElement(instrument_dom, "pre_cut", default=self.pre_cut)
+        self.post_cut = getIntElement(instrument_dom, "post_cut", default=self.post_cut)
         self.q_min = getFloatElement(instrument_dom, "q_min", default=self.q_min)
         self.q_step = getFloatElement(instrument_dom, "q_step", default=self.q_step)
         self.auto_q_binning = getBoolElement(instrument_dom, "auto_q_binning", default=False)

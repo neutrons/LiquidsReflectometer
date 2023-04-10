@@ -19,10 +19,6 @@ def test_full_reduction():
     """
     template_path = 'data/template.xml'
 
-    # Number of data points to cut at the beginning and end of each run
-    pre_cut = 1
-    post_cut = 1
-
     qz_all = []
     refl_all = []
     d_refl_all = []
@@ -35,11 +31,6 @@ def test_full_reduction():
         if first_run is None:
             first_run = run_number
             resolution = event_reduction.compute_resolution(ws_sc)
-
-        npts = len(qz_mid)
-        qz_mid = qz_mid[pre_cut:npts-post_cut]
-        refl = refl[pre_cut:npts-post_cut]
-        d_refl = d_refl[pre_cut:npts-post_cut]
 
         for i in range(len(qz_mid)):
             qz_all.append(qz_mid[i])
@@ -67,7 +58,7 @@ def test_reduce_workflow():
     for i in range(198409, 198417):
         ws = mtd_api.Load("REF_L_%s" % i)
         workflow.reduce(ws, template_path, output_dir=output_dir,
-                        pre_cut=1, post_cut=1, average_overlap=False)
+                        average_overlap=False)
 
     reduced_path = 'data/reference_rq.txt'
     if os.path.isfile(reduced_path):

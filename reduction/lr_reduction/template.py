@@ -229,6 +229,12 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
         a = b = 1
         err_a = err_b = 0
 
+    # Trim ends as needed
+    npts = len(qz_mid)
+    qz_mid = qz_mid[template_data.pre_cut:npts-template_data.post_cut]
+    refl = refl[template_data.pre_cut:npts-template_data.post_cut]
+    d_refl = d_refl[template_data.pre_cut:npts-template_data.post_cut]
+
     # We can optionally return details about the reduction process
     if info:
         meta_data = event_refl.to_dict()

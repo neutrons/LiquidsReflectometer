@@ -28,9 +28,11 @@ final output.
 Implements the logic to handle a collection of runs that maps a single R(q) curve.
 It can read and write the LR standard output files.
 
+### Release notes
+ - v2.0.8: move pre/post cuts to template.
+
 ### To-do list
- - Abstract out distances
- - Add extra options to template, like q-summing, pre/post-cut, etc...
+ - Add extra options to template, like q-summing, etc...
  - Launcher: Add alternate output directory
  - Launcher: Add time-resolved option to use the new reduction
  - Test bck in Q
