@@ -1,6 +1,6 @@
-# Experiment IPTS-28662 Run 198409
+# Experiment IPTS-1234 Run 198409
 # Reduction v2 [2023]
-# Run title: sample1_pcps_d2o_peg600_5pct-198409-1.
+# Run title: test
 # Run start time: 2022-12-07T17:50:56.376265667
 # Reduction time: Mon Jan 23 17:00:03 2023
 # Q summing: False
