@@ -8,7 +8,6 @@
 """
 import sys
 import os
-import json
 import time
 import warnings
 warnings.simplefilter('ignore')
@@ -44,8 +43,6 @@ run_number = run_number.replace('.nxs.h5', '')
 
 # The new reduction will be used by default starting in June 2023
 old_version = False
-if len(sys.argv) > 3 and sys.argv[3] == 'new':
-    old_version = False
 if len(sys.argv) > 3 and sys.argv[3] == 'old':
     old_version = True
 
@@ -158,4 +155,3 @@ if os.path.isfile(default_file_path):
         plot1d(run_number, [[x, y, dy, dx]], instrument='REF_L', 
                x_title=u"Q (1/A)", x_log=True,
                y_title="Reflectivity", y_log=True, show_dx=False)
-
