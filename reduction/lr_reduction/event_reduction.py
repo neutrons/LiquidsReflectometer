@@ -97,7 +97,7 @@ class EventReflectivity(object):
         self.signal_peak = signal_peak
         self.signal_bck = signal_bck
         self.norm_peak = norm_peak
-        self.norm_bck = None
+        self.norm_bck = norm_bck
         self.signal_low_res = signal_low_res
         self.norm_low_res = norm_low_res
         self.specular_pixel = specular_pixel
@@ -159,6 +159,12 @@ class EventReflectivity(object):
 
         # Q binning to use
         self.q_bins = get_q_binning(self.q_min, self.q_max, self.q_step)
+
+        # Catch options that can be turned off
+        if self.signal_low_res is None:
+            self.signal_low_res = [1, self.n_x-1]
+        if self.norm_low_res is None:
+            self.norm_low_res = [1, self.n_x-1]
 
     def extract_meta_data_4A(self):
         """
@@ -292,7 +298,10 @@ class EventReflectivity(object):
                                               theta=self.theta, q_summing=False)
 
             # Direct beam background could be added here. The effect will be negligible.
-
+            if self.norm_bck is not None:
+                norm_bck, d_norm_bck = self.norm_bck_subtraction()
+                norm -= norm_bck
+                d_norm = np.sqrt(d_norm**2 + d_norm_bck**2)
             db_bins = norm>0
 
             refl[db_bins] = refl[db_bins]/norm[db_bins]
@@ -334,7 +343,7 @@ class EventReflectivity(object):
         self.d_refl = d_refl
         return self.q_bins, refl, d_refl
 
-    def _roi_integration(self, peak, low_res, q_bins=None, wl_dist=None, wl_bins=None, q_summing=False):
+    def _roi_integration(self, ws, peak, low_res, q_bins=None, wl_dist=None, wl_bins=None, q_summing=False):
         """
             Integrate a region of interest and normalize by the number of included pixels.
 
@@ -344,7 +353,7 @@ class EventReflectivity(object):
             their position on the detector and place in the proper Q bin.
         """
         q_bins = self.q_bins if q_bins is None else q_bins
-        refl_bck, d_refl_bck = self._reflectivity(self._ws_sc, peak_position=0, q_bins=q_bins,
+        refl_bck, d_refl_bck = self._reflectivity(ws, peak_position=0, q_bins=q_bins,
                                                   peak=peak, low_res=low_res,
                                                   theta=self.theta, q_summing=q_summing,
                                                   wl_dist=wl_dist, wl_bins=wl_bins)
@@ -354,7 +363,7 @@ class EventReflectivity(object):
         d_refl_bck /= _pixel_area
         return refl_bck, d_refl_bck
 
-    def _bck_subtraction(self, peak, bck, low_res, normalize_to_single_pixel=False,
+    def _bck_subtraction(self, ws, peak, bck, low_res, normalize_to_single_pixel=False,
                          q_bins=None, wl_dist=None, wl_bins=None, q_summing=False):
         """
             Abstracted out background subtraction process.
@@ -372,7 +381,7 @@ class EventReflectivity(object):
             right_side = min(bck[1], peak[0]-1)
             _left = [bck[0], right_side]
             print("Left side background: [%s, %s]" % (_left[0], _left[1]))
-            refl_bck, d_refl_bck = self._roi_integration(peak=_left, low_res=low_res,
+            refl_bck, d_refl_bck = self._roi_integration(ws, peak=_left, low_res=low_res,
                                                          q_bins=q_bins, wl_dist=wl_dist,
                                                          wl_bins=wl_bins, q_summing=q_summing)
         # Background on the right of the peak only. We allow the user to overlap the peak on the left,
@@ -381,17 +390,17 @@ class EventReflectivity(object):
             left_side = max(bck[0], peak[1]+1)
             _right = [left_side, bck[1]]
             print("Right side background: [%s, %s]" % (_right[0], _right[1]))
-            refl_bck, d_refl_bck = self._roi_integration(peak=_right, low_res=low_res,
+            refl_bck, d_refl_bck = self._roi_integration(ws, peak=_right, low_res=low_res,
                                                          q_bins=q_bins, wl_dist=wl_dist,
                                                          wl_bins=wl_bins, q_summing=q_summing)
         # Background on both sides
         elif bck[0] < peak[0]-1 and bck[1] > peak[1]+1:
             _left = [bck[0], peak[0]-1]
-            refl_bck, d_refl_bck = self._roi_integration(peak=_left, low_res=low_res,
+            refl_bck, d_refl_bck = self._roi_integration(ws, peak=_left, low_res=low_res,
                                                          q_bins=q_bins, wl_dist=wl_dist,
                                                          wl_bins=wl_bins, q_summing=q_summing)
             _right = [peak[1]+1, bck[1]]
-            _refl_bck, _d_refl_bck = self._roi_integration(peak=_right, low_res=low_res,
+            _refl_bck, _d_refl_bck = self._roi_integration(ws, peak=_right, low_res=low_res,
                                                            q_bins=q_bins, wl_dist=wl_dist,
                                                            wl_bins=wl_bins, q_summing=q_summing)
             print("Background on both sides: [%s %s] [%s %s]" % (_left[0], _left[1], _right[0], _right[1]))
@@ -418,9 +427,16 @@ class EventReflectivity(object):
         """
             Higher-level call for background subtraction. Hides the ranges needed to define the ROI.
         """
-        return self._bck_subtraction(self.signal_peak, self.signal_bck, self.signal_low_res,
+        return self._bck_subtraction(self._ws_sc, self.signal_peak, self.signal_bck, self.signal_low_res,
                                      normalize_to_single_pixel=normalize_to_single_pixel, q_bins=q_bins,
                                      wl_dist=wl_dist, wl_bins=wl_bins, q_summing=q_summing)
+
+    def norm_bck_subtraction(self):
+        """
+            Higher-level call for background subtraction for the normalization run.
+        """
+        return self._bck_subtraction(self._ws_db, self.norm_peak, self.norm_bck, self.norm_low_res,
+                                     normalize_to_single_pixel=False)
 
     def slice(self, x_min=0.002, x_max=0.004, x_bins=None, z_bins=None,
               refl=None, d_refl=None, normalize=False):

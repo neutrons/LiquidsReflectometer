@@ -1,12 +1,9 @@
 <Reduction>
  <instrument_name>REFL</instrument_name>
- <timestamp>Wednesday, 07. December 2022 09:37AM</timestamp>
- <python_version>3.7.12 | packaged by conda-forge | (default, Oct 26 2021, 06:08:53) 
-[GCC 9.4.0]</python_version>
- <platform>Linux</platform>
- <architecture>x86_64</architecture>
- <mantid_version>6.2.0</mantid_version>
-<generator>RefRed</generator>
+ <timestamp>Wednesday, 12. April 2023 03:19PM</timestamp>
+ <version>2.0.9</version>
+ <mantid_version>6.4.0</mantid_version>
+<generator>RefRed-4.0.3+72.gf6793b3</generator>
  <DataSeries>
   <RefLData>
    <peak_selection_type>narrow</peak_selection_type>
@@ -30,8 +27,8 @@
    <x_min_pixel>70</x_min_pixel>
    <x_max_pixel>178</x_max_pixel>
    <x_range_flag>True</x_range_flag>
-   <tthd_value>-4.69</tthd_value>
-   <ths_value>-2.34</ths_value>
+   <tthd_value>-9.28</tthd_value>
+   <ths_value>-4.64</ths_value>
    <data_lambda_requested>15.0</data_lambda_requested>
    <norm_flag>True</norm_flag>
    <norm_x_range_flag>True</norm_x_range_flag>
@@ -77,8 +74,8 @@
    <x_min_pixel>70</x_min_pixel>
    <x_max_pixel>180</x_max_pixel>
    <x_range_flag>True</x_range_flag>
-   <tthd_value>-4.69</tthd_value>
-   <ths_value>-2.34</ths_value>
+   <tthd_value>-9.28</tthd_value>
+   <ths_value>-4.64</ths_value>
    <data_lambda_requested>12.386</data_lambda_requested>
    <norm_flag>True</norm_flag>
    <norm_x_range_flag>True</norm_x_range_flag>
@@ -124,8 +121,8 @@
    <x_min_pixel>70</x_min_pixel>
    <x_max_pixel>180</x_max_pixel>
    <x_range_flag>True</x_range_flag>
-   <tthd_value>-4.69</tthd_value>
-   <ths_value>-2.34</ths_value>
+   <tthd_value>-9.28</tthd_value>
+   <ths_value>-4.64</ths_value>
    <data_lambda_requested>9.74</data_lambda_requested>
    <norm_flag>True</norm_flag>
    <norm_x_range_flag>True</norm_x_range_flag>
@@ -171,8 +168,8 @@
    <x_min_pixel>70</x_min_pixel>
    <x_max_pixel>181</x_max_pixel>
    <x_range_flag>True</x_range_flag>
-   <tthd_value>-4.69</tthd_value>
-   <ths_value>-2.34</ths_value>
+   <tthd_value>-9.28</tthd_value>
+   <ths_value>-4.64</ths_value>
    <data_lambda_requested>7.043</data_lambda_requested>
    <norm_flag>True</norm_flag>
    <norm_x_range_flag>True</norm_x_range_flag>
@@ -218,8 +215,8 @@
    <x_min_pixel>70</x_min_pixel>
    <x_max_pixel>182</x_max_pixel>
    <x_range_flag>True</x_range_flag>
-   <tthd_value>-4.69</tthd_value>
-   <ths_value>-2.34</ths_value>
+   <tthd_value>-9.28</tthd_value>
+   <ths_value>-4.64</ths_value>
    <data_lambda_requested>4.25</data_lambda_requested>
    <norm_flag>True</norm_flag>
    <norm_x_range_flag>True</norm_x_range_flag>
@@ -265,8 +262,8 @@
    <x_min_pixel>70</x_min_pixel>
    <x_max_pixel>180</x_max_pixel>
    <x_range_flag>True</x_range_flag>
-   <tthd_value>-4.69</tthd_value>
-   <ths_value>-2.34</ths_value>
+   <tthd_value>-9.28</tthd_value>
+   <ths_value>-4.64</ths_value>
    <data_lambda_requested>4.25</data_lambda_requested>
    <norm_flag>True</norm_flag>
    <norm_x_range_flag>True</norm_x_range_flag>
@@ -312,8 +309,8 @@
    <x_min_pixel>70</x_min_pixel>
    <x_max_pixel>182</x_max_pixel>
    <x_range_flag>True</x_range_flag>
-   <tthd_value>-4.69</tthd_value>
-   <ths_value>-2.34</ths_value>
+   <tthd_value>-9.28</tthd_value>
+   <ths_value>-4.64</ths_value>
    <data_lambda_requested>4.25</data_lambda_requested>
    <norm_flag>True</norm_flag>
    <norm_x_range_flag>True</norm_x_range_flag>
@@ -342,7 +339,7 @@
    <from_peak_pixels>134</from_peak_pixels>
    <to_peak_pixels>148</to_peak_pixels>
    <peak_discrete_selection>N/A</peak_discrete_selection>
-   <background_flag>True</background_flag>
+   <background_flag>False</background_flag>
    <back_roi1_from>131</back_roi1_from>
    <back_roi1_to>151</back_roi1_to>
    <back_roi2_from>0</back_roi2_from>
@@ -359,8 +356,8 @@
    <x_min_pixel>70</x_min_pixel>
    <x_max_pixel>182</x_max_pixel>
    <x_range_flag>True</x_range_flag>
-   <tthd_value>-4.69</tthd_value>
-   <ths_value>-2.34</ths_value>
+   <tthd_value>-9.28</tthd_value>
+   <ths_value>-4.64</ths_value>
    <data_lambda_requested>4.25</data_lambda_requested>
    <norm_flag>True</norm_flag>
    <norm_x_range_flag>True</norm_x_range_flag>

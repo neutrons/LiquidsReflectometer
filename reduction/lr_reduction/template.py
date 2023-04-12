@@ -160,6 +160,7 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
         template_data = read_template(template_data, sequence_number)
 
     # Load normalization run
+    normalize = normalize and template_data.apply_normalization
     if ws_db is None and normalize:
         ws_db = api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
 
@@ -187,11 +188,23 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
 
     #TODO: Fit this peak
     peak_center = (peak[0]+peak[1])/2.0
-    low_res = template_data.data_x_range
+
+    if template_data.data_x_range_flag:
+        low_res = template_data.data_x_range
+    else:
+        low_res = None
 
     norm_peak = template_data.norm_peak_range
-    norm_low_res = template_data.norm_x_range
-    norm_bck = None
+    if template_data.norm_x_range_flag:
+        norm_low_res = template_data.norm_x_range
+    else:
+        norm_low_res = None
+
+    # We are not subtrating background for the direct beam
+    if template_data.subtract_norm_background:
+        norm_bck = template_data.norm_background_roi
+    else:
+        norm_bck = None
 
     [tof_min, tof_max] = template_data.tof_range
     q_min = template_data.q_min

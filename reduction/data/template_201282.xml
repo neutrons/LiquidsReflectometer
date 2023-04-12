@@ -39,7 +39,7 @@
    <norm_x_min>69</norm_x_min>
    <norm_from_peak_pixels>137</norm_from_peak_pixels>
    <norm_to_peak_pixels>145</norm_to_peak_pixels>
-   <norm_background_flag>True</norm_background_flag>
+   <norm_background_flag>False</norm_background_flag>
    <norm_from_back_pixels>134</norm_from_back_pixels>
    <norm_to_back_pixels>148</norm_to_back_pixels>
    <norm_lambda_requested>15.0</norm_lambda_requested>
@@ -90,7 +90,7 @@
    <norm_x_min>68</norm_x_min>
    <norm_from_peak_pixels>137</norm_from_peak_pixels>
    <norm_to_peak_pixels>147</norm_to_peak_pixels>
-   <norm_background_flag>True</norm_background_flag>
+   <norm_background_flag>False</norm_background_flag>
    <norm_from_back_pixels>134</norm_from_back_pixels>
    <norm_to_back_pixels>150</norm_to_back_pixels>
    <norm_lambda_requested>12.386</norm_lambda_requested>
@@ -141,7 +141,7 @@
    <norm_x_min>72</norm_x_min>
    <norm_from_peak_pixels>137</norm_from_peak_pixels>
    <norm_to_peak_pixels>147</norm_to_peak_pixels>
-   <norm_background_flag>True</norm_background_flag>
+   <norm_background_flag>False</norm_background_flag>
    <norm_from_back_pixels>134</norm_from_back_pixels>
    <norm_to_back_pixels>150</norm_to_back_pixels>
    <norm_lambda_requested>9.74</norm_lambda_requested>
@@ -192,7 +192,7 @@
    <norm_x_min>102</norm_x_min>
    <norm_from_peak_pixels>138</norm_from_peak_pixels>
    <norm_to_peak_pixels>147</norm_to_peak_pixels>
-   <norm_background_flag>True</norm_background_flag>
+   <norm_background_flag>False</norm_background_flag>
    <norm_from_back_pixels>135</norm_from_back_pixels>
    <norm_to_back_pixels>150</norm_to_back_pixels>
    <norm_lambda_requested>7.043</norm_lambda_requested>
@@ -243,7 +243,7 @@
    <norm_x_min>113</norm_x_min>
    <norm_from_peak_pixels>138</norm_from_peak_pixels>
    <norm_to_peak_pixels>147</norm_to_peak_pixels>
-   <norm_background_flag>True</norm_background_flag>
+   <norm_background_flag>False</norm_background_flag>
    <norm_from_back_pixels>135</norm_from_back_pixels>
    <norm_to_back_pixels>150</norm_to_back_pixels>
    <norm_lambda_requested>4.25</norm_lambda_requested>
@@ -294,7 +294,7 @@
    <norm_x_min>113</norm_x_min>
    <norm_from_peak_pixels>138</norm_from_peak_pixels>
    <norm_to_peak_pixels>147</norm_to_peak_pixels>
-   <norm_background_flag>True</norm_background_flag>
+   <norm_background_flag>False</norm_background_flag>
    <norm_from_back_pixels>135</norm_from_back_pixels>
    <norm_to_back_pixels>150</norm_to_back_pixels>
    <norm_lambda_requested>4.25</norm_lambda_requested>
@@ -345,7 +345,7 @@
    <norm_x_min>113</norm_x_min>
    <norm_from_peak_pixels>138</norm_from_peak_pixels>
    <norm_to_peak_pixels>147</norm_to_peak_pixels>
-   <norm_background_flag>True</norm_background_flag>
+   <norm_background_flag>False</norm_background_flag>
    <norm_from_back_pixels>135</norm_from_back_pixels>
    <norm_to_back_pixels>150</norm_to_back_pixels>
    <norm_lambda_requested>4.25</norm_lambda_requested>
