@@ -226,7 +226,8 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
                                            bck_in_q=bck_in_q, clean=clean, normalize=normalize)
     qz_mid = (qz[:-1] + qz[1:])/2.0
 
-    if normalize:
+    print("Normalization options: %s %s" % (normalize, template_data.scaling_factor_flag))
+    if normalize and template_data.scaling_factor_flag:
         # Get the scaling factors
         a, b, err_a, err_b = scaling_factor(template_data.scaling_factor_file, ws_sc)
     

@@ -57,7 +57,7 @@ class ReductionParameters(object):
     
         # Scaling factor file
         self.scaling_factor_file = ''
-        self.scaling_factor_file_flag = True
+        self.scaling_factor_flag = True
         self.slits_width_flag = True
 
         # Incident medium list and selected value
@@ -117,7 +117,7 @@ class ReductionParameters(object):
         _xml += "<angle_offset_error>%s</angle_offset_error>\n" % str(self.angle_offset_error)
 
         # scaling factor file name
-        _xml += "<scaling_factor_flag>%s</scaling_factor_flag>\n" % str(self.scaling_factor_file_flag)
+        _xml += "<scaling_factor_flag>%s</scaling_factor_flag>\n" % str(self.scaling_factor_flag)
         _xml += "<scaling_factor_file>%s</scaling_factor_file>\n" % str(self.scaling_factor_file)
         _xml += "<slits_width_flag>%s</slits_width_flag>\n" % str(self.slits_width_flag)
 
@@ -211,7 +211,7 @@ class ReductionParameters(object):
         # Scaling factor file and options
         self.scaling_factor_file = getStringElement(instrument_dom, "scaling_factor_file")
         self.slits_width_flag = getBoolElement(instrument_dom, "slits_width_flag")
-        self.scaling_factor_file_flag = getBoolElement(instrument_dom, "scaling_factor_flag")
+        self.scaling_factor_flag = getBoolElement(instrument_dom, "scaling_factor_flag")
 
         # Incident medium selected
         if getStringList(instrument_dom, "incident_medium_list") != []:
