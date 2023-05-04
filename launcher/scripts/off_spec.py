@@ -108,9 +108,11 @@ def plot_data(counts, wl, title, file_path, show=True):
     plt.ylabel('Counts')
     ax[1].set_yscale('log')
 
+    plt.savefig(file_path)
+
     if show:
         plt.show()
-    plt.savefig(file_path)
+
 
 
 if __name__ == "__main__":
