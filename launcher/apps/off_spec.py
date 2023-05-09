@@ -7,7 +7,8 @@ from qtpy import QtWidgets, QtGui, QtCore
 
 from qtpy.QtWidgets import (QWidget, QGridLayout,
                             QFileDialog, QLabel,
-                            QPushButton, QMessageBox)
+                            QPushButton, QMessageBox,
+                            QSpacerItem)
 
 
 DATA_FILE_DIRECTIVE = "Click to choose a file to process"
@@ -20,6 +21,8 @@ class OffSpec(QWidget):
         QWidget.__init__(self)
         self.setWindowTitle('Export off-spec data')
         layout = QGridLayout()
+        layout.setColumnStretch(1, 0)
+        layout.setColumnStretch(2, 1)
         self.setLayout(layout)
 
         self.settings = QtCore.QSettings()
@@ -47,10 +50,19 @@ class OffSpec(QWidget):
         self.output_dir_label = QLabel(self)
         layout.addWidget(self.output_dir_label, 3, 2)
 
+        spacer = QSpacerItem(20, 20, QtWidgets.QSizePolicy.Minimum,
+                             QtWidgets.QSizePolicy.Minimum)
+        layout.addItem(spacer, 4, 1)
+
         # Process button
         self.perform_reduction = QPushButton('Process')
-        layout.addWidget(self.perform_reduction, 4, 1)
+        self.perform_reduction.setStyleSheet("background-color : green")
+        layout.addWidget(self.perform_reduction, 5, 1)
 
+        spacer = QSpacerItem(10, 10, QtWidgets.QSizePolicy.Minimum,
+                             QtWidgets.QSizePolicy.Expanding)
+        layout.addItem(spacer, 6, 1)
+    
         # connections
         self.choose_output_dir.clicked.connect(self.output_dir_selection)
         self.perform_reduction.clicked.connect(self.reduce)
