@@ -215,3 +215,76 @@ def reduce_fixed_two_theta(ws, template_file, output_dir, average_overlap=False,
     # Return the sequence identifier
     return run_list[0]
 
+def reduce_explorer(ws, ws_db, theta_pv=None, center_pixel=145, db_center_pixel=145, peak_width=10):
+    """
+    """
+    from . import peak_finding
+
+    if theta_pv is None:
+        if ws.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
+            theta_pv = 'thi'
+        else:
+            theta_pv = 'ths'
+    print("\nProcessing: %s" % ws.getRunNumber())
+
+    # Theta value that we are aiming for
+    theta_value = np.fabs(ws.getRun()[theta_pv].value[0])
+
+    # Load normalization run
+    tthd_value = ws.getRun()['tthd'].value[0]
+
+    # Fit direct beam position
+    x_min = center_pixel - 25
+    x_max = center_pixel + 25
+    tof, _x, _y = peak_finding.process_data(ws_db, summed=True, tof_step=200)
+    peak_center = np.argmax(_y)
+    db_center, db_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min, x_max=x_max, center=peak_center)
+    print("    DB center: %g\t Width: %g" % (db_center, db_width))
+
+    # Fit the reflected beam position
+    x_min=db_center_pixel-peak_width
+    x_max=db_center_pixel+peak_width
+    tof, _x, _y = peak_finding.process_data(ws, summed=True, tof_step=200)
+    peak_center = np.argmax(_y)
+    sc_center, sc_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min, x_max=x_max, center=peak_center)
+    print("    SC center: %g\t Width: %g" % (sc_center, sc_width))
+
+    pixel_width = float(ws.getInstrument().getNumberParameter("pixel-width")[0]) / 1000.0
+    sample_det_distance = event_reduction.EventReflectivity.DEFAULT_4B_SAMPLE_DET_DISTANCE
+    twotheta = np.arctan((db_center-sc_center)*pixel_width / sample_det_distance) / 2.0 * 180 / np.pi
+
+    # Store the tthd of the direct beam and account for the fact that it may be
+    # different from our reflected beam for this calibration data.
+    # This will allow us to be compatible with both fixed and moving detector arm.
+    tthd_db = ws_db.getRun()['tthd'].value[0]
+    twotheta = twotheta + tthd_value - tthd_db
+
+    print("    Theta = %g   Two-theta = %g" % (theta_value, twotheta))
+
+    # Perform the reduction
+    width_mult = 2.5
+    peak = [np.rint(sc_center - width_mult*sc_width).astype(int), np.rint(sc_center + width_mult*sc_width).astype(int)]
+    norm_peak = [np.rint(db_center - width_mult*db_width).astype(int), np.rint(db_center + width_mult*db_width).astype(int)]
+    peak_bck = [peak[0]-3, peak[1]+3]
+    norm_bck = [norm_peak[0]-3, norm_peak[1]+3]
+
+    tof_min = ws.getTofMin()
+    tof_max = ws.getTofMax()
+
+    theta = theta_value * np.pi / 180.
+
+    event_refl = event_reduction.EventReflectivity(ws, ws_db,
+                                                   signal_peak=peak, signal_bck=peak_bck,
+                                                   norm_peak=norm_peak, norm_bck=norm_bck,
+                                                   specular_pixel=sc_center.value,
+                                                   signal_low_res=[65,180], norm_low_res=[65,180],
+                                                   q_min=None, q_max=None,
+                                                   tof_range = [tof_min, tof_max],
+                                                   theta=theta)
+
+    # R(Q)
+    qz, refl, d_refl = event_refl.specular(q_summing=False, tof_weighted=False,
+                                           bck_in_q=False, clean=False, normalize=True)
+    qz_mid = (qz[:-1] + qz[1:])/2.0
+
+    return qz_mid, refl, d_refl

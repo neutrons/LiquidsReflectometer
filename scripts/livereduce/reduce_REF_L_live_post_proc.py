@@ -11,7 +11,7 @@ sys.path.append("/SNS/REF_L/shared/reduction")
 from lr_reduction import workflow
 
 
-DEBUG = False
+DEBUG = True
 if DEBUG:
     logfile = open("/SNS/REF_L/shared/livereduce/LR_live_outer.log", 'a')
     logfile.write("\nStarting post-proc: %s\n" % time.ctime())
@@ -77,6 +77,7 @@ def reduction():
 
 
 def time_resolved():
+    logthis("\nStarting time-resolved processing\n")
     ws = mtd_api.mtd[LIVE_DATA_WS]
     run_number = ws.getRunNumber()
     ws.getRun().integrateProtonCharge()
@@ -94,7 +95,8 @@ def time_resolved():
     # If we changed run, we should not use the previous data
     if len(time_data) == 0:
         logthis("New run: clearing previous data\n")
-        mtd_api.DeleteWorkspace("previous_data")
+        if 'previous_data' in mtd_api.mtd:
+            mtd_api.DeleteWorkspace("previous_data")
 
     if "previous_data" in mtd_api.mtd and len(time_data)>0:
         _previous_data = mtd_api.mtd["previous_data"]
@@ -140,9 +142,9 @@ def time_resolved():
         data_names.append('Last 30s')
 
     previous_data = mtd_api.CloneWorkspace(ws)
-
+    logthis("plotting...\n")
     plot_div = plot1d(run_number, plot_data, data_names=data_names, instrument='REF_L',
-                      x_title=u"TOF", x_log=True, title=time.ctime(),
+                      x_title="TOF", x_log=True, title=time.ctime(),
                       y_title="Counts / charge", y_log=True, show_dx=False, publish=False)
     return plot_div
 
@@ -156,6 +158,7 @@ def get_live_data(run_number):
         with open(live_data_path, 'r') as fd:
             live_data = json.load(fd)
             if 'run_number' in live_data and run_number == live_data['run_number']:
+                logthis("Found stored live data: %g\n" % len(live_data['time_data']))
                 return live_data['time_data']
     return []
 

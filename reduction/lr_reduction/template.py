@@ -177,7 +177,10 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     if theta_value is not None:
         theta = theta_value * np.pi / 180.
     else:
-        theta = ths_value * np.pi / 180.
+        if ws_sc.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
+            theta = thi_value * np.pi / 180.
+        else:
+            theta = ths_value * np.pi / 180.
 
     # Get the reduction parameters from the template
     peak = template_data.data_peak_range

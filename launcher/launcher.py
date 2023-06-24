@@ -16,6 +16,7 @@ from apps.reduction import Reduction
 from apps.refracted import Refracted
 from apps.sld_calculator import SLD
 from apps.off_spec import OffSpec
+from apps.quick_reduce import QuickReduce
 
 REFERENCE_DIRECTIVE = "Click to choose a 60Hz reference R(Q) file"
 TEMPLATE_DIRECTIVE = "Click to choose a 30Hz template"
@@ -55,6 +56,12 @@ class ReductionInterface(QTabWidget):
         self.offspec_tab = OffSpec()
         self.addTab(self.offspec_tab, "Off-spec data")
         self.setTabText(tab_id, "Off-spec data")
+
+        # Quick reduction
+        tab_id += 1
+        self.quick_tab = QuickReduce()
+        self.addTab(self.quick_tab, "Quick reduction")
+        self.setTabText(tab_id, "Quick reduction")
 
         # XRR reduction
         tab_id += 1
