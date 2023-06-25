@@ -60,7 +60,7 @@ def reduction():
             return ''
 
         first_run_of_set = workflow.reduce(ws, template_file,
-                                           output_dir, pre_cut=1, post_cut=1,
+                                           output_dir, 
                                            average_overlap=False, q_summing=False,
                                            bck_in_q=False, is_live=True)
 
