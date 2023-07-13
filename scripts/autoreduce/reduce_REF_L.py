@@ -104,7 +104,7 @@ else:
 #-------------------------------------------------------------------------
 # Produce plot for the web monitor
 # Wait 30 seconds in order to avoid race condition with live reduction
-time.sleep(30)
+#time.sleep(30)
 
 default_file_name = 'REFL_%s_combined_data_auto.txt' % first_run_of_set
 default_file_path = os.path.join(output_dir, default_file_name)

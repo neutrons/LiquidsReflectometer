@@ -194,7 +194,10 @@ if LIVE_DATA_WS in mtd_api.mtd:
             html_div += reduction_div
             html_div += ''
             html_div += plot_div
-            publish_plot('REF_L', run_number, files={'file': html_div},
+            # There's a race condition between the automated reduction and the live reduction
+            # at the end of a run. To avoid this, we always post the live reduction to run 0.
+            RUN_NUMBER = 0
+            publish_plot('REF_L', RUN_NUMBER, files={'file': html_div},
                          config="/SNS/REF_L/shared/.livedata.conf")
     except:
         logthis("failure: %s" % sys.exc_info()[1])
