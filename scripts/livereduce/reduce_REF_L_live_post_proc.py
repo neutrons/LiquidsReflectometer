@@ -185,7 +185,10 @@ if LIVE_DATA_WS in mtd_api.mtd:
         logthis("\nRun %s    Events: %g [charge=%s]\n" % (run_number, n_events, charge))
 
         # Call the reduction
-        reduction_div = reduction()
+        #try:
+        #    reduction_div = reduction()
+        #except:
+        reduction_div = ''
 
         # Time-resolved plot
         plot_div = time_resolved()

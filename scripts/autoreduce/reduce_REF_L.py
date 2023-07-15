@@ -9,6 +9,7 @@
 import sys
 import os
 import time
+import numpy as np
 import warnings
 warnings.simplefilter('ignore')
 
@@ -117,7 +118,8 @@ if os.path.isfile(default_file_path):
     except:
         logger.notice("Could not set data availability")
     print("Loading %s" % os.path.join(output_dir, default_file_name))
-    reflectivity = LoadAscii(Filename=os.path.join(output_dir, default_file_name), Unit="MomentumTransfer")
+
+    x, y, dy, dx = np.loadtxt(os.path.join(output_dir, default_file_name)).T
 
     plotting_ready = True
     try:
@@ -126,11 +128,6 @@ if os.path.isfile(default_file_path):
         from finddata.publish_plot import plot1d, _determine_config_file, publish_plot
         if _determine_config_file(None) is None:
             plotting_ready = False
-
-    x = reflectivity.readX(0)
-    y = reflectivity.readY(0)
-    dy = reflectivity.readE(0)
-    dx = reflectivity.readDx(0)
 
     if int(run_number) - first_run_of_set < 10:
         for r in range(0, 10):
