@@ -185,10 +185,10 @@ if LIVE_DATA_WS in mtd_api.mtd:
         logthis("\nRun %s    Events: %g [charge=%s]\n" % (run_number, n_events, charge))
 
         # Call the reduction
-        #try:
-        #    reduction_div = reduction()
-        #except:
-        reduction_div = ''
+        try:
+            reduction_div = reduction()
+        except:
+            reduction_div = ''
 
         # Time-resolved plot
         plot_div = time_resolved()
@@ -199,7 +199,7 @@ if LIVE_DATA_WS in mtd_api.mtd:
             html_div += plot_div
             # There's a race condition between the automated reduction and the live reduction
             # at the end of a run. To avoid this, we always post the live reduction to run 0.
-            RUN_NUMBER = 0
+            RUN_NUMBER = run_number
             publish_plot('REF_L', RUN_NUMBER, files={'file': html_div},
                          config="/SNS/REF_L/shared/.livedata.conf")
     except:

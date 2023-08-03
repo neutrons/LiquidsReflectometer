@@ -224,7 +224,7 @@ class EventReflectivity(object):
             norm_run = 0
 
         dq0 = 0
-        dq_over_q = compute_resolution(self._ws_sc)
+        dq_over_q = compute_resolution(self._ws_sc, theta=self.theta)
         return dict(wl_min=self.wl_range[0], wl_max=self.wl_range[1],
                     q_min=self.q_min, q_max=self.q_max, theta=self.theta,
                     start_time=start_time, experiment=experiment, run_number=run_number,
@@ -709,9 +709,10 @@ class EventReflectivity(object):
         return (theta_sample-theta_in) * np.pi / 180.0
 
 
-def compute_resolution(ws, default_dq=0.027):
+def compute_resolution(ws, default_dq=0.027, theta=None):
     """
         Compute the Q resolution from the meta data.
+        :param theta: scattering angle in radians
     """
     # We can't compute the resolution if the value of xi is not in the logs.
     # Since it was not always logged, check for it here.
@@ -733,9 +734,10 @@ def compute_resolution(ws, default_dq=0.027):
         s1_sample_distance = ws.getInstrument().getNumberParameter("s1-sample-distance")[0]*1000
 
     s1h = abs(ws.getRun().getProperty("S1VHeight").value[0])
-    ths = abs(ws.getRun().getProperty("ths").value[0])
+    if theta is None:
+        theta = abs(ws.getRun().getProperty("ths").value[0]) * np.pi / 180.
     xi = abs(ws.getRun().getProperty("BL4B:Mot:xi.RBV").value[0])
     sample_si_distance = xi_reference - xi
     slit_distance = s1_sample_distance - sample_si_distance
-    dq_over_q = s1h / slit_distance * 180 / 3.1416 / ths
+    dq_over_q = s1h / slit_distance / theta
     return dq_over_q

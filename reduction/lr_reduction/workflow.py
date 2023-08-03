@@ -39,10 +39,15 @@ def reduce(ws, template_file, output_dir, average_overlap=False,
     # Save partial results
     coll = output.RunCollection()
     coll.add(qz_mid, refl, d_refl, meta_data=meta_data)
-    coll.save_ascii(os.path.join(output_dir, 'REFL_%s_%s_%s_partial.txt' % (meta_data['sequence_id'],
-                                                                            meta_data['sequence_number'],
-                                                                            meta_data['run_number'])),
-                    meta_as_json=True)
+
+    # If this is live data, put it in a separate file to avoid conflict with auto-reduction
+    if is_live:
+        reduced_file = os.path.join(output_dir, 'REFL_live_partial.txt')
+    else:
+        reduced_file = os.path.join(output_dir, 'REFL_%s_%s_%s_partial.txt' % (meta_data['sequence_id'],
+                                                                               meta_data['sequence_number'],
+                                                                               meta_data['run_number']))
+    coll.save_ascii(reduced_file, meta_as_json=True)
 
     # Assemble partial results into a single R(q)
     seq_list, run_list = assemble_results(meta_data['sequence_id'], output_dir,
@@ -77,6 +82,8 @@ def assemble_results(first_run, output_dir, average_overlap=False, is_live=False
             _, _, _, _, _meta = output.read_file(os.path.join(output_dir, item))
             if is_live or not _meta['start_time'] == "live":
                 coll.add_from_file(os.path.join(output_dir, item))
+        elif item == "REFL_live_partial.txt":
+            coll.add_from_file(os.path.join(output_dir, item))
 
     output_file_name = 'REFL_%s_combined_data_auto.txt' % first_run
     if is_live:
