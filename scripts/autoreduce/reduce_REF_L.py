@@ -40,7 +40,7 @@ event_file = os.path.split(event_file_path)[-1]
 # The legacy format is REF_L_xyz_event.nxs
 # The new format is REF_L_xyz.nxs.h5
 run_number = event_file.split('_')[2]
-run_number = run_number.replace('.nxs.h5', '')
+run_number = int(run_number.replace('.nxs.h5', ''))
 
 # The new reduction will be used by default starting in June 2023
 old_version = False
@@ -107,7 +107,10 @@ else:
 # Wait 30 seconds in order to avoid race condition with live reduction
 #time.sleep(30)
 
-default_file_name = 'REFL_%s_combined_data_auto.txt' % first_run_of_set
+sequence_id = int(ws.getRun().getProperty("sequence_id").value[0])
+sequence_number = int(ws.getRun().getProperty("sequence_number").value[0])
+
+default_file_name = 'REFL_%s_combined_data_auto.txt' % sequence_id
 default_file_path = os.path.join(output_dir, default_file_name)
 if os.path.isfile(default_file_path):
     # Set flag to announce that the data is available
@@ -129,25 +132,28 @@ if os.path.isfile(default_file_path):
         if _determine_config_file(None) is None:
             plotting_ready = False
 
-    if int(run_number) - first_run_of_set < 10:
-        for r in range(0, 10):
-            reduced_file_name = 'REFL_%s_%s_%s_auto.nxs' % (first_run_of_set, r+1, first_run_of_set+r)
+    offset = sequence_id - run_number + sequence_number - 1
+
+    if int(run_number) - sequence_id < 10:
+        for i in range(0, 10):
+            _id = i + offset
+            _run = sequence_id + i
+            reduced_file_name = 'REFL_%s_%s_%s_auto.nxs' % (sequence_id, _id+1, _run)
             reduced_file_path = os.path.join(output_dir, reduced_file_name)
-            reduced_file_name2 = 'REFL_%s_%s_%s_partial.txt' % (first_run_of_set, r+1, first_run_of_set+r)
+            reduced_file_name2 = 'REFL_%s_%s_%s_partial.txt' % (sequence_id, _id+1, _run)
             reduced_file_path2 = os.path.join(output_dir, reduced_file_name2)
             if os.path.isfile(reduced_file_path) or os.path.isfile(reduced_file_path2):
                 # Look to see whether submitting the plot is enabled
                 if plotting_ready:
-                    plot1d(first_run_of_set+r, [[x, y, dy, dx]], instrument='REF_L', 
+                    plot1d(_run, [[x, y, dy, dx]], instrument='REF_L', 
                            x_title=u"Q (1/A)", x_log=True,
                            y_title="Reflectivity", y_log=True, show_dx=False)
                 else:
-                    plot_div = plot1d(first_run_of_set+r, [[x, y, dy, dx]], instrument='REF_L', 
+                    plot_div = plot1d(_run, [[x, y, dy, dx]], instrument='REF_L', 
                                       x_title=u"q (1/A)", x_log=True,
                                       y_title="Reflectivity", y_log=True, show_dx=False, publish=False)
-                    publish_plot('REF_L', first_run_of_set+r, files={'file': plot_div},
+                    publish_plot('REF_L', _run, files={'file': plot_div},
                                  config="/SNS/REF_L/shared/.livedata.conf")
-
     else:
         plot1d(run_number, [[x, y, dy, dx]], instrument='REF_L', 
                x_title=u"Q (1/A)", x_log=True,
