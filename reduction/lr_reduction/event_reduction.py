@@ -250,17 +250,6 @@ class EventReflectivity(object):
         else:
             self.specular_unweighted(q_summing=q_summing, normalize=normalize)
 
-        # Dead time correction
-        dead_time = 4e-6
-        t_sc = self._ws_sc.getRun().getProperty("duration").value
-        n_sc = self._ws_sc.getNumberEvents()
-        t_db = self._ws_db.getRun().getProperty("duration").value
-        n_db = self._ws_db.getNumberEvents()
-
-        t_corr_sc = 1 / (1-n_sc*dead_time/t_sc)
-        t_corr_db = 1 / (1-n_db*dead_time/t_db)
-        print("T(r) = %g; T(d) = %g" % (t_corr_sc, t_corr_db))
-
         # Remove leading zeros
         r = np.trim_zeros(self.refl, 'f')
         trim = len(self.refl) - len(r)
@@ -268,8 +257,11 @@ class EventReflectivity(object):
         self.d_refl = self.d_refl[trim:]
         self.q_bins = self.q_bins[trim:]
 
-        self.refl = self.refl * t_corr_sc / t_corr_db
-        self.d_refl = self.d_refl * t_corr_sc / t_corr_db
+        # Dead time correction
+        # dead_time = 4e-6
+        #self.refl = self.refl * t_corr_sc / t_corr_db
+        #self.d_refl = self.d_refl * t_corr_sc / t_corr_db
+
         # Remove leading artifact from the wavelength coverage
         # Remember that q_bins is longer than refl by 1 because
         # it contains bin boundaries

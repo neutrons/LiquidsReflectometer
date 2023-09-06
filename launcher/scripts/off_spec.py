@@ -9,6 +9,9 @@ import mantid
 import mantid.simpleapi as api
 mantid.kernel.config.setLogLevel(3)
 
+mantid.ConfigService.Instance().setString("default.instrument", "REF_L")
+mantid.ConfigService.Instance().setString("default.facility", "SNS")
+mantid.ConfigService.Instance().setString("datasearch.searcharchive", "sns")
 
 DEFAULT_4B_SAMPLE_DET_DISTANCE = 1.83
 DEFAULT_4B_SOURCE_DET_DISTANCE = 15.75

@@ -105,7 +105,7 @@ def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, sca
     q = r_meas[0][_q_idx_meas30]
     # Skip infinite points if they exist, and skip the first two points which
     # often has binning artifact
-    _idx = (q > r_meas[0][1]) & (r_q_final < np.inf) & (q < r_meas[0][-2]) 
+    _idx = (q > r_meas[0][1]) & (r_q_final < np.inf) & (q < r_meas[0][-2]) & (r_q_final > 0)
 
     # Q resolution
     #   Assume a constant term of 0 unless it is specified
@@ -220,8 +220,12 @@ def reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30
             np.savetxt(os.path.join(output_dir, _filename), _reduced.T)
         except:
             print("reduce_30Hz_slices_ws: %s" % sys.exc_info()[0])
-            raise
         total_time += time_interval
+
+    # Save output
+    output_file = os.path.join(output_dir, 'r%s-time-resolved.json' % meas_run_30Hz)
+    print("Saving t-NR to %s" % output_file)
+    package_json_data(meas_run_30Hz, output_dir, out_array=output_file)
 
     if create_plot:
         plot_slices(reduced, title='Duration: %g seconds' % duration,
@@ -317,3 +321,28 @@ def plot_slices(reduced, title, time_interval, file_path, offset=10):
     ax.set_xscale('log')
     plt.show()
     plt.savefig(file_path)
+
+
+def package_json_data(dynamic_run, dyn_data_dir, out_array=None):
+
+    compiled_array = []
+    compiled_times = []
+
+    _file_list = sorted(os.listdir(dyn_data_dir))
+
+    # Get only the files for the run we're interested in
+    _good_files = [_f for _f in _file_list if _f.startswith('r%s_t' % dynamic_run)]
+
+    for i, _file in enumerate(_good_files):
+        if _file.startswith('r%s_t' % dynamic_run):
+            _data = np.loadtxt(os.path.join(dyn_data_dir, _file)).T
+            _data_name, _ = os.path.splitext(_file)
+            _time = int(_data_name.replace('r%s_t' % dynamic_run, ''))
+            compiled_array.append(_data.tolist())
+            compiled_times.append(_time)
+
+    if out_array:
+        with open(out_array, 'w') as fp:
+            json.dump(dict(times=compiled_times, data=compiled_array), fp)
+
+    return compiled_times, compiled_array
