@@ -1,31 +1,33 @@
 #!/usr/bin/python3
-import sys
 import os
 import subprocess
+import sys
 
-from qtpy import QtWidgets, QtGui, QtCore
-
-from qtpy.QtWidgets import (QWidget, QGridLayout,
-                            QFileDialog, QLabel,
-                            QPushButton, QMessageBox)
-
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtWidgets import (
+    QFileDialog,
+    QGridLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QWidget,
+)
 
 TEMPLATE_DIRECTIVE = "Click to choose a 60Hz template"
 OUTPUT_DIR_DIRECTIVE = "Click to choose an output directory"
 
 
 class Dynamic60Hz(QWidget):
-
     def __init__(self):
         QWidget.__init__(self)
-        self.setWindowTitle('Time-resolved reduction')
+        self.setWindowTitle("Time-resolved reduction")
         layout = QGridLayout()
         self.setLayout(layout)
 
         self.settings = QtCore.QSettings()
 
         # 30Hz template file
-        self.choose_template = QPushButton('Template')
+        self.choose_template = QPushButton("Template")
         layout.addWidget(self.choose_template, 1, 1)
 
         self.template_path = QLabel(self)
@@ -56,14 +58,14 @@ class Dynamic60Hz(QWidget):
         layout.addWidget(self.idx_label, 6, 2)
 
         # Output directory
-        self.choose_output_dir = QPushButton('Output directory')
+        self.choose_output_dir = QPushButton("Output directory")
         layout.addWidget(self.choose_output_dir, 7, 1)
 
         self.output_dir_label = QLabel(self)
         layout.addWidget(self.output_dir_label, 7, 2)
 
         # Process button
-        self.perform_reduction = QPushButton('Reduce')
+        self.perform_reduction = QPushButton("Reduce")
         layout.addWidget(self.perform_reduction, 8, 1)
 
         # connections
@@ -75,16 +77,19 @@ class Dynamic60Hz(QWidget):
         self.read_settings()
 
     def template_selection(self):
-        _template_file, _ = QFileDialog.getOpenFileName(self, 'Open file',
-                                                        self.template_path.text(),
-                                                        'Template file (*.xml)')
+        _template_file, _ = QFileDialog.getOpenFileName(
+            self, "Open file", self.template_path.text(), "Template file (*.xml)"
+        )
         if os.path.isfile(_template_file):
             self.template_path.setText(_template_file)
 
     def output_dir_selection(self):
-        _dir = QFileDialog.getExistingDirectory(None, 'Select a folder:',
-                                                self.output_dir_label.text(),
-                                                QFileDialog.ShowDirsOnly)
+        _dir = QFileDialog.getExistingDirectory(
+            None,
+            "Select a folder:",
+            self.output_dir_label.text(),
+            QFileDialog.ShowDirsOnly,
+        )
         if os.path.isdir(_dir):
             self.output_dir_label.setText(_dir)
 
@@ -99,21 +104,23 @@ class Dynamic60Hz(QWidget):
             _out_dir = OUTPUT_DIR_DIRECTIVE
         self.output_dir_label.setText(_out_dir)
 
-        _data_run = self.settings.value("60Hz_data_run_number", '')
+        _data_run = self.settings.value("60Hz_data_run_number", "")
         self.data_run_number_ledit.setText(_data_run)
 
-        _interval = self.settings.value("60Hz_time_slice", '')
+        _interval = self.settings.value("60Hz_time_slice", "")
         self.time_slice_ledit.setText(_interval)
 
-        _interval = self.settings.value("60Hz_scan_index", '')
+        _interval = self.settings.value("60Hz_scan_index", "")
         self.idx_ledit.setText(_interval)
 
     def save_settings(self):
-        self.settings.setValue('60Hz_template', self.template_path.text())
-        self.settings.setValue('60Hz_data_run_number', self.data_run_number_ledit.text())
-        self.settings.setValue('60Hz_time_slice', self.time_slice_ledit.text())
-        self.settings.setValue('60Hz_scan_index', self.idx_ledit.text())
-        self.settings.setValue('60Hz_output_dir', self.output_dir_label.text())
+        self.settings.setValue("60Hz_template", self.template_path.text())
+        self.settings.setValue(
+            "60Hz_data_run_number", self.data_run_number_ledit.text()
+        )
+        self.settings.setValue("60Hz_time_slice", self.time_slice_ledit.text())
+        self.settings.setValue("60Hz_scan_index", self.idx_ledit.text())
+        self.settings.setValue("60Hz_output_dir", self.output_dir_label.text())
 
     def check_inputs(self):
         error = None
@@ -146,9 +153,16 @@ class Dynamic60Hz(QWidget):
         print("Reduce!")
 
         # python3 template_reduction.py dynamic60Hz <meas_run_60Hz> <template_60Hz> <time_interval> <output_dir>
-        subprocess.run(['python3', 'scripts/template_reduction.py', 'dynamic60Hz',
-                        self.data_run_number_ledit.text(),
-                        self.template_path.text(),
-                        self.time_slice_ledit.text(), self.output_dir_label.text(),
-                        '--scan_index', self.idx_ledit.text()])
-
+        subprocess.run(
+            [
+                "python3",
+                "scripts/template_reduction.py",
+                "dynamic60Hz",
+                self.data_run_number_ledit.text(),
+                self.template_path.text(),
+                self.time_slice_ledit.text(),
+                self.output_dir_label.text(),
+                "--scan_index",
+                self.idx_ledit.text(),
+            ]
+        )

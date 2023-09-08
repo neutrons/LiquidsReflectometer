@@ -1,10 +1,12 @@
 # import mantid algorithms, numpy and matplotlib
 import sys
-sys.path.append('../autoreduce')
-from mantid.simpleapi import *
+
 import numpy as np
+from mantid.simpleapi import *
 from scipy import ndimage
-from peak_finding import find_peaks, peak_prominences, peak_widths
+
+sys.path.append("../autoreduce")
+from peak_finding import find_peaks, peak_prominences, peak_widths  # noqa E402
 
 
 def scan_peaks(x):
@@ -17,10 +19,11 @@ def scan_peaks(x):
     quality = -peaks_w * prom
 
     zipped = zip(peaks, peaks_w, quality, prom)
-    ordered = sorted(zipped, key=lambda a:a[2])
-    found_peaks = [[p[0],p[1]] for p in ordered]
+    ordered = sorted(zipped, key=lambda a: a[2])
+    found_peaks = [[p[0], p[1]] for p in ordered]
 
     return found_peaks
+
 
 ws = Load("REF_L_179932")
 
@@ -29,7 +32,7 @@ n_y = int(ws.getInstrument().getNumberParameter("number-of-y-pixels")[0])
 
 _integrated = Integration(InputWorkspace=ws)
 signal = _integrated.extractY()
-z=np.reshape(signal, (n_x, n_y))
+z = np.reshape(signal, (n_x, n_y))
 x = z.sum(axis=0)
 
 peaks = scan_peaks(x)

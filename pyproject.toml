@@ -1,0 +1,21 @@
+[project]
+name = "LiquidsReflectometer"
+description = "Reduction scripts for the Liquids Reflectometer. This includes both automated reduction scripts and useful scripts to reprocess data."
+dynamic = ["version"]
+requires-python = ">=3.8"
+dependencies = [
+    "mantidworkbench"
+]
+
+[tool.ruff]
+line-length = 120
+# https://beta.ruff.rs/docs/rules/
+select = ["A", "ARG", "BLE", "E", "F", "I", "PT"]
+ignore = ["F403", "F405", "F401", "F821" # wild imports and  unknown names
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "yaml",
+]
+ignore_missing_imports = true

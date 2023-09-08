@@ -1,30 +1,32 @@
 #!/usr/bin/python3
-import sys
 import os
 import subprocess
+import sys
 
-from qtpy import QtWidgets, QtGui, QtCore
-
-from qtpy.QtWidgets import (QWidget, QGridLayout,
-                            QFileDialog, QLabel,
-                            QPushButton, QMessageBox)
-
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtWidgets import (
+    QFileDialog,
+    QGridLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QWidget,
+)
 
 TEMPLATE_DIRECTIVE = "Click to choose a 60Hz template"
 
 
 class Reduction(QWidget):
-
     def __init__(self):
         QWidget.__init__(self)
-        self.setWindowTitle('Batch reduction')
+        self.setWindowTitle("Batch reduction")
         layout = QGridLayout()
         self.setLayout(layout)
 
         self.settings = QtCore.QSettings()
 
         # Standard template file
-        self.choose_template = QPushButton('Template')
+        self.choose_template = QPushButton("Template")
         layout.addWidget(self.choose_template, 1, 1)
 
         self.template_path = QLabel(self)
@@ -74,7 +76,7 @@ class Reduction(QWidget):
         layout.addWidget(self.average_overlapp_check, 7, 2)
 
         # Process button
-        self.perform_reduction = QPushButton('Reduce')
+        self.perform_reduction = QPushButton("Reduce")
         layout.addWidget(self.perform_reduction, 8, 1)
 
         # connections
@@ -94,9 +96,9 @@ class Reduction(QWidget):
         self.const_q_label.setEnabled(not use_old)
 
     def template_selection(self):
-        _template_file, _ = QFileDialog.getOpenFileName(self, 'Open file',
-                                                        self.template_path.text(),
-                                                        'Template file (*.xml)')
+        _template_file, _ = QFileDialog.getOpenFileName(
+            self, "Open file", self.template_path.text(), "Template file (*.xml)"
+        )
         if os.path.isfile(_template_file):
             self.template_path.setText(_template_file)
 
@@ -106,26 +108,34 @@ class Reduction(QWidget):
             _template_file = TEMPLATE_DIRECTIVE
         self.template_path.setText(_template_file)
 
-        _first_run = self.settings.value("reduction_first_run_number", '')
+        _first_run = self.settings.value("reduction_first_run_number", "")
         self.first_run_number_ledit.setText(_first_run)
 
-        _interval = self.settings.value("reduction_last_run_number", '')
+        _interval = self.settings.value("reduction_last_run_number", "")
         self.last_run_number_ledit.setText(_interval)
 
         _use_old = self.settings.value("reduction_use_old", "false")
-        self.select_version_check.setChecked(_use_old=='true')
+        self.select_version_check.setChecked(_use_old == "true")
         _avg = self.settings.value("reduction_avg_overlap", "true")
-        self.average_overlapp_check.setChecked(_avg=='true')
+        self.average_overlapp_check.setChecked(_avg == "true")
         _const_q = self.settings.value("reduction_const_q", "false")
-        self.const_q_check.setChecked(_const_q=='true')
+        self.const_q_check.setChecked(_const_q == "true")
 
     def save_settings(self):
-        self.settings.setValue('reduction_template', self.template_path.text())
-        self.settings.setValue('reduction_first_run_number', self.first_run_number_ledit.text())
-        self.settings.setValue('reduction_last_run_number', self.last_run_number_ledit.text())
-        self.settings.setValue('reduction_use_old', self.select_version_check.isChecked())
-        self.settings.setValue('reduction_avg_overlap', self.average_overlapp_check.isChecked())
-        self.settings.setValue('reduction_const_q', self.const_q_check.isChecked())
+        self.settings.setValue("reduction_template", self.template_path.text())
+        self.settings.setValue(
+            "reduction_first_run_number", self.first_run_number_ledit.text()
+        )
+        self.settings.setValue(
+            "reduction_last_run_number", self.last_run_number_ledit.text()
+        )
+        self.settings.setValue(
+            "reduction_use_old", self.select_version_check.isChecked()
+        )
+        self.settings.setValue(
+            "reduction_avg_overlap", self.average_overlapp_check.isChecked()
+        )
+        self.settings.setValue("reduction_const_q", self.const_q_check.isChecked())
 
     def check_inputs(self):
         error = None
@@ -152,32 +162,37 @@ class Reduction(QWidget):
             return
 
         # Get the IPTS from the template file
-        toks = self.template_path.text().split('/')
-        if toks[3].startswith('IPTS'):
+        toks = self.template_path.text().split("/")
+        if toks[3].startswith("IPTS"):
             ipts = toks[3]
         else:
-            self.show_dialog("The chosen template is not in an IPTS folder, please select another one.")
+            self.show_dialog(
+                "The chosen template is not in an IPTS folder, please select another one."
+            )
             return
 
         self.save_settings()
 
         print("Reduce!")
 
-        options = ['python3', '/SNS/REF_L/shared/batch_reduce.py',
-                   ipts,
-                   self.first_run_number_ledit.text(),
-                   self.last_run_number_ledit.text()]
+        options = [
+            "python3",
+            "/SNS/REF_L/shared/batch_reduce.py",
+            ipts,
+            self.first_run_number_ledit.text(),
+            self.last_run_number_ledit.text(),
+        ]
         if not self.select_version_check.isChecked():
-            options.append('new')
+            options.append("new")
             options.append(self.template_path.text())
             options.append(str(self.average_overlapp_check.isChecked()))
             options.append(str(self.const_q_check.isChecked()))
         else:
-            options.append('old')
+            options.append("old")
             options.append(self.template_path.text())
 
         # python3 batch_reduce.py <IPTS> <first run> <last run>
-        print(' '.join(options))
+        print(" ".join(options))
         subprocess.run(options)
 
         self.show_dialog("Task completed: please verify!", "Task completed")

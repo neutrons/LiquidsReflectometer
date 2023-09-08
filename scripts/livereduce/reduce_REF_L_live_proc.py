@@ -8,5 +8,5 @@ from mantid import simpleapi
 simpleapi.logger.notice("Starting proc")
 try:
     simpleapi.CloneWorkspace(InputWorkspace=input, OutputWorkspace=output)
-except:
-    return input
+except:  # noqa E722
+    return input  # noqa F706
