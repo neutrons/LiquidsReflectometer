@@ -13,7 +13,7 @@ line-length = 140
 select = ["A", "ARG", "E", "W", "F", "I", "PT", "RUF100"]
 ignore = ["E402", # module level import not at top of file
           "E722", # bare except
-	      "E741", "E743", # ambiguous function name, generally 'l'
+          "E741", "E743", # ambiguous function name, generally 'l'
           "F403", # wild imports
           "F405", "F821", # unknown names from probably from wild imports
 ]
