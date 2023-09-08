@@ -13,9 +13,3 @@ line-length = 120
 select = ["A", "ARG", "BLE", "E", "F", "I", "PT"]
 ignore = ["F403", "F405", "F401", "F821" # wild imports and  unknown names
 ]
-
-[[tool.mypy.overrides]]
-module = [
-    "yaml",
-]
-ignore_missing_imports = true
