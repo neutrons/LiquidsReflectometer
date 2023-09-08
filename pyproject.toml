@@ -10,7 +10,7 @@ dependencies = [
 [tool.ruff]
 line-length = 140
 # https://beta.ruff.rs/docs/rules/
-select = ["A", "ARG", "BLE", "E", "F", "I", "PT"]
+select = ["A", "ARG", "E", "W", "F", "I", "PT", "RUF100"]
 ignore = ["E402", # module level import not at top of file
           "E722", # bare except
 	      "E741", "E743", # ambiguous function name, generally 'l'
