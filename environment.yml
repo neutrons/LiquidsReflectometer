@@ -13,4 +13,5 @@ dependencies:
   - conda-build
   - python-build
   - versioningit
+  - boa
 prefix: /home/gcs/mambaforge/envs/liquid-ref
