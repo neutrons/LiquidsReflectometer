@@ -1,24 +1,18 @@
 #!/usr/bin/python3
-import sys
 import os
 import subprocess
 
-from qtpy import QtWidgets, QtGui, QtCore
-
-from qtpy.QtWidgets import (QWidget, QGridLayout,
-                            QFileDialog, QLabel,
-                            QPushButton, QMessageBox)
-
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtWidgets import QFileDialog, QGridLayout, QLabel, QMessageBox, QPushButton, QWidget
 
 OUTPUT_DIR_DIRECTIVE = "Click to choose an output directory"
 DEFAULT_MATERIAL = "Si"
 
 
 class Refracted(QWidget):
-
     def __init__(self):
         QWidget.__init__(self)
-        self.setWindowTitle('Refracted beam')
+        self.setWindowTitle("Refracted beam")
         layout = QGridLayout()
         self.setLayout(layout)
 
@@ -33,7 +27,7 @@ class Refracted(QWidget):
         layout.addWidget(self.run_number_label, 1, 2)
 
         # Output directory
-        self.choose_output_dir = QPushButton('Output directory')
+        self.choose_output_dir = QPushButton("Output directory")
         layout.addWidget(self.choose_output_dir, 2, 1)
 
         self.output_dir_label = QLabel(self)
@@ -47,7 +41,7 @@ class Refracted(QWidget):
         layout.addWidget(self.material_label, 3, 2)
 
         # Process button
-        self.perform_reduction = QPushButton('Process')
+        self.perform_reduction = QPushButton("Process")
         layout.addWidget(self.perform_reduction, 4, 1)
 
         # connections
@@ -58,9 +52,7 @@ class Refracted(QWidget):
         self.read_settings()
 
     def output_dir_selection(self):
-        _dir = QFileDialog.getExistingDirectory(None, 'Select a folder:',
-                                                self.output_dir_label.text(),
-                                                QFileDialog.ShowDirsOnly)
+        _dir = QFileDialog.getExistingDirectory(None, "Select a folder:", self.output_dir_label.text(), QFileDialog.ShowDirsOnly)
         if os.path.isdir(_dir):
             self.output_dir_label.setText(_dir)
 
@@ -70,7 +62,7 @@ class Refracted(QWidget):
             _out_dir = OUTPUT_DIR_DIRECTIVE
         self.output_dir_label.setText(_out_dir)
 
-        _run = self.settings.value("refracted_run_number", '')
+        _run = self.settings.value("refracted_run_number", "")
         self.run_number_ledit.setText(_run)
 
         _material = self.settings.value("refracted_material", "Si")
@@ -79,9 +71,9 @@ class Refracted(QWidget):
         self.material_ledit.setText(_material)
 
     def save_settings(self):
-        self.settings.setValue('refracted_output_dir', self.output_dir_label.text())
-        self.settings.setValue('refracted_run_number', self.run_number_ledit.text())
-        self.settings.setValue('refracted_material', self.material_ledit.text())
+        self.settings.setValue("refracted_output_dir", self.output_dir_label.text())
+        self.settings.setValue("refracted_run_number", self.run_number_ledit.text())
+        self.settings.setValue("refracted_material", self.material_ledit.text())
 
     def check_inputs(self):
         error = None
@@ -112,7 +104,13 @@ class Refracted(QWidget):
         print("Process!")
 
         # python3 template_reduction.py dynamic60Hz <meas_run_60Hz> <template_60Hz> <time_interval> <output_dir>
-        subprocess.run(['python3', 'scripts/refracted_beam.py',
-                        self.run_number_ledit.text(), self.output_dir_label.text(),
-                        '--material', self.material_ledit.text()])
-
+        subprocess.run(
+            [
+                "python3",
+                "scripts/refracted_beam.py",
+                self.run_number_ledit.text(),
+                self.output_dir_label.text(),
+                "--material",
+                self.material_ledit.text(),
+            ]
+        )

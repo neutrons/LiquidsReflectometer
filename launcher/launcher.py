@@ -1,22 +1,15 @@
 #!/usr/bin/python3
 import sys
-import os
-import subprocess
 
-from qtpy import QtWidgets, QtGui, QtCore
-
-from qtpy.QtWidgets import (QApplication, QWidget, QGridLayout,
-                            QTabWidget, QFileDialog, QLabel,
-                            QPushButton, QMessageBox)
-
-from apps.dynamic_60Hz import Dynamic60Hz
 from apps.dynamic_30Hz import Dynamic30Hz
-from apps.xrr import XRR
-from apps.reduction import Reduction
-from apps.refracted import Refracted
-from apps.sld_calculator import SLD
+from apps.dynamic_60Hz import Dynamic60Hz
 from apps.off_spec import OffSpec
 from apps.quick_reduce import QuickReduce
+from apps.reduction import Reduction
+from apps.sld_calculator import SLD
+from apps.xrr import XRR
+from qtpy import QtCore
+from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 
 REFERENCE_DIRECTIVE = "Click to choose a 60Hz reference R(Q) file"
 TEMPLATE_DIRECTIVE = "Click to choose a 30Hz template"
@@ -24,10 +17,9 @@ OUTPUT_DIR_DIRECTIVE = "Click to choose an output directory"
 
 
 class ReductionInterface(QTabWidget):
-
     def __init__(self):
         QWidget.__init__(self)
-        self.setWindowTitle('Reflectometry Launcher')
+        self.setWindowTitle("Reflectometry Launcher")
         layout = QGridLayout()
         self.setLayout(layout)
 
@@ -76,12 +68,13 @@ class ReductionInterface(QTabWidget):
         self.setTabText(tab_id, "SLD calculator")
 
         # Refracted beam analysis
-        #tab_id += 1
-        #self.refracted_tab = Refracted()
-        #self.addTab(self.refracted_tab, "Refraction analysis")
-        #self.setTabText(tab_id, "Refraction analysis")
+        # tab_id += 1
+        # self.refracted_tab = Refracted()
+        # self.addTab(self.refracted_tab, "Refraction analysis")
+        # self.setTabText(tab_id, "Refraction analysis")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app = QApplication([])
     window = ReductionInterface()
     window.show()
