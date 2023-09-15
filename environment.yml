@@ -6,6 +6,7 @@ channels:
 dependencies:
   - pre-commit
   - pytest
+  - pytest-cov
   - numpy
   - python=3.8
   - mantidworkbench
