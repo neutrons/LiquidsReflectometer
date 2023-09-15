@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Miniconda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        channels: conda-forge,defaults
+        mamba-version: "*"
+        activate-environment: liquid-ref
+    - name: Restore cached conda environment
+      id: cache-load
+      uses: actions/cache/restore@v3
+      with:
+        path: /usr/share/miniconda/envs/liquid-ref
+        key: ${{ runner.os }}-conda-${{ hashFiles('**/environment.yml') }}
+    - name: Load Environment
+      if: steps.cache-load.outputs.cache-hit != 'true'
+      run: |
+        mamba env update --file environment.yml  --prune
+    - name: Apt install deps
+      run: |
+        sudo apt update
+        sudo apt-get install xvfb
+    - name: Start xvfb daemon
+      run: |
+        /sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen 0 1280x1024x16
+    - name: Test with pytest
+      run: |
+        python -m pytest --cov=src --cov-report=xml --cov-report=term
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+
+
+  conda-build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.8"]
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Miniconda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        channels: conda-forge,mantid/label/nightly,defaults
+        mamba-version: "*"
+        activate-environment: liquid-ref
+    - name: Restore cached conda environment
+      id: cache-load
+      uses: actions/cache/restore@v3
+      with:
+        path: /usr/share/miniconda/envs/liquid-ref
+        key: ${{ runner.os }}-conda-${{ hashFiles('**/environment.yml') }}
+    - name: Load Environment
+      if: steps.cache-load.outputs.cache-hit != 'true'
+      run: |
+        mamba env update --file environment.yml  --prune
+    - name: Build python wheel
+      shell: bash -l {0}
+      run: |
+        python -m build --wheel --no-isolation
+    - name: Build conda libraray
+      shell: bash -l {0}
+      run: |
+        # set up environment
+        cd conda.recipe
+        echo "versioningit $(versioningit ../)"
+        # build the package
+        VERSION=$(versioningit ../) conda mambabuild --output-folder . .
+        conda verify noarch/lr_reduction*.tar.bz2
+    - name: Deploy to Anaconda
+      shell: bash -l {0}
+      if: startsWith(github.ref, 'refs/tags/v')
+      env:
+        ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
+        IS_RC: ${{ contains(github.ref, 'rc') }}
+      run: |
+        # label is main or rc depending on the tag-name
+        CONDA_LABEL="main"
+        if [ "${IS_RC}" = "true" ]; then CONDA_LABEL="rc"; fi
+        echo pushing ${{ github.ref }} with label $CONDA_LABEL
+        anaconda upload --label $CONDA_LABEL conda.recipe/noarch/lr_reduction*.tar.bz2

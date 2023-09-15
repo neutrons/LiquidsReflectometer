@@ -1,0 +1,16 @@
+name: liquid-ref
+channels:
+  - conda-forge
+  - default
+  - mantid
+dependencies:
+  - pre-commit
+  - pytest
+  - numpy
+  - python=3.8
+  - mantidworkbench
+  - codecov
+  - conda-build
+  - python-build
+  - versioningit
+prefix: /home/gcs/mambaforge/envs/liquid-ref
