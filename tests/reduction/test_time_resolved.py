@@ -1,10 +1,22 @@
 import unittest
 import pytest
+import os
 import numpy as np
 from reduction.lr_reduction import time_resolved
+from mantid import config
 
 
 class TimeResolvedTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if os.getcwd().endswith("LiquidsReflectometer"):
+            os.chdir("tests")
+
+        cwd = os.getcwd()
+        dirs = [26010, 26776, 28662, 29196, 31279]
+        for dir_num in dirs:
+            config.appendDataSearchDir(str(os.path.join(cwd, f"data/liquidsreflectometer-data/SNS/REF_L/IPTS-{dir_num}/nexus")))
+
     @pytest.mark.datarepo()
     def test_reduce_workflow(self):
         """

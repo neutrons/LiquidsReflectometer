@@ -5,6 +5,7 @@ import pytest
 import mantid
 import mantid.simpleapi as mtd_api
 import numpy as np
+from mantid import config
 
 mantid.kernel.config.setLogLevel(3)
 
@@ -12,8 +13,17 @@ from reduction.lr_reduction import event_reduction, template, workflow
 
 
 class ReductionTest(unittest.TestCase):
-    @pytest.mark.datarepo()
     @classmethod
+    def setUpClass(cls):
+        if os.getcwd().endswith("LiquidsReflectometer"):
+            os.chdir("tests")
+
+        cwd = os.getcwd()
+        dirs = [26010, 26776, 28662, 29196, 31279]
+        for dir_num in dirs:
+            config.appendDataSearchDir(str(os.path.join(cwd, f"data/liquidsreflectometer-data/SNS/REF_L/IPTS-{dir_num}/nexus")))
+
+    @pytest.mark.datarepo()
     def test_full_reduction(self):
         """
         Test the fill reduction chain
@@ -51,7 +61,6 @@ class ReductionTest(unittest.TestCase):
         assert np.fabs(np.sum(ref_data[1] - refl_all)) < 1e-10
 
     @pytest.mark.datarepo()
-    @classmethod
     def test_reduce_workflow(self):
         template_path = "data/template.xml"
         output_dir = "results"
@@ -78,7 +87,6 @@ class ReductionTest(unittest.TestCase):
         assert np.sum((_data[3] - _refl[3]) / _refl[3]) / len(_refl[3]) < 0.01
 
     @pytest.mark.datarepo()
-    @classmethod
     def test_reduce_workflow_201282(self):
         """
         Test to reproduce autoreduction output
@@ -108,7 +116,6 @@ class ReductionTest(unittest.TestCase):
         assert np.sum((_data[3] - _refl[3]) / _refl[3]) / len(_refl[3]) < 0.01
 
     @pytest.mark.datarepo()
-    @classmethod
     def test_background_subtraction(self):
         """
         Test with background subtraction off for the data and on for the normalization
