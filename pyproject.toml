@@ -26,7 +26,7 @@ pythonpath = [
   ".", "reduction", "scripts",
 ]
 
-testpaths = ["tests"]
+testpaths = ["tests", "tests/data/liquidsreflectometer-data"]
 norecursedirs = [".git", "tmp*", "_tmp*", "__pycache__", "*dataset*", "*data_set*"]
 markers = [
   "datarepo: mark a test as using LiquidsReflectometer-data repository",
