@@ -18,10 +18,12 @@ class ReductionTest(unittest.TestCase):
         if os.getcwd().endswith("LiquidsReflectometer"):
             os.chdir("tests")
 
+        print(config.getDataSearchDirs())
         cwd = os.getcwd()
         dirs = [26010, 26776, 28662, 29196, 31279]
         for dir_num in dirs:
             config.appendDataSearchDir(str(os.path.join(cwd, f"data/liquidsreflectometer-data/SNS/REF_L/IPTS-{dir_num}/nexus")))
+        print(config.getDataSearchDirs())
 
     @pytest.mark.datarepo()
     def test_full_reduction(self):
@@ -125,7 +127,7 @@ class ReductionTest(unittest.TestCase):
         reduced_path = os.path.join(output_dir, "REFL_198382_combined_data_auto.txt")
         if os.path.exists(reduced_path):
             os.remove(reduced_path)
-
+        print(config.getDataSearchDirs())
         for i in range(198388, 198390):
             ws = mtd_api.Load("REF_L_%s" % i)
             workflow.reduce(ws, template_path, output_dir=output_dir, average_overlap=False)
