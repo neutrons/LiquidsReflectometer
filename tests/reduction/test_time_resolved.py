@@ -3,7 +3,7 @@ import pytest
 import os
 import numpy as np
 from reduction.lr_reduction import time_resolved
-from mantid import config
+from mantid import config, ConfigService, ConfigServiceImpl
 
 
 @pytest.mark.datarepo()
@@ -15,6 +15,8 @@ class TimeResolvedTest(unittest.TestCase):
 
         cwd = os.getcwd()
         config.appendDataSearchDir(str(os.path.join(cwd, "data/liquidsreflectometer-data/nexus")))
+        ConfigService.appendDataSearchDir(str(os.path.join(cwd, "data/liquidsreflectometer-data/nexus")))
+        ConfigServiceImpl.ConfigService.appendDataSearchDir(str(os.path.join(cwd, "data/liquidsreflectometer-data/nexus")))
         print(config.getDataSearchDirs())
 
     @classmethod
