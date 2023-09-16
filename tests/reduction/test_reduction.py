@@ -16,6 +16,7 @@ from reduction.lr_reduction import event_reduction, template, workflow
 class ReductionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        print(f"ls: {os.listdir()}, cwd: {os.getcwd()}")
         if os.getcwd().endswith("LiquidsReflectometer"):
             os.chdir("tests")
 
