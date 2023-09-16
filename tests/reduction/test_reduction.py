@@ -5,9 +5,10 @@ import pytest
 import mantid
 import mantid.simpleapi as mtd_api
 import numpy as np
-from mantid import ConfigService as config
+from mantid import config
 
 mantid.kernel.config.setLogLevel(3)
+mantid.kernel.config.setDataSearchDirs(f"{os.getcwd()}/tests/data/liquidsreflectometer-data/nexus")
 
 from reduction.lr_reduction import event_reduction, template, workflow
 
@@ -19,9 +20,10 @@ class ReductionTest(unittest.TestCase):
         print(f"ls: {os.listdir()}, cwd: {os.getcwd()}")
         if os.getcwd().endswith("LiquidsReflectometer"):
             os.chdir("tests")
-
-        cwd = os.getcwd()
-        config.appendDataSearchDir(str(os.path.join(cwd, "data/liquidsreflectometer-data/nexus")))
+        # cls._old = config["datasearch.directories"]
+        # config["datasearch.directories"] = f"data/liquidsreflectometer-data/nexus;{cls._old}"
+        # cwd = os.getcwd()
+        # config.appendDataSearchDir(str(os.path.join(cwd, "data/liquidsreflectometer-data/nexus")))
         print(config.getDataSearchDirs())
 
     @classmethod
