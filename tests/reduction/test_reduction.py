@@ -21,9 +21,7 @@ class ReductionTest(unittest.TestCase):
             os.chdir("tests")
 
         cwd = os.getcwd()
-        dirs = [26010, 26776, 28662, 29196, 31279]
-        for dir_num in dirs:
-            config.appendDataSearchDir(str(os.path.join(cwd, f"data/liquidsreflectometer-data/SNS/REF_L/IPTS-{dir_num}/nexus")))
+        config.appendDataSearchDir(str(os.path.join(cwd, "data/liquidsreflectometer-data/nexus")))
         print(config.getDataSearchDirs())
 
     @classmethod
@@ -36,7 +34,7 @@ class ReductionTest(unittest.TestCase):
         refl_all = []
         d_refl_all = []
         first_run = None
-        filename = "data/liquidsreflectometer-data/SNS/REF_L/IPTS-28662/nexus/REF_L_198409.nxs.h5"
+        filename = "data/liquidsreflectometer-data/nexus/REF_L_198409.nxs.h5"
         print(oct(os.stat(filename).st_mode)[-3:])
         for run_number in range(198409, 198417):
             ws_sc = mtd_api.Load(str(run_number))

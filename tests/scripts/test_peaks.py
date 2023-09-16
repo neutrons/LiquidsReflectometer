@@ -19,9 +19,8 @@ class ScanPeaksTest(unittest.TestCase):
             os.chdir("tests")
 
         cwd = os.getcwd()
-        dirs = [26010, 26776, 28662, 29196, 31279]
-        for dir_num in dirs:
-            config.appendDataSearchDir(str(os.path.join(cwd, f"data/liquidsreflectometer-data/SNS/REF_L/IPTS-{dir_num}/nexus")))
+        config.appendDataSearchDir(str(os.path.join(cwd, "data/liquidsreflectometer-data/nexus")))
+        print(config.getDataSearchDirs())
 
     @classmethod
     def test_peak_finding(self):
