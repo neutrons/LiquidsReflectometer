@@ -20,7 +20,6 @@ class ReductionTest(unittest.TestCase):
         if os.getcwd().endswith("LiquidsReflectometer"):
             os.chdir("tests")
 
-        print(config.getDataSearchDirs())
         cwd = os.getcwd()
         dirs = [26010, 26776, 28662, 29196, 31279]
         for dir_num in dirs:

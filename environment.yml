@@ -9,7 +9,7 @@ dependencies:
   - pytest-cov
   - numpy
   - python=3.8
-  - mantidworkbench
+  - mantidworkbench>=6.7.0
   - codecov
   - conda-build
   - python-build
