@@ -6,6 +6,7 @@ from reduction.lr_reduction import time_resolved
 from mantid import config
 
 
+@pytest.mark.datarepo()
 class TimeResolvedTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -17,7 +18,7 @@ class TimeResolvedTest(unittest.TestCase):
         for dir_num in dirs:
             config.appendDataSearchDir(str(os.path.join(cwd, f"data/liquidsreflectometer-data/SNS/REF_L/IPTS-{dir_num}/nexus")))
 
-    @pytest.mark.datarepo()
+    @classmethod
     def test_reduce_workflow(self):
         """
         Test the time-resolved reduction that uses a measured reference.

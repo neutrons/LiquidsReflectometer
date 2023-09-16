@@ -11,6 +11,7 @@ from mantid import config
 from scripts.autoreduce.peak_finding import find_peaks, peak_prominences, peak_widths
 
 
+@pytest.mark.scripts()
 class ScanPeaksTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -22,7 +23,7 @@ class ScanPeaksTest(unittest.TestCase):
         for dir_num in dirs:
             config.appendDataSearchDir(str(os.path.join(cwd, f"data/liquidsreflectometer-data/SNS/REF_L/IPTS-{dir_num}/nexus")))
 
-    @pytest.mark.scripts()
+    @classmethod
     def test_peak_finding(self):
         def scan_peaks(x):
             f1 = ndimage.gaussian_filter(x, 3)

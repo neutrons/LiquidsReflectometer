@@ -12,6 +12,7 @@ mantid.kernel.config.setLogLevel(3)
 from reduction.lr_reduction import event_reduction, template, workflow
 
 
+@pytest.mark.datarepo()
 class ReductionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -25,7 +26,7 @@ class ReductionTest(unittest.TestCase):
             config.appendDataSearchDir(str(os.path.join(cwd, f"data/liquidsreflectometer-data/SNS/REF_L/IPTS-{dir_num}/nexus")))
         print(config.getDataSearchDirs())
 
-    @pytest.mark.datarepo()
+    @classmethod
     def test_full_reduction(self):
         """
         Test the fill reduction chain
@@ -64,7 +65,7 @@ class ReductionTest(unittest.TestCase):
         assert len(ref_data[1]) == len(refl_all)
         assert np.fabs(np.sum(ref_data[1] - refl_all)) < 1e-10
 
-    @pytest.mark.datarepo()
+    @classmethod
     def test_reduce_workflow(self):
         template_path = "data/template.xml"
         output_dir = "results"
@@ -90,7 +91,7 @@ class ReductionTest(unittest.TestCase):
         # it for each run, so we expect a small discrepancy within 1%.
         assert np.sum((_data[3] - _refl[3]) / _refl[3]) / len(_refl[3]) < 0.01
 
-    @pytest.mark.datarepo()
+    @classmethod
     def test_reduce_workflow_201282(self):
         """
         Test to reproduce autoreduction output
@@ -119,7 +120,7 @@ class ReductionTest(unittest.TestCase):
         # it for each run, so we expect a small discrepancy within 1%.
         assert np.sum((_data[3] - _refl[3]) / _refl[3]) / len(_refl[3]) < 0.01
 
-    @pytest.mark.datarepo()
+    @classmethod
     def test_background_subtraction(self):
         """
         Test with background subtraction off for the data and on for the normalization
