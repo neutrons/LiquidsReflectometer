@@ -5,7 +5,7 @@ import pytest
 import mantid
 import mantid.simpleapi as mtd_api
 import numpy as np
-from mantid import config
+from mantid import ConfigService as config
 
 mantid.kernel.config.setLogLevel(3)
 
