@@ -37,7 +37,7 @@ class ReductionTest(unittest.TestCase):
         filename = "data/liquidsreflectometer-data/nexus/REF_L_198409.nxs.h5"
         print(oct(os.stat(filename).st_mode)[-3:])
         for run_number in range(198409, 198417):
-            ws_sc = mtd_api.Load(str(run_number))
+            ws_sc = mtd_api.Load(Filename=f"REF_L_{run_number}")
             qz_mid, refl, d_refl = template.process_from_template_ws(ws_sc, template_path)
 
             if first_run is None:
