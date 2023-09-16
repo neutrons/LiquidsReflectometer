@@ -23,7 +23,7 @@ line-length = 140
 
 [tool.pytest.ini_options]
 pythonpath = [
-  ".", "reduction", "scripts",
+  ".", "reduction", "scripts", "tests/data/liquidsreflectometer-data/nexus/"
 ]
 
 testpaths = ["tests", "tests/data/liquidsreflectometer-data"]
