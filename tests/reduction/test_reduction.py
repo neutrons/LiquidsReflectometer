@@ -39,7 +39,7 @@ class ReductionTest(unittest.TestCase):
         filename = "data/liquidsreflectometer-data/SNS/REF_L/IPTS-28662/nexus/REF_L_198409.nxs.h5"
         print(oct(os.stat(filename).st_mode)[-3:])
         for run_number in range(198409, 198417):
-            ws_sc = mtd_api.Load(f"REF_L_{run_number}")
+            ws_sc = mtd_api.Load(str(run_number))
             qz_mid, refl, d_refl = template.process_from_template_ws(ws_sc, template_path)
 
             if first_run is None:
@@ -74,7 +74,7 @@ class ReductionTest(unittest.TestCase):
             os.remove(reduced_path)
 
         for i in range(198409, 198417):
-            ws = mtd_api.Load("REF_L_%s" % i)
+            ws = mtd_api.Load(str(i))
             workflow.reduce(ws, template_path, output_dir=output_dir, average_overlap=False)
 
         reference_path = "data/reference_rq.txt"
