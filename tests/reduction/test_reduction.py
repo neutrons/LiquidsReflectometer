@@ -5,9 +5,8 @@ import pytest
 import mantid
 import mantid.simpleapi as mtd_api
 import numpy as np
-from mantid import config
+from mantid.kernel import ConfigService
 
-mantid.kernel.config.setLogLevel(3)
 mantid.kernel.config.setDataSearchDirs(f"{os.getcwd()}/tests/data/liquidsreflectometer-data/nexus")
 
 from reduction.lr_reduction import event_reduction, template, workflow
@@ -24,10 +23,16 @@ class ReductionTest(unittest.TestCase):
         # config["datasearch.directories"] = f"data/liquidsreflectometer-data/nexus;{cls._old}"
         # cwd = os.getcwd()
         # config.appendDataSearchDir(str(os.path.join(cwd, "data/liquidsreflectometer-data/nexus")))
+        config = ConfigService.Instance()
         print(config.getDataSearchDirs())
+        config.setDataSearchDirs(f"{os.getcwd()}/data/liquidsreflectometer-data/nexus")
+        print(config.getDataSearchDirs())
+        import sys
+
+        print(sys.path)
 
     @classmethod
-    def test_full_reduction(self):
+    def test_full_reduction(cls):
         """
         Test the fill reduction chain
         """
@@ -68,7 +73,7 @@ class ReductionTest(unittest.TestCase):
         assert np.fabs(np.sum(ref_data[1] - refl_all)) < 1e-10
 
     @classmethod
-    def test_reduce_workflow(self):
+    def test_reduce_workflow(cls):
         template_path = "data/template.xml"
         output_dir = "results"
         reduced_path = os.path.join(output_dir, "REFL_198409_combined_data_auto.txt")
@@ -94,7 +99,7 @@ class ReductionTest(unittest.TestCase):
         assert np.sum((_data[3] - _refl[3]) / _refl[3]) / len(_refl[3]) < 0.01
 
     @classmethod
-    def test_reduce_workflow_201282(self):
+    def test_reduce_workflow_201282(cls):
         """
         Test to reproduce autoreduction output
         """
@@ -123,7 +128,7 @@ class ReductionTest(unittest.TestCase):
         assert np.sum((_data[3] - _refl[3]) / _refl[3]) / len(_refl[3]) < 0.01
 
     @classmethod
-    def test_background_subtraction(self):
+    def test_background_subtraction(cls):
         """
         Test with background subtraction off for the data and on for the normalization
         """
@@ -132,7 +137,6 @@ class ReductionTest(unittest.TestCase):
         reduced_path = os.path.join(output_dir, "REFL_198382_combined_data_auto.txt")
         if os.path.exists(reduced_path):
             os.remove(reduced_path)
-        print(config.getDataSearchDirs())
         for i in range(198388, 198390):
             ws = mtd_api.Load("REF_L_%s" % i)
             workflow.reduce(ws, template_path, output_dir=output_dir, average_overlap=False)
