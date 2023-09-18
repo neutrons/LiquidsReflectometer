@@ -2,12 +2,9 @@ import unittest
 import os
 import pytest
 
-import mantid
 import mantid.simpleapi as mtd_api
 import numpy as np
 from mantid.kernel import ConfigService
-
-mantid.kernel.config.setDataSearchDirs(f"{os.getcwd()}/tests/data/liquidsreflectometer-data/nexus")
 
 from reduction.lr_reduction import event_reduction, template, workflow
 
@@ -24,7 +21,7 @@ class ReductionTest(unittest.TestCase):
         # config.appendDataSearchDir(str(os.path.join(cwd, "data/liquidsreflectometer-data/nexus")))
         config = ConfigService.Instance()
         print(config.getDataSearchDirs())
-        config.setDataSearchDirs(f"{os.getcwd()}/data/liquidsreflectometer-data/nexus")
+        config.setString("datasearch.directories", f"{os.getcwd()}/data/liquidsreflectometer-data/nexus")
         print(config.getDataSearchDirs())
         import sys
 
