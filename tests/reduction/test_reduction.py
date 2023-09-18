@@ -14,8 +14,7 @@ from reduction.lr_reduction import event_reduction, template, workflow
 
 @pytest.mark.datarepo()
 class ReductionTest(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
+    def setUp(self):
         print(f"ls: {os.listdir()}, cwd: {os.getcwd()}")
         if os.getcwd().endswith("LiquidsReflectometer"):
             os.chdir("tests")
@@ -31,8 +30,7 @@ class ReductionTest(unittest.TestCase):
 
         print(sys.path)
 
-    @classmethod
-    def test_full_reduction(cls):
+    def test_full_reduction(self):
         """
         Test the fill reduction chain
         """
@@ -72,8 +70,7 @@ class ReductionTest(unittest.TestCase):
         assert len(ref_data[1]) == len(refl_all)
         assert np.fabs(np.sum(ref_data[1] - refl_all)) < 1e-10
 
-    @classmethod
-    def test_reduce_workflow(cls):
+    def test_reduce_workflow(self):
         template_path = "data/template.xml"
         output_dir = "results"
         reduced_path = os.path.join(output_dir, "REFL_198409_combined_data_auto.txt")
@@ -98,8 +95,7 @@ class ReductionTest(unittest.TestCase):
         # it for each run, so we expect a small discrepancy within 1%.
         assert np.sum((_data[3] - _refl[3]) / _refl[3]) / len(_refl[3]) < 0.01
 
-    @classmethod
-    def test_reduce_workflow_201282(cls):
+    def test_reduce_workflow_201282(self):
         """
         Test to reproduce autoreduction output
         """
@@ -127,8 +123,7 @@ class ReductionTest(unittest.TestCase):
         # it for each run, so we expect a small discrepancy within 1%.
         assert np.sum((_data[3] - _refl[3]) / _refl[3]) / len(_refl[3]) < 0.01
 
-    @classmethod
-    def test_background_subtraction(cls):
+    def test_background_subtraction(self):
         """
         Test with background subtraction off for the data and on for the normalization
         """
