@@ -1,12 +1,11 @@
-import sys
-import os
 import argparse
-import numpy as np
-
-from matplotlib import pyplot as plt
+import os
 
 import mantid
 import mantid.simpleapi as api
+import numpy as np
+from matplotlib import pyplot as plt
+
 mantid.kernel.config.setLogLevel(3)
 
 mantid.ConfigService.Instance().setString("default.instrument", "REF_L")
@@ -17,12 +16,12 @@ DEFAULT_4B_SAMPLE_DET_DISTANCE = 1.83
 DEFAULT_4B_SOURCE_DET_DISTANCE = 15.75
 
 
-class PixelData():
+class PixelData:
     source_detector_distance = DEFAULT_4B_SOURCE_DET_DISTANCE
     det_distance = DEFAULT_4B_SAMPLE_DET_DISTANCE
 
     def __init__(self, run_number):
-        self.ws = api.LoadEventNexus("REF_L_%s" % run_number, OutputWorkspace='r%s' % run_number)
+        self.ws = api.LoadEventNexus("REF_L_%s" % run_number, OutputWorkspace="r%s" % run_number)
         self.run_number = run_number
         self.get_parameters()
 
@@ -51,7 +50,7 @@ class PixelData():
 
         self.pixel_width = float(self.ws.getInstrument().getNumberParameter("pixel-width")[0]) / 1000.0
 
-        self.tthd = self.ws.getRun()['tthd'].value[0]
+        self.tthd = self.ws.getRun()["tthd"].value[0]
 
         h = 6.626e-34  # m^2 kg s^-1
         m = 1.675e-27  # kg
@@ -76,40 +75,39 @@ class PixelData():
 
         # Use center of wl bins
         wl = x[0] / self.constant
-        wl = (wl[1:] + wl[:-1])/2.0
+        wl = (wl[1:] + wl[:-1]) / 2.0
 
-        with open(os.path.join(output_dir, 'r%s-wl.txt' % self.run_number), 'w') as fd:
+        with open(os.path.join(output_dir, "r%s-wl.txt" % self.run_number), "w") as fd:
             fd.write(str(self))
             fd.write("# pixel\t wavelength\t signal\t error\n")
             for i in np.arange(p_vs_t.shape[0]):
                 for i_wl in range(len(wl)):
                     fd.write("%8g %8g %8g %8g\n" % (i, wl[i_wl], p_vs_t[i][i_wl], err[i][i_wl]))
 
-        plot_data(p_vs_t, wl, 'run %s' % self.run_number,
-                  os.path.join(output_dir, 'r%s-counts.png' % self.run_number))
+        plot_data(p_vs_t, wl, "run %s" % self.run_number, os.path.join(output_dir, "r%s-counts.png" % self.run_number))
 
 
 def plot_data(counts, wl, title, file_path, show=True):
     counts_vs_wl = np.sum(counts, axis=0)
     counts_vs_pixel = np.sum(counts, axis=1)
 
-    fig, ax = plt.subplots(2, 1, figsize=(6,10))
+    fig, ax = plt.subplots(2, 1, figsize=(6, 10))
 
     plt.subplot(2, 1, 1)
     plt.plot(np.arange(counts_vs_pixel.shape[0]), counts_vs_pixel)
 
-    plt.title('Total counts per pixel - %s' % title)
-    plt.xlabel('pixel number')
-    plt.ylabel('Counts')
-    ax[0].set_yscale('log')
+    plt.title("Total counts per pixel - %s" % title)
+    plt.xlabel("pixel number")
+    plt.ylabel("Counts")
+    ax[0].set_yscale("log")
 
     plt.subplot(2, 1, 2)
     plt.plot(wl, counts_vs_wl)
 
-    plt.title('Total counts vs wavelength - %s' % title)
-    plt.xlabel('Wavelength [$\AA$]')
-    plt.ylabel('Counts')
-    ax[1].set_yscale('log')
+    plt.title("Total counts vs wavelength - %s" % title)
+    plt.xlabel(r"Wavelength [$\AA$]")
+    plt.ylabel("Counts")
+    ax[1].set_yscale("log")
 
     plt.savefig(file_path)
 
@@ -117,16 +115,12 @@ def plot_data(counts, wl, title, file_path, show=True):
         plt.show()
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(add_help=True)
 
-    parser.add_argument('run_number', type=str,
-                        help='Run number to process')
-    parser.add_argument('wl_step', type=float,
-                        help='Wavelength bin width', default=0.1)
-    parser.add_argument('output_dir', type=str,
-                        help='Output directory')
+    parser.add_argument("run_number", type=str, help="Run number to process")
+    parser.add_argument("wl_step", type=float, help="Wavelength bin width", default=0.1)
+    parser.add_argument("output_dir", type=str, help="Output directory")
 
     # Parse arguments
     args = parser.parse_args()

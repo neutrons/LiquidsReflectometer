@@ -10,23 +10,23 @@ from . import __version__ as VERSION
 # Get the mantid version being used, if available
 try:
     import mantid
+
     MANTID_VERSION = mantid.__version__
 except:
     MANTID_VERSION = "None"
 
 
 class ReductionParameters(object):
-
     def __init__(self):
         # Signal selection
         self.data_peak_range = [140, 150]
         self.subtract_background = True
-        self.background_roi = [137, 153,100, 200]
-        self.tof_range = [9600., 21600.]
+        self.background_roi = [137, 153, 100, 200]
+        self.tof_range = [9600.0, 21600.0]
         self.select_tof_range = True
 
         self.data_x_range_flag = True
-        self.data_x_range = [115,210]
+        self.data_x_range = [115, 210]
 
         # Normalization
         self.apply_normalization = True
@@ -34,7 +34,7 @@ class ReductionParameters(object):
         self.subtract_norm_background = True
         self.norm_background_roi = [137, 153]
         self.norm_x_range_flag = True
-        self.norm_x_range = [115,210]
+        self.norm_x_range = [115, 210]
 
         # Data files
         self.data_files = [0]
@@ -54,14 +54,14 @@ class ReductionParameters(object):
         self.ths_value = 0
         self.angle_offset = 0.0
         self.angle_offset_error = 0.0
-    
+
         # Scaling factor file
-        self.scaling_factor_file = ''
+        self.scaling_factor_file = ""
         self.scaling_factor_flag = True
         self.slits_width_flag = True
 
         # Incident medium list and selected value
-        self.incident_medium_list = ['air']
+        self.incident_medium_list = ["air"]
         self.incident_medium_index_selected = 0
 
     def from_dict(self, data_dict):
@@ -70,9 +70,9 @@ class ReductionParameters(object):
 
     def to_xml(self):
         """
-            Create XML from the current data.
+        Create XML from the current data.
         """
-        _xml  = "<RefLData>\n"
+        _xml = "<RefLData>\n"
         _xml += "<peak_selection_type>narrow</peak_selection_type>\n"
         _xml += "<from_peak_pixels>%s</from_peak_pixels>\n" % str(self.data_peak_range[0])
         _xml += "<to_peak_pixels>%s</to_peak_pixels>\n" % str(self.data_peak_range[1])
@@ -85,7 +85,7 @@ class ReductionParameters(object):
         _xml += "<tof_range_flag>%s</tof_range_flag>\n" % str(self.select_tof_range)
         _xml += "<from_tof_range>%s</from_tof_range>\n" % str(self.tof_range[0])
         _xml += "<to_tof_range>%s</to_tof_range>\n" % str(self.tof_range[1])
-        _xml += "<data_sets>%s</data_sets>\n" % ','.join([str(i) for i in self.data_files])
+        _xml += "<data_sets>%s</data_sets>\n" % ",".join([str(i) for i in self.data_files])
         _xml += "<x_min_pixel>%s</x_min_pixel>\n" % str(self.data_x_range[0])
         _xml += "<x_max_pixel>%s</x_max_pixel>\n" % str(self.data_x_range[1])
         _xml += "<x_range_flag>%s</x_range_flag>\n" % str(self.data_x_range_flag)
@@ -131,68 +131,64 @@ class ReductionParameters(object):
 
     def from_xml_element(self, instrument_dom):
         """
-            Read in data from XML
-            @param xml_str: text to read the data from
+        Read in data from XML
+        @param xml_str: text to read the data from
         """
-        #Peak from/to pixels
-        self.data_peak_range = [getIntElement(instrument_dom, "from_peak_pixels"),
-                               getIntElement(instrument_dom, "to_peak_pixels")]
+        # Peak from/to pixels
+        self.data_peak_range = [getIntElement(instrument_dom, "from_peak_pixels"), getIntElement(instrument_dom, "to_peak_pixels")]
 
-        #data metadata
+        # data metadata
         _tthd_value = getStringElement(instrument_dom, "tthd_value")
-        if _tthd_value == '':
-            _tthd_value = 'N/A'
+        if _tthd_value == "":
+            _tthd_value = "N/A"
         self.tthd_value = _tthd_value
 
         _ths_value = getStringElement(instrument_dom, "ths_value")
-        if _ths_value == '':
-            _ths_value = 'N/A'
+        if _ths_value == "":
+            _ths_value = "N/A"
         self.ths_value = _ths_value
 
-        #low resolution range
-        self.data_x_range_flag = getBoolElement(instrument_dom, "x_range_flag",
-                                               default=self.data_x_range_flag)
+        # low resolution range
+        self.data_x_range_flag = getBoolElement(instrument_dom, "x_range_flag", default=self.data_x_range_flag)
 
-        self.data_x_range = [getIntElement(instrument_dom, "x_min_pixel"),
-                             getIntElement(instrument_dom, "x_max_pixel")]
+        self.data_x_range = [getIntElement(instrument_dom, "x_min_pixel"), getIntElement(instrument_dom, "x_max_pixel")]
 
-        self.norm_x_range_flag = getBoolElement(instrument_dom, "norm_x_range_flag",
-                                                default=self.norm_x_range_flag)
+        self.norm_x_range_flag = getBoolElement(instrument_dom, "norm_x_range_flag", default=self.norm_x_range_flag)
 
-        self.norm_x_range = [getIntElement(instrument_dom, "norm_x_min"),
-                             getIntElement(instrument_dom, "norm_x_max")]
+        self.norm_x_range = [getIntElement(instrument_dom, "norm_x_min"), getIntElement(instrument_dom, "norm_x_max")]
 
-        #background flag
-        self.subtract_background = getBoolElement(instrument_dom, "background_flag",
-                                                 default=self.subtract_background)
+        # background flag
+        self.subtract_background = getBoolElement(instrument_dom, "background_flag", default=self.subtract_background)
 
-        #background from/to pixels
-        self.background_roi = [getIntElement(instrument_dom, "back_roi1_from"),
-                               getIntElement(instrument_dom, "back_roi1_to"),
-                               getIntElement(instrument_dom, "back_roi2_from"),
-                               getIntElement(instrument_dom, "back_roi2_to")]
+        # background from/to pixels
+        self.background_roi = [
+            getIntElement(instrument_dom, "back_roi1_from"),
+            getIntElement(instrument_dom, "back_roi1_to"),
+            getIntElement(instrument_dom, "back_roi2_from"),
+            getIntElement(instrument_dom, "back_roi2_to"),
+        ]
 
         # TOF range
-        self.select_tof_range = getBoolElement(instrument_dom, "tof_range_flag",
-                                               default=self.select_tof_range)
-        self.tof_range = [getFloatElement(instrument_dom, "from_tof_range"),
-                          getFloatElement(instrument_dom, "to_tof_range")]
+        self.select_tof_range = getBoolElement(instrument_dom, "tof_range_flag", default=self.select_tof_range)
+        self.tof_range = [getFloatElement(instrument_dom, "from_tof_range"), getFloatElement(instrument_dom, "to_tof_range")]
 
         self.data_files = getIntList(instrument_dom, "data_sets")
 
-        #with or without norm
-        self.apply_normalization = getBoolElement(instrument_dom, "norm_flag",
-                                                  default=self.apply_normalization)
+        # with or without norm
+        self.apply_normalization = getBoolElement(instrument_dom, "norm_flag", default=self.apply_normalization)
 
-        #Peak from/to pixels
-        self.norm_peak_range = [getIntElement(instrument_dom, "norm_from_peak_pixels"),
-                                getIntElement(instrument_dom, "norm_to_peak_pixels")]
+        # Peak from/to pixels
+        self.norm_peak_range = [
+            getIntElement(instrument_dom, "norm_from_peak_pixels"),
+            getIntElement(instrument_dom, "norm_to_peak_pixels"),
+        ]
 
         # Background subtraction option
-        self.subtract_norm_background = getBoolElement(instrument_dom, "norm_background_flag",
-                                                       default=self.subtract_norm_background)
-        self.norm_background_roi = [getIntElement(instrument_dom, "norm_from_back_pixels"),
-                                    getIntElement(instrument_dom, "norm_to_back_pixels")]
+        self.subtract_norm_background = getBoolElement(instrument_dom, "norm_background_flag", default=self.subtract_norm_background)
+        self.norm_background_roi = [
+            getIntElement(instrument_dom, "norm_from_back_pixels"),
+            getIntElement(instrument_dom, "norm_to_back_pixels"),
+        ]
 
         self.norm_file = getIntElement(instrument_dom, "norm_dataset")
 
@@ -205,8 +201,7 @@ class ReductionParameters(object):
 
         # Angle offset
         self.angle_offset = getFloatElement(instrument_dom, "angle_offset", default=self.angle_offset)
-        self.angle_offset_error = getFloatElement(instrument_dom, "angle_offset_error",
-                                                  default=self.angle_offset_error)
+        self.angle_offset_error = getFloatElement(instrument_dom, "angle_offset_error", default=self.angle_offset_error)
 
         # Scaling factor file and options
         self.scaling_factor_file = getStringElement(instrument_dom, "scaling_factor_file")
@@ -218,14 +213,14 @@ class ReductionParameters(object):
             self.incident_medium_list = getStringList(instrument_dom, "incident_medium_list")
             self.incident_medium_index_selected = getIntElement(instrument_dom, "incident_medium_index_selected")
         else:
-            self.incident_medium_list = ['H2O']
+            self.incident_medium_list = ["H2O"]
             self.incident_medium_index_selected = 0
 
 
 ###### Utility functions to read XML content ########################
 def getText(nodelist):
     """
-        Utility method to extract text out of an XML node
+    Utility method to extract text out of an XML node
     """
     rc = ""
     for node in nodelist:
@@ -233,35 +228,42 @@ def getText(nodelist):
             rc = rc + node.data
     return rc
 
+
 def getContent(dom, tag):
     element_list = dom.getElementsByTagName(tag)
     return getText(element_list[0].childNodes) if len(element_list) > 0 else None
+
 
 def getIntElement(dom, tag, default=None):
     value = getContent(dom, tag)
     return int(value) if value is not None else default
 
+
 def getIntList(dom, tag, default=[]):
     value = getContent(dom, tag)
     if value is not None and len(value.strip()) > 0:
-        return list(map(int, value.split(',')))
+        return list(map(int, value.split(",")))
     else:
         return default
+
 
 def getFloatElement(dom, tag, default=None):
     value = getContent(dom, tag)
     return float(value) if value is not None else default
 
+
 def getFloatList(dom, tag, default=[]):
     value = getContent(dom, tag)
     if value is not None and len(value.strip()) > 0:
-        return list(map(float, value.split(',')))
+        return list(map(float, value.split(",")))
     else:
         return default
 
-def getStringElement(dom, tag, default=''):
+
+def getStringElement(dom, tag, default=""):
     value = getContent(dom, tag)
     return value if value is not None else default
+
 
 def getStringList(dom, tag, _default=[]):
     elem_list = []
@@ -271,7 +273,8 @@ def getStringList(dom, tag, _default=[]):
             elem_list.append(getText(l.childNodes).strip())
     return elem_list
 
-def getBoolElement(dom, tag, true_tag='true', default=False):
+
+def getBoolElement(dom, tag, true_tag="true", default=False):
     value = getContent(dom, tag)
     return value.lower() == true_tag.lower() if value is not None else default
 
@@ -279,7 +282,7 @@ def getBoolElement(dom, tag, true_tag='true', default=False):
 ###### Functions to read/write a template file ######################
 def to_xml(data_sets):
     """
-        Create XML from the current data.
+    Create XML from the current data.
     """
     _xml = "<Reduction>\n"
     _xml += "    <instrument_name>REFL</instrument_name>\n"
@@ -287,32 +290,33 @@ def to_xml(data_sets):
     _xml += "    <version>%s</version>\n" % VERSION
     _xml += "    <mantid_version>%s</mantid_version>\n" % MANTID_VERSION
     _xml += "    <generator>lr_reduction-%s</generator>\n" % VERSION
-    _xml  += "<DataSeries>\n"
+    _xml += "<DataSeries>\n"
     for item in data_sets:
         _xml += item.to_xml()
     _xml += "</DataSeries>\n"
     _xml += "</Reduction>\n"
     return _xml
 
+
 def from_xml(xml_str):
     """
-        Read in data from XML string
+    Read in data from XML string
     """
     data_sets = []
     dom = xml.dom.minidom.parseString(xml_str)
 
     element_list = dom.getElementsByTagName("Data")
-    if len(element_list)==0:
+    if len(element_list) == 0:
         element_list = dom.getElementsByTagName("RefLData")
 
-    if len(element_list)>0:
+    if len(element_list) > 0:
         for item in element_list:
             if item is not None:
                 data_set = ReductionParameters()
                 data_set.from_xml_element(item)
                 data_sets.append(data_set)
 
-    if len(data_sets)==0:
+    if len(data_sets) == 0:
         data_sets = [ReductionParameters()]
 
     return data_sets

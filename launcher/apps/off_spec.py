@@ -1,25 +1,18 @@
 #!/usr/bin/python3
-import sys
 import os
 import subprocess
 
-from qtpy import QtWidgets, QtGui, QtCore
-
-from qtpy.QtWidgets import (QWidget, QGridLayout,
-                            QFileDialog, QLabel,
-                            QPushButton, QMessageBox,
-                            QSpacerItem)
-
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtWidgets import QFileDialog, QGridLayout, QLabel, QMessageBox, QPushButton, QSpacerItem, QWidget
 
 DATA_FILE_DIRECTIVE = "Click to choose a file to process"
 OUTPUT_DIR_DIRECTIVE = "Click to choose an output directory"
 
 
 class OffSpec(QWidget):
-
     def __init__(self):
         QWidget.__init__(self)
-        self.setWindowTitle('Export off-spec data')
+        self.setWindowTitle("Export off-spec data")
         layout = QGridLayout()
         layout.setColumnStretch(1, 0)
         layout.setColumnStretch(2, 1)
@@ -44,25 +37,23 @@ class OffSpec(QWidget):
         layout.addWidget(self.wl_step_label, 2, 2)
 
         # Output directory
-        self.choose_output_dir = QPushButton('Output directory')
+        self.choose_output_dir = QPushButton("Output directory")
         layout.addWidget(self.choose_output_dir, 3, 1)
 
         self.output_dir_label = QLabel(self)
         layout.addWidget(self.output_dir_label, 3, 2)
 
-        spacer = QSpacerItem(20, 20, QtWidgets.QSizePolicy.Minimum,
-                             QtWidgets.QSizePolicy.Minimum)
+        spacer = QSpacerItem(20, 20, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
         layout.addItem(spacer, 4, 1)
 
         # Process button
-        self.perform_reduction = QPushButton('Process')
+        self.perform_reduction = QPushButton("Process")
         self.perform_reduction.setStyleSheet("background-color : green")
         layout.addWidget(self.perform_reduction, 5, 1)
 
-        spacer = QSpacerItem(10, 10, QtWidgets.QSizePolicy.Minimum,
-                             QtWidgets.QSizePolicy.Expanding)
+        spacer = QSpacerItem(10, 10, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         layout.addItem(spacer, 6, 1)
-    
+
         # connections
         self.choose_output_dir.clicked.connect(self.output_dir_selection)
         self.perform_reduction.clicked.connect(self.reduce)
@@ -71,17 +62,15 @@ class OffSpec(QWidget):
         self.read_settings()
 
     def output_dir_selection(self):
-        _dir = QFileDialog.getExistingDirectory(None, 'Select a folder:',
-                                                self.output_dir_label.text(),
-                                                QFileDialog.ShowDirsOnly)
+        _dir = QFileDialog.getExistingDirectory(None, "Select a folder:", self.output_dir_label.text(), QFileDialog.ShowDirsOnly)
         if os.path.isdir(_dir):
             self.output_dir_label.setText(_dir)
 
     def read_settings(self):
-        _run_number = self.settings.value("offspec_run_number", '')
+        _run_number = self.settings.value("offspec_run_number", "")
         self.run_number_ledit.setText(_run_number)
 
-        _wl_step = self.settings.value("offspec_wl_step", '')
+        _wl_step = self.settings.value("offspec_wl_step", "")
         self.wl_step_ledit.setText(_wl_step)
 
         _out_dir = self.settings.value("offspec_output_dir", OUTPUT_DIR_DIRECTIVE)
@@ -90,9 +79,9 @@ class OffSpec(QWidget):
         self.output_dir_label.setText(_out_dir)
 
     def save_settings(self):
-        self.settings.setValue('offspec_run_number', self.run_number_ledit.text())
-        self.settings.setValue('offspec_wl_step', self.wl_step_ledit.text())
-        self.settings.setValue('offspec_output_dir', self.output_dir_label.text())
+        self.settings.setValue("offspec_run_number", self.run_number_ledit.text())
+        self.settings.setValue("offspec_wl_step", self.wl_step_ledit.text())
+        self.settings.setValue("offspec_output_dir", self.output_dir_label.text())
 
     def check_inputs(self):
         error = None
@@ -122,6 +111,6 @@ class OffSpec(QWidget):
 
         print("Processing!")
 
-        subprocess.run(['python3', 'scripts/off_spec.py',
-                        self.run_number_ledit.text(), self.wl_step_ledit.text(), self.output_dir_label.text()])
-
+        subprocess.run(
+            ["python3", "scripts/off_spec.py", self.run_number_ledit.text(), self.wl_step_ledit.text(), self.output_dir_label.text()]
+        )
