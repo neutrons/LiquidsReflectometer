@@ -23,9 +23,9 @@ class ReductionTest(unittest.TestCase):
         print(config.getDataSearchDirs())
         config.setString("datasearch.directories", f"{os.getcwd()}/data/liquidsreflectometer-data/nexus")
         print(config.getDataSearchDirs())
-        import sys
+        # import sys
 
-        print(sys.path)
+        # print(sys.path)
 
     def test_full_reduction(self):
         """
