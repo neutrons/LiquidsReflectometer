@@ -128,10 +128,18 @@ class RunCollection:
                 else:
                     a = 1
                     b = 0
-                two_theta = _meta['theta'] * 360 / np.pi
-                value_list = (_meta['run_number'], _meta['norm_run'], two_theta,
-                              _meta['wl_min'], _meta['wl_max'], _meta['q_min'], _meta['q_max'],
-                              a, b)
+                two_theta = _meta["theta"] * 360 / np.pi
+                value_list = (
+                    _meta["run_number"],
+                    _meta["norm_run"],
+                    two_theta,
+                    _meta["wl_min"],
+                    _meta["wl_max"],
+                    _meta["q_min"],
+                    _meta["q_max"],
+                    a,
+                    b,
+                )
                 fd.write("# %-9s %-9s %-14.6g %-14.6g %-12.6g %-12.6s %-12.6s %-12.6s %-12.6s\n" % value_list)
                 initial_entry_written = True
 
