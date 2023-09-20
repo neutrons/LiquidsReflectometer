@@ -9,4 +9,4 @@ simpleapi.logger.notice("Starting proc")
 try:
     simpleapi.CloneWorkspace(InputWorkspace=input, OutputWorkspace=output)
 except:
-    return input
+    return input  # noqa F706
