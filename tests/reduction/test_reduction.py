@@ -5,6 +5,7 @@ import pytest
 import mantid.simpleapi as mtd_api
 import numpy as np
 from mantid.kernel import ConfigService
+from mantid.api import FileFinder
 
 from reduction.lr_reduction import event_reduction, template, workflow
 
@@ -39,9 +40,11 @@ class ReductionTest(unittest.TestCase):
         filename = "data/liquidsreflectometer-data/nexus/REF_L_198409.nxs.h5"
         print(oct(os.stat(filename).st_mode)[-3:])
         print(os.getcwd())
-        cwd = os.getcwd()
+        os.getcwd()
         for run_number in range(198409, 198417):
-            ws_sc = mtd_api.Load(Filename=f"{cwd}/data/liquidsreflectometer-data/nexus/REF_L_{run_number}.nxs.h5")
+            file_name = FileFinder.findRuns("REF_L_%d" % int(run_number))[0]
+            print(file_name)
+            ws_sc = mtd_api.Load(Filename=file_name)
             qz_mid, refl, d_refl = template.process_from_template_ws(ws_sc, template_path)
 
             if first_run is None:
