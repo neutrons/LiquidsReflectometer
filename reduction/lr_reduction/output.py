@@ -2,9 +2,11 @@
     Write R(q) output
 """
 import json
+
 import numpy as np
 
 from . import __version__ as VERSION
+
 
 class RunCollection():
     """

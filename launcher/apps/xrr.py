@@ -1,14 +1,9 @@
 #!/usr/bin/python3
-import sys
 import os
 import subprocess
 
-from qtpy import QtWidgets, QtGui, QtCore
-
-from qtpy.QtWidgets import (QWidget, QGridLayout,
-                            QFileDialog, QLabel,
-                            QPushButton, QMessageBox)
-
+from qtpy import QtCore
+from qtpy.QtWidgets import QFileDialog, QGridLayout, QLabel, QMessageBox, QPushButton, QWidget
 
 DATA_FILE_DIRECTIVE = "Click to choose a file to process"
 OUTPUT_DIR_DIRECTIVE = "Click to choose an output directory"
@@ -112,4 +107,3 @@ class XRR(QWidget):
         # python3 template_reduction.py dynamic60Hz <meas_run_60Hz> <template_60Hz> <time_interval> <output_dir>
         subprocess.run(['python3', 'scripts/xrr_reduction.py',
                         self.data_path.text(), self.output_dir_label.text()])
-

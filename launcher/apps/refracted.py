@@ -1,14 +1,9 @@
 #!/usr/bin/python3
-import sys
 import os
 import subprocess
 
-from qtpy import QtWidgets, QtGui, QtCore
-
-from qtpy.QtWidgets import (QWidget, QGridLayout,
-                            QFileDialog, QLabel,
-                            QPushButton, QMessageBox)
-
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtWidgets import QFileDialog, QGridLayout, QLabel, QMessageBox, QPushButton, QWidget
 
 OUTPUT_DIR_DIRECTIVE = "Click to choose an output directory"
 DEFAULT_MATERIAL = "Si"
@@ -115,4 +110,3 @@ class Refracted(QWidget):
         subprocess.run(['python3', 'scripts/refracted_beam.py',
                         self.run_number_ledit.text(), self.output_dir_label.text(),
                         '--material', self.material_ledit.text()])
-
