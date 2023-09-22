@@ -1,15 +1,10 @@
 #!/usr/bin/python3
-import sys
-import os
 import json
+import os
 import subprocess
 
-from qtpy import QtWidgets, QtGui, QtCore
-
-from qtpy.QtWidgets import (QWidget, QGridLayout,
-                            QFileDialog, QLabel,
-                            QPushButton, QMessageBox)
-
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtWidgets import QFileDialog, QGridLayout, QLabel, QMessageBox, QPushButton, QWidget
 
 REFERENCE_DIRECTIVE = "Click to choose a 60Hz reference R(Q) file"
 TEMPLATE_DIRECTIVE = "Click to choose a 30Hz template"
@@ -222,7 +217,7 @@ class Dynamic30Hz(QWidget):
 
     def reduce_new(self):
         return self.reduce(reduction_script='scripts/time_resolved_reduction.py')
- 
+
     def reduce_q(self):
         return self.reduce(reduction_script='scripts/time_resolved_reduction.py', q_summing=True)
 
@@ -237,7 +232,8 @@ class Dynamic30Hz(QWidget):
 
         run_list = self.parse_run_list(self.data_run_number_ledit.text())
         for run in run_list:
-            # python3 template_reduction.py dynamic30Hz <meas_run_30Hz> <ref_run_30Hz> <ref_data_60Hz> <template_30Hz> <time_interval> <output_dir>
+            # python3 template_reduction.py dynamic30Hz
+            # <meas_run_30Hz> <ref_run_30Hz> <ref_data_60Hz> <template_30Hz> <time_interval> <output_dir>
             args = ['python3', reduction_script, 'dynamic30Hz',
                     str(run),
                     self.ref_run_number_ledit.text(),

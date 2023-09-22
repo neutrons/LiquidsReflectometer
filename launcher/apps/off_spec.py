@@ -1,15 +1,9 @@
 #!/usr/bin/python3
-import sys
 import os
 import subprocess
 
-from qtpy import QtWidgets, QtGui, QtCore
-
-from qtpy.QtWidgets import (QWidget, QGridLayout,
-                            QFileDialog, QLabel,
-                            QPushButton, QMessageBox,
-                            QSpacerItem)
-
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtWidgets import QFileDialog, QGridLayout, QLabel, QMessageBox, QPushButton, QSpacerItem, QWidget
 
 DATA_FILE_DIRECTIVE = "Click to choose a file to process"
 OUTPUT_DIR_DIRECTIVE = "Click to choose an output directory"
@@ -62,7 +56,7 @@ class OffSpec(QWidget):
         spacer = QSpacerItem(10, 10, QtWidgets.QSizePolicy.Minimum,
                              QtWidgets.QSizePolicy.Expanding)
         layout.addItem(spacer, 6, 1)
-    
+
         # connections
         self.choose_output_dir.clicked.connect(self.output_dir_selection)
         self.perform_reduction.clicked.connect(self.reduce)
@@ -124,4 +118,3 @@ class OffSpec(QWidget):
 
         subprocess.run(['python3', 'scripts/off_spec.py',
                         self.run_number_ledit.text(), self.wl_step_ledit.text(), self.output_dir_label.text()])
-

@@ -54,7 +54,7 @@ class ReductionParameters(object):
         self.ths_value = 0
         self.angle_offset = 0.0
         self.angle_offset_error = 0.0
-    
+
         # Scaling factor file
         self.scaling_factor_file = ''
         self.scaling_factor_flag = True

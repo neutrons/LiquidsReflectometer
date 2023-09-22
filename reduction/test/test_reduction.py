@@ -1,16 +1,12 @@
 import os
-import pytest
-import warnings
-
-import numpy as np
 
 import mantid
 import mantid.simpleapi as mtd_api
+import numpy as np
+
 mantid.kernel.config.setLogLevel(3)
 
-from lr_reduction import template
-from lr_reduction import event_reduction
-from lr_reduction import workflow
+from lr_reduction import event_reduction, template, workflow
 
 
 def test_full_reduction():

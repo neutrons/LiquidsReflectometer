@@ -1,17 +1,17 @@
 """
     Time-resolved data reduction
 """
-import sys
-import os
-import numpy as np
 import json
-
-from matplotlib import pyplot as plt
+import os
+import sys
 
 import mantid
-from mantid.api import *
 import mantid.simpleapi as api
+import numpy as np
+from mantid.api import *
 from mantid.kernel import *
+from matplotlib import pyplot as plt
+
 mantid.kernel.config.setLogLevel(3)
 
 from . import template
@@ -43,7 +43,7 @@ def reduce_30Hz(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, scan_
                                scan_index=scan_index, template_reference=template_reference)
 
 
-def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, scan_index=1,
+def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, scan_index=1, # noqa ARG001
                         template_reference=None, q_summing=False):
     """
         Perform 30Hz reduction
@@ -118,13 +118,13 @@ def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, sca
     return np.asarray([q[_idx], r_q_final[_idx], dr_q_final[_idx], dq])
 
 
-def reduce_30Hz_slices(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, 
+def reduce_30Hz_slices(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz,
                        time_interval, output_dir, scan_index=1, create_plot=True,
-                       template_reference=None, q_summing=False):
+                       template_reference=None, q_summing=False): # noqa ARG001
 
     meas_ws_30Hz = api.LoadEventNexus("REF_L_%s" % meas_run_30Hz)
 
-    return reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, 
+    return reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz,
                                  time_interval, output_dir, scan_index=scan_index, create_plot=create_plot,
                                  template_reference=template_reference, q_summing=False)
 
@@ -136,7 +136,7 @@ def reduce_60Hz_slices(meas_run, template_file,
     return reduce_60Hz_slices_ws(meas_ws, template_file,
                                  time_interval, output_dir, scan_index=scan_index, create_plot=create_plot)
 
-def reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, 
+def reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz,
                           time_interval, output_dir, scan_index=1, create_plot=True,
                           template_reference=None, q_summing=False):
     """
@@ -234,7 +234,7 @@ def reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30
 
     return reduced
 
-def reduce_60Hz_slices_ws(meas_ws, template_file, 
+def reduce_60Hz_slices_ws(meas_ws, template_file,
                           time_interval, output_dir, scan_index=1, create_plot=True):
     """
         Perform 30Hz reduction
@@ -315,7 +315,7 @@ def plot_slices(reduced, title, time_interval, file_path, offset=10):
 
     plt.legend()
     plt.title(title)
-    plt.xlabel('q [$1/\AA$]')
+    plt.xlabel(r'q [$1/\AA$]')
     plt.ylabel('R(q)')
     ax.set_yscale('log')
     ax.set_xscale('log')

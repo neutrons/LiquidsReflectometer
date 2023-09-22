@@ -1,10 +1,10 @@
-import sys
 import os
-import numpy as np
+import sys
+import warnings
 
+import numpy as np
 from matplotlib import pyplot as plt
 
-import warnings
 warnings.filterwarnings('ignore', module='numpy')
 warnings.filterwarnings('ignore')
 
@@ -81,7 +81,7 @@ def process_xrr(data_file, output_dir=None):
 
     plt.figure(figsize=(10,6))
     plt.plot(q, r)
-    plt.xlabel('q [$1/\AA$]')
+    plt.xlabel(r'q [$1/\AA$]')
     plt.ylabel('R(q)')
     plt.yscale('log')
     plt.xscale('linear')

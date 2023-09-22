@@ -1,6 +1,4 @@
 import numpy as np
-
-from lr_reduction import workflow
 from lr_reduction import time_resolved
 
 
@@ -31,4 +29,3 @@ def test_reduce_workflow():
                     assert(np.fabs(reduced[0][1][k] - ref_data[1][i]) < 1e-10)
                     n_match += 1
     assert(n_pts == n_match)
-

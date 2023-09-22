@@ -8,4 +8,3 @@ Name[en_US]=NR Launcher
 Exec=/SNS/REF_L/shared/launcher/nr_launcher.sh
 Name=nr_launcher
 Icon=mate-panel-launcher
-

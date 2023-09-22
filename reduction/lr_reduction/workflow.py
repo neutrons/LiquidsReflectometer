@@ -1,18 +1,13 @@
 """
     Autoreduction process for the Liquids Reflectometer
 """
-import sys
-import os
 import json
+import os
+
+import mantid.simpleapi as mtd_api
 import numpy as np
 
-import mantid
-import mantid.simpleapi as mtd_api
-
-from . import template
-from . import reduction_template_reader
-from . import output
-from . import event_reduction
+from . import event_reduction, output, reduction_template_reader, template
 
 
 def reduce(ws, template_file, output_dir, average_overlap=False,
@@ -146,7 +141,7 @@ def reduce_fixed_two_theta(ws, template_file, output_dir, average_overlap=False,
         with open(options_file, 'r') as fd:
             options = json.load(fd)
         pixel_offset = options['pixel_offset']
-        tthd_calibration = options['tthd_db']
+        options['tthd_db']
         twotheta = 2*ths_value + options['twotheta_offset']
     else:
         # Fit direct beam position

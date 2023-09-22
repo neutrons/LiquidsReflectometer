@@ -1,14 +1,9 @@
 #!/usr/bin/python3
-import sys
 import os
 import subprocess
 
-from qtpy import QtWidgets, QtGui, QtCore
-
-from qtpy.QtWidgets import (QWidget, QGridLayout,
-                            QFileDialog, QLabel,
-                            QPushButton, QMessageBox)
-
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtWidgets import QFileDialog, QGridLayout, QLabel, QMessageBox, QPushButton, QWidget
 
 TEMPLATE_DIRECTIVE = "Click to choose a 60Hz template"
 OUTPUT_DIR_DIRECTIVE = "Click to choose an output directory"
@@ -151,4 +146,3 @@ class Dynamic60Hz(QWidget):
                         self.template_path.text(),
                         self.time_slice_ledit.text(), self.output_dir_label.text(),
                         '--scan_index', self.idx_ledit.text()])
-

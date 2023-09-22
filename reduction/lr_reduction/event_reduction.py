@@ -1,12 +1,9 @@
 """
     Event based reduction for the Liquids Reflectometer
 """
-import sys
 import time
 
-import mantid
 import mantid.simpleapi as api
-
 import numpy as np
 
 
@@ -173,9 +170,9 @@ class EventReflectivity(object):
         run_object = self._ws_sc.getRun()
         self.det_distance = run_object['SampleDetDis'].getStatistics().mean
         source_sample_distance = run_object['ModeratorSamDis'].getStatistics().mean
-        if not run_object['SampleDetDis'].units in ['m', 'meter']:
+        if run_object['SampleDetDis'].units not in ['m', 'meter']:
             self.det_distance /= 1000.0
-        if not run_object['ModeratorSamDis'].units in ['m', 'meter']:
+        if run_object['ModeratorSamDis'].units not in ['m', 'meter']:
             source_sample_distance /= 1000.0
         self.source_detector_distance = source_sample_distance + self.det_distance
 
@@ -184,7 +181,7 @@ class EventReflectivity(object):
             4B-specific meta data
 
             Distance from source to sample was 13.63 meters prior to the source
-            to detector distance being determined with Bragg edges to be 15.75 m. 
+            to detector distance being determined with Bragg edges to be 15.75 m.
         """
         if self._ws_sc.getInstrument().hasParameter("sample-det-distance"):
             self.det_distance = self._ws_sc.getInstrument().getNumberParameter("sample-det-distance")[0]
@@ -238,7 +235,7 @@ class EventReflectivity(object):
             Compute specular reflectivity.
 
             For constant-Q binning, it's preferred to use tof_weighted=True.
-            
+
             :param q_summing: turns on constant-Q binning
             :param tof_weighted: if True, binning will be done by weighting each event to the DB distribution
             :param bck_in_q: if True, the background will be estimated in Q space using the constant-Q binning approach
@@ -443,7 +440,7 @@ class EventReflectivity(object):
         return self._bck_subtraction(self._ws_db, self.norm_peak, self.norm_bck, self.norm_low_res,
                                      normalize_to_single_pixel=False)
 
-    def slice(self, x_min=0.002, x_max=0.004, x_bins=None, z_bins=None,
+    def slice(self, x_min=0.002, x_max=0.004, x_bins=None, z_bins=None, # noqa A003
               refl=None, d_refl=None, normalize=False):
         """
             Retrieve a slice from the off-specular data.
@@ -529,7 +526,7 @@ class EventReflectivity(object):
             refl[non_zero] = refl[non_zero] / charge / bin_size[non_zero]
         else:
             d_refl_sq = np.sqrt(np.fabs(refl)) / charge
-            refl /= charge 
+            refl /= charge
 
         return refl, d_refl_sq
 
