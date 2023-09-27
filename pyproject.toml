@@ -10,7 +10,7 @@ dependencies = [
 [tool.ruff]
 line-length = 140
 # https://beta.ruff.rs/docs/rules/
-select = ["A", "ARG", "E", "W", "F", "I", "PT", "RUF100"]
+select = ["A", "ARG", "E", "W", "F", "PT", "RUF100"]
 ignore = ["E402", # module level import not at top of file
           "E722", # bare except
           "E741", "E743", # ambiguous function name, generally 'l'
@@ -20,3 +20,21 @@ ignore = ["E402", # module level import not at top of file
 
 [tool.black]
 line-length = 140
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+skip_empty = true
+
+[tool.pytest.ini_options]
+pythonpath = [
+  ".", "reduction", "scripts", "tests/data/liquidsreflectometer-data/nexus/"
+]
+
+testpaths = ["tests", "tests/data/liquidsreflectometer-data"]
+norecursedirs = [".git", "tmp*", "_tmp*", "__pycache__", "*dataset*", "*data_set*"]
+markers = [
+  "datarepo: mark a test as using LiquidsReflectometer-data repository",
+  "scripts: mark a test as a script that should be run manually",
+]
