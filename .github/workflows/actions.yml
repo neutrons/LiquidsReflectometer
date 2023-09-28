@@ -40,11 +40,9 @@ jobs:
           /sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen 0 1280x1024x16
     - name: Test with pytest
       run: |
-        echo "datasearch.directories=$PWD/tests/data/liquidsreflectometer-data/nexus/" >> /usr/share/miniconda/envs/liquid-ref/bin/Mantid.properties
-        tail -n 5 /usr/share/miniconda/envs/liquid-ref/bin/Mantid.properties
         git submodule init
         git submodule update
-        xvfb-run --server-args="-screen 0 1280x1024x16" --auto-servernum python -m pytest --cov=reduction --cov=scripts --cov-report=xml --cov-report=term -s -m datarepo
+        python -m pytest --cov=reduction --cov=scripts --cov-report=xml --cov-report=term
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
       env:

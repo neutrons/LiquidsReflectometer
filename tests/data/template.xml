@@ -50,7 +50,7 @@
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
    <scaling_factor_flag>True</scaling_factor_flag>
-   <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
+   <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
    <slits_width_flag>True</slits_width_flag>
@@ -97,7 +97,7 @@
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
    <scaling_factor_flag>True</scaling_factor_flag>
-   <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
+   <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
    <slits_width_flag>True</slits_width_flag>
@@ -144,7 +144,7 @@
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
    <scaling_factor_flag>True</scaling_factor_flag>
-   <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
+   <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
    <slits_width_flag>True</slits_width_flag>
@@ -191,7 +191,7 @@
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
    <scaling_factor_flag>True</scaling_factor_flag>
-   <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
+   <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
    <slits_width_flag>True</slits_width_flag>
@@ -238,7 +238,7 @@
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
    <scaling_factor_flag>True</scaling_factor_flag>
-   <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
+   <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
    <slits_width_flag>True</slits_width_flag>
@@ -285,7 +285,7 @@
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
    <scaling_factor_flag>True</scaling_factor_flag>
-   <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
+   <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
    <slits_width_flag>True</slits_width_flag>
@@ -332,7 +332,7 @@
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
    <scaling_factor_flag>True</scaling_factor_flag>
-   <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
+   <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
    <slits_width_flag>True</slits_width_flag>
@@ -379,7 +379,7 @@
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
    <scaling_factor_flag>True</scaling_factor_flag>
-   <scaling_factor_file>/SNS/REF_L/IPTS-30101/shared/autoreduce/sf_197912_Si_auto.cfg</scaling_factor_file>
+   <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
    <incident_medium_index_selected>0</incident_medium_index_selected>
    <slits_width_flag>True</slits_width_flag>
