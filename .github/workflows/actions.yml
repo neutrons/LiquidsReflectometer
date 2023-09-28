@@ -23,6 +23,7 @@ jobs:
         miniforge-version: latest
         python-version: "3.8"
         environment-file: environment.yml
+        activate-environment: liquid-ref
     - name: Restore cached conda environment
       id: cache-load
       uses: actions/cache/restore@v3
