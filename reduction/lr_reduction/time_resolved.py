@@ -123,6 +123,8 @@ def reduce_30Hz_slices(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz
                        time_interval, output_dir, scan_index=1, create_plot=True,
                        template_reference=None, q_summing=False): # noqa ARG001
     print(f'time_resolved: {config.getDataSearchDirs()}')
+    import sys
+    print(f'syspath: {sys.path}')
     meas_ws_30Hz = api.LoadEventNexus("REF_L_%s" % meas_run_30Hz)
 
     return reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz,
