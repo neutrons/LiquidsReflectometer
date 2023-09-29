@@ -1,6 +1,8 @@
 import unittest
 import os
 import pytest
+import sys
+print(sys.path)
 
 import mantid.simpleapi as mtd_api
 import numpy as np
