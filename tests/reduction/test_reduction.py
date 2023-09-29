@@ -7,7 +7,7 @@ import numpy as np
 from mantid.kernel import ConfigService
 from mantid.api import FileFinder
 
-from .reduction.lr_reduction import event_reduction, template, workflow
+from reduction.lr_reduction import event_reduction, template, workflow
 
 
 @pytest.mark.datarepo()

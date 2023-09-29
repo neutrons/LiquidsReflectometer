@@ -16,4 +16,3 @@ dependencies:
   - versioningit
   - boa
   - conda-verify
-prefix: /home/gcs/mambaforge/envs/liquid-ref
