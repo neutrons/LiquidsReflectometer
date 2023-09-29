@@ -34,14 +34,15 @@ class ReductionTest(unittest.TestCase):
         refl_all = []
         d_refl_all = []
         first_run = None
-        filename = "data/liquidsreflectometer-data/nexus/REF_L_198409.nxs.h5"
-        print(oct(os.stat(filename).st_mode)[-3:])
-        print(os.getcwd())
+        # file_prefix = "data/liquidsreflectometer-data/nexus/REF_L_{}.nxs.h5"
+        # print(oct(os.stat(filename).st_mode)[-3:])
+        # print(os.getcwd())
         os.getcwd()
         for run_number in range(198409, 198417):
+            file_loc = f"data/liquidsreflectometer-data/nexus/REF_L_{run_number}.nxs.h5"
             file_name = FileFinder.findRuns("REF_L_%d" % int(run_number))[0]
-            print(file_name)
-            ws_sc = mtd_api.Load(Filename=file_name)
+            print(f'foundfile: {file_name}')
+            ws_sc = mtd_api.Load(Filename=file_loc)
             qz_mid, refl, d_refl = template.process_from_template_ws(ws_sc, template_path)
 
             if first_run is None:
