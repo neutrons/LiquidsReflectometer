@@ -132,7 +132,7 @@ def reduce_fixed_two_theta(ws, template_file, output_dir, average_overlap=False,
     template_data = template.read_template(template_file, sequence_number)
 
     # Load normalization run
-    ws_db = mtd_api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
+    ws_db = mtd_api.LoadEventNexus("REF_L_%s.nxs.h5" % template_data.norm_file)
     tthd_value = ws.getRun()['tthd'].value[0]
 
     # Look for parameters that might have been determined earlier for this measurement

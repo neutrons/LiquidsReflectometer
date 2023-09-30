@@ -96,10 +96,10 @@ def reduce_30Hz(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, scan_
     template_data = read_template(template_30Hz, scan_index)
 
     # Reduce the quartz at 30Hz
-    ref_ws_30Hz = api.LoadEventNexus("REF_L_%s" % ref_run_30Hz)
+    ref_ws_30Hz = api.LoadEventNexus("REF_L_%s.nxs.h5" % ref_run_30Hz)
 
     # Reduce the sample data at 30Hz
-    meas_ws_30Hz = api.LoadEventNexus("REF_L_%s" % meas_run_30Hz)
+    meas_ws_30Hz = api.LoadEventNexus("REF_L_%s.nxs.h5" % meas_run_30Hz)
 
     # Load the 60Hz reference data
     data_60Hz = np.loadtxt(ref_data_60Hz).T
@@ -209,7 +209,7 @@ def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, sca
 def reduce_30Hz_slices(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, 
                        time_interval, output_dir, scan_index=1, create_plot=True, template_reference=None):
 
-    meas_ws_30Hz = api.LoadEventNexus("REF_L_%s" % meas_run_30Hz)
+    meas_ws_30Hz = api.LoadEventNexus("REF_L_%s.nxs.h5" % meas_run_30Hz)
 
     return reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, 
                                  time_interval, output_dir, scan_index=scan_index, create_plot=create_plot,
@@ -218,7 +218,7 @@ def reduce_30Hz_slices(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz
 def reduce_60Hz_slices(meas_run, template_file,
                        time_interval, output_dir, scan_index=1, create_plot=True):
 
-    meas_ws = api.LoadEventNexus("REF_L_%s" % meas_run)
+    meas_ws = api.LoadEventNexus("REF_L_%s.nxs.h5" % meas_run)
 
     return reduce_60Hz_slices_ws(meas_ws, template_file,
                                  time_interval, output_dir, scan_index=scan_index, create_plot=create_plot)
@@ -244,7 +244,7 @@ def reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30
     if os.path.isfile(ref_run_30Hz):
         ref_ws_30Hz = api.LoadEventNexus(ref_run_30Hz)
     else:
-        ref_ws_30Hz = api.LoadEventNexus("REF_L_%s" % ref_run_30Hz)
+        ref_ws_30Hz = api.LoadEventNexus("REF_L_%s.nxs.h5" % ref_run_30Hz)
 
     # Reduce the sample data at 30Hz
     print("Reading sample data at 30Hz")

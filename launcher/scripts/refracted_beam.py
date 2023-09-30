@@ -401,7 +401,7 @@ def process_run(run_number, output_dir, material='Si'):
     """
         Process file and extract offset and pixel size
     """
-    ws_sc = api.LoadEventNexus("REF_L_%s" % run_number)
+    ws_sc = api.LoadEventNexus("REF_L_%s.nxs.h5" % run_number)
 
     refr = Refracted(ws_sc, material=material, offset=0.0, pixel_size=0.0007)
 

@@ -158,7 +158,7 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     # Load normalization run
     normalize = normalize and template_data.apply_normalization
     if ws_db is None and normalize:
-        ws_db = api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
+        ws_db = api.LoadEventNexus("REF_L_%s.nxs.h5" % template_data.norm_file)
 
     # If we run in theta-theta geometry, we'll need thi
     thi_value = ws_sc.getRun()['thi'].value[0]

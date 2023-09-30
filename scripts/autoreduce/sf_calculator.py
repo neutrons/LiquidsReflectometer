@@ -110,7 +110,7 @@ class ScalingFactor(object):
 
         # Load the data
         for run in run_list:
-            workspace = LoadEventNexus(Filename="REF_L_%s" % run, OutputWorkspace="__data_file_%s" % run)
+            workspace = LoadEventNexus(Filename="REF_L_%s.nxs.h5" % run, OutputWorkspace="__data_file_%s" % run)
             lr_data.append(workspace)
 
         sort_by_runs = True

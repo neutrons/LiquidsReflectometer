@@ -22,7 +22,7 @@ class PixelData():
     det_distance = DEFAULT_4B_SAMPLE_DET_DISTANCE
 
     def __init__(self, run_number):
-        self.ws = api.LoadEventNexus("REF_L_%s" % run_number, OutputWorkspace='r%s' % run_number)
+        self.ws = api.LoadEventNexus("REF_L_%s.nxs.h5" % run_number, OutputWorkspace='r%s' % run_number)
         self.run_number = run_number
         self.get_parameters()
 
