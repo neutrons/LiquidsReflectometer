@@ -50,7 +50,7 @@ jobs:
         # git -C tests/data/liquidsreflectometer-data/ pull
         git submodule update --init
         ls -al tests/data/liquidsreflectometer-data/nexus/
-        xvfb-run --server-args="-screen 0 1280x1024x16" --auto-servernum python -m pytest --cov=reduction --cov=scripts --cov-report=xml --cov-report=term
+        xvfb-run --server-args="-screen 0 1280x1024x16" --auto-servernum python -m pytest 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
       env:
