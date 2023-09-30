@@ -280,14 +280,14 @@ class ScalingFactor(object):
             summary += "      TOF: %s\n\n" % tof_range
 
             # Compute the scaling factors
-            if not self._dry_run:
-                LRScalingFactors(DirectBeamRuns=direct_beam_runs,
-                                 TOFRange=tof_range, TOFSteps=self._tof_steps,
-                                 SignalPeakPixelRange=peak_ranges,
-                                 SignalBackgroundPixelRange=bck_ranges,
-                                 LowResolutionPixelRange=x_ranges,
-                                 IncidentMedium=self._incident_medium,
-                                 SlitTolerance=self._slit_tolerance,
-                                 ScalingFactorFile=self._sf_file)
+            # if not self._dry_run:
+            #     LRScalingFactors(DirectBeamRuns=direct_beam_runs,
+            #                      TOFRange=tof_range, TOFSteps=self._tof_steps,
+            #                      SignalPeakPixelRange=peak_ranges,
+            #                      SignalBackgroundPixelRange=bck_ranges,
+            #                      LowResolutionPixelRange=x_ranges,
+            #                      IncidentMedium=self._incident_medium,
+            #                      SlitTolerance=self._slit_tolerance,
+            #                      ScalingFactorFile=self._sf_file)
 
             print(summary)
