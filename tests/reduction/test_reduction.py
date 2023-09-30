@@ -76,7 +76,7 @@ class ReductionTest(unittest.TestCase):
             os.remove(reduced_path)
 
         for i in range(198409, 198417):
-            ws = mtd_api.Load(str(i))
+            ws = mtd_api.Load(f"REF_L_{i}")
             workflow.reduce(ws, template_path, output_dir=output_dir, average_overlap=False)
 
         reference_path = "data/reference_rq.txt"
