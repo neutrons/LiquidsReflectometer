@@ -45,6 +45,7 @@ jobs:
         # sudo apt-get update
         # sudo apt-get install git-lfs
         dpkg -l git-lfs
+        python -m pip install -e . # install the application in editable mode
         git submodule add --force https://code.ornl.gov/sns-hfir-scse/infrastructure/test-data/liquidsreflectometer-data.git tests/data/liquidsreflectometer-data
         # git -C tests/data/liquidsreflectometer-data/ lfs install
         # git -C tests/data/liquidsreflectometer-data/ pull
