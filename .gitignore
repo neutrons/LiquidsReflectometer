@@ -133,4 +133,5 @@ dmypy.json
 
 # project specific files
 reduction/_version.py
-conda.recipe/
+conda.recipe/*
+!conda.recipe/meta.yaml
