@@ -1,13 +1,11 @@
 import unittest
 import os
 import pytest
-import sys
-print(sys.path)
 
 import mantid.simpleapi as mtd_api
 import numpy as np
 from mantid.kernel import ConfigService
-from mantid.api import FileFinder
+mantid.kernel.config.setLogLevel(3)
 
 from reduction.lr_reduction import event_reduction, template, workflow
 
@@ -23,8 +21,6 @@ class ReductionTest(unittest.TestCase):
         config.appendDataSearchDir(str(os.path.join(cwd, "data/liquidsreflectometer-data/nexus")))
         print(config.getDataSearchDirs())
 
-
-    @classmethod
     def test_full_reduction(self):
         """
         Test the fill reduction chain
@@ -34,21 +30,15 @@ class ReductionTest(unittest.TestCase):
         refl_all = []
         d_refl_all = []
         first_run = None
-        # file_prefix = "data/liquidsreflectometer-data/nexus/REF_L_{}.nxs.h5"
-        # print(oct(os.stat(filename).st_mode)[-3:])
-        # print(os.getcwd())
-        os.getcwd()
+
         for run_number in range(198409, 198417):
-            file_loc = f"data/liquidsreflectometer-data/nexus/REF_L_{run_number}.nxs.h5"
-            file_name = FileFinder.findRuns("REF_L_%d" % int(run_number))[0]
-            print(f'foundfile: {file_name}')
-            ws_sc = mtd_api.Load(Filename=file_loc)
+            ws_sc = mtd_api.Load("REF_L_%s" % run_number)
             qz_mid, refl, d_refl = template.process_from_template_ws(ws_sc, template_path)
 
             if first_run is None:
                 first_run = run_number
                 resolution = event_reduction.compute_resolution(ws_sc)
-                print(resolution)
+
             for i in range(len(qz_mid)):
                 qz_all.append(qz_mid[i])
                 refl_all.append(refl[i])
@@ -63,7 +53,7 @@ class ReductionTest(unittest.TestCase):
         refl_all = np.take_along_axis(refl_all, idx, axis=None)
         d_refl_all = np.take_along_axis(d_refl_all, idx, axis=None)
 
-        # assert(resolution == 0.02785205863936946)
+        assert(resolution == 0.02785205863936946)
         ref_data = np.loadtxt("data/reference_rq.txt").T
         assert len(ref_data[1]) == len(refl_all)
         assert np.fabs(np.sum(ref_data[1] - refl_all)) < 1e-10

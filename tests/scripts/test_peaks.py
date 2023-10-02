@@ -11,9 +11,8 @@ from mantid import config
 from scripts.autoreduce.peak_finding import find_peaks, peak_prominences, peak_widths
 
 
-@pytest.mark.scripts()
+@pytest.mark.datarepo()
 class ScanPeaksTest(unittest.TestCase):
-    @classmethod
     def setUpClass(cls):
         if os.getcwd().endswith("LiquidsReflectometer"):
             os.chdir("tests")
@@ -22,7 +21,6 @@ class ScanPeaksTest(unittest.TestCase):
         config.appendDataSearchDir(str(os.path.join(cwd, "data/liquidsreflectometer-data/nexus")))
         print(config.getDataSearchDirs())
 
-    @classmethod
     def test_peak_finding(self):
         def scan_peaks(x):
             f1 = ndimage.gaussian_filter(x, 3)

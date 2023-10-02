@@ -39,19 +39,9 @@ jobs:
         /sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen 0 1280x1024x16
     - name: Test with pytest
       run: |
-        # sed -i '/^sdatasearch.directories=/s/.*/datasearch.directories=\/home\/cloud\/_work\/LiquidsReflectometer\/LiquidsReflectometer\/tests\/data\/liquidsreflectometer-data\/nexus/' ~/.mantid/Mantid.user.properties
-        echo datasearch.directories=/home/cloud/_work/LiquidsReflectometer/LiquidsReflectometer/tests/data/liquidsreflectometer-data/nexus/ >> ~/.mantid/Mantid.user.properties
-        cat ~/.mantid/Mantid.user.properties
-        # sudo apt-get update
-        # sudo apt-get install git-lfs
-        dpkg -l git-lfs
-        python -m pip install -e . # install the application in editable mode
         git submodule add --force https://code.ornl.gov/sns-hfir-scse/infrastructure/test-data/liquidsreflectometer-data.git tests/data/liquidsreflectometer-data
-        # git -C tests/data/liquidsreflectometer-data/ lfs install
-        # git -C tests/data/liquidsreflectometer-data/ pull
         git submodule update --init
-        ls -al tests/data/liquidsreflectometer-data/nexus/
-        xvfb-run --server-args="-screen 0 1280x1024x16" --auto-servernum python -m pytest --cov=reduction --cov=scripts --cov-report=xml --cov-report=term
+        python -m pytest --cov=reduction --cov=scripts --cov-report=xml --cov-report=term -m datarepo
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
       env:

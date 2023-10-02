@@ -8,7 +8,6 @@ from mantid import config
 
 @pytest.mark.datarepo()
 class TimeResolvedTest(unittest.TestCase):
-    @classmethod
     def setUpClass(cls):
         if os.getcwd().endswith("LiquidsReflectometer"):
             os.chdir("tests")
@@ -17,14 +16,13 @@ class TimeResolvedTest(unittest.TestCase):
         config.appendDataSearchDir(str(os.path.join(cwd, "data/liquidsreflectometer-data/nexus")))
         print(config.getDataSearchDirs())
 
-    @classmethod
     def test_reduce_workflow(self):
         """
         Test the time-resolved reduction that uses a measured reference.
         It is generally used at 30 Hz but it also works at 60 Hz.
         """
         template_path = "data/template.xml"
-        output_dir = "/tmp"
+        output_dir = "results"
         reduced_path = "data/reference_rq_avg_overlap.txt"
         ref_data = np.loadtxt(reduced_path).T
 
