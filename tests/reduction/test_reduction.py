@@ -2,6 +2,7 @@ import unittest
 import os
 import pytest
 
+import mantid
 import mantid.simpleapi as mtd_api
 import numpy as np
 from mantid.kernel import ConfigService
