@@ -84,6 +84,7 @@ jobs:
       run: |
         # set up environment
         conda config --add channels mantid
+        conda config --add channels conda-forge
         cd conda.recipe
         echo "versioningit $(versioningit ../)"
         # build the package
