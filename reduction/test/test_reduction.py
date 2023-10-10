@@ -3,6 +3,8 @@ import os
 import mantid
 import mantid.simpleapi as mtd_api
 import numpy as np
+mtd_api.config["default.facility"] = "SNS"
+mtd_api.config["default.instrument"] = "REF_L"
 
 mantid.kernel.config.setLogLevel(3)
 
@@ -14,12 +16,10 @@ def test_full_reduction():
         Test the fill reduction chain
     """
     template_path = 'data/template.xml'
-
     qz_all = []
     refl_all = []
     d_refl_all = []
     first_run = None
-
     for run_number in range(198409, 198417):
         ws_sc = mtd_api.Load("REF_L_%s" % run_number)
         qz_mid, refl, d_refl = template.process_from_template_ws(ws_sc, template_path)
@@ -50,9 +50,10 @@ def test_full_reduction():
 
 def test_reduce_workflow():
     template_path = 'data/template.xml'
-    output_dir = '/tmp'
+    output_dir = 'data/'
     reduced_path = os.path.join(output_dir, 'REFL_198409_combined_data_auto.txt')
-    os.remove(reduced_path)
+    if os.path.isfile(reduced_path):
+        os.remove(reduced_path)
 
     for i in range(198409, 198417):
         ws = mtd_api.Load("REF_L_%s" % i)
@@ -79,9 +80,10 @@ def test_reduce_workflow_201282():
         Test to reproduce autoreduction output
     """
     template_path = 'data/template_201282.xml'
-    output_dir = '/tmp'
+    output_dir = 'data/'
     reduced_path = os.path.join(output_dir, 'REFL_201282_combined_data_auto.txt')
-    os.remove(reduced_path)
+    if os.path.isfile(reduced_path):
+        os.remove(reduced_path)
 
     for i in range(201282, 201289):
         ws = mtd_api.Load("REF_L_%s" % i)
@@ -108,9 +110,10 @@ def test_background_subtraction():
         Test with background subtraction off for the data and on for the normalization
     """
     template_path = 'data/template_short_nobck.xml'
-    output_dir = '/tmp'
+    output_dir = 'data/'
     reduced_path = os.path.join(output_dir, 'REFL_198382_combined_data_auto.txt')
-    os.remove(reduced_path)
+    if os.path.isfile(reduced_path):
+        os.remove(reduced_path)
 
     for i in range(198388, 198390):
         ws = mtd_api.Load("REF_L_%s" % i)
