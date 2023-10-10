@@ -3,7 +3,7 @@ import os
 import mantid
 import mantid.simpleapi as mtd_api
 import numpy as np
-
+mtd_api.config.appendDataSearchDir('reduction/tests/data/liquidsreflectometer-data/nexus')
 mtd_api.config["default.facility"] = "SNS"
 mtd_api.config["default.instrument"] = "REF_L"
 
@@ -17,8 +17,8 @@ def test_full_reduction():
         Test the fill reduction chain
     """
     template_path = 'data/template.xml'
-    mtd_api.config.appendDataSearchDir('tests/data/liquidsreflectometer-data/nexus')
-    print(os.listdir('tests/data/liquidsreflectometer-data/nexus/'))
+    
+    #print(os.listdir('tests/data/liquidsreflectometer-data/nexus/'))
     qz_all = []
     refl_all = []
     d_refl_all = []
