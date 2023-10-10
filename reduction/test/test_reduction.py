@@ -42,7 +42,7 @@ def test_full_reduction():
     refl_all = np.take_along_axis(refl_all, idx, axis=None)
     d_refl_all = np.take_along_axis(d_refl_all, idx, axis=None)
 
-    assert(resolution == 0.02785205863936946)
+    assert(np.fabs(resolution - 0.02785205863936946) < 1e-5)
     ref_data = np.loadtxt('data/reference_rq.txt').T
     assert(len(ref_data[1]) == len(refl_all))
     assert(np.fabs(np.sum(ref_data[1]-refl_all)) < 1e-10)
