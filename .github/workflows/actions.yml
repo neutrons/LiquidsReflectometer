@@ -40,6 +40,8 @@ jobs:
     - name: Test with pytest
       working-directory: ./reduction
       run: |
+        echo datasearch.directories=/home/cloud/_work/LiquidsReflectometer/LiquidsReflectometer/reduction/tests/data/liquidsreflectometer-data/nexus/ >> ~/.mantid/Mantid.user.properties
+        cat ~/.mantid/Mantid.user.properties
         git submodule add --force https://code.ornl.gov/sns-hfir-scse/infrastructure/test-data/liquidsreflectometer-data.git tests/data/liquidsreflectometer-data
         git submodule update --init
         python -m pytest --cov=reduction --cov-report=xml --cov-report=term test
