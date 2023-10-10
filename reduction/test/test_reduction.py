@@ -3,6 +3,9 @@ import os
 import mantid
 import mantid.simpleapi as mtd_api
 import numpy as np
+mtd_api.config.appendDataSearchDir('tests/data/liquidsreflectometer-data/nexus/')
+mtd_api.config["default.facility"] = "SNS"
+mtd_apiconfig["default.instrument"] = "REF_L"
 
 mantid.kernel.config.setLogLevel(3)
 
