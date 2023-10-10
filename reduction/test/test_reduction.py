@@ -22,7 +22,7 @@ def test_full_reduction():
     refl_all = []
     d_refl_all = []
     first_run = None
-
+    print(os.listdir('tests/data/liquidsreflectometer-data/nexus/')
     for run_number in range(198409, 198417):
         ws_sc = mtd_api.Load("REF_L_%s" % run_number)
         qz_mid, refl, d_refl = template.process_from_template_ws(ws_sc, template_path)
@@ -55,7 +55,8 @@ def test_reduce_workflow():
     template_path = 'data/template.xml'
     output_dir = '/tmp'
     reduced_path = os.path.join(output_dir, 'REFL_198409_combined_data_auto.txt')
-    os.remove(reduced_path)
+    if os.path.isfile(reduced_path):
+        os.remove(reduced_path)
 
     for i in range(198409, 198417):
         ws = mtd_api.Load("REF_L_%s" % i)
