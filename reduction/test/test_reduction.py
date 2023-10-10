@@ -3,7 +3,7 @@ import os
 import mantid
 import mantid.simpleapi as mtd_api
 import numpy as np
-mtd_api.config.appendDataSearchDir(os.path.abspath(os.path.join(os.getcwd(), '../tests/data/liquidsreflectometer-data/nexus/')))
+mtd_api.config.appendDataSearchDir('tests/data/liquidsreflectometer-data/nexus/')
 mtd_api.config["default.facility"] = "SNS"
 mtd_api.config["default.instrument"] = "REF_L"
 
