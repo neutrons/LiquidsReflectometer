@@ -41,7 +41,7 @@ jobs:
       run: |
         git submodule add --force https://code.ornl.gov/sns-hfir-scse/infrastructure/test-data/liquidsreflectometer-data.git tests/data/liquidsreflectometer-data
         git submodule update --init
-        python -m pytest --cov=reduction --cov=scripts --cov-report=xml --cov-report=term -m datarepo reduction/test
+        python -m pytest --cov=reduction --cov-report=xml --cov-report=term reduction/test
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
       env:
