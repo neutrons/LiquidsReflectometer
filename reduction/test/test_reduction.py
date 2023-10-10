@@ -22,6 +22,7 @@ def test_full_reduction():
     refl_all = []
     d_refl_all = []
     first_run = None
+    print(os.getcwd())
     for run_number in range(198409, 198417):
         ws_sc = mtd_api.Load("REF_L_%s.nxs.h5" % run_number)
         qz_mid, refl, d_refl = template.process_from_template_ws(ws_sc, template_path)
