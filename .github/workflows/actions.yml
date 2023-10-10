@@ -38,10 +38,11 @@ jobs:
       run: |
         /sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen 0 1280x1024x16
     - name: Test with pytest
+      working-directory: ./reduction
       run: |
         git submodule add --force https://code.ornl.gov/sns-hfir-scse/infrastructure/test-data/liquidsreflectometer-data.git tests/data/liquidsreflectometer-data
         git submodule update --init
-        python -m pytest --cov=reduction --cov-report=xml --cov-report=term reduction/test
+        python -m pytest --cov=reduction --cov-report=xml --cov-report=term test
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
       env:
