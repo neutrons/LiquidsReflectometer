@@ -17,8 +17,6 @@ def test_full_reduction():
         Test the fill reduction chain
     """
     template_path = 'data/template.xml'
-    
-    print(os.listdir('tests/data/liquidsreflectometer-data/nexus/'))
     qz_all = []
     refl_all = []
     d_refl_all = []
