@@ -23,6 +23,7 @@ def get_wl_range(ws):
 
     return [wl_min, wl_max]
 
+
 def get_q_binning(q_min=0.001, q_max=0.15, q_step=-0.02):
     """
         Determine Q binning
@@ -34,16 +35,6 @@ def get_q_binning(q_min=0.001, q_max=0.15, q_step=-0.02):
         _step = 1.0+np.abs(q_step)
         n_steps = int(np.log(q_max/q_min)/np.log(_step))
         return q_min * np.asarray([_step**i for i in range(n_steps)])
-
-def quicknxs_scale(theta, peak, low_res, norm_peak, norm_low_res):
-    """
-        Scaling factor to multiply by to be compatible with QuickNXS 1.0.
-    """
-    quicknxs_scale = (float(norm_peak[1])-float(norm_peak[0])) * (float(norm_low_res[1])-float(norm_low_res[0]))
-    quicknxs_scale /= (float(peak[1])-float(peak[0])) * (float(low_res[1])-float(low_res[0]))
-    _scale = 0.005 / np.fabs(np.sin(theta)) if theta > 0.0002 else 1.0
-    quicknxs_scale *= _scale
-    return quicknxs_scale
 
 
 class EventReflectivity(object):

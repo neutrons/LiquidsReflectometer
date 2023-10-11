@@ -11,6 +11,16 @@ mantid.kernel.config.setLogLevel(3)
 from lr_reduction import event_reduction, template, workflow
 
 
+def test_info():
+    """
+        Test utility functions to get basic info
+    """
+    ws_sc = mtd_api.Load("REF_L_198409")
+    wl_min, wl_max = event_reduction.get_wl_range(ws_sc)
+    assert(wl_min == 13.7)
+    assert(wl_max == 16.3)
+
+
 def test_full_reduction():
     """
         Test the fill reduction chain
