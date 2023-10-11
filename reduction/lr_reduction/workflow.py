@@ -141,7 +141,6 @@ def reduce_fixed_two_theta(ws, template_file, output_dir, average_overlap=False,
         with open(options_file, 'r') as fd:
             options = json.load(fd)
         pixel_offset = options['pixel_offset']
-        options['tthd_db']
         twotheta = 2*ths_value + options['twotheta_offset']
     else:
         # Fit direct beam position

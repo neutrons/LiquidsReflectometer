@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from lr_reduction import time_resolved
 
@@ -8,7 +9,7 @@ def test_reduce_workflow():
         It is generally used at 30 Hz but it also works at 60 Hz.
     """
     template_path = 'data/template.xml'
-    output_dir = '/tmp'
+    output_dir = 'data/'
     reduced_path = 'data/reference_rq_avg_overlap.txt'
     ref_data = np.loadtxt(reduced_path).T
 
@@ -29,3 +30,7 @@ def test_reduce_workflow():
                     assert(np.fabs(reduced[0][1][k] - ref_data[1][i]) < 1e-10)
                     n_match += 1
     assert(n_pts == n_match)
+
+    # Plot data
+    time_resolved.plot_slices(reduced, 'Test', 300,
+                              os.path.join(output_dir, 'reduced.png'), show=False)

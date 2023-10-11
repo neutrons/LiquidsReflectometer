@@ -31,8 +31,6 @@ def process_data(workspace, summed=True, tof_step=200):
 def fit_signal_flat_bck(x, y, x_min=110, x_max=170, center=None, sigma=None):
     gauss = GaussianModel(prefix='g_')
     linear = LinearModel(prefix='l_')
-    QuadraticModel(prefix='q_')
-    RectangleModel(prefix='r_')
 
     amplitude_guess = np.max(y[x_min:x_max])
 
@@ -46,8 +44,6 @@ def fit_signal_flat_bck(x, y, x_min=110, x_max=170, center=None, sigma=None):
     pars = gauss.make_params(amplitude=amplitude_guess, center=_center, sigma=_sigma)
     pars.update(linear.make_params(a=0, b=0))
 
-    #if center is not None:
-    #    pars['g_center'].vary=False
     if sigma is not None:
         pars['g_sigma'].vary=False
     pars['g_amplitude'].min=0
@@ -61,11 +57,10 @@ def fit_signal_flat_bck(x, y, x_min=110, x_max=170, center=None, sigma=None):
     fit = model.fit(y[x_min:x_max], pars, method='leastsq',
                     x=x[x_min:x_max],
                     weights=1/weights[x_min:x_max])
-    #print(fit.fit_report())
+    # print(fit.fit_report())
 
     fit.params['g_amplitude']
     c=fit.params['g_center']
     width=fit.params['g_sigma']
-    # print("Gaussian: \t %5.4g +- %5.4g \t %3.3g +- %3.3g \t %3.3g +- %3.3g" %
-    #       (a.value, a.stderr, c.value, c.stderr, width.value, width.stderr))
+
     return c, width, fit

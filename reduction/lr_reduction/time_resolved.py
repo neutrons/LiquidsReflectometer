@@ -18,31 +18,6 @@ from . import template
 from .event_reduction import compute_resolution
 
 
-def reduce_30Hz(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz, scan_index=1, template_reference=None):
-    """
-        Perform 30Hz reduction
-        @param meas_run_30Hz: run number of the data we want to reduce
-        @param ref_run_30Hz: run number of the reference data, take with the same config
-        @param ref_data_60Hz: file path of the reduce data file at 60Hz
-        @param template_30Hz: file path of the template file for 30Hz
-        @param scan_index: scan index to use within the template.
-    """
-    # Load the template
-    template_data = template.read_template(template_30Hz, scan_index)
-
-    # Reduce the quartz at 30Hz
-    ref_ws_30Hz = api.LoadEventNexus("REF_L_%s" % ref_run_30Hz)
-
-    # Reduce the sample data at 30Hz
-    meas_ws_30Hz = api.LoadEventNexus("REF_L_%s" % meas_run_30Hz)
-
-    # Load the 60Hz reference data
-    data_60Hz = np.loadtxt(ref_data_60Hz).T
-
-    return reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data,
-                               scan_index=scan_index, template_reference=template_reference)
-
-
 def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, scan_index=1, # noqa ARG001
                         template_reference=None, q_summing=False):
     """
@@ -299,7 +274,7 @@ def reduce_60Hz_slices_ws(meas_ws, template_file,
     return reduced
 
 
-def plot_slices(reduced, title, time_interval, file_path, offset=10):
+def plot_slices(reduced, title, time_interval, file_path, offset=10, show=True):
     fig, ax = plt.subplots(figsize=(6,6))
 
     total_time = 0
@@ -319,7 +294,8 @@ def plot_slices(reduced, title, time_interval, file_path, offset=10):
     plt.ylabel('R(q)')
     ax.set_yscale('log')
     ax.set_xscale('log')
-    plt.show()
+    if show:
+        plt.show()
     plt.savefig(file_path)
 
 
