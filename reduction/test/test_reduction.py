@@ -85,6 +85,53 @@ def test_reduce_workflow():
     assert(np.sum((_data[3]-_refl[3])/_refl[3])/len(_refl[3]) < 0.01)
 
 
+def test_reduce_workflow_with_overlap_avg():
+    """
+        Test the complete working, but this time we average the point in the
+        overlap regions.
+    """
+    template_path = 'data/template.xml'
+    output_dir = 'data/'
+    reduced_path = os.path.join(output_dir, 'REFL_198409_combined_data_auto.txt')
+    if os.path.isfile(reduced_path):
+        os.remove(reduced_path)
+
+    for i in range(198409, 198417):
+        ws = mtd_api.Load("REF_L_%s" % i)
+        workflow.reduce(ws, template_path, output_dir=output_dir,
+                        average_overlap=True)
+
+    reference_path = 'data/reference_rq_avg.txt'
+    if os.path.isfile(reference_path):
+        _data = np.loadtxt(reference_path).T
+
+    if os.path.isfile(reduced_path):
+        _refl = np.loadtxt(reduced_path).T
+
+    for i in range(3):
+        assert(np.fabs(np.sum(_data[i]-_refl[i])) < 1e-10)
+
+    # The reference was computed with a constant dq/q but our approach recalculates
+    # it for each run, so we expect a small discrepancy within 1%.
+    assert(np.sum((_data[3]-_refl[3])/_refl[3])/len(_refl[3]) < 0.01)
+
+
+def test_quick_reduce():
+    """
+        Test the quick reduction workflow
+    """
+    ws = mtd_api.Load("REF_L_201284")
+    ws_db = mtd_api.Load("REF_L_201045")
+
+    _refl = workflow.reduce_explorer(ws, ws_db, center_pixel=145, db_center_pixel=145)
+    reference_path = 'data/reference_r201284_quick.txt'
+    if os.path.isfile(reference_path):
+        _data = np.loadtxt(reference_path).T
+
+    for i in range(3):
+        assert(np.fabs(np.sum(_data[i] - _refl[i])) < 1e-10)
+
+
 def test_reduce_workflow_201282():
     """
         Test to reproduce autoreduction output
