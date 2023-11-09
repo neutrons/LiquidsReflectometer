@@ -30,10 +30,6 @@ def find_ranges_without_overlap(r1, r2):
     if x4 < x1 or x3 > x2:
         return [r1]  # r1 is the range without r2
 
-    # r2 partially overlaps r1
-    if x1 <= x3 and x4 <= x2:
-        return [[x1, x3 - 1], [x4 + 1, x2]]  # ranges before and after r2
-
     # r2 is entirely within r1
     if x1 <= x3 and x2 >= x4:
         return [[x1, x3 - 1], [x4 + 1, x2]]  # ranges before and after r2
