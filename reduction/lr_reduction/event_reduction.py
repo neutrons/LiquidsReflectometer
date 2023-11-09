@@ -362,65 +362,6 @@ class EventReflectivity(object):
         d_refl_bck /= _pixel_area
         return refl_bck, d_refl_bck
 
-    def __bck_subtraction(self, ws, peak, bck, low_res, normalize_to_single_pixel=False,
-                         q_bins=None, wl_dist=None, wl_bins=None, q_summing=False):
-        """
-            Abstracted out background subtraction process.
-
-            The options are the same as for the reflectivity calculation.
-            If wl_dist and wl_bins are supplied, the events will be weighted by flux.
-            If q_summing is True, the angle of each neutron will be recalculated according to
-            their position on the detector and place in the proper Q bin.
-        """
-        q_bins = self.q_bins if q_bins is None else q_bins
-
-        # Background on the left of the peak only. We allow the user to overlap the peak on the right,
-        # but only use the part left of the peak.
-        if bck[0] < peak[0]-1 and bck[1] < peak[1]+1:
-            right_side = min(bck[1], peak[0]-1)
-            _left = [bck[0], right_side]
-            print("Left side background: [%s, %s]" % (_left[0], _left[1]))
-            refl_bck, d_refl_bck = self._roi_integration(ws, peak=_left, low_res=low_res,
-                                                         q_bins=q_bins, wl_dist=wl_dist,
-                                                         wl_bins=wl_bins, q_summing=q_summing)
-        # Background on the right of the peak only. We allow the user to overlap the peak on the left,
-        # but only use the part right of the peak.
-        elif bck[0] > peak[0]-1 and bck[1] > peak[1]+1:
-            left_side = max(bck[0], peak[1]+1)
-            _right = [left_side, bck[1]]
-            print("Right side background: [%s, %s]" % (_right[0], _right[1]))
-            refl_bck, d_refl_bck = self._roi_integration(ws, peak=_right, low_res=low_res,
-                                                         q_bins=q_bins, wl_dist=wl_dist,
-                                                         wl_bins=wl_bins, q_summing=q_summing)
-        # Background on both sides
-        elif bck[0] < peak[0]-1 and bck[1] > peak[1]+1:
-            _left = [bck[0], peak[0]-1]
-            refl_bck, d_refl_bck = self._roi_integration(ws, peak=_left, low_res=low_res,
-                                                         q_bins=q_bins, wl_dist=wl_dist,
-                                                         wl_bins=wl_bins, q_summing=q_summing)
-            _right = [peak[1]+1, bck[1]]
-            _refl_bck, _d_refl_bck = self._roi_integration(ws, peak=_right, low_res=low_res,
-                                                           q_bins=q_bins, wl_dist=wl_dist,
-                                                           wl_bins=wl_bins, q_summing=q_summing)
-            print("Background on both sides: [%s %s] [%s %s]" % (_left[0], _left[1], _right[0], _right[1]))
-
-            refl_bck = (refl_bck + _refl_bck)/2.0
-            d_refl_bck = np.sqrt(d_refl_bck**2 + _d_refl_bck**2)/2.0
-        else:
-            print("Invalid background: [%s %s]" % (bck[0], bck[1]))
-            refl_bck = np.zeros(q_bins.shape[0]-1)
-            d_refl_bck = refl_bck
-
-        # At this point we have integrated the region of interest and obtain the average per
-        # pixel, so unless that's what we want we need to multiply by the number of pixels
-        # used to integrate the signal.
-        if not normalize_to_single_pixel:
-            _pixel_area = peak[1] - peak[0]+1.0
-            refl_bck *= _pixel_area
-            d_refl_bck *= _pixel_area
-
-        return refl_bck, d_refl_bck
-
     def bck_subtraction(self, normalize_to_single_pixel=False, q_bins=None, wl_dist=None, wl_bins=None,
                         q_summing=False):
         """
