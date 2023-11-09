@@ -128,7 +128,8 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
 
 
 def process_from_template(run_number, template_path, q_summing=False, normalize=True,
-                          tof_weighted=False, bck_in_q=False, clean=False, info=False):
+                          tof_weighted=False, bck_in_q=False, clean=False, info=False,
+                          functional_background=False):
     """
         The clean option removes leading zeros and the drop when doing q-summing
     """
@@ -140,12 +141,14 @@ def process_from_template(run_number, template_path, q_summing=False, normalize=
     ws_sc = api.Load("REF_L_%s" % run_number)
     return process_from_template_ws(ws_sc, template_path, q_summing=q_summing,
                                     tof_weighted=tof_weighted, bck_in_q=bck_in_q,
-                                    clean=clean, info=info, normalize=normalize)
+                                    clean=clean, info=info, normalize=normalize,
+                                    functional_background=functional_background)
 
 
 def process_from_template_ws(ws_sc, template_data, q_summing=False,
                              tof_weighted=False, bck_in_q=False, clean=False,
-                             info=False, normalize=True, theta_value=None, ws_db=None):
+                             info=False, normalize=True, theta_value=None, ws_db=None,
+                             functional_background=False):
     # Get the sequence number
     sequence_number = 1
     if ws_sc.getRun().hasProperty("sequence_number"):
@@ -181,7 +184,7 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     # Get the reduction parameters from the template
     peak = template_data.data_peak_range
     if template_data.subtract_background:
-        peak_bck = [template_data.background_roi[0], template_data.background_roi[1]]
+        peak_bck = template_data.background_roi
     else:
         peak_bck = None
 
@@ -218,6 +221,7 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
                                                    q_min=q_min, q_step=q_step, q_max=None,
                                                    tof_range=[tof_min, tof_max],
                                                    theta=np.abs(theta),
+                                                   functional_background=functional_background,
                                                    instrument=event_reduction.EventReflectivity.INSTRUMENT_4B)
 
     # R(Q)

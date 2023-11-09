@@ -11,7 +11,8 @@ from . import event_reduction, output, reduction_template_reader, template
 
 
 def reduce(ws, template_file, output_dir, average_overlap=False,
-           q_summing=False, bck_in_q=False, is_live=False):
+           q_summing=False, bck_in_q=False, is_live=False,
+           functional_background=False):
     """
         Function called by reduce_REFL.py, which lives in /SNS/REF_L/shared/autoreduce
         and is called by the automated reduction workflow.
@@ -29,7 +30,9 @@ def reduce(ws, template_file, output_dir, average_overlap=False,
                                                                         q_summing=q_summing,
                                                                         tof_weighted=q_summing,
                                                                         clean=q_summing,
-                                                                        bck_in_q=bck_in_q, info=True)
+                                                                        bck_in_q=bck_in_q,
+                                                                        functional_background=functional_background,
+                                                                        info=True)
 
     # Save partial results
     coll = output.RunCollection()
@@ -48,8 +51,11 @@ def reduce(ws, template_file, output_dir, average_overlap=False,
     seq_list, run_list = assemble_results(meta_data['sequence_id'], output_dir,
                                           average_overlap, is_live=is_live)
 
-    # Save template
-    write_template(seq_list, run_list, template_file, output_dir)
+    # Save template. This will not happen if the template_file input was
+    # template data, which the template processing allows.
+    if isinstance(template_file, str):
+        print("Template data was passed instead of a file path: template data not saved")
+        write_template(seq_list, run_list, template_file, output_dir)
 
     # Return the sequence identifier
     return run_list[0]

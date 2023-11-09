@@ -85,6 +85,41 @@ def test_reduce_workflow():
     assert(np.sum((_data[3]-_refl[3])/_refl[3])/len(_refl[3]) < 0.01)
 
 
+def test_reduce_bck_option_mismatch():
+    """
+        Ask for functional background but pass by a background range with
+        only a single region. This will revert to simple averaging over the range.
+    """
+    template_path = 'data/template.xml'
+    output_dir = 'data/'
+    reduced_path = os.path.join(output_dir, 'REFL_198409_combined_data_auto.txt')
+    if os.path.isfile(reduced_path):
+        os.remove(reduced_path)
+
+    for i in range(198409, 198417):
+        ws = mtd_api.Load("REF_L_%s" % i)
+        sequence_number = ws.getRun().getProperty("sequence_number").value[0]
+        template_data = template.read_template(template_path, sequence_number)
+        template_data.background_roi = template_data.background_roi[:2]
+        workflow.reduce(ws, template_data, output_dir=output_dir,
+                        average_overlap=False,
+                        functional_background=True)
+
+    reference_path = 'data/reference_rq.txt'
+    if os.path.isfile(reference_path):
+        _data = np.loadtxt(reference_path).T
+
+    if os.path.isfile(reduced_path):
+        _refl = np.loadtxt(reduced_path).T
+
+    for i in range(3):
+        assert(np.fabs(np.sum(_data[i]-_refl[i])) < 1e-10)
+
+    # The reference was computed with a constant dq/q but our approach recalculates
+    # it for each run, so we expect a small discrepancy within 1%.
+    assert(np.sum((_data[3]-_refl[3])/_refl[3])/len(_refl[3]) < 0.01)
+
+
 def test_reduce_workflow_with_overlap_avg():
     """
         Test the complete working, but this time we average the point in the
