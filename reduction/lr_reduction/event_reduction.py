@@ -6,6 +6,8 @@ import time
 import mantid.simpleapi as api
 import numpy as np
 
+from . import background
+
 
 def get_wl_range(ws):
     """
@@ -59,7 +61,8 @@ class EventReflectivity(object):
                  signal_peak, signal_bck, norm_peak, norm_bck,
                  specular_pixel, signal_low_res, norm_low_res,
                  q_min=None, q_step=-0.02, q_max=None,
-                 tof_range=None, theta=1.0, instrument=None):
+                 tof_range=None, theta=1.0, instrument=None,
+                 functional_background=False):
         """
             Pixel ranges include the min and max pixels.
 
@@ -97,6 +100,9 @@ class EventReflectivity(object):
         self._offspec_x_bins = None
         self._offspec_z_bins = None
         self.summing_threshold = None
+
+        # Turn on functional background estimation
+        self.use_functional_bck = functional_background
 
         # Process workspaces
         if self.tof_range is not None:
@@ -356,80 +362,37 @@ class EventReflectivity(object):
         d_refl_bck /= _pixel_area
         return refl_bck, d_refl_bck
 
-    def _bck_subtraction(self, ws, peak, bck, low_res, normalize_to_single_pixel=False,
-                         q_bins=None, wl_dist=None, wl_bins=None, q_summing=False):
-        """
-            Abstracted out background subtraction process.
-
-            The options are the same as for the reflectivity calculation.
-            If wl_dist and wl_bins are supplied, the events will be weighted by flux.
-            If q_summing is True, the angle of each neutron will be recalculated according to
-            their position on the detector and place in the proper Q bin.
-        """
-        q_bins = self.q_bins if q_bins is None else q_bins
-
-        # Background on the left of the peak only. We allow the user to overlap the peak on the right,
-        # but only use the part left of the peak.
-        if bck[0] < peak[0]-1 and bck[1] < peak[1]+1:
-            right_side = min(bck[1], peak[0]-1)
-            _left = [bck[0], right_side]
-            print("Left side background: [%s, %s]" % (_left[0], _left[1]))
-            refl_bck, d_refl_bck = self._roi_integration(ws, peak=_left, low_res=low_res,
-                                                         q_bins=q_bins, wl_dist=wl_dist,
-                                                         wl_bins=wl_bins, q_summing=q_summing)
-        # Background on the right of the peak only. We allow the user to overlap the peak on the left,
-        # but only use the part right of the peak.
-        elif bck[0] > peak[0]-1 and bck[1] > peak[1]+1:
-            left_side = max(bck[0], peak[1]+1)
-            _right = [left_side, bck[1]]
-            print("Right side background: [%s, %s]" % (_right[0], _right[1]))
-            refl_bck, d_refl_bck = self._roi_integration(ws, peak=_right, low_res=low_res,
-                                                         q_bins=q_bins, wl_dist=wl_dist,
-                                                         wl_bins=wl_bins, q_summing=q_summing)
-        # Background on both sides
-        elif bck[0] < peak[0]-1 and bck[1] > peak[1]+1:
-            _left = [bck[0], peak[0]-1]
-            refl_bck, d_refl_bck = self._roi_integration(ws, peak=_left, low_res=low_res,
-                                                         q_bins=q_bins, wl_dist=wl_dist,
-                                                         wl_bins=wl_bins, q_summing=q_summing)
-            _right = [peak[1]+1, bck[1]]
-            _refl_bck, _d_refl_bck = self._roi_integration(ws, peak=_right, low_res=low_res,
-                                                           q_bins=q_bins, wl_dist=wl_dist,
-                                                           wl_bins=wl_bins, q_summing=q_summing)
-            print("Background on both sides: [%s %s] [%s %s]" % (_left[0], _left[1], _right[0], _right[1]))
-
-            refl_bck = (refl_bck + _refl_bck)/2.0
-            d_refl_bck = np.sqrt(d_refl_bck**2 + _d_refl_bck**2)/2.0
-        else:
-            print("Invalid background: [%s %s]" % (bck[0], bck[1]))
-            refl_bck = np.zeros(q_bins.shape[0]-1)
-            d_refl_bck = refl_bck
-
-        # At this point we have integrated the region of interest and obtain the average per
-        # pixel, so unless that's what we want we need to multiply by the number of pixels
-        # used to integrate the signal.
-        if not normalize_to_single_pixel:
-            _pixel_area = peak[1] - peak[0]+1.0
-            refl_bck *= _pixel_area
-            d_refl_bck *= _pixel_area
-
-        return refl_bck, d_refl_bck
-
     def bck_subtraction(self, normalize_to_single_pixel=False, q_bins=None, wl_dist=None, wl_bins=None,
                         q_summing=False):
         """
             Higher-level call for background subtraction. Hides the ranges needed to define the ROI.
         """
-        return self._bck_subtraction(self._ws_sc, self.signal_peak, self.signal_bck, self.signal_low_res,
-                                     normalize_to_single_pixel=normalize_to_single_pixel, q_bins=q_bins,
-                                     wl_dist=wl_dist, wl_bins=wl_bins, q_summing=q_summing)
+        # Sanity check
+        if len(self.signal_bck) == 2 and self.use_functional_bck:
+            msg = "Background range incompatible with functional background: "
+            msg += "switching to averaging"
+            print(msg)
+            self.use_functional_bck = False
+
+        if self.use_functional_bck:
+            return background.functional_background(self._ws_sc, self, self.signal_peak,
+                                                    self.signal_bck, self.signal_low_res,
+                                                    normalize_to_single_pixel=normalize_to_single_pixel,
+                                                    q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins,
+                                                    q_summing=q_summing)
+        else:
+            return background.side_background(self._ws_sc, self, self.signal_peak, self.signal_bck,
+                                              self.signal_low_res,
+                                              normalize_to_single_pixel=normalize_to_single_pixel,
+                                              q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins,
+                                              q_summing=q_summing)
 
     def norm_bck_subtraction(self):
         """
             Higher-level call for background subtraction for the normalization run.
         """
-        return self._bck_subtraction(self._ws_db, self.norm_peak, self.norm_bck, self.norm_low_res,
-                                     normalize_to_single_pixel=False)
+        return background.side_background(self._ws_db, self, self.norm_peak, self.norm_bck,
+                                          self.norm_low_res, normalize_to_single_pixel=False)
 
     def slice(self, x_min=0.002, x_max=0.004, x_bins=None, z_bins=None, # noqa A003
               refl=None, d_refl=None, normalize=False):
@@ -453,16 +416,18 @@ class EventReflectivity(object):
 
         return z_bins, _spec, _d_spec
 
-    def _reflectivity(self, ws, peak_position, peak, low_res, theta, q_bins=None, q_summing=False, wl_dist=None, wl_bins=None):
+    def _reflectivity(self, ws, peak_position, peak, low_res, theta, q_bins=None, q_summing=False,
+                      wl_dist=None, wl_bins=None, sum_pixels=True):
         """
             Assumes that the input workspace is normalized by proton charge.
         """
         charge = ws.getRun().getProtonCharge()
         _q_bins = self.q_bins if q_bins is None else q_bins
 
-        refl = np.zeros(len(_q_bins)-1)
-        d_refl_sq = np.zeros(len(_q_bins)-1)
-        counts = np.zeros(len(_q_bins)-1)
+        shape = len(_q_bins)-1 if sum_pixels else ((peak[1]-peak[0]+1), len(_q_bins)-1)
+        refl = np.zeros(shape)
+        d_refl_sq = np.zeros(shape)
+        counts = np.zeros(shape)
         _pixel_width = self.pixel_width if q_summing else 0.0
 
         for i in range(low_res[0], int(low_res[1]+1)):
@@ -490,12 +455,19 @@ class EventReflectivity(object):
                     wl_weights = 1.0/np.interp(wl_list, wl_bins, wl_dist, np.inf, np.inf)
                     hist_weigths = wl_weights * qz / wl_list
                     _counts, _ = np.histogram(qz, bins=_q_bins, weights=hist_weigths)
-                    refl += _counts
-                    _counts, _ = np.histogram(qz, bins=_q_bins)
-                    counts += _counts
+                    _norm, _ = np.histogram(qz, bins=_q_bins)
+                    if sum_pixels:
+                        refl += _counts
+                        counts += _norm
+                    else:
+                        refl[j-peak[0]] += _counts
+                        counts[j-peak[0]] += _norm
                 else:
                     _counts, _ = np.histogram(qz, bins=_q_bins)
-                    refl += _counts
+                    if sum_pixels:
+                        refl += _counts
+                    else:
+                        refl[j-peak[0]] += _counts
 
         # The following is for information purposes
         if q_summing:

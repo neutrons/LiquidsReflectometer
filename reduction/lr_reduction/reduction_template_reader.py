@@ -21,7 +21,7 @@ class ReductionParameters(object):
         # Signal selection
         self.data_peak_range = [140, 150]
         self.subtract_background = True
-        self.background_roi = [137, 153,100, 200]
+        self.background_roi = [137, 153, 0, 0]
         self.tof_range = [9600., 21600.]
         self.select_tof_range = True
 
