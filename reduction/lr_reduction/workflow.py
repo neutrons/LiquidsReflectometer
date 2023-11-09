@@ -54,8 +54,9 @@ def reduce(ws, template_file, output_dir, average_overlap=False,
     # Save template. This will not happen if the template_file input was
     # template data, which the template processing allows.
     if isinstance(template_file, str):
-        print("Template data was passed instead of a file path: template data not saved")
         write_template(seq_list, run_list, template_file, output_dir)
+    else:
+        print("Template data was passed instead of a file path: template data not saved")
 
     # Return the sequence identifier
     return run_list[0]

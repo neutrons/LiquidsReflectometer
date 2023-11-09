@@ -11,6 +11,16 @@ mantid.kernel.config.setLogLevel(3)
 from lr_reduction import event_reduction, template, workflow
 
 
+def cleanup_partial_files(output_dir, runs):
+    """
+        Clean up reduced files left behind after reduction
+    """
+    for i, r in enumerate(runs):
+        reduced_path = os.path.join(output_dir, 'REFL_%s_%d_%s_partial.txt' % (runs[0], i+1, r))
+        if os.path.isfile(reduced_path):
+            os.remove(reduced_path)
+
+
 def test_info():
     """
         Test utility functions to get basic info
@@ -57,6 +67,10 @@ def test_full_reduction():
     assert(len(ref_data[1]) == len(refl_all))
     assert(np.fabs(np.sum(ref_data[1]-refl_all)) < 1e-10)
 
+    # Cleanup
+    output_dir = 'data/'
+    cleanup_partial_files(output_dir, range(198409, 198417))
+
 
 def test_reduce_workflow():
     template_path = 'data/template.xml'
@@ -83,6 +97,39 @@ def test_reduce_workflow():
     # The reference was computed with a constant dq/q but our approach recalculates
     # it for each run, so we expect a small discrepancy within 1%.
     assert(np.sum((_data[3]-_refl[3])/_refl[3])/len(_refl[3]) < 0.01)
+
+    # Cleanup
+    cleanup_partial_files(output_dir, range(198409, 198417))
+
+
+def test_reduce_functional_bck():
+    template_path = 'data/template_fbck.xml'
+    output_dir = 'data/'
+    reduced_path = os.path.join(output_dir, 'REFL_198409_combined_data_auto.txt')
+    if os.path.isfile(reduced_path):
+        os.remove(reduced_path)
+
+    for i in range(198409, 198417):
+        ws = mtd_api.Load("REF_L_%s" % i)
+        workflow.reduce(ws, template_path, output_dir=output_dir,
+                        average_overlap=False)
+
+    reference_path = 'data/reference_fbck.txt'
+    if os.path.isfile(reference_path):
+        _data = np.loadtxt(reference_path).T
+
+    if os.path.isfile(reduced_path):
+        _refl = np.loadtxt(reduced_path).T
+
+    for i in range(3):
+        assert(np.fabs(np.sum(_data[i]-_refl[i])) < 1e-10)
+
+    # The reference was computed with a constant dq/q but our approach recalculates
+    # it for each run, so we expect a small discrepancy within 1%.
+    assert(np.sum((_data[3]-_refl[3])/_refl[3])/len(_refl[3]) < 0.01)
+
+    # Cleanup
+    cleanup_partial_files(output_dir, range(198409, 198417))
 
 
 def test_reduce_bck_option_mismatch():
@@ -119,6 +166,9 @@ def test_reduce_bck_option_mismatch():
     # it for each run, so we expect a small discrepancy within 1%.
     assert(np.sum((_data[3]-_refl[3])/_refl[3])/len(_refl[3]) < 0.01)
 
+    # Cleanup
+    cleanup_partial_files(output_dir, range(198409, 198417))
+
 
 def test_reduce_workflow_with_overlap_avg():
     """
@@ -149,6 +199,9 @@ def test_reduce_workflow_with_overlap_avg():
     # The reference was computed with a constant dq/q but our approach recalculates
     # it for each run, so we expect a small discrepancy within 1%.
     assert(np.sum((_data[3]-_refl[3])/_refl[3])/len(_refl[3]) < 0.01)
+
+    # Cleanup
+    cleanup_partial_files(output_dir, range(198409, 198417))
 
 
 def test_quick_reduce():
@@ -225,3 +278,5 @@ def test_background_subtraction():
     # The reference was computed with a constant dq/q but our approach recalculates
     # it for each run, so we expect a small discrepancy within 1%.
     assert(np.sum((_data[3]-_refl[3])/_refl[3])/len(_refl[3]) < 0.01)
+
+    cleanup_partial_files(output_dir, range(198382, 198390))
