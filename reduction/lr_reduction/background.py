@@ -2,19 +2,6 @@ import numpy as np
 from lmfit.models import LinearModel
 
 
-def determine_background_method(peak, bck):
-    """
-        Check whether we have a background range defined by two pixels or four.
-        
-    """
-    if len(bck) == 2 or (len(bck) == 4 and bck[2] == 0 and bck[3] == 0):
-        return side_background()
-    elif not len(bck) == 4:
-        raise ValueError("Background ROI should be of length 2 or 4")
-
-    return functional_background(peak, bck)
-
-
 def find_ranges_without_overlap(r1, r2):
     """
         Returns the part of r1 that does not contain r2
