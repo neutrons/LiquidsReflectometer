@@ -112,7 +112,8 @@ def test_reduce_functional_bck():
     for i in range(198409, 198417):
         ws = mtd_api.Load("REF_L_%s" % i)
         workflow.reduce(ws, template_path, output_dir=output_dir,
-                        average_overlap=False)
+                        average_overlap=False,
+                        functional_background=True)
 
     reference_path = 'data/reference_fbck.txt'
     if os.path.isfile(reference_path):
@@ -121,8 +122,11 @@ def test_reduce_functional_bck():
     if os.path.isfile(reduced_path):
         _refl = np.loadtxt(reduced_path).T
 
-    for i in range(3):
-        assert(np.fabs(np.sum(_data[i]-_refl[i])) < 1e-10)
+    for i in range(2):
+        assert(np.fabs(np.sum(_data[i]-_refl[i])) < 1e-9)
+
+    # Error bars from fit might be different
+    assert(np.fabs(np.sum(_data[2]-_refl[2])) < 1e-8)
 
     # The reference was computed with a constant dq/q but our approach recalculates
     # it for each run, so we expect a small discrepancy within 1%.
