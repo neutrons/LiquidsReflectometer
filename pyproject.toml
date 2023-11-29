@@ -1,10 +1,11 @@
 [project]
 name = "LiquidsReflectometer"
 description = "Reduction scripts for the Liquids Reflectometer. This includes both automated reduction scripts and useful scripts to reprocess data."
-dynamic = ["version"]
+dynamic = ["version", "readme", "license", "dependencies"]
 requires-python = ">=3.8"
-dependencies = [
-    "mantidworkbench"
+classifiers = [
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3"
 ]
 
 [tool.ruff]
