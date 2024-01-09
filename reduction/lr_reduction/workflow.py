@@ -12,7 +12,7 @@ from . import event_reduction, output, reduction_template_reader, template
 
 def reduce(ws, template_file, output_dir, average_overlap=False,
            q_summing=False, bck_in_q=False, is_live=False,
-           functional_background=False):
+           functional_background=False, dead_time=False):
     """
         Function called by reduce_REFL.py, which lives in /SNS/REF_L/shared/autoreduce
         and is called by the automated reduction workflow.
@@ -32,7 +32,8 @@ def reduce(ws, template_file, output_dir, average_overlap=False,
                                                                         clean=q_summing,
                                                                         bck_in_q=bck_in_q,
                                                                         functional_background=functional_background,
-                                                                        info=True)
+                                                                        info=True,
+                                                                        dead_time=dead_time)
 
     # Save partial results
     coll = output.RunCollection()

@@ -56,13 +56,14 @@ class EventReflectivity(object):
     INSTRUMENT_4B = 1
     DEFAULT_4B_SAMPLE_DET_DISTANCE = 1.83
     DEFAULT_4B_SOURCE_DET_DISTANCE = 15.75
+    DEAD_TIME = 4.0
 
     def __init__(self, scattering_workspace, direct_workspace,
                  signal_peak, signal_bck, norm_peak, norm_bck,
                  specular_pixel, signal_low_res, norm_low_res,
                  q_min=None, q_step=-0.02, q_max=None,
                  tof_range=None, theta=1.0, instrument=None,
-                 functional_background=False):
+                 functional_background=False, dead_time=False):
         """
             Pixel ranges include the min and max pixels.
 
@@ -80,6 +81,7 @@ class EventReflectivity(object):
             :param q_min: value of largest q point
             :param tof_range: TOF range,or None
             :param theta: theta scattering angle in radians
+            :param dead_time: if not zero, dead time correction will be used
         """
         if instrument in [self.INSTRUMENT_4A, self.INSTRUMENT_4B]:
             self.instrument = instrument
@@ -100,6 +102,7 @@ class EventReflectivity(object):
         self._offspec_x_bins = None
         self._offspec_z_bins = None
         self.summing_threshold = None
+        self.dead_time = dead_time
 
         # Turn on functional background estimation
         self.use_functional_bck = functional_background
@@ -226,6 +229,52 @@ class EventReflectivity(object):
                     dq0=dq0, dq_over_q=dq_over_q, sequence_number=sequence_number,
                     sequence_id=sequence_id)
 
+    def get_dead_time_correction(self, tof_step=100):
+        """
+            Perform dead time correction using counts per pulse over the whole
+            face of the detector.
+            Interpolate for the Q values we are going to use for the reduction.
+        """
+        # Rebin the data according to the tof_step we want to compute the correction with
+        tof_min = self._ws_sc.getTofMin()
+        tof_max = self._ws_sc.getTofMax()
+        _ws_sc = api.Rebin(InputWorkspace=self._ws_sc, Params="%s,%s,%s" % (tof_min, tof_step, tof_max))
+        _ws_db = api.RebinToWorkspace(WorkspaceToRebin=self._ws_db, WorkspaceToMatch=_ws_sc)
+
+        # Get the total number of counts on the detector for each TOF bin per pulse
+        counts_ws = api.SumSpectra(_ws_sc)
+        t_series = np.asarray(_ws_sc.getRun()['proton_charge'].value)
+        non_zero = t_series > 0
+        n_pulses = np.count_nonzero(non_zero)
+        rate_sc = counts_ws.readY(0) / n_pulses
+        wl_bins = counts_ws.readX(0) / self.constant
+        wl_bins = (wl_bins[1:] + wl_bins[:-1]) / 2
+
+        counts_ws = api.SumSpectra(_ws_db)
+        t_series = np.asarray(_ws_sc.getRun()['proton_charge'].value)
+        non_zero = t_series > 0
+        n_pulses = np.count_nonzero(non_zero)
+        rate_db = counts_ws.readY(0) / n_pulses
+
+        # Compute the dead time correction for each TOF bin
+        corr_sc = 1/(1-rate_sc*self.DEAD_TIME/tof_step)
+        corr_db = 1/(1-rate_db*self.DEAD_TIME/tof_step)
+        if np.min(corr_sc) < 0 or np.min(corr_db) < 0:
+            print("Corrupted dead time correction:")
+            print("Reflected: %s" % corr_sc)
+            print("Direct Beam: %s" % corr_db)
+        dead_time_per_tof = corr_sc / corr_db
+
+        # Compute Q for each TOF bin
+        d_theta = self.gravity_correction(self._ws_sc, wl_bins)
+        q_values = 4.0 * np.pi / wl_bins * np.sin(self.theta - d_theta)
+
+        # Interpolate to estimate the dead time correction at the Q values we measured
+        q_middle = (self.q_bins[1:] + self.q_bins[:-1]) / 2
+        dead_time_corr = np.interp(q_middle, q_values, dead_time_per_tof)
+
+        return dead_time_corr
+
     def specular(self, q_summing=False, tof_weighted=False, bck_in_q=False,
                  clean=False, normalize=True):
         """
@@ -239,6 +288,10 @@ class EventReflectivity(object):
             :param clean: if True, and Q summing is True, then leading artifact will be removed
             :param normalize: if True, and tof_weighted is False, normalization will be skipped
         """
+        # First, let's compute the dead-time correction if we need it
+        if self.dead_time:
+            dead_time_corr = self.get_dead_time_correction()
+        
         if tof_weighted:
             self.specular_weighted(q_summing=q_summing, bck_in_q=bck_in_q)
         else:
@@ -252,9 +305,15 @@ class EventReflectivity(object):
         self.q_bins = self.q_bins[trim:]
 
         # Dead time correction
-        # dead_time = 4e-6
-        #self.refl = self.refl * t_corr_sc / t_corr_db
-        #self.d_refl = self.d_refl * t_corr_sc / t_corr_db
+        if self.dead_time:
+            i_max = np.argmax(dead_time_corr[trim:])
+            i_min = np.argmin(dead_time_corr[trim:])
+            print("Dead time correction: [%g -> %g] at [%g -> %g]" % (dead_time_corr[trim:][i_min],
+                                                                      dead_time_corr[trim:][i_max],
+                                                                      self.q_bins[i_min],
+                                                                      self.q_bins[i_max]))
+            self.refl *= dead_time_corr[trim:]
+            self.d_refl *= dead_time_corr[trim:]
 
         # Remove leading artifact from the wavelength coverage
         # Remember that q_bins is longer than refl by 1 because
