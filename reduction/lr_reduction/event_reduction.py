@@ -56,7 +56,7 @@ class EventReflectivity(object):
     INSTRUMENT_4B = 1
     DEFAULT_4B_SAMPLE_DET_DISTANCE = 1.83
     DEFAULT_4B_SOURCE_DET_DISTANCE = 15.75
-    DEAD_TIME = 4.0
+    DEAD_TIME = 8.0 # Nominally 4.0 microseconds
 
     def __init__(self, scattering_workspace, direct_workspace,
                  signal_peak, signal_bck, norm_peak, norm_bck,
@@ -239,7 +239,7 @@ class EventReflectivity(object):
         tof_min = self._ws_sc.getTofMin()
         tof_max = self._ws_sc.getTofMax()
         _ws_sc = api.Rebin(InputWorkspace=self._ws_sc, Params="%s,%s,%s" % (tof_min, tof_step, tof_max))
-        _ws_db = api.RebinToWorkspace(WorkspaceToRebin=self._ws_db, WorkspaceToMatch=_ws_sc)
+        _ws_db = api.Rebin(InputWorkspace=self._ws_db, Params="%s,%s,%s" % (tof_min, tof_step, tof_max))
 
         # Get the total number of counts on the detector for each TOF bin per pulse
         counts_ws = api.SumSpectra(_ws_sc)
@@ -248,10 +248,10 @@ class EventReflectivity(object):
         n_pulses = np.count_nonzero(non_zero)
         rate_sc = counts_ws.readY(0) / n_pulses
         wl_bins = counts_ws.readX(0) / self.constant
-        wl_bins = (wl_bins[1:] + wl_bins[:-1]) / 2
 
+        # Direct beam
         counts_ws = api.SumSpectra(_ws_db)
-        t_series = np.asarray(_ws_sc.getRun()['proton_charge'].value)
+        t_series = np.asarray(self._ws_db.getRun()['proton_charge'].value)
         non_zero = t_series > 0
         n_pulses = np.count_nonzero(non_zero)
         rate_db = counts_ws.readY(0) / n_pulses
@@ -259,20 +259,23 @@ class EventReflectivity(object):
         # Compute the dead time correction for each TOF bin
         corr_sc = 1/(1-rate_sc*self.DEAD_TIME/tof_step)
         corr_db = 1/(1-rate_db*self.DEAD_TIME/tof_step)
+
         if np.min(corr_sc) < 0 or np.min(corr_db) < 0:
             print("Corrupted dead time correction:")
             print("Reflected: %s" % corr_sc)
             print("Direct Beam: %s" % corr_db)
-        dead_time_per_tof = corr_sc / corr_db
+        dead_time_per_tof = np.flip(corr_sc / corr_db)
 
         # Compute Q for each TOF bin
         d_theta = self.gravity_correction(self._ws_sc, wl_bins)
-        q_values = 4.0 * np.pi / wl_bins * np.sin(self.theta - d_theta)
+        q_values_edges = np.flip(4.0 * np.pi / wl_bins * np.sin(self.theta - d_theta))
+        q_values = (q_values_edges[1:] + q_values_edges[:-1]) / 2
 
         # Interpolate to estimate the dead time correction at the Q values we measured
         q_middle = (self.q_bins[1:] + self.q_bins[:-1]) / 2
+        
         dead_time_corr = np.interp(q_middle, q_values, dead_time_per_tof)
-
+        
         return dead_time_corr
 
     def specular(self, q_summing=False, tof_weighted=False, bck_in_q=False,
