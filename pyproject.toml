@@ -1,5 +1,5 @@
 [project]
-name = "LiquidsReflectometer"
+name = "lr_reduction"
 description = "Reduction scripts for the Liquids Reflectometer. This includes both automated reduction scripts and useful scripts to reprocess data."
 dynamic = ["version", "readme", "license", "dependencies"]
 requires-python = ">=3.8"
