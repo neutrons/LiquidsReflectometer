@@ -202,7 +202,7 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     else:
         norm_low_res = None
 
-    # We are not subtrating background for the direct beam
+    # We are not subtracting background for the direct beam
     if template_data.subtract_norm_background:
         norm_bck = template_data.norm_background_roi
     else:
