@@ -33,6 +33,7 @@ class ReductionParameters(object):
         self.apply_normalization = True
         self.norm_peak_range = [140, 150]
         self.subtract_norm_background = True
+        self.two_norm_backgrounds: bool = False
         self.norm_background_roi = [137, 153]
         self.norm_x_range_flag = True
         self.norm_x_range = [115,210]

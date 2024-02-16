@@ -185,6 +185,8 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     peak = template_data.data_peak_range
     if template_data.subtract_background:
         peak_bck = template_data.background_roi
+        if template_data.two_backgrounds is False:
+            peak_bck = peak_bck[0: 3]  # retain only the first background
     else:
         peak_bck = None
 
@@ -205,6 +207,8 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     # We are not subtracting background for the direct beam
     if template_data.subtract_norm_background:
         norm_bck = template_data.norm_background_roi
+        if template_data.two_norm_backgrounds is False:
+            norm_bck = norm_bck[0: 3]  # retain only the first background
     else:
         norm_bck = None
 
