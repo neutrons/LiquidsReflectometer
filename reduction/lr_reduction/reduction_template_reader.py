@@ -66,7 +66,8 @@ class ReductionParameters(object):
         self.incident_medium_index_selected = 0
 
     def from_dict(self, data_dict):
-        r"""Update object's attributes with a dictionary with entries of the type  attribute_name: attribute_value.
+        r"""
+        Update object's attributes with a dictionary with entries of the type  attribute_name: attribute_value.
 
         Raises
         ------
