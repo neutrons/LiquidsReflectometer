@@ -33,7 +33,6 @@ class ReductionParameters(object):
         self.apply_normalization = True
         self.norm_peak_range = [140, 150]
         self.subtract_norm_background = True
-        self.two_norm_backgrounds: bool = False
         self.norm_background_roi = [137, 153]
         self.norm_x_range_flag = True
         self.norm_x_range = [115,210]
@@ -80,6 +79,7 @@ class ReductionParameters(object):
         _xml += "<to_peak_pixels>%s</to_peak_pixels>\n" % str(self.data_peak_range[1])
         _xml += "<peak_discrete_selection>N/A</peak_discrete_selection>\n"
         _xml += "<background_flag>%s</background_flag>\n" % str(self.subtract_background)
+        _xml += "<two_backgrounds_flag>%s</two_backgrounds_flag>\n" % str(self.two_backgrounds)
         _xml += "<back_roi1_from>%s</back_roi1_from>\n" % str(self.background_roi[0])
         _xml += "<back_roi1_to>%s</back_roi1_to>\n" % str(self.background_roi[1])
         _xml += "<back_roi2_from>%s</back_roi2_from>\n" % str(self.background_roi[2])
@@ -164,11 +164,15 @@ class ReductionParameters(object):
         self.norm_x_range = [getIntElement(instrument_dom, "norm_x_min"),
                              getIntElement(instrument_dom, "norm_x_max")]
 
-        #background flag
+        # background flag
         self.subtract_background = getBoolElement(instrument_dom, "background_flag",
                                                  default=self.subtract_background)
 
-        #background from/to pixels
+        # use two backgrounds flag
+        self.two_backgrounds = getBoolElement(instrument_dom, "two_backgrounds_flag",
+                                              default=self.two_backgrounds)
+
+        # background from/to pixels
         self.background_roi = [getIntElement(instrument_dom, "back_roi1_from"),
                                getIntElement(instrument_dom, "back_roi1_to"),
                                getIntElement(instrument_dom, "back_roi2_from"),
@@ -193,6 +197,7 @@ class ReductionParameters(object):
         # Background subtraction option
         self.subtract_norm_background = getBoolElement(instrument_dom, "norm_background_flag",
                                                        default=self.subtract_norm_background)
+
         self.norm_background_roi = [getIntElement(instrument_dom, "norm_from_back_pixels"),
                                     getIntElement(instrument_dom, "norm_to_back_pixels")]
 
