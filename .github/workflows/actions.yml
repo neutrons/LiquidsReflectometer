@@ -9,34 +9,18 @@ on:
 
 jobs:
   tests:
-    runs-on: self-hosted
+    runs-on: ubuntu-22.04
     defaults:
       run:
         shell: bash -l {0}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v2
     - name: Set up Miniconda
       uses: conda-incubator/setup-miniconda@v2
       with:
-        channels: conda-forge,defaults,mantid
         auto-update-conda: true
         miniforge-version: latest
-        python-version: "3.8"
         environment-file: environment.yml
-        activate-environment: liquid-ref
-    - name: Restore cached conda environment
-      id: cache-load
-      uses: actions/cache/restore@v3
-      with:
-        path: /usr/share/miniconda/envs/liquid-ref
-        key: ${{ runner.os }}-conda-${{ hashFiles('environment.yml') }}
-    - name: Load Environment
-      if: steps.cache-load.outputs.cache-hit != 'true'
-      run: |
-        mamba env update --file environment.yml  --prune
-    - name: Start xvfb daemon
-      run: |
-        /sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen 0 1280x1024x16
     - name: Test with pytest
       working-directory: ./reduction
       run: |
