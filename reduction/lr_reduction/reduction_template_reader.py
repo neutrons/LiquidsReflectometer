@@ -66,6 +66,19 @@ class ReductionParameters(object):
         self.incident_medium_index_selected = 0
 
     def from_dict(self, data_dict):
+        r"""Update object's attributes with a dictionary with entries of the type  attribute_name: attribute_value.
+
+        Raises
+        ------
+        ValueError
+            if one entry of the dictionary is not an attribute of this object
+        """
+
+        # check all keys are data_dict are attributes of object `self`
+        attribute_names = list(vars(self))
+        if not all(key in attribute_names for key in data_dict):
+            raise ValueError("data_dir contains invalid entries")
+        # update attribute values
         for k, v in data_dict.items():
             setattr(self, k, v)
 
