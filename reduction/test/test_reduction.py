@@ -1,4 +1,5 @@
 # standard imports
+from pathlib import Path
 import os
 
 # third-party imports
@@ -110,7 +111,8 @@ def test_reduce_workflow(nexus_dir):
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
-def test_reduce_functional_bck(nexus_dir):
+def test_reduce_functional_bck(nexus_dir, template_dir):
+    os.chdir(Path(template_dir).parent)
     template_path = 'data/template_fbck.xml'
     output_dir = 'data/'
     reduced_path = os.path.join(output_dir, 'REFL_198409_combined_data_auto.txt')

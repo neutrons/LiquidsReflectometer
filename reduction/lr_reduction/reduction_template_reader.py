@@ -333,7 +333,7 @@ def from_xml(xml_str):
                 data_set.from_xml_element(item)
                 data_sets.append(data_set)
 
-    if len(data_sets)==0:
+    if len(data_sets) == 0:
         data_sets = [ReductionParameters()]
 
     return data_sets

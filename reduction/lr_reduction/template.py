@@ -186,7 +186,7 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     if template_data.subtract_background:
         peak_bck = template_data.background_roi
         if template_data.two_backgrounds is False:
-            peak_bck = peak_bck[0: 3]  # retain only the first background
+            peak_bck = peak_bck[0: 2]  # retain only the first background
     else:
         peak_bck = None
 
