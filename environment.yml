@@ -1,10 +1,9 @@
 name: liquid-ref
 channels:
+  - mantid/label/main
   - conda-forge
-  - default
-  - mantid
+  - defaults
 dependencies:
-  - python=3.8
   - pre-commit
   - pytest
   - pytest-cov
