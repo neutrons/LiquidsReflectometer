@@ -31,10 +31,6 @@ def test_info(nexus_dir):
         Test utility functions to get basic info
     """
     with amend_config(data_dir=nexus_dir):
-        from mantid.kernel import ConfigService
-        config = ConfigService.Instance()
-        print(f"\nMANTID DATA DIRS = {config['datasearch.directories']}\n")
-        ws_sc = mtd_api.Load(f"{nexus_dir}/REF_L_198409.nxs.h5")
         ws_sc = mtd_api.Load("REF_L_198409")
     wl_min, wl_max = event_reduction.get_wl_range(ws_sc)
     assert(wl_min == 13.7)
