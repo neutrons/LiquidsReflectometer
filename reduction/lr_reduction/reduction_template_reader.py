@@ -21,6 +21,7 @@ class ReductionParameters(object):
         # Signal selection
         self.data_peak_range = [140, 150]
         self.subtract_background = True
+        self.two_backgrounds: bool = False
         self.background_roi = [137, 153, 0, 0]
         self.tof_range = [9600., 21600.]
         self.select_tof_range = True
@@ -65,6 +66,20 @@ class ReductionParameters(object):
         self.incident_medium_index_selected = 0
 
     def from_dict(self, data_dict):
+        r"""
+        Update object's attributes with a dictionary with entries of the type  attribute_name: attribute_value.
+
+        Raises
+        ------
+        ValueError
+            if one entry of the dictionary is not an attribute of this object
+        """
+
+        # check all keys are data_dict are attributes of object `self`
+        attribute_names = list(vars(self))
+        if not all(key in attribute_names for key in data_dict):
+            raise ValueError("data_dir contains invalid entries")
+        # update attribute values
         for k, v in data_dict.items():
             setattr(self, k, v)
 
@@ -78,6 +93,7 @@ class ReductionParameters(object):
         _xml += "<to_peak_pixels>%s</to_peak_pixels>\n" % str(self.data_peak_range[1])
         _xml += "<peak_discrete_selection>N/A</peak_discrete_selection>\n"
         _xml += "<background_flag>%s</background_flag>\n" % str(self.subtract_background)
+        _xml += "<two_backgrounds_flag>%s</two_backgrounds_flag>\n" % str(self.two_backgrounds)
         _xml += "<back_roi1_from>%s</back_roi1_from>\n" % str(self.background_roi[0])
         _xml += "<back_roi1_to>%s</back_roi1_to>\n" % str(self.background_roi[1])
         _xml += "<back_roi2_from>%s</back_roi2_from>\n" % str(self.background_roi[2])
@@ -162,11 +178,15 @@ class ReductionParameters(object):
         self.norm_x_range = [getIntElement(instrument_dom, "norm_x_min"),
                              getIntElement(instrument_dom, "norm_x_max")]
 
-        #background flag
+        # background flag
         self.subtract_background = getBoolElement(instrument_dom, "background_flag",
                                                  default=self.subtract_background)
 
-        #background from/to pixels
+        # use two backgrounds flag
+        self.two_backgrounds = getBoolElement(instrument_dom, "two_backgrounds_flag",
+                                              default=self.two_backgrounds)
+
+        # background from/to pixels
         self.background_roi = [getIntElement(instrument_dom, "back_roi1_from"),
                                getIntElement(instrument_dom, "back_roi1_to"),
                                getIntElement(instrument_dom, "back_roi2_from"),
@@ -191,6 +211,7 @@ class ReductionParameters(object):
         # Background subtraction option
         self.subtract_norm_background = getBoolElement(instrument_dom, "norm_background_flag",
                                                        default=self.subtract_norm_background)
+
         self.norm_background_roi = [getIntElement(instrument_dom, "norm_from_back_pixels"),
                                     getIntElement(instrument_dom, "norm_to_back_pixels")]
 
@@ -312,7 +333,7 @@ def from_xml(xml_str):
                 data_set.from_xml_element(item)
                 data_sets.append(data_set)
 
-    if len(data_sets)==0:
+    if len(data_sets) == 0:
         data_sets = [ReductionParameters()]
 
     return data_sets
