@@ -1,6 +1,7 @@
 # standard imports
 from contextlib import contextmanager
 from copy import deepcopy
+from pathlib import Path
 from typing import Union
 
 # third-party libraries
@@ -47,6 +48,10 @@ def amend_config(
             if isinstance(data_dir, str)
             else data_dir
         )
+        # make sure the data_dirs exists and are directories
+        for path in data_dirs:
+            if Path(path).is_dir() is False:
+                raise ValueError(f"Data directory: {path} does not exist or is not a directory")
         key = "datasearch.directories"
         backup[key] = deepcopy(config[key])
         # prepend or replace our custom data directories to the list of data search directories
