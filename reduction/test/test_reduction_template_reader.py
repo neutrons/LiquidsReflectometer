@@ -20,10 +20,13 @@ class TestReductionParameters:
         # valid data dictionary
         redparms.from_dict(dict(two_backgrounds=True))
         assert redparms.two_backgrounds
-        # invalid data dictionary
+        # invalid data dictionary and not permissible
         with pytest.raises(ValueError) as excinfo:
-            redparms.from_dict(dict(nonsense=True))
+            redparms.from_dict(dict(nonsense=True), permissible=False)
         assert "data_dir contains invalid entries" == str(excinfo.value)
+        # invalid data dictionary and permissible
+        redparms.from_dict(dict(nonsense=True))
+
 
 if __name__ == "__main__":
     pytest.main(__file__)
