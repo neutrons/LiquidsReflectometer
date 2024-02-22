@@ -65,19 +65,25 @@ class ReductionParameters(object):
         self.incident_medium_list = ['air']
         self.incident_medium_index_selected = 0
 
-    def from_dict(self, data_dict):
+    def from_dict(self, data_dict, permissible=True):
         r"""
         Update object's attributes with a dictionary with entries of the type  attribute_name: attribute_value.
+
+        Parameters
+        ----------
+        permissible: bool
+            allow keys in data_dict that are not attribute names of ReductionParameters instances. Reading from
+            `data_dict` will result in this instance having new attributes not defined in `__init__()`
 
         Raises
         ------
         ValueError
-            if one entry of the dictionary is not an attribute of this object
+            when `permissible=False` and one entry (or more) of the dictionary is not an attribute of this object
         """
 
         # check all keys are data_dict are attributes of object `self`
         attribute_names = list(vars(self))
-        if not all(key in attribute_names for key in data_dict):
+        if permissible is False and all(key in attribute_names for key in data_dict) is False:
             raise ValueError("data_dir contains invalid entries")
         # update attribute values
         for k, v in data_dict.items():
