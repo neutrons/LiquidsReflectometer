@@ -6,8 +6,9 @@ import time
 import mantid.simpleapi as api
 import numpy as np
 
-import background
-import DeadTimeCorrection.call as DeadTimeCorrection
+from . import background
+from . import DeadTimeCorrection as _dtc
+import _dtc.call as SingleReadoutDeadTimeCorrection
 
 
 def get_wl_range(ws):
@@ -242,22 +243,22 @@ class EventReflectivity(object):
         tof_min = self._ws_sc.getTofMin()
         tof_max = self._ws_sc.getTofMax()
 
-        corr_ws = DeadTimeCorrection(InputWorkspace=self._ws_sc,
-                                     DeadTime=self.DEAD_TIME,
-                                     TOFStep=self.DEAD_TIME_TOF_STEP,
-                                     Paralyzable=self.paralyzable,
-                                     TOFRange=[tof_min, tof_max],
-                                     OutputWorkspace="corr")
+        corr_ws = SingleReadoutDeadTimeCorrection(InputWorkspace=self._ws_sc,
+                                                  DeadTime=self.DEAD_TIME,
+                                                  TOFStep=self.DEAD_TIME_TOF_STEP,
+                                                  Paralyzable=self.paralyzable,
+                                                  TOFRange=[tof_min, tof_max],
+                                                  OutputWorkspace="corr")
         corr_sc = corr_ws.readY(0)
         wl_bins = corr_ws.readX(0) / self.constant
 
         # Direct beam workspace
-        corr_ws = DeadTimeCorrection(InputWorkspace=self._ws_db,
-                                     DeadTime=self.DEAD_TIME,
-                                     TOFStep=self.DEAD_TIME_TOF_STEP,
-                                     Paralyzable=self.paralyzable,
-                                     TOFRange=[tof_min, tof_max],
-                                     OutputWorkspace="corr")
+        corr_ws = SingleReadoutDeadTimeCorrection(InputWorkspace=self._ws_db,
+                                                  DeadTime=self.DEAD_TIME,
+                                                  TOFStep=self.DEAD_TIME_TOF_STEP,
+                                                  Paralyzable=self.paralyzable,
+                                                  TOFRange=[tof_min, tof_max],
+                                                  OutputWorkspace="corr")
         corr_db = corr_ws.readY(0)
 
         # Flip the correction since we are going from TOF to Q
