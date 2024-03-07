@@ -6,8 +6,8 @@ import time
 import mantid.simpleapi as api
 import numpy as np
 
-from . import background
-from .DeadTimeCorrection import call as DeadTimeCorrection
+import background
+import DeadTimeCorrection.call as DeadTimeCorrection
 
 
 def get_wl_range(ws):
