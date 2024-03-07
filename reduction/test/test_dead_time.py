@@ -4,6 +4,9 @@ from lr_reduction.DeadTimeCorrection import SingleReadoutDeadTimeCorrection
 
 import mantid
 import mantid.simpleapi as mtd_api
+mtd_api.config["default.facility"] = "SNS"
+mtd_api.config["default.instrument"] = "REF_L"
+
 
 def test_deadtime():
     """
