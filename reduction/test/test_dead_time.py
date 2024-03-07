@@ -10,7 +10,7 @@ mtd_api.config["default.instrument"] = "REF_L"
 from lr_reduction.utils import amend_config
 
 
-def test_deadtime():
+def test_deadtime(nexus_dir):
     """
         Test the time-resolved reduction that uses a measured reference.
         It is generally used at 30 Hz but it also works at 60 Hz.
@@ -29,7 +29,7 @@ def test_deadtime():
         assert(c>0)
         assert(c<1.001)
 
-def test_deadtime_paralyzable():
+def test_deadtime_paralyzable(nexus_dir):
     """
         Test the time-resolved reduction that uses a measured reference.
         It is generally used at 30 Hz but it also works at 60 Hz.
