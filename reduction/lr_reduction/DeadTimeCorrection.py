@@ -42,7 +42,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
 
     def PyInit(self):
         self.declareProperty(WorkspaceProperty("InputWorkspace", "", Direction.Input),
-                             "Optionally, we can provide a workspace directly")
+                             "Input workspace use to compute dead time correction")
         self.declareProperty("DeadTime", 4.2, doc="Dead time in microseconds")
         self.declareProperty("TOFStep", 100,
                              doc="TOF bins to compute deadtime correction for, in microseconds")
@@ -80,7 +80,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         if paralyzing:
             true_rate = -scipy.special.lambertw(-rate * dead_time / tof_step).real / dead_time
             corr = true_rate / (rate / tof_step)
-            # If we have no events, set the correction to 1 orderwise we will get a nan
+            # If we have no events, set the correction to 1 otherwise we will get a nan
             # from the equation above.
             corr[rate==0] = 1
         else:

@@ -5,7 +5,6 @@ import time
 
 import mantid.simpleapi as api
 import numpy as np
-import scipy
 
 from . import background
 from .DeadTimeCorrection import call as DeadTimeCorrection
@@ -59,6 +58,7 @@ class EventReflectivity(object):
     DEFAULT_4B_SAMPLE_DET_DISTANCE = 1.83
     DEFAULT_4B_SOURCE_DET_DISTANCE = 15.75
     DEAD_TIME = 4.2 # Nominally 4.0 microseconds
+    DEAD_TIME_TOF_STEP = 100
 
     def __init__(self, scattering_workspace, direct_workspace,
                  signal_peak, signal_bck, norm_peak, norm_bck,
@@ -234,13 +234,17 @@ class EventReflectivity(object):
                     dq0=dq0, dq_over_q=dq_over_q, sequence_number=sequence_number,
                     sequence_id=sequence_id)
 
-    def get_dead_time_correction(self, tof_step=100, paralyzing=False):
+    def get_dead_time_correction(self):
+        """
+            Compute dead time correction to be applied to the reflectivity curve.
+        """
         # Scattering workspace
         tof_min = self._ws_sc.getTofMin()
         tof_max = self._ws_sc.getTofMax()
 
         corr_ws = DeadTimeCorrection(InputWorkspace=self._ws_sc,
                                      DeadTime=self.DEAD_TIME,
+                                     TOFStep=self.DEAD_TIME_TOF_STEP,
                                      Paralyzable=self.paralyzable,
                                      TOFRange=[tof_min, tof_max],
                                      OutputWorkspace="corr")
@@ -250,6 +254,7 @@ class EventReflectivity(object):
         # Direct beam workspace
         corr_ws = DeadTimeCorrection(InputWorkspace=self._ws_db,
                                      DeadTime=self.DEAD_TIME,
+                                     TOFStep=self.DEAD_TIME_TOF_STEP,
                                      Paralyzable=self.paralyzable,
                                      TOFRange=[tof_min, tof_max],
                                      OutputWorkspace="corr")
@@ -284,6 +289,7 @@ class EventReflectivity(object):
             :param normalize: if True, and tof_weighted is False, normalization will be skipped
         """
         # First, let's compute the dead-time correction if we need it
+        # We do this first because the specular calls below may modify the input workspace
         if self.dead_time:
             dead_time_corr = self.get_dead_time_correction()
         
