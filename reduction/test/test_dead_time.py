@@ -7,13 +7,16 @@ import mantid.simpleapi as mtd_api
 mtd_api.config["default.facility"] = "SNS"
 mtd_api.config["default.instrument"] = "REF_L"
 
+from lr_reduction.utils import amend_config
+
 
 def test_deadtime():
     """
         Test the time-resolved reduction that uses a measured reference.
         It is generally used at 30 Hz but it also works at 60 Hz.
     """
-    ws = mtd_api.Load("REF_L_198409")
+    with amend_config(data_dir=nexus_dir):
+        ws = mtd_api.Load("REF_L_198409")
 
     algo = SingleReadoutDeadTimeCorrection()
     algo.PyInit()
@@ -31,7 +34,8 @@ def test_deadtime_paralyzable():
         Test the time-resolved reduction that uses a measured reference.
         It is generally used at 30 Hz but it also works at 60 Hz.
     """
-    ws = mtd_api.Load("REF_L_198409")
+    with amend_config(data_dir=nexus_dir):
+        ws = mtd_api.Load("REF_L_198409")
 
     algo = SingleReadoutDeadTimeCorrection()
     algo.PyInit()
