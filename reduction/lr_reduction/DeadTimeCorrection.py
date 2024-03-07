@@ -41,7 +41,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         return "Single read-out dead time correction calculation"
 
     def PyInit(self):
-        self.declareProperty(WorkspaceProperty("InputWorkspace", "", Direction.Input),
+        self.declareProperty(IEventWorkspaceProperty("InputWorkspace", "", Direction.Input),
                              "Input workspace use to compute dead time correction")
         self.declareProperty("DeadTime", 4.2, doc="Dead time in microseconds")
         self.declareProperty("TOFStep", 100,
