@@ -1,6 +1,6 @@
 import os
 import numpy as np
-#from lr_reduction.DeadTimeCorrection import SingleReadoutDeadTimeCorrection
+from lr_reduction.DeadTimeCorrection import SingleReadoutDeadTimeCorrection
 
 import mantid
 import mantid.simpleapi as mtd_api
@@ -18,8 +18,12 @@ def test_deadtime(nexus_dir):
     with amend_config(data_dir=nexus_dir):
         ws = mtd_api.Load("REF_L_198409")
 
-    corr_ws = SingleReadoutDeadTimeCorrection(InputWorkspace=ws)
-
+    algo = SingleReadoutDeadTimeCorrection()
+    algo.PyInit()
+    algo.setProperty("InputWorkspace", ws)
+    algo.setProperty("OutputWorkspace", "dead_time_corr")
+    algo.PyExec()
+    corr_ws = algo.getProperty('OutputWorkspace').value
     corr = corr_ws.readY(0)
     for c in corr:
         assert(c>0)
@@ -33,8 +37,13 @@ def test_deadtime_paralyzable(nexus_dir):
     with amend_config(data_dir=nexus_dir):
         ws = mtd_api.Load("REF_L_198409")
 
-    corr_ws = SingleReadoutDeadTimeCorrection(InputWorkspace=ws,
-                                              Paralyzable=True)
+    algo = SingleReadoutDeadTimeCorrection()
+    algo.PyInit()
+    algo.setProperty("InputWorkspace", ws)
+    algo.setProperty("Paralyzable", True)
+    algo.setProperty("OutputWorkspace", "dead_time_corr")
+    algo.PyExec()
+    corr_ws = algo.getProperty('OutputWorkspace').value
     corr = corr_ws.readY(0)
     with open("dc.txt", 'w') as fd:
         fd.write(str(corr))
