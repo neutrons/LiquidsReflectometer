@@ -65,6 +65,10 @@ class ReductionParameters(object):
         self.incident_medium_list = ['air']
         self.incident_medium_index_selected = 0
 
+        # Dead time correction
+        self.dead_time:bool = False
+        self.paralyzable:bool = False
+
     def from_dict(self, data_dict, permissible=True):
         r"""
         Update object's attributes with a dictionary with entries of the type  attribute_name: attribute_value.
@@ -146,6 +150,10 @@ class ReductionParameters(object):
         # Incident medium
         _xml += "<incident_medium_list>%s</incident_medium_list>\n" % str(self.incident_medium_list[0])
         _xml += "<incident_medium_index_selected>%s</incident_medium_index_selected>\n" % str(self.incident_medium_index_selected)
+
+        # Dead time correction
+        _xml += "<dead_time_correction>%s</dead_time_correction>\n" % str(self.dead_time)
+        _xml += "<dead_time_paralyzable>%s</dead_time_paralyzable>\n" % str(self.paralyzable)
 
         _xml += "</RefLData>\n"
 
@@ -247,6 +255,12 @@ class ReductionParameters(object):
         else:
             self.incident_medium_list = ['H2O']
             self.incident_medium_index_selected = 0
+
+        # Dead time correction
+        self.dead_time = getBoolElement(instrument_dom, "dead_time_correction",
+                                        default=self.dead_time)
+        self.paralyzable = getBoolElement(instrument_dom, "dead_time_paralyzable",
+                                          default=self.paralyzable)
 
 
 ###### Utility functions to read XML content ########################
