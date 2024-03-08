@@ -1,5 +1,3 @@
-import os
-import numpy as np
 from lr_reduction.DeadTimeCorrection import SingleReadoutDeadTimeCorrection
 
 import mantid
