@@ -40,7 +40,7 @@ def test_info(nexus_dir):
 
 def test_full_reduction(nexus_dir):
     """
-        Test the fill reduction chain
+        Test the full reduction chain
     """
     template_path = 'data/template.xml'
     qz_all = []
@@ -122,9 +122,13 @@ def test_reduce_functional_bck(nexus_dir, template_dir):
     for i in range(198409, 198417):
         with amend_config(data_dir=nexus_dir):
             ws = mtd_api.Load("REF_L_%s" % i)
-        workflow.reduce(ws, template_path, output_dir=output_dir,
-                        average_overlap=False,
-                        functional_background=True)
+
+        sequence_number = ws.getRun().getProperty("sequence_number").value[0]
+        template_data = template.read_template(template_path, sequence_number)
+        template_data.two_backgrounds = True
+
+        workflow.reduce(ws, template_data, output_dir=output_dir,
+                        average_overlap=False)
 
     reference_path = 'data/reference_fbck.txt'
     if os.path.isfile(reference_path):
@@ -164,9 +168,9 @@ def test_reduce_bck_option_mismatch(nexus_dir):
         sequence_number = ws.getRun().getProperty("sequence_number").value[0]
         template_data = template.read_template(template_path, sequence_number)
         template_data.background_roi = template_data.background_roi[:2]
+        template_data.two_backgrounds = True
         workflow.reduce(ws, template_data, output_dir=output_dir,
-                        average_overlap=False,
-                        functional_background=True)
+                        average_overlap=False)
 
     reference_path = 'data/reference_rq.txt'
     if os.path.isfile(reference_path):

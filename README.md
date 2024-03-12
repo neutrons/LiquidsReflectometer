@@ -6,6 +6,7 @@ Reduction scripts for the Liquids Reflectometer. This includes both automated re
 
 
 ## Release notes:
+ - reduction v2.0.19 [03/2024] Add dead time correction and clean up functional background option
  - reduction v2.0.14 [02/2024] Add functional background
  - reduction v2.0.13 [08/2023] Get correct angle with free liquids
  - reduction v2.0.9 [04/2023] Subtract normalization background & add x-direction option
