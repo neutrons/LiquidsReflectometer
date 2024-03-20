@@ -237,12 +237,17 @@ class EventReflectivity(object):
     def get_dead_time_correction(self):
         """
             Compute dead time correction to be applied to the reflectivity curve.
+            The method will also try to load the error events from each of the
+            data files to ensure that we properly estimate the dead time correction.
         """
         # Scattering workspace
         tof_min = self._ws_sc.getTofMin()
         tof_max = self._ws_sc.getTofMax()
 
+        run_number = self._ws_sc.getRun().getProperty("run_number").value
+        error_ws = api.LoadErrorEventsNexus(run_number)
         corr_ws = DeadTimeCorrection.call(InputWorkspace=self._ws_sc,
+                                          InputErrorEventsWorkspace=error_ws,
                                           DeadTime=self.DEAD_TIME,
                                           TOFStep=self.DEAD_TIME_TOF_STEP,
                                           Paralyzable=self.paralyzable,
@@ -252,7 +257,10 @@ class EventReflectivity(object):
         wl_bins = corr_ws.readX(0) / self.constant
 
         # Direct beam workspace
+        run_number = self._ws_db.getRun().getProperty("run_number").value
+        error_ws = api.LoadErrorEventsNexus(run_number)
         corr_ws = DeadTimeCorrection.call(InputWorkspace=self._ws_db,
+                                          InputErrorEventsWorkspace=error_ws,
                                           DeadTime=self.DEAD_TIME,
                                           TOFStep=self.DEAD_TIME_TOF_STEP,
                                           Paralyzable=self.paralyzable,
@@ -270,11 +278,15 @@ class EventReflectivity(object):
 
         # Interpolate to estimate the dead time correction at the Q values we measured
         q_middle = (self.q_bins[1:] + self.q_bins[:-1]) / 2
-        
+
         dead_time_corr = np.interp(q_middle, q_values, dead_time_per_tof)
-        
+
+        # Cleanup
+        api.DeleteWorkspace(corr_ws)
+        api.DeleteWorkspace(error_ws)
+
         return dead_time_corr
-        
+
     def specular(self, q_summing=False, tof_weighted=False, bck_in_q=False,
                  clean=False, normalize=True):
         """
