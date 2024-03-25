@@ -1,6 +1,6 @@
 name: liquid-ref
 channels:
-  - mantid/label/main
+  - mantid/label/nightly
   - conda-forge
   - defaults
 dependencies:
