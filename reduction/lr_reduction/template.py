@@ -137,7 +137,7 @@ def process_from_template(run_number, template_path, q_summing=False, normalize=
         list_of_runs = str(run_number).split(',')
         run_number = '+'.join(list_of_runs)
     # Load data
-    ws_sc = api.Load("REF_L_%s" % run_number)
+    ws_sc = api.Load("REF_L_%s" % run_number, OutputWorkspace="REF_L_%s" % run_number)
     return process_from_template_ws(ws_sc, template_path, q_summing=q_summing,
                                     tof_weighted=tof_weighted, bck_in_q=bck_in_q,
                                     clean=clean, info=info, normalize=normalize)
