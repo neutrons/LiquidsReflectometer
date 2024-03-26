@@ -16,7 +16,7 @@ warnings.simplefilter('ignore')
 # New reduction code
 sys.path.append("/SNS/REF_L/shared/reduction")
 
-CONDA_ENV = 'mantid'
+CONDA_ENV = 'mantid-dev'
 
 import mantid
 from mantid.simpleapi import *
