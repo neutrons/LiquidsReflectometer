@@ -66,7 +66,7 @@ class EventReflectivity(object):
                  q_min=None, q_step=-0.02, q_max=None,
                  tof_range=None, theta=1.0, instrument=None,
                  functional_background=False, dead_time=False,
-                 paralyzable=False):
+                 paralyzable=True):
         """
             Pixel ranges include the min and max pixels.
 
@@ -245,7 +245,7 @@ class EventReflectivity(object):
         tof_max = self._ws_sc.getTofMax()
 
         run_number = self._ws_sc.getRun().getProperty("run_number").value
-        error_ws = api.LoadErrorEventsNexus(run_number)
+        error_ws = api.LoadErrorEventsNexus("REF_L_%s" % run_number)
         corr_ws = DeadTimeCorrection.call(InputWorkspace=self._ws_sc,
                                           InputErrorEventsWorkspace=error_ws,
                                           DeadTime=self.DEAD_TIME,
@@ -258,7 +258,7 @@ class EventReflectivity(object):
 
         # Direct beam workspace
         run_number = self._ws_db.getRun().getProperty("run_number").value
-        error_ws = api.LoadErrorEventsNexus(run_number)
+        error_ws = api.LoadErrorEventsNexus("REF_L_%s" % run_number)
         corr_ws = DeadTimeCorrection.call(InputWorkspace=self._ws_db,
                                           InputErrorEventsWorkspace=error_ws,
                                           DeadTime=self.DEAD_TIME,

@@ -1,11 +1,12 @@
 import sys
-sys.path.append('../autoreduce')
+import os
+sys.path.append(os.path.expanduser('~/git/LiquidsReflectometer/reduction'))
 
-from sf_calculator import ScalingFactor
+from lr_reduction.sf_calculator import ScalingFactor
 
-sf = ScalingFactor(run_list=range(184975, 184990),
-                   sf_file="/tmp/sf_184975_air.cfg",
-                   medium='air')
+sf = ScalingFactor(run_list=range(197912, 197932),
+                   sf_file="/tmp/sf_197912_si.cfg",
+                   medium='Si')
 
 sf.execute()
 

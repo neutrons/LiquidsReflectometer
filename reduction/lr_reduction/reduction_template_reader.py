@@ -67,7 +67,7 @@ class ReductionParameters(object):
 
         # Dead time correction
         self.dead_time:bool = False
-        self.paralyzable:bool = False
+        self.paralyzable:bool = True
 
     def from_dict(self, data_dict, permissible=True):
         r"""
