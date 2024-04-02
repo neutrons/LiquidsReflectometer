@@ -115,3 +115,26 @@ def test_compute_sf_with_deadtime_tof_300(nexus_dir):
 
     check_results(output_cfg, 'data/sf_197912_Si_dt_par_46_300.cfg')
 
+
+def test_compute_sf_with_deadtime_tof_200(nexus_dir):
+    """
+        Test the computation of scaling factors
+    """
+    with amend_config(data_dir=nexus_dir):
+        ws = mtd_api.Load("REF_L_197912")
+
+    output_dir = '/tmp'
+
+    output_cfg = os.path.join(output_dir, "sf_197912_Si_test_dt.cfg")
+    if os.path.isfile(output_cfg):
+        os.remove(output_cfg)
+
+    output = sf_workflow.process_scaling_factors(ws, output_dir,
+                                                 use_deadtime=True,
+                                                 deadtime=4.6,
+                                                 deadtime_tof_step=200,
+                                                 paralyzable=False,
+                                                 wait=False, postfix='_test_dt')
+    assert output is True
+
+    check_results(output_cfg, 'data/sf_197912_Si_dt_par_46_200.cfg')

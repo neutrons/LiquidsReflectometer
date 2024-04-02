@@ -465,9 +465,15 @@ class LRScalingFactors(PythonAlgorithm):
         corr_ws = DeadTimeCorrection.call(InputWorkspace=ws,
                                           InputErrorEventsWorkspace=error_ws,
                                           Paralyzable=paralyzable,
-                                          TOFStep=tof_step,
+                                          DeadTime=deadtime,
+                                          TOFStep=deadtime_step,
                                           TOFRange=[tof_min, tof_max],
                                           OutputWorkspace="corr")
+
+        # Rebin to the workspace we need
+        corr_ws = Rebin(InputWorkspace=corr_ws, Params=[tof_min, tof_step, tof_max],
+            PreserveEvents=False, OutputWorkspace=str(corr_ws)
+        )
 
         return corr_ws
 
