@@ -71,12 +71,6 @@ print("Using template: %s" % template_file)
 # Check the measurement geometry. This will be useful later
 #if ws.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
 
-# Determine whether we have to go through the legacy reduction to
-# process direct beams
-if not old_version and ws.getRun().hasProperty("data_type"):
-    data_type = ws.getRun().getProperty("data_type").value[0]
-    old_version = not data_type == 0
-
 if old_version:
     SetInstrumentParameter(ws, ParameterName="dq-constant", Value="0.0", ParameterType="Number")
     output = LRAutoReduction(#Filename=event_file_path,
@@ -90,17 +84,27 @@ if old_version:
                              TemplateFile=template_file)
     first_run_of_set=int(output[1])
 else:
-    print("Average overlap: %s" % avg_overlap)
-    print("Constant-Q binning: %s" % const_q)
-    from lr_reduction import workflow
-    if True:
+    data_type = ws.getRun().getProperty("data_type").value[0]
+    # Direct beam data
+    if data_type == 1:
+        from lr_reduction.scaling_factors import workflow as sf_workflow
+        sf_workflow.process_scaling_factors(ws, output_dir,
+                                            tof_step=200,
+                                            order_by_runs=True,
+                                            use_deadtime=True,
+                                            deadtime=4.2,
+                                            deadtime_tof_step=200,
+                                            paralyzable=True,
+                                            wait=True,
+                                            slit_tolerance=0.07)
+    else:
+        # Scattering data
+        print("Average overlap: %s" % avg_overlap)
+        print("Constant-Q binning: %s" % const_q)
+        from lr_reduction import workflow
         first_run_of_set = workflow.reduce(ws, template_file, output_dir,
                                            average_overlap=avg_overlap,
                                            q_summing=const_q, bck_in_q=False)
-    else:
-        first_run_of_set = workflow.reduce_fixed_two_theta(ws, template_file, output_dir,
-                                                           average_overlap=avg_overlap,
-                                                           q_summing=const_q, bck_in_q=False)
 
 #-------------------------------------------------------------------------
 # Produce plot for the web monitor
