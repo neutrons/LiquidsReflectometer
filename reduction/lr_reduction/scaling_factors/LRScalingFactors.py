@@ -12,6 +12,7 @@ from mantid.simpleapi import *
 from mantid.kernel import *
 
 from lr_reduction import DeadTimeCorrection
+from lr_reduction.utils import mantid_algorithm_exec
 
 
 class LRScalingFactors(PythonAlgorithm):
@@ -462,13 +463,15 @@ class LRScalingFactors(PythonAlgorithm):
         deadtime = self.getProperty("DeadTime").value
         deadtime_step = self.getProperty("DeadTimeTOFStep").value
         error_ws = LoadErrorEventsNexus(ws.getRun().getProperty("run_number").value)
-        corr_ws = DeadTimeCorrection.call(InputWorkspace=ws,
-                                          InputErrorEventsWorkspace=error_ws,
-                                          Paralyzable=paralyzable,
-                                          DeadTime=deadtime,
-                                          TOFStep=deadtime_step,
-                                          TOFRange=[tof_min, tof_max],
-                                          OutputWorkspace="corr")
+
+        corr_ws = mantid_algorithm_exec(DeadTimeCorrection.SingleReadoutDeadTimeCorrection,
+                                        InputWorkspace=ws,
+                                        InputErrorEventsWorkspace=error_ws,
+                                        Paralyzable=paralyzable,
+                                        DeadTime=deadtime,
+                                        TOFStep=deadtime_step,
+                                        TOFRange=[tof_min, tof_max],
+                                        OutputWorkspace="corr")
 
         # Rebin to the workspace we need
         corr_ws = Rebin(InputWorkspace=corr_ws, Params=[tof_min, tof_step, tof_max],

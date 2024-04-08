@@ -16,7 +16,8 @@ from math import ceil
 
 THI_TOLERANCE = 0.002
 
-from . import LRScalingFactors
+from lr_reduction.scaling_factors import LRScalingFactors
+from lr_reduction.utils import mantid_algorithm_exec
 
 
 class CompareTwoNXSDataForSFcalculator(object):
@@ -35,6 +36,11 @@ class CompareTwoNXSDataForSFcalculator(object):
     resultComparison = 0
 
     def __init__(self, nxsdataToCompareWith, nxsdataToPosition):
+        """
+            Compare two runs to decide in which order they should be processed
+            :param workspace nxsdataToCompareWith: new run to compare with
+            :param workspace nxsdataToPosition: second run to compare with
+        """
         self.nexusToCompareWithRun = nxsdataToCompareWith.getRun()
         self.nexusToPositionRun = nxsdataToPosition.getRun()
 
@@ -95,6 +101,10 @@ class CompareTwoNXSDataForSFcalculator(object):
 def sorter_function(r1, r2):
     """
     Sorter function used by with the 'sorted' call to sort the direct beams.
+
+    :param workspace r1: first workspace to compare with
+    :param workspace r2: second workspace to compare with
+
     """
     return CompareTwoNXSDataForSFcalculator(r2, r1).result()
 
@@ -266,23 +276,20 @@ class LRDirectBeamSort(PythonAlgorithm):
             deadtime = self.getProperty("DeadTime").value
             deadtime_step = self.getProperty("DeadTimeTOFStep").value
 
-            algo = LRScalingFactors.LRScalingFactors()
-            algo.PyInit()
-            algo.setProperty("DirectBeamRuns", direct_beam_runs)
-            algo.setProperty("TOFRange", tof_range)
-            algo.setProperty("TOFSteps", tof_steps)
-            algo.setProperty("SignalPeakPixelRange", peak_ranges)
-            algo.setProperty("SignalBackgroundPixelRange", bck_ranges)
-            algo.setProperty("LowResolutionPixelRange", x_ranges)
-            algo.setProperty("IncidentMedium", incident_medium)
-            algo.setProperty("SlitTolerance", slit_tolerance)
-            algo.setProperty("ScalingFactorFile", scaling_file)
-            algo.setProperty("DirectBeamRuns", direct_beam_runs)
-            algo.setProperty("UseDeadTimeCorrection", use_deadtime)
-            algo.setProperty("ParalyzableDeadTime", paralyzable)
-            algo.setProperty("DeadTime", deadtime)
-            algo.setProperty("DeadTimeTOFStep", deadtime_step)
-            algo.PyExec()
+            mantid_algorithm_exec(LRScalingFactors.LRScalingFactors,
+                                  DirectBeamRuns=direct_beam_runs,
+                                  TOFRange=tof_range,
+                                  TOFSteps=tof_steps,
+                                  SignalPeakPixelRange=peak_ranges,
+                                  SignalBackgroundPixelRange=bck_ranges,
+                                  LowResolutionPixelRange=x_ranges,
+                                  IncidentMedium=incident_medium,
+                                  SlitTolerance=slit_tolerance,
+                                  ScalingFactorFile=scaling_file,
+                                  UseDeadTimeCorrection=use_deadtime,
+                                  ParalyzableDeadTime=paralyzable,
+                                  DeadTime=deadtime,
+                                  DeadTimeTOFStep=deadtime_step)
 
         # log output summary
         logger.notice(summary)

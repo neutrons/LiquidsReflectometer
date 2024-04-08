@@ -8,6 +8,17 @@ from typing import Union
 from mantid.kernel import ConfigService
 
 
+def mantid_algorithm_exec(algorithm_class, **kwargs):
+    algorithm_instance = algorithm_class()
+    assert algorithm_instance.PyInit, "str(algorithm_class) is not a Mantid Python algorithm"
+    algorithm_instance.PyInit()
+    for name, value in kwargs.items():
+        algorithm_instance.setProperty(name, value)
+    algorithm_instance.PyExec()
+    if 'OutputWorkspace' in kwargs:
+        return algorithm_instance.getProperty('OutputWorkspace').value
+
+
 @contextmanager
 def amend_config(
     new_config: dict = None, data_dir: Union[str, list] = None, data_dir_insert_mode: str = "prepend"

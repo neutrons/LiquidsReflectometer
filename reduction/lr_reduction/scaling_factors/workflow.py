@@ -3,7 +3,8 @@
 """
 import os
 
-from . import LRDirectBeamSort
+from lr_reduction.scaling_factors import LRDirectBeamSort
+from lr_reduction.utils import mantid_algorithm_exec
 
 
 def process_scaling_factors(ws, output_dir, tof_step=200., order_by_runs=True,
@@ -14,6 +15,18 @@ def process_scaling_factors(ws, output_dir, tof_step=200., order_by_runs=True,
         Compute scaling factors given a DB run, assumed to be the last
         one of a set.
         :param workspace ws: Mantid workspace for one of the direct beams to use.
+        :param output_dir: path the the output directory
+        :param tof_step: TOF binning for the scaling factor calculation
+        :param order_by_runs: if True, the runs will be ordered by run number instead of meta data
+        :param incident_medium: name of the incident medium
+        :param slit_tolerance: tolerance to use when matching slits between runs
+        :param wait: if True, scaling factors will only be processed if the workspace
+                     given corresponds to the last run of the complete set
+        :param postfix: string to add at the end of the output file
+        :param use_deadtime: if True, a dead time correction will be applied
+        :param paralyzable: if True, a paralyzable dead time correction will be applied
+        :param deadtime: value of the dead time
+        :param deadtime_tof_step: TOF binning to use when computing the dead time
     """
     # Read in the sequence information
     meta_data_run = ws.getRun()
@@ -40,20 +53,18 @@ def process_scaling_factors(ws, output_dir, tof_step=200., order_by_runs=True,
 
     output_cfg = os.path.join(output_dir, "sf_%s_%s%s.cfg" % (first_run_of_set, file_id, postfix))
 
-    algo = LRDirectBeamSort.LRDirectBeamSort()
-    algo.PyInit()
-    algo.setProperty("RunList", list(range(first_run_of_set, first_run_of_set + sequence_total)))
-    algo.setProperty("UseLowResCut", True)
-    algo.setProperty("ComputeScalingFactors", True)
-    algo.setProperty("TOFSteps", tof_step)
-    algo.setProperty("IncidentMedium", incident_medium)
-    algo.setProperty("SlitTolerance", slit_tolerance)
-    algo.setProperty("OrderDirectBeamsByRunNumber", order_by_runs)
-    algo.setProperty("UseDeadTimeCorrection", use_deadtime)
-    algo.setProperty("ParalyzableDeadTime", paralyzable)
-    algo.setProperty("DeadTime", deadtime)
-    algo.setProperty("DeadTimeTOFStep", deadtime_tof_step)
-    algo.setProperty("ScalingFactorFile", output_cfg)
-    algo.PyExec()
+    mantid_algorithm_exec(LRDirectBeamSort.LRDirectBeamSort,
+                          RunList=list(range(first_run_of_set, first_run_of_set + sequence_total)),
+                          UseLowResCut=True,
+                          ComputeScalingFactors=True,
+                          TOFSteps=tof_step,
+                          IncidentMedium=incident_medium,
+                          SlitTolerance=slit_tolerance,
+                          OrderDirectBeamsByRunNumber=order_by_runs,
+                          UseDeadTimeCorrection=use_deadtime,
+                          ParalyzableDeadTime=paralyzable,
+                          DeadTime=deadtime,
+                          DeadTimeTOFStep=deadtime_tof_step,
+                          ScalingFactorFile=output_cfg)
 
     return True
