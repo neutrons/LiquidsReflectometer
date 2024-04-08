@@ -8,6 +8,7 @@ import numpy as np
 
 from . import background
 from . import DeadTimeCorrection
+from lr_reduction.utils import mantid_algorithm_exec
 
 
 def get_wl_range(ws):
@@ -246,26 +247,28 @@ class EventReflectivity(object):
 
         run_number = self._ws_sc.getRun().getProperty("run_number").value
         error_ws = api.LoadErrorEventsNexus("REF_L_%s" % run_number)
-        corr_ws = DeadTimeCorrection.call(InputWorkspace=self._ws_sc,
-                                          InputErrorEventsWorkspace=error_ws,
-                                          DeadTime=self.DEAD_TIME,
-                                          TOFStep=self.DEAD_TIME_TOF_STEP,
-                                          Paralyzable=self.paralyzable,
-                                          TOFRange=[tof_min, tof_max],
-                                          OutputWorkspace="corr")
+        corr_ws = mantid_algorithm_exec(DeadTimeCorrection.SingleReadoutDeadTimeCorrection,
+                                        InputWorkspace=self._ws_sc,
+                                        InputErrorEventsWorkspace=error_ws,
+                                        DeadTime=self.DEAD_TIME,
+                                        TOFStep=self.DEAD_TIME_TOF_STEP,
+                                        Paralyzable=self.paralyzable,
+                                        TOFRange=[tof_min, tof_max],
+                                        OutputWorkspace="corr")
         corr_sc = corr_ws.readY(0)
         wl_bins = corr_ws.readX(0) / self.constant
 
         # Direct beam workspace
         run_number = self._ws_db.getRun().getProperty("run_number").value
         error_ws = api.LoadErrorEventsNexus("REF_L_%s" % run_number)
-        corr_ws = DeadTimeCorrection.call(InputWorkspace=self._ws_db,
-                                          InputErrorEventsWorkspace=error_ws,
-                                          DeadTime=self.DEAD_TIME,
-                                          TOFStep=self.DEAD_TIME_TOF_STEP,
-                                          Paralyzable=self.paralyzable,
-                                          TOFRange=[tof_min, tof_max],
-                                          OutputWorkspace="corr")
+        corr_ws = mantid_algorithm_exec(DeadTimeCorrection.SingleReadoutDeadTimeCorrection,
+                                        InputWorkspace=self._ws_db,
+                                        InputErrorEventsWorkspace=error_ws,
+                                        DeadTime=self.DEAD_TIME,
+                                        TOFStep=self.DEAD_TIME_TOF_STEP,
+                                        Paralyzable=self.paralyzable,
+                                        TOFRange=[tof_min, tof_max],
+                                        OutputWorkspace="corr")
         corr_db = corr_ws.readY(0)
 
         # Flip the correction since we are going from TOF to Q

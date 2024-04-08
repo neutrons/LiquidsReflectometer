@@ -7,22 +7,6 @@ from mantid.kernel import *
 import numpy as np
 import scipy
 
-def call(InputWorkspace, InputErrorEventsWorkspace=None, DeadTime=4.2, TOFStep=100., Paralyzable=False, TOFRange=[0, 0], OutputWorkspace='correction'):
-    """
-        Function to make the algorithm call similar to a normal Mantid call
-    """
-    algo = SingleReadoutDeadTimeCorrection()
-    algo.PyInit()
-    algo.setProperty("InputWorkspace", InputWorkspace)
-    algo.setProperty("InputErrorEventsWorkspace", InputErrorEventsWorkspace)
-    algo.setProperty("DeadTime", DeadTime)
-    algo.setProperty("TOFStep", TOFStep)
-    algo.setProperty("Paralyzable", Paralyzable)
-    algo.setProperty("TOFRange", TOFRange)
-    algo.setProperty("OutputWorkspace", OutputWorkspace)
-    algo.PyExec()
-    return algo.getProperty('OutputWorkspace').value
-
 
 class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
 
