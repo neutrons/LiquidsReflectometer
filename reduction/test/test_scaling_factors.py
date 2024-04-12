@@ -18,13 +18,22 @@ def check_results(data_file, reference):
     """
         Check scaling factor file output against reference
     """
+    # Read data and skip header
     with open(data_file, 'r') as fd:
-        cfg_data = fd.readlines()
+        _cfg_data = fd.readlines()
+        cfg_data = []
+        for l in _cfg_data:
+            if not l.startswith('#'):
+                cfg_data.append(l)
 
     with open(reference, 'r') as fd:
-        cfg_ref = fd.readlines()
+        _cfg_ref = fd.readlines()
+        cfg_ref = []
+        for l in _cfg_ref:
+            if not l.startswith('#'):
+                cfg_ref.append(l)
 
-    for i in range(5, len(cfg_ref)):
+    for i in range(len(cfg_ref)):
         # Newly generated data
         toks = cfg_data[i].split(' ')
         for t in toks:
