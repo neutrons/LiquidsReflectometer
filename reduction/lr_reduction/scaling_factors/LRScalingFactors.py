@@ -11,6 +11,7 @@ from mantid.api import *
 from mantid.simpleapi import *
 from mantid.kernel import *
 
+import lr_reduction
 from lr_reduction import DeadTimeCorrection
 from lr_reduction.utils import mantid_algorithm_exec
 
@@ -74,7 +75,7 @@ class LRScalingFactors(PythonAlgorithm):
         self.declareProperty("FrontSlitName", "S1", doc="Name of the front slit")
         self.declareProperty("BackSlitName", "Si", doc="Name of the back slit")
         self.declareProperty("TOFSteps", 500.0, doc="TOF step size")
-        self.declareProperty("SlitTolerance", 0.02, doc="Tolerance for matching slit positions")
+        self.declareProperty("SlitTolerance", 0.07, doc="Tolerance for matching slit positions")
         self.declareProperty("UseDeadTimeCorrection", True, doc="If True, counts will be corrected for dead time")
         self.declareProperty("ParalyzableDeadTime", True,
                              doc="If true, paralyzable correction will be applied, non-paralyzing otherwise")
@@ -400,9 +401,19 @@ class LRScalingFactors(PythonAlgorithm):
         medium = self.getProperty("IncidentMedium").value
         scaling_file_meta[medium] = "# Medium=%s, runs: %s" % (medium, direct_beams)
 
+        correct_for_deadtime = self.getProperty("UseDeadTimeCorrection").value
+        paralyzable = self.getProperty("ParalyzableDeadTime").value
+        deadtime = self.getProperty("DeadTime").value
+        deadtime_step = self.getProperty("DeadTimeTOFStep").value
+
         fd = open(scaling_file, "w")
         fd.write("# y=a+bx\n#\n")
         fd.write("# LambdaRequested[Angstroms] S1H[mm] (S2/Si)H[mm] S1W[mm] (S2/Si)W[mm] a b error_a error_b\n#\n")
+        fd.write("# Version: lr_reduction %s\n" % lr_reduction.__version__)
+        fd.write("#    apply_deadtime: %s\n" % correct_for_deadtime)
+        fd.write("#    paralyzable_deadtime: %s\n" % paralyzable)
+        fd.write("#    deadtime_value: %s\n" % deadtime)
+        fd.write("#    deadtime_tof_step: %s\n#\n" % deadtime_step)
 
         for k, v in scaling_file_meta.items():
             fd.write("%s\n" % v)
