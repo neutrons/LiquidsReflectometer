@@ -7,6 +7,7 @@
 # pylint: disable=invalid-name, no-init
 import os
 import re
+import time
 from mantid.api import *
 from mantid.simpleapi import *
 from mantid.kernel import *
@@ -410,6 +411,7 @@ class LRScalingFactors(PythonAlgorithm):
         fd.write("# y=a+bx\n#\n")
         fd.write("# LambdaRequested[Angstroms] S1H[mm] (S2/Si)H[mm] S1W[mm] (S2/Si)W[mm] a b error_a error_b\n#\n")
         fd.write("# Version: lr_reduction %s\n" % lr_reduction.__version__)
+        fd.write("# Generated on %s\n" % time.ctime())
         fd.write("#    apply_deadtime: %s\n" % correct_for_deadtime)
         fd.write("#    paralyzable_deadtime: %s\n" % paralyzable)
         fd.write("#    deadtime_value: %s\n" % deadtime)
