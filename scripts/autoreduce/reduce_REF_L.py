@@ -20,6 +20,10 @@ CONDA_ENV = 'mantid-dev'
 
 import mantid
 from mantid.simpleapi import *
+from mantid.kernel import ConfigService
+ConfigService.Instance().setString("default.instrument", "REF_L")
+ConfigService.Instance().setString("default.facility", "SNS")
+ConfigService.Instance().setString("datasearch.searcharchive", "sns")
 
 event_file_path=sys.argv[1]
 output_dir=sys.argv[2]

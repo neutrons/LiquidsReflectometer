@@ -11,7 +11,7 @@ from mantid.kernel import *
 
 from . import event_reduction, reduction_template_reader
 
-TOLERANCE = 0.02
+TOLERANCE = 0.07
 
 
 def read_template(template_file, sequence_number):
