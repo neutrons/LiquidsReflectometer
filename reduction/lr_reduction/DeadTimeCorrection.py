@@ -44,6 +44,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         dead_time = self.getProperty("DeadTime").value
         tof_step = self.getProperty("TOFStep").value
         paralyzing = self.getProperty("Paralyzable").value
+        output_workspace = self.getPropertyValue("OutputWorkspace")
 
         # Rebin the data according to the tof_step we want to compute the correction with
         tof_min, tof_max = self.getProperty("TOFRange").value
@@ -54,7 +55,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         _ws_sc = Rebin(InputWorkspace=ws_event_data, Params="%s,%s,%s" % (tof_min, tof_step, tof_max), PreserveEvents=False)
 
         # Get the total number of counts on the detector for each TOF bin per pulse
-        counts_ws = SumSpectra(_ws_sc)
+        counts_ws = SumSpectra(_ws_sc, OutputWorkspace=output_workspace)
 
         # If we have error events, add them since those are also detector triggers
         if ws_error_events is not None:
