@@ -58,8 +58,6 @@ class EventReflectivity(object):
     INSTRUMENT_4B = 1
     DEFAULT_4B_SAMPLE_DET_DISTANCE = 1.83
     DEFAULT_4B_SOURCE_DET_DISTANCE = 15.75
-    DEAD_TIME = 4.2 # Nominally 4.0 microseconds
-    DEAD_TIME_TOF_STEP = 100
 
     def __init__(self, scattering_workspace, direct_workspace,
                  signal_peak, signal_bck, norm_peak, norm_bck,
@@ -67,7 +65,8 @@ class EventReflectivity(object):
                  q_min=None, q_step=-0.02, q_max=None,
                  tof_range=None, theta=1.0, instrument=None,
                  functional_background=False, dead_time=False,
-                 paralyzable=True):
+                 paralyzable=True, dead_time_value=4.2,
+                 dead_time_tof_step=100):
         """
             Pixel ranges include the min and max pixels.
 
@@ -87,6 +86,8 @@ class EventReflectivity(object):
             :param theta: theta scattering angle in radians
             :param dead_time: if not zero, dead time correction will be used
             :param paralyzable: if True, the dead time calculation will use the paralyzable approach
+            :param dead_time_value: value of the dead time in microsecond
+            :param dead_time_tof_step: TOF bin size in microsecond
         """
         if instrument in [self.INSTRUMENT_4A, self.INSTRUMENT_4B]:
             self.instrument = instrument
@@ -109,6 +110,8 @@ class EventReflectivity(object):
         self.summing_threshold = None
         self.dead_time = dead_time
         self.paralyzable = paralyzable
+        self.dead_time_value = dead_time_value
+        self.dead_time_tof_step = dead_time_tof_step
 
         # Turn on functional background estimation
         self.use_functional_bck = functional_background
@@ -250,8 +253,8 @@ class EventReflectivity(object):
         corr_ws = mantid_algorithm_exec(DeadTimeCorrection.SingleReadoutDeadTimeCorrection,
                                         InputWorkspace=self._ws_sc,
                                         InputErrorEventsWorkspace=error_ws,
-                                        DeadTime=self.DEAD_TIME,
-                                        TOFStep=self.DEAD_TIME_TOF_STEP,
+                                        DeadTime=self.dead_time_value,
+                                        TOFStep=self.dead_time_tof_step,
                                         Paralyzable=self.paralyzable,
                                         TOFRange=[tof_min, tof_max],
                                         OutputWorkspace="corr")
@@ -264,8 +267,8 @@ class EventReflectivity(object):
         corr_ws = mantid_algorithm_exec(DeadTimeCorrection.SingleReadoutDeadTimeCorrection,
                                         InputWorkspace=self._ws_db,
                                         InputErrorEventsWorkspace=error_ws,
-                                        DeadTime=self.DEAD_TIME,
-                                        TOFStep=self.DEAD_TIME_TOF_STEP,
+                                        DeadTime=self.dead_time_value,
+                                        TOFStep=self.dead_time_tof_step,
                                         Paralyzable=self.paralyzable,
                                         TOFRange=[tof_min, tof_max],
                                         OutputWorkspace="corr")
@@ -307,7 +310,7 @@ class EventReflectivity(object):
         # We do this first because the specular calls below may modify the input workspace
         if self.dead_time:
             dead_time_corr = self.get_dead_time_correction()
-        
+
         if tof_weighted:
             self.specular_weighted(q_summing=q_summing, bck_in_q=bck_in_q)
         else:

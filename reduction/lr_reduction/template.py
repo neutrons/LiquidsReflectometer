@@ -222,6 +222,8 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
                                                    theta=np.abs(theta),
                                                    dead_time=template_data.dead_time,
                                                    paralyzable=template_data.paralyzable,
+                                                   dead_time_value=template_data.dead_time_value,
+                                                   dead_time_tof_step=template_data.dead_time_tof_step,
                                                    functional_background=template_data.two_backgrounds,
                                                    instrument=event_reduction.EventReflectivity.INSTRUMENT_4B)
 
