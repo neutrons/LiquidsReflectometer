@@ -69,7 +69,7 @@ class ReductionParameters(object):
         self.dead_time:bool = False
         self.paralyzable:bool = True
         self.dead_time_value = 4.2
-        self.dead_time_tof_step = 150
+        self.dead_time_tof_step = 100
 
     def from_dict(self, data_dict, permissible=True):
         r"""
