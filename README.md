@@ -6,6 +6,7 @@ Reduction scripts for the Liquids Reflectometer. This includes both automated re
 
 
 ## Release notes:
+ - reduction v2.0.26 [05/2024] Implement a better dead time correction using weighted events
  - reduction v2.0.25 [04/2024] Use dead time parameters from template
  - reduction v2.0.24 [04/2024] Fix issue with errors when using dead time correction
  - reduction v2.0.22 [04/2024] Add dead time correction to scaling factor calculation
