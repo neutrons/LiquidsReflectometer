@@ -155,10 +155,17 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     if isinstance(template_data, str):
         template_data = read_template(template_data, sequence_number)
 
+    if template_data.dead_time:
+        ws_sc = event_reduction.apply_dead_time_correction(ws_sc, template_data)
+
     # Load normalization run
     normalize = normalize and template_data.apply_normalization
     if ws_db is None and normalize:
         ws_db = api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
+
+    # Apply dead time correction
+    if template_data.dead_time:
+        ws_db = event_reduction.apply_dead_time_correction(ws_db, template_data)
 
     # If we run in theta-theta geometry, we'll need thi
     thi_value = ws_sc.getRun()['thi'].value[0]
