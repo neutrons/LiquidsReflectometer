@@ -86,7 +86,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
 
         # We don't compute an error on the dead time correction, so set it to zero
         counts_ws.setE(0, 0 * corr)
-
+        counts_ws.setDistribution(True)
         self.setProperty('OutputWorkspace', counts_ws)
 
 

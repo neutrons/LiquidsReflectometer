@@ -279,6 +279,7 @@ def reduce_explorer(ws, ws_db, theta_pv=None, center_pixel=145, db_center_pixel=
 
     theta = theta_value * np.pi / 180.
 
+    #TODO: dead time correction should be applied here
     event_refl = event_reduction.EventReflectivity(ws, ws_db,
                                                    signal_peak=peak, signal_bck=peak_bck,
                                                    norm_peak=norm_peak, norm_bck=norm_bck,

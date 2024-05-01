@@ -41,6 +41,44 @@ def get_q_binning(q_min=0.001, q_max=0.15, q_step=-0.02):
         return q_min * np.asarray([_step**i for i in range(n_steps)])
 
 
+def get_dead_time_correction(ws, template_data):
+    """
+        Compute dead time correction to be applied to the reflectivity curve.
+        The method will also try to load the error events from each of the
+        data files to ensure that we properly estimate the dead time correction.
+        :param ws: workspace with raw data to compute correction for
+        :param template_data: reduction parameters
+    """
+    tof_min = ws.getTofMin()
+    tof_max = ws.getTofMax()
+
+    run_number = ws.getRun().getProperty("run_number").value
+    error_ws = api.LoadErrorEventsNexus("REF_L_%s" % run_number)
+    corr_ws = mantid_algorithm_exec(DeadTimeCorrection.SingleReadoutDeadTimeCorrection,
+                                    InputWorkspace=ws,
+                                    InputErrorEventsWorkspace=error_ws,
+                                    Paralyzable=template_data.paralyzable,
+                                    DeadTime=template_data.dead_time_value,
+                                    TOFStep=template_data.dead_time_tof_step,
+                                    TOFRange=[tof_min, tof_max],
+                                    OutputWorkspace="corr")
+    corr_ws = api.Rebin(corr_ws, [tof_min, 10, tof_max])
+    return corr_ws
+
+def apply_dead_time_correction(ws, template_data):
+    """
+        Apply dead time correction, and ensure that it is done only once
+        per workspace.
+        :param ws: workspace with raw data to compute correction for
+        :param template_data: reduction parameters
+    """
+    if not "dead_time_applied" in ws.getRun():
+        corr_ws = get_dead_time_correction(ws, template_data)
+        ws = api.Multiply(ws, corr_ws, OutputWorkspace=str(ws))
+        api.AddSampleLog(Workspace=ws, LogName="dead_time_applied", LogText='1', LogType="Number")
+    return ws
+    
+
 class EventReflectivity(object):
     """
         Event based reflectivity calculation.
@@ -238,61 +276,6 @@ class EventReflectivity(object):
                     dq0=dq0, dq_over_q=dq_over_q, sequence_number=sequence_number,
                     sequence_id=sequence_id)
 
-    def get_dead_time_correction(self):
-        """
-            Compute dead time correction to be applied to the reflectivity curve.
-            The method will also try to load the error events from each of the
-            data files to ensure that we properly estimate the dead time correction.
-        """
-        # Scattering workspace
-        tof_min = self._ws_sc.getTofMin()
-        tof_max = self._ws_sc.getTofMax()
-
-        run_number = self._ws_sc.getRun().getProperty("run_number").value
-        error_ws = api.LoadErrorEventsNexus("REF_L_%s" % run_number)
-        corr_ws = mantid_algorithm_exec(DeadTimeCorrection.SingleReadoutDeadTimeCorrection,
-                                        InputWorkspace=self._ws_sc,
-                                        InputErrorEventsWorkspace=error_ws,
-                                        DeadTime=self.dead_time_value,
-                                        TOFStep=self.dead_time_tof_step,
-                                        Paralyzable=self.paralyzable,
-                                        TOFRange=[tof_min, tof_max],
-                                        OutputWorkspace="corr")
-        corr_sc = corr_ws.readY(0)
-        wl_bins = corr_ws.readX(0) / self.constant
-
-        # Direct beam workspace
-        run_number = self._ws_db.getRun().getProperty("run_number").value
-        error_ws = api.LoadErrorEventsNexus("REF_L_%s" % run_number)
-        corr_ws = mantid_algorithm_exec(DeadTimeCorrection.SingleReadoutDeadTimeCorrection,
-                                        InputWorkspace=self._ws_db,
-                                        InputErrorEventsWorkspace=error_ws,
-                                        DeadTime=self.dead_time_value,
-                                        TOFStep=self.dead_time_tof_step,
-                                        Paralyzable=self.paralyzable,
-                                        TOFRange=[tof_min, tof_max],
-                                        OutputWorkspace="corr")
-        corr_db = corr_ws.readY(0)
-
-        # Flip the correction since we are going from TOF to Q
-        dead_time_per_tof = np.flip(corr_sc / corr_db)
-
-        # Compute Q for each TOF bin
-        d_theta = self.gravity_correction(self._ws_sc, wl_bins)
-        q_values_edges = np.flip(4.0 * np.pi / wl_bins * np.sin(self.theta - d_theta))
-        q_values = (q_values_edges[1:] + q_values_edges[:-1]) / 2
-
-        # Interpolate to estimate the dead time correction at the Q values we measured
-        q_middle = (self.q_bins[1:] + self.q_bins[:-1]) / 2
-
-        dead_time_corr = np.interp(q_middle, q_values, dead_time_per_tof)
-
-        # Cleanup
-        api.DeleteWorkspace(corr_ws)
-        api.DeleteWorkspace(error_ws)
-
-        return dead_time_corr
-
     def specular(self, q_summing=False, tof_weighted=False, bck_in_q=False,
                  clean=False, normalize=True):
         """
@@ -306,11 +289,6 @@ class EventReflectivity(object):
             :param clean: if True, and Q summing is True, then leading artifact will be removed
             :param normalize: if True, and tof_weighted is False, normalization will be skipped
         """
-        # First, let's compute the dead-time correction if we need it
-        # We do this first because the specular calls below may modify the input workspace
-        if self.dead_time:
-            dead_time_corr = self.get_dead_time_correction()
-
         if tof_weighted:
             self.specular_weighted(q_summing=q_summing, bck_in_q=bck_in_q)
         else:
@@ -322,17 +300,6 @@ class EventReflectivity(object):
         self.refl = self.refl[trim:]
         self.d_refl = self.d_refl[trim:]
         self.q_bins = self.q_bins[trim:]
-
-        # Dead time correction
-        if self.dead_time:
-            i_max = np.argmax(dead_time_corr[trim:])
-            i_min = np.argmin(dead_time_corr[trim:])
-            print("Dead time correction: [%g -> %g] at [%g -> %g]" % (dead_time_corr[trim:][i_min],
-                                                                      dead_time_corr[trim:][i_max],
-                                                                      self.q_bins[i_min],
-                                                                      self.q_bins[i_max]))
-            self.refl *= dead_time_corr[trim:]
-            self.d_refl *= dead_time_corr[trim:]
 
         # Remove leading artifact from the wavelength coverage
         # Remember that q_bins is longer than refl by 1 because
@@ -522,6 +489,7 @@ class EventReflectivity(object):
 
                 # Gravity correction
                 d_theta = self.gravity_correction(ws, wl_list)
+                event_weights = evt_list.getWeights()
 
                 # Sign will depend on reflect up or down
                 x_distance = _pixel_width * (j - peak_position)
@@ -531,8 +499,9 @@ class EventReflectivity(object):
 
                 if wl_dist is not None and wl_bins is not None:
                     wl_weights = 1.0/np.interp(wl_list, wl_bins, wl_dist, np.inf, np.inf)
-                    hist_weigths = wl_weights * qz / wl_list
-                    _counts, _ = np.histogram(qz, bins=_q_bins, weights=hist_weigths)
+                    hist_weights = wl_weights * qz / wl_list
+                    hist_weights *= event_weights
+                    _counts, _ = np.histogram(qz, bins=_q_bins, weights=hist_weights)
                     _norm, _ = np.histogram(qz, bins=_q_bins)
                     if sum_pixels:
                         refl += _counts
@@ -541,7 +510,7 @@ class EventReflectivity(object):
                         refl[j-peak[0]] += _counts
                         counts[j-peak[0]] += _norm
                 else:
-                    _counts, _ = np.histogram(qz, bins=_q_bins)
+                    _counts, _ = np.histogram(qz, bins=_q_bins, weights=event_weights)
                     if sum_pixels:
                         refl += _counts
                     else:
