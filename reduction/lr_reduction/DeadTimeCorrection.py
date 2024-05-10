@@ -68,7 +68,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
 
         # If we skip pulses, we need to account for them when computing the 
         # instantaneous rate
-        chopper_speed = run_object.getProperty('SpeedRequest1').value[0]
+        chopper_speed = _ws_sc.getRun()['SpeedRequest1'].value[0]
         n_pulses = n_pulses * chopper_speed / 60.0
         rate = counts_ws.readY(0) / n_pulses
 
