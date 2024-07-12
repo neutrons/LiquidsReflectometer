@@ -227,7 +227,7 @@ def reduce_explorer(ws, ws_db, theta_pv=None, center_pixel=145, db_center_pixel=
     from . import peak_finding
 
     if theta_pv is None:
-        if ws.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
+        if 'BL4B:CS:ExpPl:OperatingMode' in ws.getRun() and ws.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
             theta_pv = 'thi'
         else:
             theta_pv = 'ths'

@@ -358,6 +358,8 @@ class EventReflectivity(object):
 
         self.refl = refl
         self.d_refl = d_refl
+        self.norm = norm[db_bins]
+        self.d_norm = d_norm[db_bins]
         return self.q_bins, refl, d_refl
 
     def specular_weighted(self, q_summing=True, bck_in_q=False):
