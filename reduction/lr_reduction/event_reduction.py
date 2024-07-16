@@ -351,6 +351,10 @@ class EventReflectivity(object):
             refl[db_bins] = refl[db_bins]/norm[db_bins]
             d_refl[db_bins] = np.sqrt(d_refl[db_bins]**2 / norm[db_bins]**2 + refl[db_bins]**2 * d_norm[db_bins]**2 / norm[db_bins]**4)
 
+            # Hold on to normalization to be able to diagnose issues later
+            self.norm = norm[db_bins]
+            self.d_norm = d_norm[db_bins]
+
             # Clean up points where we have no direct beam
             zero_db = [not v for v in db_bins]
             refl[zero_db] = 0
@@ -358,8 +362,7 @@ class EventReflectivity(object):
 
         self.refl = refl
         self.d_refl = d_refl
-        self.norm = norm[db_bins]
-        self.d_norm = d_norm[db_bins]
+
         return self.q_bins, refl, d_refl
 
     def specular_weighted(self, q_summing=True, bck_in_q=False):
