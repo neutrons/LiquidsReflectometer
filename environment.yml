@@ -1,10 +1,10 @@
 name: liquid-ref
 channels:
-  - mantid/label/nightly
+  - mantid/label/main
   - conda-forge
   - defaults
 dependencies:
-  - mantid>6.9.20240318
+  - mantid=6.10
   - matplotlib
   - pre-commit
   - pytest
