@@ -26,7 +26,6 @@ tests = [
 [project.urls]
 Homepage = "https://github.com/neutrons/LiquidsReflectometer"
 
-
 [tool.setuptools.packages.find]
 where = ["reduction"]
 exclude = ["tests*", "scripts*", "docs*", "notebooks*"]
