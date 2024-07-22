@@ -82,8 +82,8 @@ def assemble_results(first_run, output_dir, average_overlap=False, is_live=False
             _, _, _, _, _meta = output.read_file(os.path.join(output_dir, item))
             if is_live or not _meta['start_time'] == "live":
                 coll.add_from_file(os.path.join(output_dir, item))
-        elif item == "REFL_live_partial.txt":
-            coll.add_from_file(os.path.join(output_dir, item))
+        #elif item == "REFL_live_partial.txt":
+        #    coll.add_from_file(os.path.join(output_dir, item))
 
     output_file_name = 'REFL_%s_combined_data_auto.txt' % first_run
     if is_live:
