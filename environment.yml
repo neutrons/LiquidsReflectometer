@@ -6,14 +6,17 @@ channels:
 dependencies:
   - mantid=6.10
   - matplotlib
+  - numpy
+  - lmfit
+  - versioningit
   - pre-commit
   - pytest
   - pytest-cov
-  - numpy
-  - lmfit
   - codecov
   - conda-build
   - python-build
   - versioningit
   - boa
   - conda-verify
+  - sphinx
+  - sphinx-rtd-theme
