@@ -1,38 +1,34 @@
 [project]
 name = "lr_reduction"
-authors = [
-	{name = "Mat", email = "m2d@ornl.gov"}
-]
+authors = [{name = "Mat", email = "m2d@ornl.gov"}]
 description = "Reduction scripts for the Liquids Reflectometer. This includes both automated reduction scripts and useful scripts to reprocess data."
-dynamic = ["version"]
+version = "0.1.0"  # initial version, dynamically overriden
 license = {file = "LICENSE"}
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
   "Operating System :: OS Independent",
-  "Programming Language :: Python :: 3"
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Neutron reflectometry"
 ]
 dependencies = [
     "lmfit",
     "numpy",
     "matplotlib",
     "mantid"
-
 ]
 
 [project.optional-dependencies]
 tests = [
-    "mock",
-    "pytest",
-    "pytest-qt",
-    "typing"
+    "pytest"
 ]
 
 [project.urls]
 Homepage = "https://github.com/neutrons/LiquidsReflectometer"
 
-[tool.setuptools]
-py-modules = []
+[tool.setuptools.packages.find]
+where = ["reduction"]
+exclude = ["tests*", "scripts*", "docs*", "notebooks*"]
 
 [tool.ruff]
 line-length = 140
@@ -69,3 +65,4 @@ ignore = [
 ]
 doctests = false
 max-line-length = 130
+
