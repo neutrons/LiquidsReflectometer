@@ -1,16 +1,16 @@
 name: liquid-ref
 channels:
+  - mantid/label/main
   - conda-forge
-  - default
-  - mantid
+  - defaults
 dependencies:
+  - mantid=6.10
+  - matplotlib
   - pre-commit
   - pytest
   - pytest-cov
   - numpy
   - lmfit
-  - python=3.8
-  - mantidworkbench>=6.7.0
   - codecov
   - conda-build
   - python-build

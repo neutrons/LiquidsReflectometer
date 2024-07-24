@@ -21,6 +21,7 @@ class ReductionParameters(object):
         # Signal selection
         self.data_peak_range = [140, 150]
         self.subtract_background = True
+        self.two_backgrounds: bool = False
         self.background_roi = [137, 153, 0, 0]
         self.tof_range = [9600., 21600.]
         self.select_tof_range = True
@@ -64,7 +65,33 @@ class ReductionParameters(object):
         self.incident_medium_list = ['air']
         self.incident_medium_index_selected = 0
 
-    def from_dict(self, data_dict):
+        # Dead time correction
+        self.dead_time:bool = False
+        self.paralyzable:bool = True
+        self.dead_time_value = 4.2
+        self.dead_time_tof_step = 100
+
+    def from_dict(self, data_dict, permissible=True):
+        r"""
+        Update object's attributes with a dictionary with entries of the type  attribute_name: attribute_value.
+
+        Parameters
+        ----------
+        permissible: bool
+            allow keys in data_dict that are not attribute names of ReductionParameters instances. Reading from
+            `data_dict` will result in this instance having new attributes not defined in `__init__()`
+
+        Raises
+        ------
+        ValueError
+            when `permissible=False` and one entry (or more) of the dictionary is not an attribute of this object
+        """
+
+        # check all keys are data_dict are attributes of object `self`
+        attribute_names = list(vars(self))
+        if permissible is False and all(key in attribute_names for key in data_dict) is False:
+            raise ValueError("data_dir contains invalid entries")
+        # update attribute values
         for k, v in data_dict.items():
             setattr(self, k, v)
 
@@ -78,6 +105,7 @@ class ReductionParameters(object):
         _xml += "<to_peak_pixels>%s</to_peak_pixels>\n" % str(self.data_peak_range[1])
         _xml += "<peak_discrete_selection>N/A</peak_discrete_selection>\n"
         _xml += "<background_flag>%s</background_flag>\n" % str(self.subtract_background)
+        _xml += "<two_backgrounds_flag>%s</two_backgrounds_flag>\n" % str(self.two_backgrounds)
         _xml += "<back_roi1_from>%s</back_roi1_from>\n" % str(self.background_roi[0])
         _xml += "<back_roi1_to>%s</back_roi1_to>\n" % str(self.background_roi[1])
         _xml += "<back_roi2_from>%s</back_roi2_from>\n" % str(self.background_roi[2])
@@ -125,6 +153,11 @@ class ReductionParameters(object):
         _xml += "<incident_medium_list>%s</incident_medium_list>\n" % str(self.incident_medium_list[0])
         _xml += "<incident_medium_index_selected>%s</incident_medium_index_selected>\n" % str(self.incident_medium_index_selected)
 
+        # Dead time correction
+        _xml += "<dead_time_correction>%s</dead_time_correction>\n" % str(self.dead_time)
+        _xml += "<dead_time_paralyzable>%s</dead_time_paralyzable>\n" % str(self.paralyzable)
+        _xml += "<dead_time_value>%s</dead_time_value>\n" % str(self.dead_time_value)
+        _xml += "<dead_time_tof_step>%s</dead_time_tof_step>\n" % str(self.dead_time_tof_step)
         _xml += "</RefLData>\n"
 
         return _xml
@@ -162,11 +195,15 @@ class ReductionParameters(object):
         self.norm_x_range = [getIntElement(instrument_dom, "norm_x_min"),
                              getIntElement(instrument_dom, "norm_x_max")]
 
-        #background flag
+        # background flag
         self.subtract_background = getBoolElement(instrument_dom, "background_flag",
                                                  default=self.subtract_background)
 
-        #background from/to pixels
+        # use two backgrounds flag
+        self.two_backgrounds = getBoolElement(instrument_dom, "two_backgrounds_flag",
+                                              default=self.two_backgrounds)
+
+        # background from/to pixels
         self.background_roi = [getIntElement(instrument_dom, "back_roi1_from"),
                                getIntElement(instrument_dom, "back_roi1_to"),
                                getIntElement(instrument_dom, "back_roi2_from"),
@@ -191,6 +228,7 @@ class ReductionParameters(object):
         # Background subtraction option
         self.subtract_norm_background = getBoolElement(instrument_dom, "norm_background_flag",
                                                        default=self.subtract_norm_background)
+
         self.norm_background_roi = [getIntElement(instrument_dom, "norm_from_back_pixels"),
                                     getIntElement(instrument_dom, "norm_to_back_pixels")]
 
@@ -220,6 +258,16 @@ class ReductionParameters(object):
         else:
             self.incident_medium_list = ['H2O']
             self.incident_medium_index_selected = 0
+
+        # Dead time correction
+        self.dead_time = getBoolElement(instrument_dom, "dead_time_correction",
+                                        default=self.dead_time)
+        self.paralyzable = getBoolElement(instrument_dom, "dead_time_paralyzable",
+                                          default=self.paralyzable)
+        self.dead_time_value = getFloatElement(instrument_dom, "dead_time_value",
+                                               default=self.dead_time_value)
+        self.dead_time_tof_step = getFloatElement(instrument_dom, "dead_time_tof_step",
+                                                  default=self.dead_time_tof_step)
 
 
 ###### Utility functions to read XML content ########################
@@ -312,7 +360,7 @@ def from_xml(xml_str):
                 data_set.from_xml_element(item)
                 data_sets.append(data_set)
 
-    if len(data_sets)==0:
+    if len(data_sets) == 0:
         data_sets = [ReductionParameters()]
 
     return data_sets

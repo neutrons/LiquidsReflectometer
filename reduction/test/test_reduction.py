@@ -1,14 +1,20 @@
+# standard imports
+from pathlib import Path
 import os
 
+# third-party imports
 import mantid
 import mantid.simpleapi as mtd_api
 import numpy as np
+
+# lr_reduction imports
+from lr_reduction import event_reduction, template, workflow
+from lr_reduction.utils import amend_config
+
+
 mtd_api.config["default.facility"] = "SNS"
 mtd_api.config["default.instrument"] = "REF_L"
-
 mantid.kernel.config.setLogLevel(3)
-
-from lr_reduction import event_reduction, template, workflow
 
 
 def cleanup_partial_files(output_dir, runs):
@@ -21,19 +27,20 @@ def cleanup_partial_files(output_dir, runs):
             os.remove(reduced_path)
 
 
-def test_info():
+def test_info(nexus_dir):
     """
         Test utility functions to get basic info
     """
-    ws_sc = mtd_api.Load("REF_L_198409")
+    with amend_config(data_dir=nexus_dir):
+        ws_sc = mtd_api.Load("REF_L_198409")
     wl_min, wl_max = event_reduction.get_wl_range(ws_sc)
     assert(wl_min == 13.7)
     assert(wl_max == 16.3)
 
 
-def test_full_reduction():
+def test_full_reduction(nexus_dir):
     """
-        Test the fill reduction chain
+        Test the full reduction chain
     """
     template_path = 'data/template.xml'
     qz_all = []
@@ -41,7 +48,8 @@ def test_full_reduction():
     d_refl_all = []
     first_run = None
     for run_number in range(198409, 198417):
-        ws_sc = mtd_api.Load("REF_L_%s" % run_number)
+        with amend_config(data_dir=nexus_dir):
+            ws_sc = mtd_api.Load("REF_L_%s" % run_number)
         qz_mid, refl, d_refl = template.process_from_template_ws(ws_sc, template_path)
 
         if first_run is None:
@@ -72,7 +80,7 @@ def test_full_reduction():
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
-def test_reduce_workflow():
+def test_reduce_workflow(nexus_dir):
     template_path = 'data/template.xml'
     output_dir = 'data/'
     reduced_path = os.path.join(output_dir, 'REFL_198409_combined_data_auto.txt')
@@ -80,7 +88,8 @@ def test_reduce_workflow():
         os.remove(reduced_path)
 
     for i in range(198409, 198417):
-        ws = mtd_api.Load("REF_L_%s" % i)
+        with amend_config(data_dir=nexus_dir):
+            ws = mtd_api.Load("REF_L_%s" % i)
         workflow.reduce(ws, template_path, output_dir=output_dir,
                         average_overlap=False)
 
@@ -102,7 +111,8 @@ def test_reduce_workflow():
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
-def test_reduce_functional_bck():
+def test_reduce_functional_bck(nexus_dir, template_dir):
+    os.chdir(Path(template_dir).parent)
     template_path = 'data/template_fbck.xml'
     output_dir = 'data/'
     reduced_path = os.path.join(output_dir, 'REFL_198409_combined_data_auto.txt')
@@ -110,10 +120,15 @@ def test_reduce_functional_bck():
         os.remove(reduced_path)
 
     for i in range(198409, 198417):
-        ws = mtd_api.Load("REF_L_%s" % i)
-        workflow.reduce(ws, template_path, output_dir=output_dir,
-                        average_overlap=False,
-                        functional_background=True)
+        with amend_config(data_dir=nexus_dir):
+            ws = mtd_api.Load("REF_L_%s" % i)
+
+        sequence_number = ws.getRun().getProperty("sequence_number").value[0]
+        template_data = template.read_template(template_path, sequence_number)
+        template_data.two_backgrounds = True
+
+        workflow.reduce(ws, template_data, output_dir=output_dir,
+                        average_overlap=False)
 
     reference_path = 'data/reference_fbck.txt'
     if os.path.isfile(reference_path):
@@ -136,7 +151,7 @@ def test_reduce_functional_bck():
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
-def test_reduce_bck_option_mismatch():
+def test_reduce_bck_option_mismatch(nexus_dir):
     """
         Ask for functional background but pass by a background range with
         only a single region. This will revert to simple averaging over the range.
@@ -148,13 +163,14 @@ def test_reduce_bck_option_mismatch():
         os.remove(reduced_path)
 
     for i in range(198409, 198417):
-        ws = mtd_api.Load("REF_L_%s" % i)
+        with amend_config(data_dir=nexus_dir):
+            ws = mtd_api.Load("REF_L_%s" % i)
         sequence_number = ws.getRun().getProperty("sequence_number").value[0]
         template_data = template.read_template(template_path, sequence_number)
         template_data.background_roi = template_data.background_roi[:2]
+        template_data.two_backgrounds = True
         workflow.reduce(ws, template_data, output_dir=output_dir,
-                        average_overlap=False,
-                        functional_background=True)
+                        average_overlap=False)
 
     reference_path = 'data/reference_rq.txt'
     if os.path.isfile(reference_path):
@@ -174,7 +190,7 @@ def test_reduce_bck_option_mismatch():
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
-def test_reduce_workflow_with_overlap_avg():
+def test_reduce_workflow_with_overlap_avg(nexus_dir):
     """
         Test the complete working, but this time we average the point in the
         overlap regions.
@@ -186,7 +202,8 @@ def test_reduce_workflow_with_overlap_avg():
         os.remove(reduced_path)
 
     for i in range(198409, 198417):
-        ws = mtd_api.Load("REF_L_%s" % i)
+        with amend_config(data_dir=nexus_dir):
+            ws = mtd_api.Load("REF_L_%s" % i)
         workflow.reduce(ws, template_path, output_dir=output_dir,
                         average_overlap=True)
 
@@ -208,12 +225,13 @@ def test_reduce_workflow_with_overlap_avg():
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
-def test_quick_reduce():
+def test_quick_reduce(nexus_dir):
     """
         Test the quick reduction workflow
     """
-    ws = mtd_api.Load("REF_L_201284")
-    ws_db = mtd_api.Load("REF_L_201045")
+    with amend_config(data_dir=nexus_dir):
+        ws = mtd_api.Load("REF_L_201284")
+        ws_db = mtd_api.Load("REF_L_201045")
 
     _refl = workflow.reduce_explorer(ws, ws_db, center_pixel=145, db_center_pixel=145)
     reference_path = 'data/reference_r201284_quick.txt'
@@ -224,7 +242,7 @@ def test_quick_reduce():
         assert(np.fabs(np.sum(_data[i] - _refl[i])) < 1e-10)
 
 
-def test_reduce_workflow_201282():
+def test_reduce_workflow_201282(nexus_dir):
     """
         Test to reproduce autoreduction output
     """
@@ -235,7 +253,8 @@ def test_reduce_workflow_201282():
         os.remove(reduced_path)
 
     for i in range(201282, 201289):
-        ws = mtd_api.Load("REF_L_%s" % i)
+        with amend_config(data_dir=nexus_dir):
+            ws = mtd_api.Load("REF_L_%s" % i)
         workflow.reduce(ws, template_path, output_dir=output_dir,
                         average_overlap=False)
 
@@ -254,7 +273,7 @@ def test_reduce_workflow_201282():
     assert(np.sum((_data[3]-_refl[3])/_refl[3])/len(_refl[3]) < 0.01)
 
 
-def test_background_subtraction():
+def test_background_subtraction(nexus_dir):
     """
         Test with background subtraction off for the data and on for the normalization
     """
@@ -265,7 +284,8 @@ def test_background_subtraction():
         os.remove(reduced_path)
 
     for i in range(198388, 198390):
-        ws = mtd_api.Load("REF_L_%s" % i)
+        with amend_config(data_dir=nexus_dir):
+            ws = mtd_api.Load("REF_L_%s" % i)
         workflow.reduce(ws, template_path, output_dir=output_dir,
                         average_overlap=False)
 

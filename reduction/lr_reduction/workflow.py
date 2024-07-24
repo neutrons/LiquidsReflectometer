@@ -11,8 +11,7 @@ from . import event_reduction, output, reduction_template_reader, template
 
 
 def reduce(ws, template_file, output_dir, average_overlap=False,
-           q_summing=False, bck_in_q=False, is_live=False,
-           functional_background=False):
+           q_summing=False, bck_in_q=False, is_live=False):
     """
         Function called by reduce_REFL.py, which lives in /SNS/REF_L/shared/autoreduce
         and is called by the automated reduction workflow.
@@ -31,7 +30,6 @@ def reduce(ws, template_file, output_dir, average_overlap=False,
                                                                         tof_weighted=q_summing,
                                                                         clean=q_summing,
                                                                         bck_in_q=bck_in_q,
-                                                                        functional_background=functional_background,
                                                                         info=True)
 
     # Save partial results
@@ -229,7 +227,7 @@ def reduce_explorer(ws, ws_db, theta_pv=None, center_pixel=145, db_center_pixel=
     from . import peak_finding
 
     if theta_pv is None:
-        if ws.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
+        if 'BL4B:CS:ExpPl:OperatingMode' in ws.getRun() and ws.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
             theta_pv = 'thi'
         else:
             theta_pv = 'ths'
@@ -281,6 +279,7 @@ def reduce_explorer(ws, ws_db, theta_pv=None, center_pixel=145, db_center_pixel=
 
     theta = theta_value * np.pi / 180.
 
+    #TODO: dead time correction should be applied here
     event_refl = event_reduction.EventReflectivity(ws, ws_db,
                                                    signal_peak=peak, signal_bck=peak_bck,
                                                    norm_peak=norm_peak, norm_bck=norm_bck,

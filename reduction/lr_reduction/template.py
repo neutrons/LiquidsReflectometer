@@ -11,8 +11,8 @@ from mantid.kernel import *
 
 from . import event_reduction, reduction_template_reader
 
-TOLERANCE = 0.02
-
+TOLERANCE = 0.07
+OUTPUT_NORM_DATA = False
 
 def read_template(template_file, sequence_number):
     """
@@ -128,8 +128,7 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
 
 
 def process_from_template(run_number, template_path, q_summing=False, normalize=True,
-                          tof_weighted=False, bck_in_q=False, clean=False, info=False,
-                          functional_background=False):
+                          tof_weighted=False, bck_in_q=False, clean=False, info=False):
     """
         The clean option removes leading zeros and the drop when doing q-summing
     """
@@ -138,17 +137,15 @@ def process_from_template(run_number, template_path, q_summing=False, normalize=
         list_of_runs = str(run_number).split(',')
         run_number = '+'.join(list_of_runs)
     # Load data
-    ws_sc = api.Load("REF_L_%s" % run_number)
+    ws_sc = api.Load("REF_L_%s" % run_number, OutputWorkspace="REF_L_%s" % run_number)
     return process_from_template_ws(ws_sc, template_path, q_summing=q_summing,
                                     tof_weighted=tof_weighted, bck_in_q=bck_in_q,
-                                    clean=clean, info=info, normalize=normalize,
-                                    functional_background=functional_background)
+                                    clean=clean, info=info, normalize=normalize)
 
 
 def process_from_template_ws(ws_sc, template_data, q_summing=False,
                              tof_weighted=False, bck_in_q=False, clean=False,
-                             info=False, normalize=True, theta_value=None, ws_db=None,
-                             functional_background=False):
+                             info=False, normalize=True, theta_value=None, ws_db=None):
     # Get the sequence number
     sequence_number = 1
     if ws_sc.getRun().hasProperty("sequence_number"):
@@ -158,10 +155,17 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     if isinstance(template_data, str):
         template_data = read_template(template_data, sequence_number)
 
+    if template_data.dead_time:
+        ws_sc = event_reduction.apply_dead_time_correction(ws_sc, template_data)
+
     # Load normalization run
     normalize = normalize and template_data.apply_normalization
     if ws_db is None and normalize:
         ws_db = api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
+
+    # Apply dead time correction
+    if template_data.dead_time:
+        ws_db = event_reduction.apply_dead_time_correction(ws_db, template_data)
 
     # If we run in theta-theta geometry, we'll need thi
     thi_value = ws_sc.getRun()['thi'].value[0]
@@ -176,7 +180,7 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     if theta_value is not None:
         theta = theta_value * np.pi / 180.
     else:
-        if ws_sc.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
+        if 'BL4B:CS:ExpPl:OperatingMode' in ws_sc.getRun() and ws_sc.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
             theta = thi_value * np.pi / 180.
         else:
             theta = ths_value * np.pi / 180.
@@ -185,6 +189,8 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     peak = template_data.data_peak_range
     if template_data.subtract_background:
         peak_bck = template_data.background_roi
+        if template_data.two_backgrounds is False:
+            peak_bck = peak_bck[0: 2]  # retain only the first background
     else:
         peak_bck = None
 
@@ -202,7 +208,7 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     else:
         norm_low_res = None
 
-    # We are not subtrating background for the direct beam
+    # We are not subtracting background for the direct beam
     if template_data.subtract_norm_background:
         norm_bck = template_data.norm_background_roi
     else:
@@ -221,7 +227,11 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
                                                    q_min=q_min, q_step=q_step, q_max=None,
                                                    tof_range=[tof_min, tof_max],
                                                    theta=np.abs(theta),
-                                                   functional_background=functional_background,
+                                                   dead_time=template_data.dead_time,
+                                                   paralyzable=template_data.paralyzable,
+                                                   dead_time_value=template_data.dead_time_value,
+                                                   dead_time_tof_step=template_data.dead_time_tof_step,
+                                                   functional_background=template_data.two_backgrounds,
                                                    instrument=event_reduction.EventReflectivity.INSTRUMENT_4B)
 
     # R(Q)
@@ -261,4 +271,25 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
         meta_data['bck_in_q'] = bck_in_q
         return qz_mid, refl, d_refl, meta_data
 
+    if normalize and OUTPUT_NORM_DATA:
+        lr = ws_sc.getRun().getProperty('LambdaRequest').value[0]
+        s1h = abs(ws_sc.getRun().getProperty("S1VHeight").value[0])
+        s1w = abs(ws_sc.getRun().getProperty("S1HWidth").value[0])
+        s2h = abs(ws_sc.getRun().getProperty("SiVHeight").value[0])
+        s2w = abs(ws_sc.getRun().getProperty("SiHWidth").value[0])
+
+        # Apply scaling factor
+        _norm = (a_q * event_refl.norm)[template_data.pre_cut:npts-template_data.post_cut]
+        _d_norm = (a_q * event_refl.d_norm)[template_data.pre_cut:npts-template_data.post_cut]
+
+        wl=4.0*np.pi/qz_mid * np.sin(np.abs(theta))
+
+        with open('%s_%s_%2.3g_counts.txt' % (template_data.norm_file, lr, np.abs(ths_value)), 'w') as fd:
+            fd.write('# Theta: %g\n' % np.abs(ths_value))
+            fd.write('# Slit 1 (h x w): %g x %g\n' % (s1h, s1w))
+            fd.write('# Slit 2 (h x w): %g x %g\n' % (s2h, s2w))
+            fd.write('# Q, wavelength, counts/mC, error\n')
+            for i in range(len(_norm)):
+                fd.write('%g %g %g %g\n' % (qz_mid[i], wl[i], _norm[i], _d_norm[i]))
+    
     return qz_mid, refl, d_refl

@@ -1,9 +1,15 @@
+# standard imports
 import os
+
+# third-party imports
 import numpy as np
+
+# lr_reduction imports
 from lr_reduction import time_resolved
+from lr_reduction.utils import amend_config
 
 
-def test_reduce_workflow():
+def test_reduce_workflow(nexus_dir):
     """
         Test the time-resolved reduction that uses a measured reference.
         It is generally used at 30 Hz but it also works at 60 Hz.
@@ -12,11 +18,11 @@ def test_reduce_workflow():
     output_dir = 'data/'
     reduced_path = 'data/reference_rq_avg_overlap.txt'
     ref_data = np.loadtxt(reduced_path).T
-
-    reduced = time_resolved.reduce_30Hz_slices(198413, 198413, ref_data_60Hz=reduced_path,
-                                               template_30Hz=template_path,
-                                               time_interval=300, output_dir=output_dir,
-                                               scan_index=5, create_plot=False)
+    with amend_config(data_dir=nexus_dir):
+        reduced = time_resolved.reduce_30Hz_slices(198413, 198413, ref_data_60Hz=reduced_path,
+                                                   template_30Hz=template_path,
+                                                   time_interval=300, output_dir=output_dir,
+                                                   scan_index=5, create_plot=False)
 
     q_long = len(ref_data[0])
     q_short = len(reduced[0][0])

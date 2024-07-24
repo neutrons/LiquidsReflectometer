@@ -1,0 +1,3 @@
+[submodule "reduction/tests/data/liquidsreflectometer-data"]
+	path = reduction/tests/data/liquidsreflectometer-data
+	url = https://code.ornl.gov/sns-hfir-scse/infrastructure/test-data/liquidsreflectometer-data.git
