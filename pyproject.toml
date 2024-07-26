@@ -2,7 +2,7 @@
 name = "lr_reduction"
 authors = [{name = "Mat", email = "m2d@ornl.gov"}]
 description = "Reduction scripts for the Liquids Reflectometer. This includes both automated reduction scripts and useful scripts to reprocess data."
-version = "0.1.0"  # initial version, dynamically overriden
+version = ["version"]  # initial version, dynamically overriden
 license = {file = "LICENSE"}
 readme = "README.md"
 requires-python = ">=3.8"
@@ -40,6 +40,21 @@ ignore = [
   "F403",  # wild imports
   "F405", "F821"  # unknown names from probably from wild imports
 ]
+
+[tool.versioningit.vcs]
+method = "git"
+default-tag = "0.0.1"
+
+[tool.versioningit.next-version]
+method = "minor"
+
+[tool.versioningit.format]
+distance = "{next_version}.dev{distance}"
+dirty = "{version}+d{build_date:%Y%m%d}"
+distance-dirty = "{next_version}.dev{distance}+d{build_date:%Y%m%d%H%M}"
+
+[tool.versioningit.write]
+file = "src/usansred/_version.py"
 
 [tool.coverage.run]
 branch = true
