@@ -4,16 +4,16 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - lmfit
   - mantid=6.10
   - matplotlib
+# development dependencies
+  - boa
+  - codecov
+  - conda-build
+  - conda-verify
   - pre-commit
   - pytest
   - pytest-cov
-  - numpy
-  - lmfit
-  - codecov
-  - conda-build
   - python-build
   - versioningit
-  - boa
-  - conda-verify
