@@ -18,6 +18,16 @@ dependencies = [
     "mantid"
 ]
 
+# versioningit will generate file _version.py when installing this package, even if installing from sources
+[build-system]
+requires = [
+  "setuptools >= 40.6.0",
+  "wheel",
+  "toml",
+  "versioningit"
+]
+build-backend = "setuptools.build_meta"
+
 [project.optional-dependencies]
 tests = [
     "pytest"
