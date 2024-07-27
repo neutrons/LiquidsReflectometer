@@ -38,6 +38,7 @@ SiYCENrbv = PV('BL4B:Mot:si:Y:Center:Readback')
 C = PV('BL4B:Det:PCharge')
 neutrons = PV('BL4B:Det:Neutrons')
 timer = PV('BL4B:CS:RunControl:RunTimer')
+stop_diag = PV("BL4B:Det:N1:Stop")
 StartRun = PV('BL4B:CS:RunControl:Start')
 StopRun = PV('BL4B:CS:RunControl:Stop')
 PauseRun = PV('BL4B:CS:RunControl:Pause')
@@ -53,7 +54,7 @@ BL4B_MOT_PREFIX = 'BL4B:Mot:'
 MOVE_TIMEOUT = 600
 
 # Set to True only for debugging 
-RETURN_ON_FAIL = True
+RETURN_ON_FAIL = False
 
 
 class LiquidsReflectometer:
@@ -66,20 +67,24 @@ class LiquidsReflectometer:
 
         # Stop any existing runs
         StopRun.put(1)
+        stop_diag.put(1)
         self.acquiring = False
 
         # Virtual values
         self.virtual_counts = 0
         self.virtual_timer = 0
     
-    def initialize_series(self, seq: int = 1, length: int = 1, title='Composite DB'):
+    def initialize_series(self, length: int = 1, title='Composite DB'):
         group_id = PV('BL4B:CS:RunControl:LastRunNumber').get() + 1
-        PV("BL4B:CS:Autoreduce:Sequence:Total").put(length)
+        PV("BL4B:CS:Autoreduce:Sequence:Num").put(1)
         PV("BL4B:CS:Autoreduce:Sequence:Id").put(group_id)
         PV('BL4B:CS:Autoreduce:BaseTitle').put(title)
-        PV('BL4B:CS:ExpPl:DataType').put(5)
+        PV("BL4B:CS:Autoreduce:Sequence:Total").put(length)
+        PV("BL4B:CS:Autoreduce:DataType".put(3)
+        #PV('BL4B:CS:ExpPl:DataType').put(5)
 
-    def increment_sequence(self):
+    def increment_sequence(self, title='C-DB'):
+        PV('BL4B:CS:Autoreduce:BaseTitle').put(title)
         sequence_num = PV("BL4B:CS:Autoreduce:Sequence:Num")
         sequence_num.put(sequence_num.get() + 1)
 
@@ -87,21 +92,31 @@ class LiquidsReflectometer:
         check_list = []
         print("Moving:")
         for i, (motor, position) in enumerate(positions.items()):
+            if 'ths' in motor:
+                continue
             print("  %s -> %s" % (motor, position))
             if motor.startswith("BL4B"):
                 _motor = motor
             else:
                 _motor = BL4B_MOT_PREFIX + motor
             _pv = PV(_motor).put(position)
-            check_list.append(PV(_motor + '.Status'))
+            if 'Wavelength' in _motor:
+                check_list.append(PV('BL4B:Chop:Gbl:Busy:Stat'))
+            elif 'SpeedReq' in _motor:
+                pass
+            else:
+                check_list.append(PV(_motor + ':Status'))
 
         ready = IS_VIRTUAL
         t0 = time.time()
         while not ready:
-            time.sleep(2)
-            print('  ... checking')
+            time.sleep(0.5)
+            #print('  ... checking')
+            ready = True
             for _pv in check_list:
                 # Check motor status
+                status = _pv.get()
+                #print(type(status), status)
                 ready = ready and _pv.get() == 0
             if time.time() - t0 > MOVE_TIMEOUT:
                 print("Timed out ...")
@@ -110,10 +125,11 @@ class LiquidsReflectometer:
         print('Ready')
         return True
     
-    def start_or_resume(self, counts: int = 0, seconds: int = 0):
+    def start_or_resume(self, counts: int = 0, seconds: int = 0, charge: float = 200):
         """
             Start or resume a run depending on the current state.
         """
+        print("Acquire [current state: %s] %g %g %g" % (self.acquiring, counts, seconds, charge))
         if self.acquiring:
             PauseRun.put(0)
         else:
@@ -126,14 +142,22 @@ class LiquidsReflectometer:
             self.virtual_timer = seconds if seconds > 0 else 1000
             return
 
+        time.sleep(1)
         # Wait for the neutron count to reach the desired value
         if counts > 0:
             while neutrons.get() < counts:
-                time.sleep(2)
-        
+                time.sleep(0.1)
         # Wait for the desired number of seconds
         elif seconds > 0:
             time.sleep(seconds)
+        elif charge > 0:
+            _c = C.get()
+            charge_to_reach = charge + _c
+            print("Starting charge: %s -> %s" % (_c, charge_to_reach))
+            while C.get() < charge_to_reach:
+                _c_check = C.get()
+                #print("    q=%s" % _c_check)
+                time.sleep(0.1)
     
     def pause(self):
         """
@@ -147,6 +171,10 @@ class LiquidsReflectometer:
         """
         StopRun.put(1)
         self.acquiring = False
+    
+    def get_deadtime(self):
+        print("Not yet implemented")
+
     
     def get_rate(self):
         """

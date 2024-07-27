@@ -89,6 +89,12 @@ if old_version:
     first_run_of_set=int(output[1])
 else:
     data_type = ws.getRun().getProperty("data_type").value[0]
+    tthd = ws.getRun().getProperty("tthd").value[0]
+    ths = ws.getRun().getProperty("ths").value[0]
+    print("Date type:", data_type)
+    if tthd < 0.0001 and ths < 0.0001:
+        print("This looks like a direct beam: skipping reduction [data_type=3]")
+        data_type = 3
     # Direct beam data
     if data_type == 1:
         from lr_reduction.scaling_factors import workflow as sf_workflow
@@ -101,7 +107,7 @@ else:
                                             paralyzable=True,
                                             wait=True,
                                             slit_tolerance=0.07)
-    else:
+    elif data_type == 0:
         # Scattering data
         print("Average overlap: %s" % avg_overlap)
         print("Constant-Q binning: %s" % const_q)
@@ -109,6 +115,8 @@ else:
         first_run_of_set = workflow.reduce(ws, template_file, output_dir,
                                            average_overlap=avg_overlap,
                                            q_summing=const_q, bck_in_q=False)
+    else:
+        print("Data type: %s [nothing to do]" % data_type)
 
 #-------------------------------------------------------------------------
 # Produce plot for the web monitor
