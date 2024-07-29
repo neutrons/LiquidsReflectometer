@@ -3,6 +3,8 @@
 Reduction scripts for the Liquids Reflectometer. This includes both automated reduction scripts and useful scripts to reprocess data.
 
 [![codecov](https://codecov.io/gh/neutrons/LiquidsReflectometer/graph/badge.svg?token=H90K5RDGK4)](https://codecov.io/gh/neutrons/LiquidsReflectometer)
+[![Documentation Status](https://readthedocs.org/projects/lr-reduction/badge/?version=latest)](https://lr-reduction.readthedocs.io/en/latest/?badge=latest)
+
 
 
 ## Release notes:
