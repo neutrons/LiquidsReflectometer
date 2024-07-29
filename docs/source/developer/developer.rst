@@ -96,7 +96,6 @@ To manually build the documentation:
 .. code-block:: bash
 
    $> conda activate lr_reduction
-   (lr_reduction)$> cd /path/to/lr_reduction/docs
    (lr_reduction)$> make docs
 
 After this, point your browser to
