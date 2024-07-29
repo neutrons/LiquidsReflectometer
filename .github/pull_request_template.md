@@ -13,7 +13,7 @@ Check all that apply:
 - Links to related issues or pull requests:
 
 ## Manual test for the reviewer
-<!-- Instructions for testing here. -->
+(Instructions for testing here)
 
 ## Check list for the reviewer
 - [ ] [release notes](https://github.com/neutrons/LiquidsReflectometer/blob/next/docs/source/releases.rst) updated, or an explanation is provided as to why release notes are unnecessary
