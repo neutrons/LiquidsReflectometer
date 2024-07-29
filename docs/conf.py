@@ -4,7 +4,6 @@ https://www.sphinx-doc.org/en/master/usage/configuration.html
 """
 import os
 import sys
-
 import versioningit
 
 sys.path.insert(0, os.path.abspath("../reduction"))
@@ -34,6 +33,7 @@ extensions = [
 
 autodoc_mock_imports = [
     "mantid",
+    "mantid.api",
     "mantid.kernel",
     "mantid.utils",
     "mantid.utils.logging",

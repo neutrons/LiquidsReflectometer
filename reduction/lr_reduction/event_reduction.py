@@ -80,13 +80,13 @@ def apply_dead_time_correction(ws, template_data):
     
 
 class EventReflectivity(object):
-    """
-        Event based reflectivity calculation.
-        List of items to be taken care of outside this class:
-          - Edge points cropping
-          - Angle offset
-          - Putting runs together in one R(q) curve
-          - Scaling factors
+    r"""
+    Event based reflectivity calculation.
+    List of items to be taken care of outside this class:
+    - Edge points cropping
+    - Angle offset
+    - Putting runs together in one R(q) curve
+    - Scaling factors
     """
     QX_VS_QZ = 0
     KZI_VS_KZF = 1

@@ -15,14 +15,6 @@ lr_reduction.background
    :undoc-members:
    :show-inheritance:
 
-lr_reduction.DeadTimeCorrection
--------------------------------
-
-.. automodule:: lr_reduction.DeadTimeCorrection
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 lr_reduction.event_reduction
 ----------------------------
 
