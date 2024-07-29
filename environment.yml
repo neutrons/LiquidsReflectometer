@@ -1,4 +1,4 @@
-name: liquid-ref
+name: lr_reduction
 channels:
   - mantid/label/main
   - conda-forge
@@ -16,4 +16,6 @@ dependencies:
   - pytest
   - pytest-cov
   - python-build
+  - sphinx
+  - sphinx-rtd-theme
   - versioningit
