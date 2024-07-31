@@ -162,6 +162,9 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     normalize = normalize and template_data.apply_normalization
     if ws_db is None and normalize:
         ws_db = api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
+        attenuator_thickness = event_reduction.get_attenuation_info(ws_db)
+        if attenuator_thickness > 0:
+            ws_db = event_reduction.process_attenuation(ws_db, thickness=attenuator_thickness)
 
     # Apply dead time correction
     if template_data.dead_time:

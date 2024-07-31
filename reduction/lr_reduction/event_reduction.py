@@ -1,6 +1,7 @@
 """
     Event based reduction for the Liquids Reflectometer
 """
+import os
 import time
 
 import mantid.simpleapi as api
@@ -9,6 +10,17 @@ import numpy as np
 from . import background
 from . import DeadTimeCorrection
 from lr_reduction.utils import mantid_algorithm_exec
+
+
+PLANCK_CONSTANT = 6.626e-34  # m^2 kg s^-1
+NEUTRON_MASS = 1.675e-27  # kg
+
+# Attenuators: PV name and thickness in cm
+CD_ATTENUATORS = [['BL4B:Actuator:50MRb', 0.0058],
+                  ['BL4B:Actuator:100MRb', 0.0122],
+                  ['BL4B:Actuator:200MRb', 0.0244], # Uncalibrated
+                  ['BL4B:Actuator:400MRb', 0.0488], # Uncalibrated
+                  ]
 
 
 def get_wl_range(ws):
@@ -39,6 +51,54 @@ def get_q_binning(q_min=0.001, q_max=0.15, q_step=-0.02):
         _step = 1.0+np.abs(q_step)
         n_steps = int(np.log(q_max/q_min)/np.log(_step))
         return q_min * np.asarray([_step**i for i in range(n_steps)])
+
+
+def get_attenuation_info(ws):
+    """
+        Retrieve information about attenuation.
+        Returns the attenuator thickness found in the meta data
+    """
+    run_info = ws.getRun()
+    attenuator_thickness = 0
+
+    # Sum up all the attenuators that are in the path of the beam
+    for att in CD_ATTENUATORS:
+        if att[0] in run_info and run_info[att[0]].value[0] == 0:
+            attenuator_thickness += att[1]
+
+    return attenuator_thickness
+
+
+def process_attenuation(ws, thickness=0):
+    """
+        Correct for absorption by assigning weight to each neutron event
+        :param ws: workspace to correct
+        :param thickness: attenuator thickness in cm
+    """
+    if ws.getInstrument().hasParameter("source-det-distance"):
+        SDD = ws.getInstrument().getNumberParameter("source-det-distance")[0]
+    else:
+        SDD = EventReflectivity.DEFAULT_4B_SOURCE_DET_DISTANCE
+
+    constant = 1e-4 * NEUTRON_MASS * SDD / PLANCK_CONSTANT
+
+    package_dir, _ = os.path.split(__file__)
+    mu_abs = np.loadtxt(os.path.join(package_dir, 'Cd-abs-factors.txt')).T
+    wl_model = mu_abs[0]
+
+    # Turn model into a histogram
+    wl_step = wl_model[-1] - wl_model[-2]
+    final_wl = wl_model[-1] + wl_step
+    wl_model = np.append(wl_model, [final_wl,])
+    mu_model = mu_abs[1]
+    tof_model = constant * wl_model
+    transmission = 1/np.exp(-mu_model * thickness)
+    transmission_ws = api.CreateWorkspace(OutputWorkspace='transmission',
+                                          DataX=tof_model, DataY=transmission,
+                                          UnitX='TOF', NSpec=1)
+
+    ws = api.Multiply(ws, transmission_ws, OutputWorkspace=str(ws))
+    return ws
 
 
 def get_dead_time_correction(ws, template_data):
