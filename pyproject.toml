@@ -40,6 +40,9 @@ Homepage = "https://github.com/neutrons/LiquidsReflectometer"
 where = ["reduction"]
 exclude = ["tests*", "scripts*", "docs*", "notebooks*"]
 
+[tool.setuptools.package-data]
+"*" = ["*.dat"]
+
 [tool.ruff]
 line-length = 140
 select = ["A", "ARG", "E", "W", "F", "I", "PT", "RUF100"]

@@ -38,6 +38,15 @@ def test_info(nexus_dir):
     assert(wl_max == 16.3)
 
 
+def test_attenuation(nexus_dir):
+    """
+        Test attenuation calculation can complete
+    """
+    with amend_config(data_dir=nexus_dir):
+        ws_sc = mtd_api.Load("REF_L_198409")
+    event_reduction.process_attenuation(ws_sc, 0.005)
+
+
 def test_full_reduction(nexus_dir):
     """
         Test the full reduction chain
