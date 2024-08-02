@@ -14,7 +14,7 @@ Notes for major or minor releases. Notes for patch releases are deferred
 
 **Of interest to the Developer:**
 
-- PR #XYZ one-liner description
+- PR #40 documentation to create a patch release
 
 2.1.0
 -----

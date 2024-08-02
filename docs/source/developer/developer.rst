@@ -104,5 +104,38 @@ After this, point your browser to
 
 Creating a stable release
 -------------------------
-- Follow the `Software Maturity Model <https://ornl-neutrons.atlassian.net/wiki/spaces/NDPD/pages/23363585/Software+Maturity+Model>`_ for continous versioning as well as creating release candidates and stable releases.
-- Update the :ref:`Release Notes <release_notes>` with major fixes, updates and additions since last stable release.
+
+- *patch* release, it may be allowed to bypass the creation of a candidate release.
+  Still, we must update branch `qa` first, then create the release tag in branch `main`.
+  For instance, to create patch version "v2.1.1":
+
+.. code-block:: bash
+
+   VERSION="v2.1.2"
+   # update the local repository
+   git fetch --all --prune
+   git fetch --prune --prune-tags origin
+   # update branch qa from next, possibly bringing work done in qa missing in next
+   git switch next
+   git rebase -v origin/next
+   git merge --no-edit origin/qa  # commit message is automatically generated
+   git push origin next  # required to "link" qa to next, for future fast-forward
+   git switch qa
+   git rebase -v origin/qa
+   git merge --ff-only origin/next
+   # update branch main from qa
+   git merge --no-edit origin/main  # commit message is automatically generated
+   git push origin qa  # required to "link" main to qa, for future fast-forward
+   git switch main
+   git rebase -v origin/main
+   git merge --ff-only origin/qa
+   git tag $VERSIONv2.1.1
+   git push origin --tags main
+
+- *minor* or *major* release, we create a stable release *after* we have created a Candidate release.
+  For this customary procedure, follow:
+
+  + the `Software Maturity Model <https://ornl-neutrons.atlassian.net/wiki/spaces/NDPD/pages/23363585/Software+Maturity+Model>`_ for continous versioning as well as creating release candidates and stable releases.
+  + Update the :ref:`Release Notes <release_notes>` with major fixes, updates and additions since last stable release.
+
+
