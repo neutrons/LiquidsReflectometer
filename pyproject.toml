@@ -41,7 +41,7 @@ where = ["reduction"]
 exclude = ["tests*", "scripts*", "docs*", "notebooks*"]
 
 [tool.setuptools.package-data]
-"*" = ["*.dat"]
+"*" = ["*.txt"]
 
 [tool.ruff]
 line-length = 140
