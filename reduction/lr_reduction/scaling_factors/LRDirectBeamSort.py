@@ -261,8 +261,32 @@ class LRDirectBeamSort(PythonAlgorithm):
             wl = g[0].getRun().getProperty("LambdaRequest").value[0]
             chopper_speed = g[0].getRun().getProperty("SpeedRequest1").value[0]
             wl_offset = self.getProperty("WavelengthOffset").value
-            tof_min = source_detector_distance / h * m * (wl + wl_offset * 60.0 / chopper_speed - 1.7 * 60.0 / chopper_speed) * 1e-4
-            tof_max = source_detector_distance / h * m * (wl + wl_offset * 60.0 / chopper_speed + 1.7 * 60.0 / chopper_speed) * 1e-4
+
+            # Determine the range to select in TOF according to how the DAS computed the
+            # chopper settings
+            use_emission_delay = False
+            if "BL4B:Chop:Skf2:ChopperModerator" in g[0].getRun():
+                base_path = g[0].getRun().getProperty("BL4B:Det:TH:DlyDet:BasePath").value[0]
+                moderator_calc = g[0].getRun().getProperty("BL4B:Chop:Skf2:ChopperModerator").value[0]
+                t_mult = g[0].getRun().getProperty("BL4B:Chop:Skf2:ChopperMultiplier").value[0]
+                t_off = g[0].getRun().getProperty("BL4B:Chop:Skf2:ChopperOffset").value[0]
+                use_emission_delay = moderator_calc == 1
+
+            # Calculate the TOF range to select
+            if use_emission_delay:
+                source_detector_distance = base_path
+
+            wl_min = wl + wl_offset * 60.0 / chopper_speed - 1.7 * 60.0 / chopper_speed
+            wl_max = wl + wl_offset * 60.0 / chopper_speed + 1.7 * 60.0 / chopper_speed
+            tof_min = source_detector_distance / h * m * wl_min * 1e-4
+            tof_max = source_detector_distance / h * m * wl_max * 1e-4
+
+            if use_emission_delay:
+                # Empirical additional delay to get rid of the ramp
+                ramp_delay = -450 + 100.0 * (wl - 4)
+                tof_min += t_off + t_mult * wl_min + ramp_delay
+                tof_max += t_off + t_mult * wl_max
+
             tof_range = [tof_min, tof_max]
 
             summary += "      TOF: %s\n\n" % tof_range
