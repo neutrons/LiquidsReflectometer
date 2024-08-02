@@ -129,7 +129,7 @@ Creating a stable release
    git switch main
    git rebase -v origin/main
    git merge --ff-only origin/qa
-   git tag $VERSIONv2.1.1
+   git tag $VERSION
    git push origin --tags main
 
 - *minor* or *major* release, we create a stable release *after* we have created a Candidate release.
