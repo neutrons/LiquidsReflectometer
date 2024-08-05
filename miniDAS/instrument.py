@@ -38,7 +38,8 @@ SiYCENrbv = PV('BL4B:Mot:si:Y:Center:Readback')
 C = PV('BL4B:Det:PCharge')
 neutrons = PV('BL4B:Det:Neutrons')
 timer = PV('BL4B:CS:RunControl:RunTimer')
-stop_diag = PV("BL4B:Det:N1:Stop")
+StartDiag = PV("BL4B:Det:N1:Start")
+StopDiag = PV("BL4B:Det:N1:Stop")
 StartRun = PV('BL4B:CS:RunControl:Start')
 StopRun = PV('BL4B:CS:RunControl:Stop')
 PauseRun = PV('BL4B:CS:RunControl:Pause')
@@ -200,6 +201,18 @@ class LiquidsReflectometer:
         """
         if self.is_virtual:
             return self.virtual_counts / self.virtual_timer
+
+        total_neutrons = neutrons.get()
+        total_time = timer.get()
+        return total_neutrons / total_time
+
+    def measure_rate(time_interval: int = 10):
+        """
+        Measure the rate for a given time.
+        """
+        StartDiag.put(1)
+        time.sleep(time_interval)
+        StopDiag.put(1)
 
         total_neutrons = neutrons.get()
         total_time = timer.get()
