@@ -57,29 +57,15 @@ SCAN_20Hz = [
              [100, {'BL4B:Chop:Gbl:SpeedReq': 20, 'BL4B:Chop:Gbl:WavelengthReq': 6., 'thm':-0.272, 's1:Y:Gap': 5.769, 'si:Y:Gap': 0.577, 's3:Y:Gap': 20, 'ths': 0.0, 'tthd': 0.0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (20,20), 'C-DB 20Hz 6A'],  # A2 DIV 10
              ]
 
-SCAN_TO_RUN = [
-                 [200, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 9.2,  's1:Y:Gap': 0.259, 'si:Y:Gap': 0.166, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (1,1), 'C-DB A1 60Hz-new 9.2A'],
-                 
-                 [200, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 6.7,  's1:Y:Gap': 0.259, 'si:Y:Gap': 0.166, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (1,1), 'C-DB A2 60Hz-new 6.7A'],
-                 [200, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 6.7,  's1:Y:Gap': 0.259, 'si:Y:Gap': 0.166, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (2,2), 'C-DB A2 60Hz-new 6.7A'],
-                 
-                 [200, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 4.2,  's1:Y:Gap': 0.259, 'si:Y:Gap': 0.166, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (2,2), 'C-DB A3 60Hz-new 4.2A'],
-                 [200, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 4.2,  's1:Y:Gap': 0.259, 'si:Y:Gap': 0.166, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (4,4), 'C-DB A3 60Hz-new 4.2A'],
-                 
-                 [200, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 4.2,  's1:Y:Gap': 0.517, 'si:Y:Gap': 0.332, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (2,2), 'C-DB A4 60Hz-new 4.2A'],
-                 [200, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 4.2,  's1:Y:Gap': 0.517, 'si:Y:Gap': 0.332, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (4,4), 'C-DB A4 60Hz-new 4.2A'],
-                 [200, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 4.2,  's1:Y:Gap': 0.517, 'si:Y:Gap': 0.332, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (8,8), 'C-DB A4 60Hz-new 4.2A'],
-                 
-                 [200, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 4.2,  's1:Y:Gap': 1.035, 'si:Y:Gap': 0.663, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (8,8), 'C-DB A5 60Hz-new 4.2A'],
-                 [200, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 4.2,  's1:Y:Gap': 1.035, 'si:Y:Gap': 0.663, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (10,10), 'C-DB A5 60Hz-new 4.2A'],
-                 [200, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 4.2,  's1:Y:Gap': 1.035, 'si:Y:Gap': 0.663, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (15,15), 'C-DB A5 60Hz-new 4.2A'],
-                 
-                 [200, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 4.2,  's1:Y:Gap': 2.069, 'si:Y:Gap': 1.326, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (8,8), 'C-DB A6 60Hz-new 4.2A'],
-                 [200, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 4.2,  's1:Y:Gap': 2.069, 'si:Y:Gap': 1.326, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (10,10), 'C-DB A6 60Hz-new 4.2A'],
-                 [200, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 4.2,  's1:Y:Gap': 2.069, 'si:Y:Gap': 1.326, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (15,15), 'C-DB A6 60Hz-new 4.2A'],
-                 
-                 ]   
 
+
+SCAN_TO_RUN = [
+    [100, {'BL4B:Chop:Gbl:SpeedReq': 30, 'BL4B:Chop:Gbl:WavelengthReq': 6, 's1:Y:Gap': 1.202, 'si:Y:Gap': 0.129, 's3:Y:Gap': 30, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20, 'BL4B:Actuator:50M':1, 'BL4B:Actuator:100M':1, 'BL4B:Actuator:200M':1, 'BL4B:Actuator:400M':1}, (2,2), 'C-DB 30Hz angle 1'],
+    [100, {'BL4B:Chop:Gbl:SpeedReq': 30, 'BL4B:Chop:Gbl:WavelengthReq': 6, 's1:Y:Gap': 3.557, 'si:Y:Gap': 0.381, 's3:Y:Gap': 30, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20, 'BL4B:Actuator:50M':0, 'BL4B:Actuator:100M':1, 'BL4B:Actuator:200M':1, 'BL4B:Actuator:400M':1}, (4,4), 'C-DB 30Hz angle 2'],
+    [100, {'BL4B:Chop:Gbl:SpeedReq': 30, 'BL4B:Chop:Gbl:WavelengthReq': 6, 's1:Y:Gap': 10.528, 'si:Y:Gap': 1.128, 's3:Y:Gap': 30, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20, 'BL4B:Actuator:50M':1, 'BL4B:Actuator:100M':0, 'BL4B:Actuator:200M':1, 'BL4B:Actuator:400M':1}, (4,4), 'C-DB 30Hz angle 3'],
+    [1, {'BL4B:Chop:Gbl:SpeedReq': 30, 'BL4B:Chop:Gbl:WavelengthReq': 6, 's1:Y:Gap': 10.528, 'si:Y:Gap': 1.128, 's3:Y:Gap': 30, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20, 'BL4B:Actuator:50M':1, 'BL4B:Actuator:100M':1, 'BL4B:Actuator:200M':1, 'BL4B:Actuator:400M':1}, (4,4), 'Take Cd out'],
+                        
+               ]
 
 class DBCollector:
     def __init__(self, db_list: list):
