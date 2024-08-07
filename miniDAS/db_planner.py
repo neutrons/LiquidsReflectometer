@@ -7,10 +7,10 @@ import json
 
 import instrument
 
-SCAN = [
-    [100, {'BL4B:Chop:Gbl:SpeedReq': 30, 'BL4B:Chop:Gbl:WavelengthReq': 6, 's1:Y:Gap': 10.528, 'si:Y:Gap': 1.128, 's3:Y:Gap': 30, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20, 
-           'BL4B:Actuator:50M':1, 'BL4B:Actuator:100M':0, 'BL4B:Actuator:200M':1, 'BL4B:Actuator:400M':1}, (4,4), 'C-DB 30Hz angle 3'],
-        ]
+#SCAN = [
+#    [100, {'BL4B:Chop:Gbl:SpeedReq': 30, 'BL4B:Chop:Gbl:WavelengthReq': 6, 's1:Y:Gap': 10.528, 'si:Y:Gap': 1.128, 's3:Y:Gap': 30, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20, 
+#           'BL4B:Actuator:50M':1, 'BL4B:Actuator:100M':0, 'BL4B:Actuator:200M':1, 'BL4B:Actuator:400M':1}, (4,4), 'C-DB 30Hz angle 3'],
+#        ]
 
 ACTUATORS = {'BL4B:Actuator:50M':1, 'BL4B:Actuator:100M':1, 'BL4B:Actuator:200M':1, 'BL4B:Actuator:400M':1}
 
@@ -76,6 +76,9 @@ def process_configuration_list(config: list):
             _pv_name = remove_chars_before_ref(pv, 'BL4B')
             _pv_name = _pv_name.replace(instrument.BL4B_MOT_PREFIX, '')
             pv_dict[_pv_name] = item[j]
+            # Set the angles to zero
+            if 'ths' in _pv_name or 'tthd' in _pv_name:
+                pv_dict[_pv_name] = 0
 
         scan_list.append(pv_dict)
     return scan_list
@@ -90,8 +93,8 @@ def find_best_n_for_slicing(scan: dict, rate_cutoff: int, n_cutoff: int):
     :param n_cutoff: The cutoff for the number of slit slices.
     """
     lr = instrument.LiquidsReflectometer()
-    si_x_gap = scan['si:X:Gap']
-    s1_x_gap = scan['s1:X:Gap']
+    si_x_gap = float(scan['si:X:Gap'])
+    s1_x_gap = float(scan['s1:X:Gap'])
     try_si_x_gap = si_x_gap
     try_s1_x_gap = s1_x_gap
 
@@ -113,7 +116,8 @@ def find_best_n_for_slicing(scan: dict, rate_cutoff: int, n_cutoff: int):
     return best_n
 
 
-def plan_composite_direct_beams(scan_file: str, rate_cutoff=1500, n_cutoff=5, charge:float = 100, title: str = ''):
+def plan_composite_direct_beams(scan_file: str, rate_cutoff=10000, n_cutoff=5,
+                                charge:float = 100, title: str = ''):
     """
     Plans a set of composite direct beams with Cd.
     
@@ -128,7 +132,7 @@ def plan_composite_direct_beams(scan_file: str, rate_cutoff=1500, n_cutoff=5, ch
     final_list = []
 
     lr = instrument.LiquidsReflectometer()
-
+ 
     for i, scan in enumerate(scan_list):
         print("Scan configuration: ", i)
         # Move to position
@@ -137,21 +141,34 @@ def plan_composite_direct_beams(scan_file: str, rate_cutoff=1500, n_cutoff=5, ch
         lr.move(ACTUATORS)
 
         # Measure neutron rate and adjust N
-        best_n = -1
+        best_n = find_best_n_for_slicing(scan, rate_cutoff, n_cutoff)
+
+    # If we didn't find a good N, add Cd
+    tryout = ACTUATORS
+    move_actuators = True
+    if best_n < 0:
+        move_actuators = False
+        try_si_x_gap = scan['si:X:Gap'] / n_cutoff
+        try_s1_x_gap = scan['s1:X:Gap'] / n_cuttof
+
         for tryout in TRYOUT_ORDER:
             lr.move(tryout)
-            best_n = find_best_n_for_slicing(scan, rate_cutoff, n_cutoff)
-            if best_n != -1:
+            rate = lr.measure_rate(5)
+            if rate < rate_cutoff:
+                move_actuators = True
                 break
 
+    if not move_actuators:
+        print("Config {i}: COULD NOT FIND LOW-RATE CONFIGURATION".format(i=i))
         print(r'Config {i}: N={best_n} Cd={tryout}'.format(i=i, best_n=best_n, tryout=tryout))
 
         _pv_list = scan.extend(tryout)
-        label = title + ' i=%d N=%d' % (i, best_n)
         final_list.append([charge, _pv_list, (best_n, best_n), title])
+    else:
+        final_list.append([charge, scan, (best_n, best_n), title])
 
     # Write list as json file
-    with open('composite_direct_beams_%s.json' % label, 'w') as file:
+    with open('composite_direct_beams_%s_%s_n_%s.json' % (title, i, best_n), 'w') as file:
         json.dump(final_list, file)
 
     return final_list
@@ -160,7 +177,9 @@ def plan_composite_direct_beams(scan_file: str, rate_cutoff=1500, n_cutoff=5, ch
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plan composite direct beams with Cd.")
     parser.add_argument("--scan", help="The scan configuration file to use.")
-    parser.add_argument("--title", help="The title of the scan [like the medium].")
+    parser.add_argument("--title", help="The title of the scan [like the medium].", default='')
+    parser.add_argument("--rate_max", help="Max neutrons/sec", default=10000, type=float)
+    parser.add_argument("--n_max", help="Max N", default=5, type=int)
     parser.add_argument("--charge", help="The charge to use for the scan.",
                         default=100, type=float)
     args = parser.parse_args()
@@ -168,6 +187,9 @@ if __name__ == "__main__":
     print("Planning composite direct beams with Cd for the reflectometer.")
     print("Scan configuration file: ", args.scan)
     print("Title: ", args.title)
-    plan_composite_direct_beams(args.scan, args.charge, args.title)
+    plan_composite_direct_beams(
+        args.scan, charge=args.charge, rate_cutoff=args.rate_max,
+        n_cutoff=args.n_max, title=args.title
+    )
     print("Planned composite direct beams with Cd.")
     print("Done.")

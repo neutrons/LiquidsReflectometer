@@ -68,7 +68,7 @@ class LiquidsReflectometer:
 
         # Stop any existing runs
         StopRun.put(1)
-        stop_diag.put(1)
+        StopDiag.put(1)
         self.acquiring = False
 
         # Virtual values
@@ -206,7 +206,7 @@ class LiquidsReflectometer:
         total_time = timer.get()
         return total_neutrons / total_time
 
-    def measure_rate(time_interval: int = 10):
+    def measure_rate(self, time_interval: int = 10):
         """
         Measure the rate for a given time.
         """
