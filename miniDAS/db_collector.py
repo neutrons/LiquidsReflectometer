@@ -25,13 +25,14 @@ SCAN_60Hz = [[100, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq':
              ]
 
 class DBCollector:
-    def __init__(self, db_list: list):
+    def __init__(self, db_list: list, charge: float = None):
         """
         Initializes the collector with a list of direct beam configurations.
         
         :param db_list: List of direct beam configurations.
         """
         self.db_list = db_list
+        self.charge = charge
 
         # Initialize the reflectometer
         self.lr = instrument.LiquidsReflectometer()
@@ -44,15 +45,15 @@ class DBCollector:
 
         for i, db in enumerate(self.db_list):
             print("Direct beam configuration: ", i)
-            si_width = self.db_list[i][1]['si:X:Gap']
-            s1_width = self.db_list[i][1]['s1:X:Gap']
+            si_width = float(self.db_list[i][1]['si:X:Gap'])
+            s1_width = float(self.db_list[i][1]['s1:X:Gap'])
             div = s1_width/si_width
-            run_title = "%s: N=%sx%s Div=%g " % (self.db_list[i][3], self.db_list[i][2][0], self.db_list[i][2][1], div)
+            run_title = str(self.db_list[i][3])
             
             self.lr.increment_sequence(title=run_title)
             try:
                 scanner = CompositeDBScanner(self.db_list[i], grid_size=self.db_list[i][2])
-                scanner.scan_centers()
+                scanner.scan_centers(self.charge)
             except:
                 print("Error occurred while scanning direct beams", i)
                 raise
@@ -83,7 +84,7 @@ class CompositeDBScanner:
         else:
             self.lr = instrument.LiquidsReflectometer()
 
-    def scan_centers(self):
+    def scan_centers(self, charge: float = None):
         """
         Scans the centers of Si and S1.
         """
@@ -103,8 +104,9 @@ class CompositeDBScanner:
         si_positions = [si_start + i * si_width / self.grid_size[0] for i in range(self.grid_size[0])]
         s1_positions = [s1_start + i * s1_width / self.grid_size[1] for i in range(self.grid_size[1])]
 
-        
-        charge_to_acquire_per_point = self.positions[0] / (self.grid_size[0] * self.grid_size[1])
+        if charge is None:
+            charge = self.positions[0]
+        charge_to_acquire_per_point = charge / (self.grid_size[0] * self.grid_size[1])
         print("Charge to acquire per configuration:", charge_to_acquire_per_point)
 
         # Iterate over Si

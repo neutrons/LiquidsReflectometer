@@ -76,11 +76,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Acquire direct beams for the reflectometer.")
     parser.add_argument("--scan", help="The scan configuration file to use.")
     parser.add_argument("--title", help="The title of the scan [like the medium].")
+    parser.add_argument("--charge", help="Amount of charge to collect [replaces default in file].")
     args = parser.parse_args()
 
     if args.scan:
         with open(args.scan, 'r') as f:
             SCAN_TO_RUN = json.load(f)
 
-    collector = db_collector.DBCollector(SCAN_TO_RUN)
+    collector = db_collector.DBCollector(SCAN_TO_RUN, charge=args.charge)
     collector.collect()

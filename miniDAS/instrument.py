@@ -77,7 +77,7 @@ class LiquidsReflectometer:
     
     def initialize_series(self, length: int = 1, title='Composite DB'):
         group_id = PV('BL4B:CS:RunControl:LastRunNumber').get() + 1
-        PV("BL4B:CS:Autoreduce:Sequence:Num").put(1)
+        PV("BL4B:CS:Autoreduce:Sequence:Num").put(0)
         PV("BL4B:CS:Autoreduce:Sequence:Id").put(group_id)
         PV('BL4B:CS:Autoreduce:BaseTitle').put(title)
         PV("BL4B:CS:Autoreduce:Sequence:Total").put(length)
@@ -94,8 +94,6 @@ class LiquidsReflectometer:
         sleep_for_actuators = False
         print("Moving:")
         for i, (motor, position) in enumerate(positions.items()):
-            if 'ths' in motor:
-                continue
             print("  %s -> %s" % (motor, position))
             if motor.startswith("BL4B"):
                 _motor = motor
@@ -198,6 +196,7 @@ class LiquidsReflectometer:
     def get_rate(self):
         """
             Get the current count rate.
+            TODO: check this
         """
         if self.is_virtual:
             return self.virtual_counts / self.virtual_timer
@@ -211,9 +210,14 @@ class LiquidsReflectometer:
         Measure the rate for a given time.
         """
         StartDiag.put(1)
+        t0 = time.time()
         time.sleep(time_interval)
         StopDiag.put(1)
+        total_time = time.time() - t0
 
         total_neutrons = neutrons.get()
-        total_time = timer.get()
-        return total_neutrons / total_time
+        rate = total_neutrons / total_time
+        
+        print("  Rate -> %g / %g = %g" % (total_neutrons, total_time, rate))
+
+        return rate

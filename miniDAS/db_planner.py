@@ -75,7 +75,7 @@ def process_configuration_list(config: list):
             # Remove annotations in front of BL4B in each PV name
             _pv_name = remove_chars_before_ref(pv, 'BL4B')
             _pv_name = _pv_name.replace(instrument.BL4B_MOT_PREFIX, '')
-            pv_dict[_pv_name] = item[j]
+            pv_dict[_pv_name] = float(item[j])
             # Set the angles to zero
             if 'ths' in _pv_name or 'tthd' in _pv_name:
                 pv_dict[_pv_name] = 0
@@ -106,6 +106,7 @@ def find_best_n_for_slicing(scan: dict, rate_cutoff: int, n_cutoff: int):
 
         # Measure neutron rate
         rate = lr.measure_rate(5)
+        print("  Measured: %s; rate=%g" % (n, rate))
 
         # Adjust N if rate is above cutoff
 
@@ -143,34 +144,38 @@ def plan_composite_direct_beams(scan_file: str, rate_cutoff=10000, n_cutoff=5,
         # Measure neutron rate and adjust N
         best_n = find_best_n_for_slicing(scan, rate_cutoff, n_cutoff)
 
-    # If we didn't find a good N, add Cd
-    tryout = ACTUATORS
-    move_actuators = True
-    if best_n < 0:
-        move_actuators = False
-        try_si_x_gap = scan['si:X:Gap'] / n_cutoff
-        try_s1_x_gap = scan['s1:X:Gap'] / n_cuttof
+        # If we didn't find a good N, add Cd
+        tryout = ACTUATORS
+        actuator_pos = -1
+        if best_n < 0:
+            move_actuators = False
+            si_x_gap = float(scan['si:X:Gap']) / n_cutoff
+            s1_x_gap = float(scan['s1:X:Gap']) / n_cutoff
+            lr.move({'si:X:Gap': si_x_gap, 's1:X:Gap': s1_x_gap})
 
-        for tryout in TRYOUT_ORDER:
-            lr.move(tryout)
-            rate = lr.measure_rate(5)
-            if rate < rate_cutoff:
-                move_actuators = True
-                break
+            for j, tryout in enumerate(TRYOUT_ORDER):
+                lr.move(tryout)
+                rate = lr.measure_rate(5)
+                print("  Measured: %s; %s; rate=%g" % (n_cutoff, j, rate))
+                if rate < rate_cutoff:
+                    move_actuators = True
+                    actuator_pos = j
+                    break
 
-    if not move_actuators:
-        print("Config {i}: COULD NOT FIND LOW-RATE CONFIGURATION".format(i=i))
-        print(r'Config {i}: N={best_n} Cd={tryout}'.format(i=i, best_n=best_n, tryout=tryout))
-
-        _pv_list = scan.extend(tryout)
-        final_list.append([charge, _pv_list, (best_n, best_n), title])
-    else:
-        final_list.append([charge, scan, (best_n, best_n), title])
+            if actuator_pos < 0:
+                print("Config {i}: COULD NOT FIND LOW-RATE CONFIGURATION".format(i=i))
+                print(r'Config {i}: N={best_n} Cd={tryout}'.format(i=i, best_n=best_n, tryout=tryout))
+            else:
+                scan.update(tryout)
+                final_list.append([charge, scan, (n_cutoff, n_cutoff), "%s N=%s Cd=%s" % (title, n_cutoff, actuator_pos)])
+        else:
+            final_list.append([charge, scan, (best_n, best_n), "%s N=%s Cd=None" % (title, best_n)])
 
     # Write list as json file
-    with open('composite_direct_beams_%s_%s_n_%s.json' % (title, i, best_n), 'w') as file:
+    with open('composite_direct_beams_%s.json' % title, 'w') as file:
         json.dump(final_list, file)
 
+    print(final_list)
     return final_list
 
 
@@ -193,3 +198,4 @@ if __name__ == "__main__":
     )
     print("Planned composite direct beams with Cd.")
     print("Done.")
+

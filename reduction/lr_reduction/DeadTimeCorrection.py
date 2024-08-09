@@ -44,7 +44,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         ws_event_data = self.getProperty("InputWorkspace").value
         ws_error_events = self.getProperty("InputErrorEventsWorkspace").value
         dead_time = self.getProperty("DeadTime").value
-        tof_step = self.getProperty("TOFStep").value
+        tof_step = 100#self.getProperty("TOFStep").value
         paralyzing = self.getProperty("Paralyzable").value
         output_workspace = self.getPropertyValue("OutputWorkspace")
 
@@ -64,14 +64,11 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
             _errors = Rebin(InputWorkspace=ws_error_events, Params="%s,%s,%s" % (tof_min, tof_step, tof_max), PreserveEvents=False)
             counts_ws += _errors
 
+        # When operating at a given frequency, the proton charge of the blocked
+        # pulsed is zero in the data file, so we don't have to adjust the number of pulses.
         t_series = np.asarray(_ws_sc.getRun()['proton_charge'].value)
-        non_zero = t_series > 0
-        n_pulses = np.count_nonzero(non_zero)
+        n_pulses = np.count_nonzero(t_series)
 
-        # If we skip pulses, we need to account for them when computing the 
-        # instantaneous rate
-        chopper_speed = _ws_sc.getRun()['SpeedRequest1'].value[0]
-        n_pulses = n_pulses * chopper_speed / 60.0
         rate = counts_ws.readY(0) / n_pulses
 
         # Compute the dead time correction for each TOF bin
