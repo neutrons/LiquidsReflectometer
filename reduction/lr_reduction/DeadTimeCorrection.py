@@ -44,7 +44,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         ws_event_data = self.getProperty("InputWorkspace").value
         ws_error_events = self.getProperty("InputErrorEventsWorkspace").value
         dead_time = self.getProperty("DeadTime").value
-        tof_step = 100#self.getProperty("TOFStep").value
+        tof_step = self.getProperty("TOFStep").value
         paralyzing = self.getProperty("Paralyzable").value
         output_workspace = self.getPropertyValue("OutputWorkspace")
 
