@@ -38,7 +38,8 @@ SiYCENrbv = PV('BL4B:Mot:si:Y:Center:Readback')
 C = PV('BL4B:Det:PCharge')
 neutrons = PV('BL4B:Det:Neutrons')
 timer = PV('BL4B:CS:RunControl:RunTimer')
-stop_diag = PV("BL4B:Det:N1:Stop")
+StartDiag = PV("BL4B:Det:N1:Start")
+StopDiag = PV("BL4B:Det:N1:Stop")
 StartRun = PV('BL4B:CS:RunControl:Start')
 StopRun = PV('BL4B:CS:RunControl:Stop')
 PauseRun = PV('BL4B:CS:RunControl:Pause')
@@ -67,7 +68,7 @@ class LiquidsReflectometer:
 
         # Stop any existing runs
         StopRun.put(1)
-        stop_diag.put(1)
+        StopDiag.put(1)
         self.acquiring = False
 
         # Virtual values
@@ -76,11 +77,11 @@ class LiquidsReflectometer:
     
     def initialize_series(self, length: int = 1, title='Composite DB'):
         group_id = PV('BL4B:CS:RunControl:LastRunNumber').get() + 1
-        PV("BL4B:CS:Autoreduce:Sequence:Num").put(1)
+        PV("BL4B:CS:Autoreduce:Sequence:Num").put(0)
         PV("BL4B:CS:Autoreduce:Sequence:Id").put(group_id)
         PV('BL4B:CS:Autoreduce:BaseTitle').put(title)
         PV("BL4B:CS:Autoreduce:Sequence:Total").put(length)
-        PV("BL4B:CS:Autoreduce:DataType".put(3)
+        PV("BL4B:CS:Autoreduce:DataType").put(3)
         #PV('BL4B:CS:ExpPl:DataType').put(5)
 
     def increment_sequence(self, title='C-DB'):
@@ -90,10 +91,9 @@ class LiquidsReflectometer:
 
     def move(self, positions):
         check_list = []
+        sleep_for_actuators = False
         print("Moving:")
         for i, (motor, position) in enumerate(positions.items()):
-            if 'ths' in motor:
-                continue
             print("  %s -> %s" % (motor, position))
             if motor.startswith("BL4B"):
                 _motor = motor
@@ -104,8 +104,14 @@ class LiquidsReflectometer:
                 check_list.append(PV('BL4B:Chop:Gbl:Busy:Stat'))
             elif 'SpeedReq' in _motor:
                 pass
+            elif 'Actuator' in _motor:
+                sleep_for_actuators = True
             else:
                 check_list.append(PV(_motor + ':Status'))
+
+        # Sleep for actuators
+        if sleep_for_actuators:
+            time.sleep(5)
 
         ready = IS_VIRTUAL
         t0 = time.time()
@@ -132,15 +138,22 @@ class LiquidsReflectometer:
         print("Acquire [current state: %s] %g %g %g" % (self.acquiring, counts, seconds, charge))
         if self.acquiring:
             PauseRun.put(0)
+            # Get the current charge
+            _c = C.get()
         else:
             StartRun.put(1)
             self.acquiring = True
+            # Make sure we start at zero charge. Doing this now
+            # prevents a race condition.
+            _c = 0
 
         # If we are virtual, update the virtual counts and timer
         if self.is_virtual:
             self.virtual_counts = counts if counts > 0 else 1000
             self.virtual_timer = seconds if seconds > 0 else 1000
             return
+
+
 
         time.sleep(1)
         # Wait for the neutron count to reach the desired value
@@ -151,10 +164,14 @@ class LiquidsReflectometer:
         elif seconds > 0:
             time.sleep(seconds)
         elif charge > 0:
-            _c = C.get()
             charge_to_reach = charge + _c
             print("Starting charge: %s -> %s" % (_c, charge_to_reach))
             while C.get() < charge_to_reach:
+                #TODO: may want to consider the following to ensure that the DAS is still
+                # running. If it's not we should just exit. It may mean someone clicked StopAll
+                #is_running = PV("BL4B:CS:RunControl:Running").get()
+                #if is_running == 0:
+                #    sys.exit(0)
                 _c_check = C.get()
                 #print("    q=%s" % _c_check)
                 time.sleep(0.1)
@@ -179,6 +196,7 @@ class LiquidsReflectometer:
     def get_rate(self):
         """
             Get the current count rate.
+            TODO: check this
         """
         if self.is_virtual:
             return self.virtual_counts / self.virtual_timer
@@ -186,3 +204,20 @@ class LiquidsReflectometer:
         total_neutrons = neutrons.get()
         total_time = timer.get()
         return total_neutrons / total_time
+
+    def measure_rate(self, time_interval: int = 10):
+        """
+        Measure the rate for a given time.
+        """
+        StartDiag.put(1)
+        t0 = time.time()
+        time.sleep(time_interval)
+        StopDiag.put(1)
+        total_time = time.time() - t0
+
+        total_neutrons = neutrons.get()
+        rate = total_neutrons / total_time
+        
+        print("  Rate -> %g / %g = %g" % (total_neutrons, total_time, rate))
+
+        return rate
