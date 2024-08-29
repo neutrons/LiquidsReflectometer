@@ -9,8 +9,7 @@
             "value": 15.282
         }
     ],
-    // Effective distances used in the reduction, accounting for emission time
-    "sample-det-distance": [
+     "sample-det-distance": [
         {
             "from":"2014-10-10",
             "value": 1.83
@@ -32,14 +31,12 @@
             "value": 304
         }
     ],
-    // Pixel size in mm
     "pixel-width": [
         {
             "from":"2014-10-10",
             "value": 0.7
         }
     ],
-    // xi-reference is the distance in mm between Si and the sample position for xi = 0
     "xi-reference": [
         {
             "from":"2014-10-10",
