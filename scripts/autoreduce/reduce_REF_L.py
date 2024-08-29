@@ -15,9 +15,8 @@ warnings.simplefilter('ignore')
 
 # New reduction code
 sys.path.append("/SNS/REF_L/shared/reduction")
-from lr_reduction import event_reduction
 
-CONDA_ENV = 'mantid-dev'
+CONDA_ENV = 'mantid'
 
 import mantid
 from mantid.simpleapi import *
@@ -92,9 +91,8 @@ else:
     data_type = ws.getRun().getProperty("data_type").value[0]
     tthd = ws.getRun().getProperty("tthd").value[0]
     ths = ws.getRun().getProperty("ths").value[0]
-    print("Date type:", data_type)
-    attenuation = event_reduction.get_attenuation_info(ws)
-    if attenuation > 0:
+    print("Date type:", data_type, tthd, ths)
+    if np.fabs(tthd) < 0.0001 and np.fabs(ths) < 0.0001:
         print("This looks like a direct beam: skipping reduction [data_type=3]")
         data_type = 3
     # Direct beam data

@@ -76,7 +76,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Acquire direct beams for the reflectometer.")
     parser.add_argument("--scan", help="The scan configuration file to use.")
     parser.add_argument("--title", help="The title of the scan [like the medium].")
-    parser.add_argument("--charge", help="Amount of charge to collect [replaces default in file].")
+    parser.add_argument("--charge", help="Amount of charge to collect [replaces default in file].", default=100, type=float)
     args = parser.parse_args()
 
     if args.scan:

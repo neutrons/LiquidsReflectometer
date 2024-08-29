@@ -99,7 +99,7 @@ class CompositeDBScanner:
 
         # The starting center should half a step from the left-most position
         si_start = si_width * (-1 + 1 / self.grid_size[0]) / 2
-        s1_start = si_width * (-1 + 1 / self.grid_size[1]) / 2
+        s1_start = s1_width * (-1 + 1 / self.grid_size[1]) / 2
 
         si_positions = [si_start + i * si_width / self.grid_size[0] for i in range(self.grid_size[0])]
         s1_positions = [s1_start + i * s1_width / self.grid_size[1] for i in range(self.grid_size[1])]
@@ -116,7 +116,7 @@ class CompositeDBScanner:
                 print(f"Si X center: {si}\tS1 X center: {s1}")
                 # Move motors to the specified positions
                 self.lr.move({'si:X:Center': si, 's1:X:Center': s1})
-                time.sleep(0.5)
+                time.sleep(1.)
                 # Acquire neutrons
                 self.lr.start_or_resume(charge=charge_to_acquire_per_point)
 
@@ -125,8 +125,12 @@ class CompositeDBScanner:
 
                 rate = self.lr.get_rate()
                 print(f"    Rate: {rate}")
-                time.sleep(0.5)
+                time.sleep(1.)
         self.lr.stop()
+        
+        # Move centers back to zero
+        self.lr.move({'si:X:Center': 0, 's1:X:Center': 0})
+        
         time.sleep(2)
 
 # Example usage

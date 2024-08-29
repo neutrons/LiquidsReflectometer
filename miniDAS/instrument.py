@@ -116,7 +116,7 @@ class LiquidsReflectometer:
         ready = IS_VIRTUAL
         t0 = time.time()
         while not ready:
-            time.sleep(0.5)
+            time.sleep(0.1)
             #print('  ... checking')
             ready = True
             for _pv in check_list:
