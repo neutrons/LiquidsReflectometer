@@ -3,6 +3,8 @@
 """
 import os
 import time
+import json
+import datetime
 
 import mantid.simpleapi as api
 import numpy as np
@@ -69,14 +71,41 @@ def get_attenuation_info(ws):
     return attenuator_thickness
 
 
+def read_settings(ws):
+    """
+        Read settings file and return values for the given timestamp
+        :param ws: Mantid workspace
+    """
+    settings = dict()
+    package_dir, _ = os.path.split(__file__)
+
+    t = ws.getRun()['start_time'].value.split('T')[0]
+    timestamp = datetime.date.fromisoformat(t)
+
+    with open(os.path.join(package_dir, 'settings.json'), 'r') as fd:
+        data = json.load(fd)
+        for key in data.keys():
+            chosen_value = None
+            delta_time = None
+            for item in data[key]:
+                valid_from = datetime.date.fromisoformat(item['from'])
+                delta = valid_from - timestamp
+                if delta_time is None or (delta.total_seconds() < 0 and delta > delta_time):
+                    delta_time = delta
+                    chosen_value = item['value']
+            settings[key] = chosen_value
+    return settings
+
+
 def process_attenuation(ws, thickness=0):
     """
         Correct for absorption by assigning weight to each neutron event
         :param ws: workspace to correct
         :param thickness: attenuator thickness in cm
     """
-    if ws.getInstrument().hasParameter("source-det-distance"):
-        SDD = ws.getInstrument().getNumberParameter("source-det-distance")[0]
+    settings = read_settings(ws)
+    if "source-det-distance" in settings:
+        SDD = settings["source-det-distance"]
     else:
         SDD = EventReflectivity.DEFAULT_4B_SOURCE_DET_DISTANCE
 
@@ -290,13 +319,15 @@ class EventReflectivity(object):
             Distance from source to sample was 13.63 meters prior to the source
             to detector distance being determined with Bragg edges to be 15.75 m.
         """
-        if self._ws_sc.getInstrument().hasParameter("sample-det-distance"):
-            self.det_distance = self._ws_sc.getInstrument().getNumberParameter("sample-det-distance")[0]
+        settings = read_settings(self._ws_sc)
+
+        if "sample-det-distance" in settings:
+            self.det_distance = settings["sample-det-distance"]
         else:
             self.det_distance = self.DEFAULT_4B_SAMPLE_DET_DISTANCE
 
-        if self._ws_sc.getInstrument().hasParameter("source-det-distance"):
-            self.source_detector_distance = self._ws_sc.getInstrument().getNumberParameter("source-det-distance")[0]
+        if "source-det-distance" in settings:
+            self.source_detector_distance = settings["source-det-distance"]
         else:
             self.source_detector_distance = self.DEFAULT_4B_SOURCE_DET_DISTANCE
 
