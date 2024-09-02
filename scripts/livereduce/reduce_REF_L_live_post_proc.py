@@ -3,12 +3,12 @@ import os
 import json
 
 import mantid.simpleapi as mtd_api
-
+import matplotlib.pyplot as plt
 import numpy as np
 import time
 
 sys.path.append("/SNS/REF_L/shared/reduction")
-from lr_reduction import workflow
+from lr_reduction import workflow, peak_finding
 
 
 DEBUG = True
@@ -23,10 +23,10 @@ def logthis(msg):
 plotting_ready = True
 LIVE_DATA_WS = 'accumulation'
 
-try:
-    from finddata.publish_plot import plot1d, publish_plot
-except ImportError:
-    plotting_ready = False
+#try:
+#    from finddata.publish_plot import plot1d, publish_plot
+#except ImportError:
+#    plotting_ready = False
 
 
 def reduction():
@@ -60,20 +60,74 @@ def reduction():
             return ''
 
         first_run_of_set = workflow.reduce(ws, template_file,
-                                           output_dir, 
+                                           '\tmp', 
                                            average_overlap=False, q_summing=False,
                                            bck_in_q=False, is_live=True)
 
         reduced_data = os.path.join(output_dir, 'REFL_%s_live_estimate.txt' % first_run_of_set)
         r = _data = np.loadtxt(reduced_data).T
         if plotting_ready:
-            plot_div = plot1d(run_number, [[r[0], r[1], r[2], r[3]]], instrument='REF_L', 
-                                      x_title=u"Q (1/A)", x_log=True,
-                                      y_title="Reflectivity", y_log=True, show_dx=False, publish=False)
-            return plot_div
+            fig, ax = plt.subplots(dpi=150, figsize=(5, 4.1))
+            plt.subplots_adjust(left=0.15, right=.95, top=0.95, bottom=0.15)
+
+
+            plt.errorbar(_refl[0], _refl[1], yerr=_refl[2], linewidth=1,
+                         markersize=2, marker='.',  linestyle='')
+            plt.xlabel('Q ($1/\AA$)', fontsize=15)
+            plt.ylabel('Reflectivity', fontsize=15)
+            plt.yscale('log')
+            plt.xscale('log')
+
+            plt.savefig('/SNS/REF_L/shared/livedata.png')
+            logthis("Saved plot")
+            #plot_div = plot1d(run_number, [[r[0], r[1], r[2], r[3]]], instrument='REF_L', 
+            #                          x_title=u"Q (1/A)", x_log=True,
+            #                          y_title="Reflectivity", y_log=True, show_dx=False, publish=False)
+            #return plot_div
     else:
         logthis("No experiment ID\n")
     return ''
+
+
+def find_peaks():
+    ws = mtd_api.mtd[LIVE_DATA_WS]
+    tof, _x, _y = peak_finding.process_data(ws, summed=True, tof_step=200)
+    
+
+    ths_value = ws.getRun()['ths'].value[0]
+    blocked = int(np.fabs(ths_value) * 50)
+    x_max = 261-blocked
+
+    peak_center = np.argmax(_y[:x_max])
+
+    _center, _width, _ = peak_finding.fit_signal_flat_bck(_x, _y,
+                                                          x_min=5, x_max=x_max,
+                                                          center=peak_center,
+                                                          sigma=5)
+    
+    ths_value = ws.getRun()['ths'].value[0]
+
+    _pixel_width = 0.0007
+    det_distance = 1.355
+    dirpix = 261
+
+    x0 = _pixel_width * (_center - dirpix)
+    theta = np.arctan(x0 / det_distance) / 2.0 * 180 / np.pi
+
+    fig, ax = plt.subplots(dpi=150, figsize=(5, 4.1))
+    plt.subplots_adjust(left=0.15, right=.95, top=0.85, bottom=0.15)
+
+    plt.plot(_x, _y)
+
+    title = "ths=%g  pixel=%g  theta=%g" % (ths_value, _center, theta)
+    logthis(title+'\n')
+    logthis("xmax: %g\n" % x_max)
+    plt.title(title)
+    plt.legend(frameon=False)
+    plt.xlabel('Pixel', fontsize=15)
+    plt.ylabel('Counts', fontsize=15)
+
+    plt.savefig('/SNS/REF_L/shared/peaks-live-data.png')
 
 
 def time_resolved():
@@ -97,6 +151,9 @@ def time_resolved():
         logthis("New run: clearing previous data\n")
         if 'previous_data' in mtd_api.mtd:
             mtd_api.DeleteWorkspace("previous_data")
+
+    fig, ax = plt.subplots(dpi=150, figsize=(5, 4.1))
+    plt.subplots_adjust(left=0.15, right=.95, top=0.85, bottom=0.15)
 
     if "previous_data" in mtd_api.mtd and len(time_data)>0:
         _previous_data = mtd_api.mtd["previous_data"]
@@ -122,19 +179,24 @@ def time_resolved():
         if len(time_data) > 1:
             plot_data.append(time_data[-2][1])
             data_names.append('Previous 30s')
+            plt.step(time_data[-2][1][0], time_data[-2][1][1], linewidth=1,
+                     label='Previous 30s')
 
         # Five minutes
         if len(time_data) > 11:
             plot_data.append(time_data[-11][1])
             d_time = int(time.time() - time_data[-11][0])
             data_names.append('5 minutes ago')
+            plt.step(time_data[-11][1][0], time_data[-11][1][1], linewidth=1,
+                     label='5 minutes ago')
 
         # Very first 30s that is only for this run
         if len(time_data) > 1:
             plot_data.append(time_data[1][1])
             first_time = int(time.time() - time_data[1][0])
             data_names.append('First 30s [%gs ago]' % first_time)
-
+            plt.step(time_data[1][1][0], time_data[1][1][1], linewidth=1,
+                     label='First 30s')
     else:
         time_data.append([time.time(), [list(x), list(y)]])
         save_live_data(run_number, time_data)
@@ -142,12 +204,15 @@ def time_resolved():
         data_names.append('Last 30s')
 
     previous_data = mtd_api.CloneWorkspace(ws)
-    logthis("plotting...\n")
-    plot_div = plot1d(run_number, plot_data, data_names=data_names, instrument='REF_L',
-                      x_title="TOF", x_log=True, title=time.ctime(),
-                      y_title="Counts / charge", y_log=True, show_dx=False, publish=False)
-    return plot_div
 
+    plt.title(str(time.ctime()))
+    plt.legend(frameon=False)
+    plt.xlabel('TOF', fontsize=15)
+    plt.ylabel('Counts', fontsize=15)
+
+    plt.savefig('/SNS/REF_L/shared/time-resolved-live-data.png')
+
+    return None
 
 def get_live_data(run_number):
     """
@@ -185,23 +250,18 @@ if LIVE_DATA_WS in mtd_api.mtd:
         logthis("\nRun %s    Events: %g [charge=%s]\n" % (run_number, n_events, charge))
 
         # Call the reduction
-        try:
-            reduction_div = reduction()
-        except:
-            reduction_div = ''
+        #try:
+        #    reduction_div = reduction()
+        #except:
+        #    logthis(sys.exc_info)
+
+        # Find peaks
+        find_peaks()
 
         # Time-resolved plot
-        plot_div = time_resolved()
+        time_resolved()
 
-        if plotting_ready:
-            html_div += reduction_div
-            html_div += ''
-            html_div += plot_div
-            # There's a race condition between the automated reduction and the live reduction
-            # at the end of a run. To avoid this, we always post the live reduction to run 0.
-            RUN_NUMBER = run_number
-            publish_plot('REF_L', RUN_NUMBER, files={'file': html_div},
-                         config="/SNS/REF_L/shared/.livedata.conf")
+
     except:
         logthis("failure: %s" % sys.exc_info()[1])
 

@@ -35,14 +35,14 @@ class ReductionInterface(QTabWidget):
         # 60Hz time-resolved
         tab_id += 1
         self.time_60Hz_tab = Dynamic60Hz()
-        self.addTab(self.time_60Hz_tab, "Time-resolved 60Hz")
-        self.setTabText(tab_id, "Time-resolved 60Hz")
+        self.addTab(self.time_60Hz_tab, "Time-resolved")
+        self.setTabText(tab_id, "Time-resolved")
 
         # 30 Hz time-resolved
         tab_id += 1
         self.time_30Hz_tab = Dynamic30Hz()
-        self.addTab(self.time_30Hz_tab, "Time-resolved 30Hz")
-        self.setTabText(tab_id, "Time-resolved 30Hz")
+        self.addTab(self.time_30Hz_tab, "Time-resolved (D2O ref)")
+        self.setTabText(tab_id, "Time-resolved (D2O ref)")
 
         # Off-specular data
         tab_id += 1

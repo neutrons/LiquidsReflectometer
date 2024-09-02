@@ -1,0 +1,52 @@
+{
+    "source-det-distance": [
+        {
+            "from": "2014-10-10",
+            "value": 15.75
+        },
+        {
+            "from": "2024-08-26",
+            "value": 15.282
+        }
+    ],
+     "sample-det-distance": [
+        {
+            "from":"2014-10-10",
+            "value": 1.83
+        },
+        {
+            "from": "2024-08-26",
+            "value": 1.362
+        }
+    ],
+    "number-of-x-pixels": [
+        {
+            "from":"2014-10-10",
+            "value": 256
+        }
+    ],
+    "number-of-y-pixels": [
+        {
+            "from":"2014-10-10",
+            "value": 304
+        }
+    ],
+    "pixel-width": [
+        {
+            "from":"2014-10-10",
+            "value": 0.7
+        }
+    ],
+    "xi-reference": [
+        {
+            "from":"2014-10-10",
+            "value": 445
+        }
+    ],
+    "s1-sample-distance": [
+        {
+            "from":"2014-10-10",
+            "value": 1.485
+        }
+    ]
+}

@@ -15,9 +15,8 @@ warnings.simplefilter('ignore')
 
 # New reduction code
 sys.path.append("/SNS/REF_L/shared/reduction")
-from lr_reduction import event_reduction
 
-CONDA_ENV = 'mantid-dev'
+CONDA_ENV = 'mantid'
 
 import mantid
 from mantid.simpleapi import *
@@ -40,6 +39,14 @@ if len(sys.argv) > 5:
 const_q = False
 if len(sys.argv) > 6:
     const_q = sys.argv[6].lower() == 'true'
+
+fit_first_peak = True
+if len(sys.argv) > 7:
+    fit_first_peak = sys.argv[7].lower() == 'true'
+
+theta_offset = None
+if len(sys.argv) > 8:
+    theta_offset = float(sys.argv[8])
 
 event_file = os.path.split(event_file_path)[-1]
 # The legacy format is REF_L_xyz_event.nxs
@@ -92,9 +99,8 @@ else:
     data_type = ws.getRun().getProperty("data_type").value[0]
     tthd = ws.getRun().getProperty("tthd").value[0]
     ths = ws.getRun().getProperty("ths").value[0]
-    print("Date type:", data_type)
-    attenuation = event_reduction.get_attenuation_info(ws)
-    if attenuation > 0:
+    print("Date type:", data_type, tthd, ths)
+    if np.fabs(tthd) < 0.0001 and np.fabs(ths) < 0.0001:
         print("This looks like a direct beam: skipping reduction [data_type=3]")
         data_type = 3
     # Direct beam data
@@ -114,7 +120,12 @@ else:
         print("Average overlap: %s" % avg_overlap)
         print("Constant-Q binning: %s" % const_q)
         from lr_reduction import workflow
-        first_run_of_set = workflow.reduce(ws, template_file, output_dir,
+
+        #first_run_of_set = workflow.reduce(ws, template_file, output_dir,
+        first_run_of_set = workflow.reduce_fixed_two_theta(ws, template_file, output_dir,
+                                           offset_from_first=fit_first_peak,
+                                           fixed_offset=theta_offset,
+                                           peak_width=0,
                                            average_overlap=avg_overlap,
                                            q_summing=const_q, bck_in_q=False)
     else:

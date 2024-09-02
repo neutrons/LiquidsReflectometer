@@ -97,9 +97,13 @@ class CompositeDBScanner:
         s1_width = self.positions[1]['s1:X:Gap']
         self.lr.move({'si:X:Gap': si_width/self.grid_size[0], 's1:X:Gap': s1_width/self.grid_size[1]})
 
+	# Set scale multiplier
+        multiplier = self.grid_size[0] * self.grid_size[1]
+        instrument.ScaleMultiplier.put(multiplier)
+
         # The starting center should half a step from the left-most position
         si_start = si_width * (-1 + 1 / self.grid_size[0]) / 2
-        s1_start = si_width * (-1 + 1 / self.grid_size[1]) / 2
+        s1_start = s1_width * (-1 + 1 / self.grid_size[1]) / 2
 
         si_positions = [si_start + i * si_width / self.grid_size[0] for i in range(self.grid_size[0])]
         s1_positions = [s1_start + i * s1_width / self.grid_size[1] for i in range(self.grid_size[1])]
@@ -110,13 +114,16 @@ class CompositeDBScanner:
         print("Charge to acquire per configuration:", charge_to_acquire_per_point)
 
         # Iterate over Si
+        counter = 0
         for si in si_positions:
             # Iterate over S1
             for s1 in s1_positions:
-                print(f"Si X center: {si}\tS1 X center: {s1}")
+                counter += 1
+                t0 = time.time()
+                print(f"{counter} -> Si X center: {si}\tS1 X center: {s1}")
                 # Move motors to the specified positions
                 self.lr.move({'si:X:Center': si, 's1:X:Center': s1})
-                time.sleep(0.5)
+                time.sleep(1.)
                 # Acquire neutrons
                 self.lr.start_or_resume(charge=charge_to_acquire_per_point)
 
@@ -124,9 +131,15 @@ class CompositeDBScanner:
                 self.lr.pause()
 
                 rate = self.lr.get_rate()
-                print(f"    Rate: {rate}")
-                time.sleep(0.5)
+                elapsed = time.time() - t0
+                print(f"    Rate: {rate}  Elapsed: {elapsed} sec\n\n")
+
+                time.sleep(1.)
         self.lr.stop()
+        
+        # Move centers back to zero
+        self.lr.move({'si:X:Center': 0, 's1:X:Center': 0})
+        instrument.ScaleMultiplier.put(multiplier)
         time.sleep(2)
 
 # Example usage
