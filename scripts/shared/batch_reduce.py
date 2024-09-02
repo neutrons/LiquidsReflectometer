@@ -39,10 +39,20 @@ const_q = False
 if len(sys.argv) > 7:
     const_q = sys.argv[7]
 
+fit_first_peak = False
+if len(sys.argv) > 8:
+    fit_first_peak = sys.argv[8]
+
+theta_offset = None
+if len(sys.argv) > 9:
+    theta_offset = sys.argv[9]
+
 print("Using new version: %s" % new_version)
 print("Using template: %s" % template_file)
 print("  Average overlap: %s" % avg_overlap)
 print("  Constant-Q binning: %s" % const_q)
+print("  Fit first peak: %s" % fit_first_peak)
+print("  Const theta offset: %s" % theta_offset)
 
 t_0 = time.time()
 for r in range(first_run, last_run+1):
@@ -53,12 +63,17 @@ for r in range(first_run, last_run+1):
     else:
         print("Processing %s" % _data_file_path)
         if new_version:
-            cmd = "%s /SNS/REF_L/shared/autoreduce/reduce_REF_L.py %s %s new %s %s %s" % (PYTHON_CMD,
-                                                                                         _data_file_path,
-                                                                                         _output_dir,
-                                                                                         template_file,
-                                                                                         avg_overlap,
-                                                                                         const_q)
+            cmd = "%s /SNS/REF_L/shared/autoreduce/reduce_REF_L.py %s %s new %s %s %s %s" % (
+                PYTHON_CMD,
+                _data_file_path,
+                _output_dir,
+                template_file,
+                avg_overlap,
+                const_q,
+                fit_first_peak
+                )
+            if theta_offset is not None:
+                cmd += " %s" % theta_offset
         else:
             if template_file is not None:
                 cmd = "%s /SNS/REF_L/shared/autoreduce/reduce_REF_L.py %s %s old %s" % (PYTHON_CMD,

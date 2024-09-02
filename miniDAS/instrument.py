@@ -49,6 +49,7 @@ Name = PV('BL4B:CS:Autoreduce:BaseTitle')
 Lcen = PV('BL4B:Det:TH:BL:Lambda')
 Lset = PV('BL4B:Chop:Gbl:WavelengthReq')
 ChopStat = PV('BL4B:Chop:Gbl:Busy:Stat')
+ScaleMultiplier = PV('BL4B:CS:Autoreduce:ScaleMultiplier')
 
 BL4B_MOT_PREFIX = 'BL4B:Mot:'
 
@@ -155,7 +156,7 @@ class LiquidsReflectometer:
 
 
 
-        time.sleep(1)
+        time.sleep(2)
         # Wait for the neutron count to reach the desired value
         if counts > 0:
             while neutrons.get() < counts:

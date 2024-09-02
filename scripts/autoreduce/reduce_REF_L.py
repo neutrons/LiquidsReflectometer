@@ -40,6 +40,14 @@ const_q = False
 if len(sys.argv) > 6:
     const_q = sys.argv[6].lower() == 'true'
 
+fit_first_peak = True
+if len(sys.argv) > 7:
+    fit_first_peak = sys.argv[7].lower() == 'true'
+
+theta_offset = None
+if len(sys.argv) > 8:
+    theta_offset = float(sys.argv[8])
+
 event_file = os.path.split(event_file_path)[-1]
 # The legacy format is REF_L_xyz_event.nxs
 # The new format is REF_L_xyz.nxs.h5
@@ -112,7 +120,12 @@ else:
         print("Average overlap: %s" % avg_overlap)
         print("Constant-Q binning: %s" % const_q)
         from lr_reduction import workflow
-        first_run_of_set = workflow.reduce(ws, template_file, output_dir,
+
+        #first_run_of_set = workflow.reduce(ws, template_file, output_dir,
+        first_run_of_set = workflow.reduce_fixed_two_theta(ws, template_file, output_dir,
+                                           offset_from_first=fit_first_peak,
+                                           fixed_offset=theta_offset,
+                                           peak_width=0,
                                            average_overlap=avg_overlap,
                                            q_summing=const_q, bck_in_q=False)
     else:

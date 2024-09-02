@@ -23,7 +23,7 @@ class Reduction(QWidget):
         layout.addWidget(self.choose_template, 1, 1)
 
         self.template_path = QLabel(self)
-        layout.addWidget(self.template_path, 1, 2)
+        layout.addWidget(self.template_path, 1, 3)
 
         # First run to process
         self.first_run_number_ledit = QtWidgets.QLineEdit()
@@ -31,7 +31,7 @@ class Reduction(QWidget):
         layout.addWidget(self.first_run_number_ledit, 3, 1)
         self.first_run_number_label = QLabel(self)
         self.first_run_number_label.setText("First run to process")
-        layout.addWidget(self.first_run_number_label, 3, 2)
+        layout.addWidget(self.first_run_number_label, 3, 3)
 
         # Last run to process
         self.last_run_number_ledit = QtWidgets.QLineEdit()
@@ -39,7 +39,7 @@ class Reduction(QWidget):
         layout.addWidget(self.last_run_number_ledit, 4, 1)
         self.last_run_number_label = QLabel(self)
         self.last_run_number_label.setText("Last run to process")
-        layout.addWidget(self.last_run_number_label, 4, 2)
+        layout.addWidget(self.last_run_number_label, 4, 3)
 
         # Select version
         self.select_version_label = QLabel(self)
@@ -48,7 +48,7 @@ class Reduction(QWidget):
         layout.addWidget(self.select_version_label, 5, 1)
         self.select_version_check = QtWidgets.QCheckBox()
         self.select_version_check.setChecked(False)
-        layout.addWidget(self.select_version_check, 5, 2)
+        layout.addWidget(self.select_version_check, 5, 3)
 
         # Select const-q binning
         self.const_q_label = QLabel(self)
@@ -57,7 +57,7 @@ class Reduction(QWidget):
         layout.addWidget(self.const_q_label, 6, 1)
         self.const_q_check = QtWidgets.QCheckBox()
         self.const_q_check.setChecked(False)
-        layout.addWidget(self.const_q_check, 6, 2)
+        layout.addWidget(self.const_q_check, 6, 3)
 
         # Select how to treat overlap
         self.average_overlapp_label = QLabel(self)
@@ -66,11 +66,33 @@ class Reduction(QWidget):
         layout.addWidget(self.average_overlapp_label, 7, 1)
         self.average_overlapp_check = QtWidgets.QCheckBox()
         self.average_overlapp_check.setChecked(True)
-        layout.addWidget(self.average_overlapp_check, 7, 2)
+        layout.addWidget(self.average_overlapp_check, 7, 3)
+
+        # Fit first peak to compute offset
+        self.first_peak_label = QLabel(self)
+        self.first_peak_label.setText("Offset from first peak")
+        self.first_peak_label.setAlignment(QtCore.Qt.AlignRight)
+        layout.addWidget(self.first_peak_label, 8, 1)
+        self.first_peak_check = QtWidgets.QCheckBox()
+        self.first_peak_check.setChecked(True)
+        layout.addWidget(self.first_peak_check, 8, 3)
+
+        # Theta offset
+        self.fix_offset_label = QLabel(self)
+        self.fix_offset_label.setText("Use fixed theta offset")
+        self.fix_offset_label.setAlignment(QtCore.Qt.AlignRight)
+        layout.addWidget(self.fix_offset_label, 9, 1)
+        self.fix_offset_check = QtWidgets.QCheckBox()
+        self.fix_offset_check.setChecked(False)
+        layout.addWidget(self.fix_offset_check, 9, 2)
+
+        self.fix_offset_ledit = QtWidgets.QLineEdit()
+        self.fix_offset_ledit.setValidator(QtGui.QDoubleValidator())
+        layout.addWidget(self.fix_offset_ledit, 9, 3)
 
         # Process button
         self.perform_reduction = QPushButton('Reduce')
-        layout.addWidget(self.perform_reduction, 8, 1)
+        layout.addWidget(self.perform_reduction, 10, 1)
 
         # connections
         self.choose_template.clicked.connect(self.template_selection)
@@ -87,7 +109,12 @@ class Reduction(QWidget):
         self.average_overlapp_label.setEnabled(not use_old)
         self.const_q_check.setEnabled(not use_old)
         self.const_q_label.setEnabled(not use_old)
-
+        self.fix_offset_check.setEnabled(not use_old)
+        self.fix_offset_label.setEnabled(not use_old)
+        self.fix_offset_ledit.setEnabled(not use_old)
+        self.first_peak_label.setEnabled(not use_old)
+        self.first_peak_check.setEnabled(not use_old)
+        
     def template_selection(self):
         _template_file, _ = QFileDialog.getOpenFileName(self, 'Open file',
                                                         self.template_path.text(),
@@ -114,6 +141,14 @@ class Reduction(QWidget):
         _const_q = self.settings.value("reduction_const_q", "false")
         self.const_q_check.setChecked(_const_q=='true')
 
+        _first_peak = self.settings.value("fit_first_peak", "false")
+        self.first_peak_check.setChecked(_first_peak=='true')
+        _fix_offset = self.settings.value("reduction_fix_use_offset", "false")
+        self.fix_offset_check.setChecked(_fix_offset=='true')
+        _fix_offset = self.settings.value("reduction_fix_offset", "0")
+        self.fix_offset_ledit.setText(_fix_offset)
+
+
     def save_settings(self):
         self.settings.setValue('reduction_template', self.template_path.text())
         self.settings.setValue('reduction_first_run_number', self.first_run_number_ledit.text())
@@ -121,6 +156,10 @@ class Reduction(QWidget):
         self.settings.setValue('reduction_use_old', self.select_version_check.isChecked())
         self.settings.setValue('reduction_avg_overlap', self.average_overlapp_check.isChecked())
         self.settings.setValue('reduction_const_q', self.const_q_check.isChecked())
+
+        self.settings.setValue('fit_first_peak', self.first_peak_check.isChecked())
+        self.settings.setValue('reduction_fix_use_offset', self.fix_offset_check.isChecked())
+        self.settings.setValue('reduction_fix_offset', self.fix_offset_ledit.text())
 
     def check_inputs(self):
         error = None
@@ -167,6 +206,9 @@ class Reduction(QWidget):
             options.append(self.template_path.text())
             options.append(str(self.average_overlapp_check.isChecked()))
             options.append(str(self.const_q_check.isChecked()))
+            options.append(str(self.first_peak_check.isChecked()))
+            if self.fix_offset_check.isChecked():
+                options.append(str(self.fix_offset_ledit.text()))
         else:
             options.append('old')
             options.append(self.template_path.text())

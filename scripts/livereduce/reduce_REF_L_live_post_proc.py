@@ -8,7 +8,7 @@ import numpy as np
 import time
 
 sys.path.append("/SNS/REF_L/shared/reduction")
-from lr_reduction import workflow
+from lr_reduction import workflow, peak_finding
 
 
 DEBUG = True
@@ -87,6 +87,47 @@ def reduction():
     else:
         logthis("No experiment ID\n")
     return ''
+
+
+def find_peaks():
+    ws = mtd_api.mtd[LIVE_DATA_WS]
+    tof, _x, _y = peak_finding.process_data(ws, summed=True, tof_step=200)
+    
+
+    ths_value = ws.getRun()['ths'].value[0]
+    blocked = int(np.fabs(ths_value) * 50)
+    x_max = 261-blocked
+
+    peak_center = np.argmax(_y[:x_max])
+
+    _center, _width, _ = peak_finding.fit_signal_flat_bck(_x, _y,
+                                                          x_min=5, x_max=x_max,
+                                                          center=peak_center,
+                                                          sigma=5)
+    
+    ths_value = ws.getRun()['ths'].value[0]
+
+    _pixel_width = 0.0007
+    det_distance = 1.355
+    dirpix = 261
+
+    x0 = _pixel_width * (_center - dirpix)
+    theta = np.arctan(x0 / det_distance) / 2.0 * 180 / np.pi
+
+    fig, ax = plt.subplots(dpi=150, figsize=(5, 4.1))
+    plt.subplots_adjust(left=0.15, right=.95, top=0.85, bottom=0.15)
+
+    plt.plot(_x, _y)
+
+    title = "ths=%g  pixel=%g  theta=%g" % (ths_value, _center, theta)
+    logthis(title+'\n')
+    logthis("xmax: %g\n" % x_max)
+    plt.title(title)
+    plt.legend(frameon=False)
+    plt.xlabel('Pixel', fontsize=15)
+    plt.ylabel('Counts', fontsize=15)
+
+    plt.savefig('/SNS/REF_L/shared/peaks-live-data.png')
 
 
 def time_resolved():
@@ -214,8 +255,12 @@ if LIVE_DATA_WS in mtd_api.mtd:
         #except:
         #    logthis(sys.exc_info)
 
+        # Find peaks
+        find_peaks()
+
         # Time-resolved plot
         time_resolved()
+
 
     except:
         logthis("failure: %s" % sys.exc_info()[1])
