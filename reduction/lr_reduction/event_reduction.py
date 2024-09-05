@@ -193,7 +193,7 @@ class EventReflectivity(object):
                  tof_range=None, theta=1.0, instrument=None,
                  functional_background=False, dead_time=False,
                  paralyzable=True, dead_time_value=4.2,
-                 dead_time_tof_step=100):
+                 dead_time_tof_step=100, use_emission_time=True):
         """
             Pixel ranges include the min and max pixels.
 
@@ -215,6 +215,7 @@ class EventReflectivity(object):
             :param paralyzable: if True, the dead time calculation will use the paralyzable approach
             :param dead_time_value: value of the dead time in microsecond
             :param dead_time_tof_step: TOF bin size in microsecond
+            :param use_emmission_time: if True, the emission time delay will be computed
         """
         if instrument in [self.INSTRUMENT_4A, self.INSTRUMENT_4B]:
             self.instrument = instrument
@@ -239,6 +240,7 @@ class EventReflectivity(object):
         self.paralyzable = paralyzable
         self.dead_time_value = dead_time_value
         self.dead_time_tof_step = dead_time_tof_step
+        self.use_emission_time = use_emission_time
 
         # Turn on functional background estimation
         self.use_functional_bck = functional_background
@@ -265,11 +267,12 @@ class EventReflectivity(object):
         """
             Extract meta data from the data file.
         """
-        # Set up basic data
-        self.n_x = int(self._ws_sc.getInstrument().getNumberParameter("number-of-x-pixels")[0])
-        self.n_y = int(self._ws_sc.getInstrument().getNumberParameter("number-of-y-pixels")[0])
+        # Get instrument parameters
+        settings = read_settings(self._ws_sc)
 
-        self.pixel_width = float(self._ws_sc.getInstrument().getNumberParameter("pixel-width")[0]) / 1000.0
+        self.n_x = settings["number-of-x-pixels"]
+        self.n_y = settings["number-of-y-pixels"]
+        self.pixel_width = settings["pixel-width"] / 1000.0
 
         if self.instrument == self.INSTRUMENT_4B:
             self.extract_meta_data_4B()
@@ -326,17 +329,25 @@ class EventReflectivity(object):
         else:
             self.det_distance = self.DEFAULT_4B_SAMPLE_DET_DISTANCE
 
-        if "source-det-distance" in settings:
+        if self.use_emission_time:
+            # Read the true distance from the data file. We will compute an emission time delay later
+            self.source_detector_distance = self._ws_sc.getRun().getProperty("BL4B:Det:TH:DlyDet:BasePath").value[0]
+        elif "source-det-distance" in settings:
+            # Use an effective source-detector distance that account for the average emission time delay
             self.source_detector_distance = settings["source-det-distance"]
         else:
+            # Use the nominal/default source-detector distance
             self.source_detector_distance = self.DEFAULT_4B_SOURCE_DET_DISTANCE
 
     def __repr__(self):
-        output = "sample-det: %s\n" % self.det_distance
-        output += "pixel: %s\n" % self.pixel_width
-        output += "WL: %s %s\n" % (self.wl_range[0], self.wl_range[1])
-        output += "Q: %s %s\n" % (self.q_min, self.q_max)
-        output += "Theta = %s" % self.theta
+        output = "Reduction settings:\n"
+        output += "    sample-det: %s\n" % self.det_distance
+        output += "    source-det: %s\n" % self.source_detector_distance
+        output += "    pixel: %s\n" % self.pixel_width
+        output += "    WL: %s %s\n" % (self.wl_range[0], self.wl_range[1])
+        output += "    Q: %s %s\n" % (self.q_min, self.q_max)
+        output += "    Theta = %s\n" % self.theta
+        output += "    Emission delay = %s" % self.use_emission_time
         return output
 
     def to_dict(self):
@@ -581,7 +592,10 @@ class EventReflectivity(object):
                 if evt_list.getNumberEvents() == 0:
                     continue
 
-                wl_list = evt_list.getTofs() / self.constant
+                tofs = evt_list.getTofs()
+                if self.use_emission_time:
+                    tofs = self.emission_time_correction(ws, tofs)
+                wl_list = tofs / self.constant
 
                 # Gravity correction
                 d_theta = self.gravity_correction(ws, wl_list)
@@ -761,6 +775,24 @@ class EventReflectivity(object):
         refl /= charge * bin_size
 
         return refl, d_refl_sq
+
+    def emission_time_correction(self, ws, tofs):
+        """
+            Coorect TOF for emission time delay in the moderator
+            :param ws: Mantid workspace
+            :param tofs: list of TOF values
+        """
+        mt_run = ws.getRun()
+        use_emission_delay = False
+        if "BL4B:Chop:Skf2:ChopperModerator" in mt_run:
+            moderator_calc = mt_run.getProperty("BL4B:Chop:Skf2:ChopperModerator").value[0]
+            t_mult = mt_run.getProperty("BL4B:Chop:Skf2:ChopperMultiplier").value[0]
+            t_off = mt_run.getProperty("BL4B:Chop:Skf2:ChopperOffset").value[0]
+            use_emission_delay = moderator_calc == 1
+
+        if use_emission_delay:
+            tofs -= t_off + t_mult * tofs / self.constant
+        return tofs
 
     def gravity_correction(self, ws, wl_list):
         """
