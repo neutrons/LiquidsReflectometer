@@ -234,16 +234,31 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
                                                    paralyzable=template_data.paralyzable,
                                                    dead_time_value=template_data.dead_time_value,
                                                    dead_time_tof_step=template_data.dead_time_tof_step,
+                                                   use_emission_time=template_data.use_emission_time,
                                                    functional_background=template_data.two_backgrounds,
                                                    instrument=event_reduction.EventReflectivity.INSTRUMENT_4B)
+    print(event_refl)
 
     # R(Q)
     qz, refl, d_refl = event_refl.specular(q_summing=q_summing, tof_weighted=tof_weighted,
                                            bck_in_q=bck_in_q, clean=clean, normalize=normalize)
     qz_mid = (qz[:-1] + qz[1:])/2.0
 
-    print("Normalization options: %s %s" % (normalize, template_data.scaling_factor_flag))
-    if normalize and template_data.scaling_factor_flag:
+    # When using composite direct beam, we don't need a scaling
+    # factor file if the multiplier is in the logs
+    scaling_factor_PV = 'BL4B:CS:Autoreduce:ScaleMultiplier'
+    if normalize and scaling_factor_PV in ws_db.getRun():
+        # The standard changed during early implementation...
+        if int(template_data.norm_file) > 212005:
+            a = ws_db.getRun()[scaling_factor_PV].value[0]**2
+        else:
+            a = ws_db.getRun()[scaling_factor_PV].value[0]
+        print("Composite scaling factor: %s" % a)
+        d_refl /= a
+        refl /= a
+        b = err_a = err_b = 0
+    elif normalize and template_data.scaling_factor_flag:
+        print("Normalization options: %s %s" % (normalize, template_data.scaling_factor_flag))
         # Get the scaling factors
         a, b, err_a, err_b = scaling_factor(template_data.scaling_factor_file, ws_sc)
 
@@ -256,6 +271,7 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
         d_refl = np.sqrt(d_refl**2/a_q**2 + refl**2*d_a_q**2/a_q**4)
         refl /= a_q
     else:
+        print("Skipping scaling factor")
         a = b = 1
         err_a = err_b = 0
 

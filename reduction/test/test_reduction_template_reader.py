@@ -13,6 +13,17 @@ class TestReductionParameters:
         redparms.two_backgrounds = True
         assert "<two_backgrounds_flag>True</two_backgrounds_flag>" in redparms.to_xml()
 
+    def test_emission_delay(self):
+        r"""verify the xml dump writes the emission delay option"""
+        redparms = ReductionParameters()
+
+        # Default should be True
+        assert redparms.use_emission_time == True
+        assert "<use_emission_time>True</use_emission_time>" in redparms.to_xml()
+
+        redparms.use_emission_time = False
+        assert "<use_emission_time>False</use_emission_time>" in redparms.to_xml()
+
     def test_from_dict(self):
         r"""verify method from_dict raises when passed some nonsense"""
 

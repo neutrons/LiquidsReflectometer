@@ -71,6 +71,9 @@ class ReductionParameters(object):
         self.dead_time_value = 4.2
         self.dead_time_tof_step = 100
 
+        # Calculate emission time delay instead of using an effective distance for all wavelengths
+        self.use_emission_time:bool = True
+
     def from_dict(self, data_dict, permissible=True):
         r"""
         Update object's attributes with a dictionary with entries of the type  attribute_name: attribute_value.
@@ -158,6 +161,9 @@ class ReductionParameters(object):
         _xml += "<dead_time_paralyzable>%s</dead_time_paralyzable>\n" % str(self.paralyzable)
         _xml += "<dead_time_value>%s</dead_time_value>\n" % str(self.dead_time_value)
         _xml += "<dead_time_tof_step>%s</dead_time_tof_step>\n" % str(self.dead_time_tof_step)
+
+        # Emission time correction
+        _xml += "<use_emission_time>%s</use_emission_time>\n" % str(self.use_emission_time)
         _xml += "</RefLData>\n"
 
         return _xml
@@ -268,6 +274,11 @@ class ReductionParameters(object):
                                                default=self.dead_time_value)
         self.dead_time_tof_step = getFloatElement(instrument_dom, "dead_time_tof_step",
                                                   default=self.dead_time_tof_step)
+
+        # Emission time
+        # Defaults to False for backward compatibility with templates where this option was not available.
+        self.use_emission_time = getBoolElement(instrument_dom, "use_emission_time",
+                                                default=False)
 
 
 ###### Utility functions to read XML content ########################
