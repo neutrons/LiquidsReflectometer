@@ -329,6 +329,13 @@ class EventReflectivity(object):
         else:
             self.det_distance = self.DEFAULT_4B_SAMPLE_DET_DISTANCE
 
+        # Check that we have the needed meta data for the emission delay calculation
+        if self.use_emission_time:
+            moderator_available = "BL4B:Chop:Skf2:ChopperModerator" in self._ws_sc.getRun()
+            if not moderator_available:
+                print("Moderator information unavailable: skipping emission time calculation")
+                self.use_emission_time = False
+        
         if self.use_emission_time:
             # Read the true distance from the data file. We will compute an emission time delay later
             self.source_detector_distance = self._ws_sc.getRun().getProperty("BL4B:Det:TH:DlyDet:BasePath").value[0]
