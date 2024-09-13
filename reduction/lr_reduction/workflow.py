@@ -11,6 +11,7 @@ from . import event_reduction, output, reduction_template_reader, template
 
 
 def reduce(ws, template_file, output_dir, average_overlap=False,
+           theta_offset: float | None = 0,
            q_summing=False, bck_in_q=False, is_live=False):
     """
         Function called by reduce_REFL.py, which lives in /SNS/REF_L/shared/autoreduce
@@ -23,9 +24,25 @@ def reduce(ws, template_file, output_dir, average_overlap=False,
         :param q_summing: if True, constant-Q binning will be used
         :param bck_in_q: if True, and constant-Q binning is used, the background will be estimated
                          along constant-Q lines rather than along TOF/pixel boundaries.
+        :param theta_offset: Theta offset to apply. If None, the template value will be used.
     """
+    # Get the sequence number
+    sequence_number = 1
+    if ws.getRun().hasProperty("sequence_number"):
+        sequence_number = ws.getRun().getProperty("sequence_number").value[0]
+    # Read template if it was passed as a file path
+    # It can be passsed as a dict directly
+    if isinstance(template_file, str):
+        template_data = template.read_template(template_file, sequence_number)
+    else:
+        template_data = template_file
+
+    # Set the theta offset if it was provided
+    if theta_offset is not None:
+        template_data.angle_offset = theta_offset
+
     # Call the reduction using the template
-    qz_mid, refl, d_refl, meta_data = template.process_from_template_ws(ws, template_file,
+    qz_mid, refl, d_refl, meta_data = template.process_from_template_ws(ws, template_data,
                                                                         q_summing=q_summing,
                                                                         tof_weighted=q_summing,
                                                                         clean=q_summing,
@@ -116,9 +133,14 @@ def write_template(seq_list, run_list, template_file, output_dir):
         fd.write(xml_str)
 
 
-def reduce_fixed_two_theta(ws, template_file, output_dir, average_overlap=False,
-           q_summing=False, bck_in_q=False, peak_width=10, offset_from_first=True):
+def offset_from_first_run(
+        ws,
+        template_file :str,
+        output_dir: str,
+        ):
     """
+    Find a theta offset from the first peak.
+    Used when sample is misaligned.
     """
     from . import peak_finding
 
@@ -131,95 +153,59 @@ def reduce_fixed_two_theta(ws, template_file, output_dir, average_overlap=False,
         sequence_id = ws.getRun().getProperty("sequence_id").value[0]
 
     # Theta value that we are aiming for
-    ths_value = ws.getRun()['ths'].value[0]
+    ths_value = ws.getRun()['ths'].value[-1]
 
     # Read template so we can load the direct beam run
     template_data = template.read_template(template_file, sequence_number)
 
     # Load normalization run
+    print("    DB: %s" % template_data.norm_file)
     ws_db = mtd_api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
-    tthd_value = ws.getRun()['tthd'].value[0]
 
     # Look for parameters that might have been determined earlier for this measurement
     options_file = os.path.join(output_dir, 'REFL_%s_options.json' % sequence_id)
-    if offset_from_first and sequence_number > 1 and os.path.isfile(options_file):
+
+    if sequence_number > 1 and os.path.isfile(options_file):
         with open(options_file, 'r') as fd:
             options = json.load(fd)
-        pixel_offset = options['pixel_offset']
-        twotheta = 2*ths_value + options['twotheta_offset']
+            return options['theta_offset']
     else:
         # Fit direct beam position
-        x_min=template_data.norm_peak_range[0]-25
-        x_max=template_data.norm_peak_range[1]+25
-        tof, _x, _y = peak_finding.process_data(ws_db, summed=True, tof_step=200)
+        x_min=template_data.norm_peak_range[0]
+        x_max=template_data.norm_peak_range[1]
+        _, _x, _y = peak_finding.process_data(ws_db, summed=True, tof_step=200)
         peak_center = np.argmax(_y)
-        db_center, db_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min, x_max=x_max, center=peak_center)
+        db_center, db_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min, x_max=x_max,
+                                                           center=peak_center,
+                                                           sigma=1.)
         print("    DB center: %g\t Width: %g from [%g %g]" % (db_center, db_width,
                                                               template_data.norm_peak_range[0],
                                                               template_data.norm_peak_range[1]))
 
         # Fit the reflected beam position
-        x_min=template_data.data_peak_range[0]-peak_width
-        x_max=template_data.data_peak_range[1]+peak_width
-        tof, _x, _y = peak_finding.process_data(ws, summed=True, tof_step=200)
-        peak_center = np.argmax(_y)
-        sc_center, sc_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min, x_max=x_max, center=peak_center)
-        pixel_offset = sc_center - (template_data.data_peak_range[1] + template_data.data_peak_range[0])/2.0
+        x_min=template_data.data_peak_range[0]
+        x_max=template_data.data_peak_range[1]
+        _, _x, _y = peak_finding.process_data(ws, summed=True, tof_step=200)
+        peak_center = np.argmax(_y[x_min:x_max]) + x_min
+        sc_center, sc_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min, x_max=x_max, center=peak_center, sigma=3.)
+        pixel_offset = sc_center - peak_center
         print("    SC center: %g\t Width: %g" % (sc_center, sc_width))
 
-        pixel_width = float(ws.getInstrument().getNumberParameter("pixel-width")[0]) / 1000.0
-        sample_det_distance = event_reduction.EventReflectivity.DEFAULT_4B_SAMPLE_DET_DISTANCE
-        twotheta = np.arctan((db_center-sc_center)*pixel_width / sample_det_distance) / 2.0 * 180 / np.pi
+        settings = event_reduction.read_settings(ws)
+        sample_det_distance = settings["sample-det-distance"]
+        pixel_width = settings["pixel-width"] / 1000.0
 
-        # Store the tthd of the direct beam and account for the fact that it may be
-        # different from our reflected beam for this calibration data.
-        # This will allow us to be compatible with both fixed and moving detector arm.
-        tthd_db = ws_db.getRun()['tthd'].value[0]
-        twotheta = twotheta + tthd_value - tthd_db
+        theta = np.arctan((sc_center-db_center) * pixel_width / sample_det_distance) / 2.0 * 180 / np.pi
+        theta_offset = theta - ths_value
 
         # If this is the first angle, keep the value for later
-        options = dict(twotheta_offset = twotheta - 2*ths_value,
-                       pixel_offset = pixel_offset,
-                       tthd_db = tthd_db, tthd_sc = tthd_value)
+        options = dict(theta_offset = theta_offset,
+                       pixel_offset = pixel_offset)
         with open(options_file, 'w') as fp:
             json.dump(options, fp)
-    print("    Two-theta = %g" % twotheta)
 
-    # Modify the template with the fitted results
-    print("    Template peak: [%g %g]" % (template_data.data_peak_range[0],
-                                          template_data.data_peak_range[1]))
+    return theta_offset
 
-    template_data.data_peak_range = np.rint(np.asarray(template_data.data_peak_range) + pixel_offset).astype(int)
-    template_data.background_roi = np.rint(np.asarray(template_data.background_roi) + pixel_offset).astype(int)
-    print("    New peak:      [%g %g]" % (template_data.data_peak_range[0],
-                                          template_data.data_peak_range[1]))
-    print("    New bck:       [%g %g]" % (template_data.background_roi[0],
-                                          template_data.background_roi[1]))
-
-    # Call the reduction using the template
-    qz_mid, refl, d_refl, meta_data = template.process_from_template_ws(ws, template_data,
-                                                                        q_summing=q_summing,
-                                                                        tof_weighted=q_summing,
-                                                                        bck_in_q=bck_in_q, info=True,
-                                                                        theta_value = twotheta/2.0,
-                                                                        ws_db = ws_db)
-
-    # Save partial results
-    coll = output.RunCollection()
-    coll.add(qz_mid, refl, d_refl, meta_data=meta_data)
-    coll.save_ascii(os.path.join(output_dir, 'REFL_%s_%s_%s_partial.txt' % (meta_data['sequence_id'],
-                                                                            meta_data['sequence_number'],
-                                                                            meta_data['run_number'])),
-                    meta_as_json=True)
-
-    # Assemble partial results into a single R(q)
-    seq_list, run_list = assemble_results(meta_data['sequence_id'], output_dir, average_overlap)
-
-    # Save template
-    write_template(seq_list, run_list, template_file, output_dir)
-
-    # Return the sequence identifier
-    return run_list[0]
 
 def reduce_explorer(ws, ws_db, theta_pv=None, center_pixel=145, db_center_pixel=145, peak_width=10):
     """
@@ -227,7 +213,8 @@ def reduce_explorer(ws, ws_db, theta_pv=None, center_pixel=145, db_center_pixel=
     from . import peak_finding
 
     if theta_pv is None:
-        if 'BL4B:CS:ExpPl:OperatingMode' in ws.getRun() and ws.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
+        if 'BL4B:CS:ExpPl:OperatingMode' in ws.getRun() \
+            and ws.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
             theta_pv = 'thi'
         else:
             theta_pv = 'ths'

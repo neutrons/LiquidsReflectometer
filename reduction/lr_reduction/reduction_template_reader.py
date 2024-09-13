@@ -276,9 +276,9 @@ class ReductionParameters(object):
                                                   default=self.dead_time_tof_step)
 
         # Emission time
-        # Defaults to False for backward compatibility with templates where this option was not available.
+        # Defaults to True, but will be skipped if the necessary meta data is not found
         self.use_emission_time = getBoolElement(instrument_dom, "use_emission_time",
-                                                default=False)
+                                                default=True)
 
 
 ###### Utility functions to read XML content ########################

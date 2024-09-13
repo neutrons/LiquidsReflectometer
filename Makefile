@@ -16,6 +16,7 @@ help:
 
 PREFIX := /SNS/REF_L/shared
 install:  ## install the automated reduction code for LR
+	versioningit -w
 	cp -R scripts/livereduce/*.py $(PREFIX)/livereduce
 	cp -R scripts/autoreduce/*.py $(PREFIX)/autoreduce
 	cp -R scripts/shared/*.py $(PREFIX)

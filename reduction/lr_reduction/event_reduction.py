@@ -1,18 +1,17 @@
 """
     Event based reduction for the Liquids Reflectometer
 """
+import datetime
+import json
 import os
 import time
-import json
-import datetime
 
 import mantid.simpleapi as api
 import numpy as np
 
-from . import background
-from . import DeadTimeCorrection
 from lr_reduction.utils import mantid_algorithm_exec
 
+from . import DeadTimeCorrection, background
 
 PLANCK_CONSTANT = 6.626e-34  # m^2 kg s^-1
 NEUTRON_MASS = 1.675e-27  # kg
@@ -161,12 +160,12 @@ def apply_dead_time_correction(ws, template_data):
         :param ws: workspace with raw data to compute correction for
         :param template_data: reduction parameters
     """
-    if not "dead_time_applied" in ws.getRun():
+    if 'dead_time_applied' not in ws.getRun():
         corr_ws = get_dead_time_correction(ws, template_data)
         ws = api.Multiply(ws, corr_ws, OutputWorkspace=str(ws))
         api.AddSampleLog(Workspace=ws, LogName="dead_time_applied", LogText='1', LogType="Number")
     return ws
-    
+
 
 class EventReflectivity(object):
     r"""
@@ -335,7 +334,7 @@ class EventReflectivity(object):
             if not moderator_available:
                 print("Moderator information unavailable: skipping emission time calculation")
                 self.use_emission_time = False
-        
+
         if self.use_emission_time:
             # Read the true distance from the data file. We will compute an emission time delay later
             self.source_detector_distance = self._ws_sc.getRun().getProperty("BL4B:Det:TH:DlyDet:BasePath").value[0]
@@ -353,7 +352,8 @@ class EventReflectivity(object):
         output += "    pixel: %s\n" % self.pixel_width
         output += "    WL: %s %s\n" % (self.wl_range[0], self.wl_range[1])
         output += "    Q: %s %s\n" % (self.q_min, self.q_max)
-        output += "    Theta = %s\n" % self.theta
+        theta_degrees = self.theta * 180 / np.pi
+        output += "    Theta = %s\n" % theta_degrees
         output += "    Emission delay = %s" % self.use_emission_time
         return output
 

@@ -116,6 +116,8 @@ class RunCollection():
                         fd.write("# TOF weighted: %s\n" % _meta['tof_weighted'])
                     if 'bck_in_q' in _meta:
                         fd.write("# Bck in Q: %s\n" % _meta['bck_in_q'])
+                    if 'theta_offset' in _meta:
+                        fd.write("# Theta offset: %s\n" % _meta['theta_offset'])
                     if meta_as_json:
                         fd.write("# Meta:%s\n" % json.dumps(_meta))
                     fd.write("# DataRun   NormRun   TwoTheta(deg)  LambdaMin(A)   ")

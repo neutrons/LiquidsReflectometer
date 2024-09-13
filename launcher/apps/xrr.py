@@ -104,6 +104,5 @@ class XRR(QWidget):
 
         print("Reduce!")
 
-        # python3 template_reduction.py dynamic60Hz <meas_run_60Hz> <template_60Hz> <time_interval> <output_dir>
         subprocess.run(['python3', 'scripts/xrr_reduction.py',
                         self.data_path.text(), self.output_dir_label.text()])

@@ -178,15 +178,25 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     # the EventReflectivity directly.
 
     _wl = ws_sc.getRun()['LambdaRequest'].value[0]
-    print('wl=%g; ths=%g; thi=%g; No offset' % (_wl, ths_value, thi_value))
 
+    # Determine scattering angle. If a value was given, don't add the offset
     if theta_value is not None:
         theta = theta_value * np.pi / 180.
     else:
-        if 'BL4B:CS:ExpPl:OperatingMode' in ws_sc.getRun() and ws_sc.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
+        if 'BL4B:CS:ExpPl:OperatingMode' in ws_sc.getRun() \
+            and ws_sc.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':
             theta = thi_value * np.pi / 180.
         else:
             theta = ths_value * np.pi / 180.
+
+        # Add offset
+        theta += template_data.angle_offset * np.pi / 180.
+
+    theta_degrees = theta * 180 / np.pi
+    print('wl=%g; ths=%g; thi=%g; offset=%g; theta used=%g' % (_wl, ths_value,
+                                                               thi_value,
+                                                               template_data.angle_offset,
+                                                               theta_degrees))
 
     # Get the reduction parameters from the template
     peak = template_data.data_peak_range
@@ -281,15 +291,6 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     refl = refl[template_data.pre_cut:npts-template_data.post_cut]
     d_refl = d_refl[template_data.pre_cut:npts-template_data.post_cut]
 
-    # We can optionally return details about the reduction process
-    if info:
-        meta_data = event_refl.to_dict()
-        meta_data['scaling_factors'] = dict(a=a, err_a=err_a, b=b, err_b=err_b)
-        meta_data['q_summing'] = q_summing
-        meta_data['tof_weighted'] = tof_weighted
-        meta_data['bck_in_q'] = bck_in_q
-        return qz_mid, refl, d_refl, meta_data
-
     if normalize and OUTPUT_NORM_DATA:
         lr = ws_sc.getRun().getProperty('LambdaRequest').value[0]
         s1h = abs(ws_sc.getRun().getProperty("S1VHeight").value[0])
@@ -310,5 +311,15 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
             fd.write('# Q, wavelength, counts/mC, error\n')
             for i in range(len(_norm)):
                 fd.write('%g %g %g %g\n' % (qz_mid[i], wl[i], _norm[i], _d_norm[i]))
-    
+
+    # We can optionally return details about the reduction process
+    if info:
+        meta_data = event_refl.to_dict()
+        meta_data['scaling_factors'] = dict(a=a, err_a=err_a, b=b, err_b=err_b)
+        meta_data['q_summing'] = q_summing
+        meta_data['tof_weighted'] = tof_weighted
+        meta_data['bck_in_q'] = bck_in_q
+        meta_data['theta_offset'] = template_data.angle_offset
+        return qz_mid, refl, d_refl, meta_data
+
     return qz_mid, refl, d_refl

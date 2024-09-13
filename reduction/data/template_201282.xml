@@ -46,8 +46,8 @@
    <norm_dataset>201043</norm_dataset>
    <auto_q_binning>False</auto_q_binning>
    <overlap_lowest_error>True</overlap_lowest_error>
-   <angle_offset>0.01</angle_offset>
-   <angle_offset_error>0.001</angle_offset_error>
+   <angle_offset>0.0</angle_offset>
+   <angle_offset_error>0.0</angle_offset_error>
    <q_step>0.015</q_step>
    <q_min>0.005</q_min>
    <scaling_factor_flag>True</scaling_factor_flag>
@@ -97,8 +97,8 @@
    <norm_dataset>201044</norm_dataset>
    <auto_q_binning>False</auto_q_binning>
    <overlap_lowest_error>True</overlap_lowest_error>
-   <angle_offset>0.01</angle_offset>
-   <angle_offset_error>0.001</angle_offset_error>
+   <angle_offset>0.0</angle_offset>
+   <angle_offset_error>0.0</angle_offset_error>
    <q_step>0.015</q_step>
    <q_min>0.005</q_min>
    <scaling_factor_flag>True</scaling_factor_flag>
@@ -148,8 +148,8 @@
    <norm_dataset>201045</norm_dataset>
    <auto_q_binning>False</auto_q_binning>
    <overlap_lowest_error>True</overlap_lowest_error>
-   <angle_offset>0.01</angle_offset>
-   <angle_offset_error>0.001</angle_offset_error>
+   <angle_offset>0.0</angle_offset>
+   <angle_offset_error>0.0</angle_offset_error>
    <q_step>0.015</q_step>
    <q_min>0.005</q_min>
    <scaling_factor_flag>True</scaling_factor_flag>
@@ -199,8 +199,8 @@
    <norm_dataset>201048</norm_dataset>
    <auto_q_binning>False</auto_q_binning>
    <overlap_lowest_error>True</overlap_lowest_error>
-   <angle_offset>0.01</angle_offset>
-   <angle_offset_error>0.001</angle_offset_error>
+   <angle_offset>0.0</angle_offset>
+   <angle_offset_error>0.0</angle_offset_error>
    <q_step>0.015</q_step>
    <q_min>0.005</q_min>
    <scaling_factor_flag>True</scaling_factor_flag>
@@ -250,8 +250,8 @@
    <norm_dataset>201051</norm_dataset>
    <auto_q_binning>False</auto_q_binning>
    <overlap_lowest_error>True</overlap_lowest_error>
-   <angle_offset>0.01</angle_offset>
-   <angle_offset_error>0.001</angle_offset_error>
+   <angle_offset>0.0</angle_offset>
+   <angle_offset_error>0.0</angle_offset_error>
    <q_step>0.015</q_step>
    <q_min>0.005</q_min>
    <scaling_factor_flag>True</scaling_factor_flag>
@@ -301,8 +301,8 @@
    <norm_dataset>201051</norm_dataset>
    <auto_q_binning>False</auto_q_binning>
    <overlap_lowest_error>True</overlap_lowest_error>
-   <angle_offset>0.01</angle_offset>
-   <angle_offset_error>0.001</angle_offset_error>
+   <angle_offset>0.0</angle_offset>
+   <angle_offset_error>0.0</angle_offset_error>
    <q_step>0.015</q_step>
    <q_min>0.005</q_min>
    <scaling_factor_flag>True</scaling_factor_flag>
@@ -352,8 +352,8 @@
    <norm_dataset>201051</norm_dataset>
    <auto_q_binning>False</auto_q_binning>
    <overlap_lowest_error>True</overlap_lowest_error>
-   <angle_offset>0.01</angle_offset>
-   <angle_offset_error>0.001</angle_offset_error>
+   <angle_offset>0.0</angle_offset>
+   <angle_offset_error>0.0</angle_offset_error>
    <q_step>0.015</q_step>
    <q_min>0.005</q_min>
    <scaling_factor_flag>True</scaling_factor_flag>

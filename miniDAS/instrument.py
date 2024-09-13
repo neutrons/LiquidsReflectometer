@@ -53,9 +53,9 @@ ScaleMultiplier = PV('BL4B:CS:Autoreduce:ScaleMultiplier')
 
 BL4B_MOT_PREFIX = 'BL4B:Mot:'
 
-MOVE_TIMEOUT = 600
+MOVE_TIMEOUT = 1500
 
-# Set to True only for debugging 
+# Set to True only for debugging
 RETURN_ON_FAIL = False
 
 
@@ -75,7 +75,7 @@ class LiquidsReflectometer:
         # Virtual values
         self.virtual_counts = 0
         self.virtual_timer = 0
-    
+
     def initialize_series(self, length: int = 1, title='Composite DB'):
         group_id = PV('BL4B:CS:RunControl:LastRunNumber').get() + 1
         PV("BL4B:CS:Autoreduce:Sequence:Num").put(0)
@@ -122,7 +122,7 @@ class LiquidsReflectometer:
             ready = True
             for _pv in check_list:
                 # Check motor status
-                status = _pv.get()
+                _pv.get()
                 #print(type(status), status)
                 ready = ready and _pv.get() == 0
             if time.time() - t0 > MOVE_TIMEOUT:
@@ -131,7 +131,7 @@ class LiquidsReflectometer:
 
         print('Ready')
         return True
-    
+
     def start_or_resume(self, counts: int = 0, seconds: int = 0, charge: float = 200):
         """
             Start or resume a run depending on the current state.
@@ -154,9 +154,7 @@ class LiquidsReflectometer:
             self.virtual_timer = seconds if seconds > 0 else 1000
             return
 
-
-
-        time.sleep(2)
+        time.sleep(0.1)
         # Wait for the neutron count to reach the desired value
         if counts > 0:
             while neutrons.get() < counts:
@@ -176,7 +174,7 @@ class LiquidsReflectometer:
                 _c_check = C.get()
                 #print("    q=%s" % _c_check)
                 time.sleep(0.1)
-    
+
     def pause(self):
         """
             Pause the current run.
@@ -189,11 +187,16 @@ class LiquidsReflectometer:
         """
         StopRun.put(1)
         self.acquiring = False
-    
+
+    def start(self):
+        PauseRun.put(0)
+        StartRun.put(1)
+        self.acquiring = True
+
     def get_deadtime(self):
         print("Not yet implemented")
 
-    
+
     def get_rate(self):
         """
             Get the current count rate.
@@ -218,7 +221,7 @@ class LiquidsReflectometer:
 
         total_neutrons = neutrons.get()
         rate = total_neutrons / total_time
-        
+
         print("  Rate -> %g / %g = %g" % (total_neutrons, total_time, rate))
 
         return rate

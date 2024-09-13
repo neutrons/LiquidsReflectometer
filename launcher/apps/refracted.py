@@ -106,7 +106,6 @@ class Refracted(QWidget):
 
         print("Process!")
 
-        # python3 template_reduction.py dynamic60Hz <meas_run_60Hz> <template_60Hz> <time_interval> <output_dir>
         subprocess.run(['python3', 'scripts/refracted_beam.py',
                         self.run_number_ledit.text(), self.output_dir_label.text(),
                         '--material', self.material_ledit.text()])
