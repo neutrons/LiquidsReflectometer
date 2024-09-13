@@ -40,11 +40,11 @@ const_q = False
 if len(sys.argv) > 6:
     const_q = sys.argv[6].lower() == 'true'
 
-fit_first_peak = True
+fit_first_peak = False
 if len(sys.argv) > 7:
     fit_first_peak = sys.argv[7].lower() == 'true'
 
-theta_offset = None
+theta_offset = 0
 if len(sys.argv) > 8:
     theta_offset = float(sys.argv[8])
 
@@ -119,14 +119,15 @@ else:
         # Scattering data
         print("Average overlap: %s" % avg_overlap)
         print("Constant-Q binning: %s" % const_q)
+        print("Theta offset: %s" % theta_offset)
+        print("Fit first peak: %s" % fit_first_peak)
         from lr_reduction import workflow
 
-        #first_run_of_set = workflow.reduce(ws, template_file, output_dir,
-        first_run_of_set = workflow.reduce_fixed_two_theta(ws, template_file, output_dir,
+        first_run_of_set = workflow.reduce(ws, template_file, output_dir,
                                            offset_from_first=fit_first_peak,
                                            fixed_offset=theta_offset,
-                                           peak_width=0,
                                            average_overlap=avg_overlap,
+                                           theta_offset=theta_offset,
                                            q_summing=const_q, bck_in_q=False)
     else:
         print("Data type: %s [nothing to do]" % data_type)

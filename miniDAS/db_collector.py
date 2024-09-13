@@ -5,30 +5,17 @@
 """
 import sys
 import time
-import argparse
-
 
 sys.path.append('/home/controls/var/tmp/scripts')
 
 import instrument
 
-# Instrument configurations to acquire DBs for.
-# This should be read from a scan.csv file.
-SCAN_60Hz = [[100, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 15,     's1:Y:Gap': 0.39, 'si:Y:Gap': 0.25, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (1,1), 'C-DB 60Hz 15A'],
-             [100, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 12.386, 's1:Y:Gap': 0.39, 'si:Y:Gap': 0.25, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (1,1), 'C-DB 60Hz 12.39A'],
-             [100, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 9.74,   's1:Y:Gap': 0.39, 'si:Y:Gap': 0.25, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (1,1), 'C-DB 60Hz 9.74A'],
-             [100, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 7.043,  's1:Y:Gap': 0.39, 'si:Y:Gap': 0.25, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (1,1), 'C-DB 60Hz 7.04A'],
-             [100, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 4.25,  's1:Y:Gap': 0.39, 'si:Y:Gap': 0.25, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (2,2), 'C-DB 60Hz 4.25A'],
-             [100, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 4.25,  's1:Y:Gap': 0.769, 'si:Y:Gap': 0.493, 's3:Y:Gap': 10, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (4,4), 'C-DB 60Hz 4.25A'],
-             [100, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 4.25,  's1:Y:Gap': 1.523, 'si:Y:Gap': 0.976, 's3:Y:Gap': 20, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (5,5), 'C-DB 60Hz 4.25A'],
-             [100, {'BL4B:Chop:Gbl:SpeedReq': 60, 'BL4B:Chop:Gbl:WavelengthReq': 4.25,  's1:Y:Gap': 3.015, 'si:Y:Gap': 1.932, 's3:Y:Gap': 20, 'ths': 0., 'tthd': 0, 's1:X:Gap': 20, 'si:X:Gap': 20}, (10,10), 'C-DB 60Hz 4.25A'],
-             ]
 
 class DBCollector:
     def __init__(self, db_list: list, charge: float = None):
         """
         Initializes the collector with a list of direct beam configurations.
-        
+
         :param db_list: List of direct beam configurations.
         """
         self.db_list = db_list
@@ -47,9 +34,9 @@ class DBCollector:
             print("Direct beam configuration: ", i)
             si_width = float(self.db_list[i][1]['si:X:Gap'])
             s1_width = float(self.db_list[i][1]['s1:X:Gap'])
-            div = s1_width/si_width
+            s1_width/si_width
             run_title = str(self.db_list[i][3])
-            
+
             self.lr.increment_sequence(title=run_title)
             try:
                 scanner = CompositeDBScanner(self.db_list[i], grid_size=self.db_list[i][2])
@@ -65,7 +52,7 @@ class CompositeDBScanner:
                  instr: instrument.LiquidsReflectometer = None):
         """
         Initializes the scanner with a frequency and grid size.
-        
+
         :param positions: Instrument configuration to acquire a direct beam for.
         :param grid_size: The size of the grid for NxN decomposition (Si x S1)
         """
@@ -97,7 +84,7 @@ class CompositeDBScanner:
         s1_width = self.positions[1]['s1:X:Gap']
         self.lr.move({'si:X:Gap': si_width/self.grid_size[0], 's1:X:Gap': s1_width/self.grid_size[1]})
 
-	# Set scale multiplier
+        # Set scale multiplier
         multiplier = self.grid_size[0] * self.grid_size[1]
         instrument.ScaleMultiplier.put(multiplier)
 
@@ -124,6 +111,10 @@ class CompositeDBScanner:
                 # Move motors to the specified positions
                 self.lr.move({'si:X:Center': si, 's1:X:Center': s1})
                 time.sleep(1.)
+                if counter == 1:
+                    # There's an issue here with Si on the first move.
+                    print("Waiting for Si before starting")
+                    time.sleep(15)
                 # Acquire neutrons
                 self.lr.start_or_resume(charge=charge_to_acquire_per_point)
 
@@ -136,13 +127,8 @@ class CompositeDBScanner:
 
                 time.sleep(1.)
         self.lr.stop()
-        
+
         # Move centers back to zero
         self.lr.move({'si:X:Center': 0, 's1:X:Center': 0})
         instrument.ScaleMultiplier.put(multiplier)
         time.sleep(2)
-
-# Example usage
-if __name__ == "__main__":
-    collector = DBCollector(SCAN_60Hz)
-    collector.collect()

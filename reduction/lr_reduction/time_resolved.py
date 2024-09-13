@@ -103,13 +103,15 @@ def reduce_30Hz_slices(meas_run_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz
                                  time_interval, output_dir, scan_index=scan_index, create_plot=create_plot,
                                  template_reference=template_reference, q_summing=False)
 
-def reduce_60Hz_slices(meas_run, template_file,
-                       time_interval, output_dir, scan_index=1, create_plot=True):
+def reduce_slices(meas_run, template_file,
+                  time_interval, output_dir, scan_index=1,
+                  theta_offset=None, create_plot=True):
 
     meas_ws = api.LoadEventNexus("REF_L_%s" % meas_run)
 
-    return reduce_60Hz_slices_ws(meas_ws, template_file,
-                                 time_interval, output_dir, scan_index=scan_index, create_plot=create_plot)
+    return reduce_slices_ws(meas_ws, template_file,
+                            time_interval, output_dir, scan_index=scan_index,
+                            theta_offset=theta_offset, create_plot=create_plot)
 
 def reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30Hz,
                           time_interval, output_dir, scan_index=1, create_plot=True,
@@ -209,19 +211,27 @@ def reduce_30Hz_slices_ws(meas_ws_30Hz, ref_run_30Hz, ref_data_60Hz, template_30
 
     return reduced
 
-def reduce_60Hz_slices_ws(meas_ws, template_file,
-                          time_interval, output_dir, scan_index=1, create_plot=True):
+def reduce_slices_ws(meas_ws, template_file,
+                     time_interval, output_dir, scan_index=1,
+                     theta_offset=0, theta_value=None, create_plot=True):
     """
-        Perform 30Hz reduction
-        @param meas_ws: workspace of the data we want to reduce
-        @param template_file: autoreduction template file
-        @param time_interval: time step in seconds
-        @param scan_index: scan index to use within the template.
+        Perform time-resolved reduction
+        :param meas_ws: workspace of the data we want to reduce
+        :param template_file: autoreduction template file
+        :param time_interval: time step in seconds
+        :param scan_index: scan index to use within the template.
+        :param theta_value: force theta value
+        :param theta_offset: add a theta offset, defaults to zero
     """
 
     # Load the template
     print("Reading template")
     template_data = template.read_template(template_file, scan_index)
+
+    # Add theta offset
+    if theta_offset is not None:
+        print("Theta offset: %s" % theta_offset)
+        template_data.angle_offset = theta_offset
 
     # Some meta-data are not filled in for the live data stream
     # Use dummy values for those
@@ -252,18 +262,31 @@ def reduce_60Hz_slices_ws(meas_ws, template_file,
     wsgroup = api.mtd["time_ws"]
     wsnames = wsgroup.getNames()
 
+    # Load DB so we do it only once
+    ws_db = api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
+
     reduced = []
     total_time = 0
     for name in wsnames:
         tmpws = api.mtd[name]
         print("workspace %s has %d events" % (name, tmpws.getNumberEvents()))
         try:
-            _reduced = template.process_from_template_ws(tmpws, template_data)
+            _reduced = template.process_from_template_ws(tmpws, template_data,
+                                                         theta_value=theta_value,
+                                                         ws_db=ws_db)
+
+            dq0 = 0
+            dq_slope = compute_resolution(tmpws)
+            dq = dq0 + dq_slope * _reduced[0]
+            _reduced = [_reduced[0], _reduced[1], _reduced[2], dq]
+            _reduced = np.asarray(_reduced)
+
             reduced.append(_reduced)
             _filename = 'r{0}_t{1:06d}.txt'.format(meas_run, int(total_time))
             np.savetxt(os.path.join(output_dir, _filename), _reduced.T)
         except:
-            print("reduce_60Hz_slices_ws: %s" % sys.exc_info()[0])
+            print("reduce_slices_ws: %s" % sys.exc_info()[0])
+            raise
         total_time += time_interval
 
     if create_plot:

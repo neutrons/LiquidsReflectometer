@@ -67,20 +67,17 @@ class Dynamic30Hz(QWidget):
         layout.addWidget(self.output_dir_label, 6, 2)
 
         # Process button
-        self.perform_reduction_old = QPushButton('Reduce [old]')
-        layout.addWidget(self.perform_reduction_old, 7, 1)
-        self.perform_reduction = QPushButton('Reduce [new]')
-        layout.addWidget(self.perform_reduction, 7, 2)
+        self.perform_reduction = QPushButton('Reduce')
+        layout.addWidget(self.perform_reduction, 7, 1)
         #self.perform_reduction_q = QPushButton('Reduce [Const-Q binning]')
         #layout.addWidget(self.perform_reduction_q, 8, 2)
         self.load_settings = QPushButton('Load settings')
-        layout.addWidget(self.load_settings, 8, 2)
+        layout.addWidget(self.load_settings, 8, 1)
 
         # connections
         self.choose_template.clicked.connect(self.template_selection)
         self.choose_ref.clicked.connect(self.ref_selection)
         self.choose_output_dir.clicked.connect(self.output_dir_selection)
-        self.perform_reduction_old.clicked.connect(self.reduce_old)
         self.perform_reduction.clicked.connect(self.reduce_new)
         #self.perform_reduction_q.clicked.connect(self.reduce_q)
         self.load_settings.clicked.connect(self.load_settings_from_file)
@@ -212,9 +209,6 @@ class Dynamic30Hz(QWidget):
 
         return run_list
 
-    def reduce_old(self):
-        return self.reduce(reduction_script='scripts/template_reduction.py')
-
     def reduce_new(self):
         return self.reduce(reduction_script='scripts/time_resolved_reduction.py')
 
@@ -232,7 +226,7 @@ class Dynamic30Hz(QWidget):
 
         run_list = self.parse_run_list(self.data_run_number_ledit.text())
         for run in run_list:
-            # python3 template_reduction.py dynamic30Hz
+            # python3 time_resolved_reduction.py dynamic30Hz
             # <meas_run_30Hz> <ref_run_30Hz> <ref_data_60Hz> <template_30Hz> <time_interval> <output_dir>
             args = ['python3', reduction_script, 'dynamic30Hz',
                     str(run),
