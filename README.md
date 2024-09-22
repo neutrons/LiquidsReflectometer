@@ -2,12 +2,14 @@
 
 Reduction scripts for the Liquids Reflectometer. This includes both automated reduction scripts and useful scripts to reprocess data.
 
+[![CI](https://github.com/neutrons/LiquidsReflectometer/actions/workflows/actions.yml/badge.svg)](https://github.com/neutrons/LiquidsReflectometer/actions/workflows/actions.yml)
 [![codecov](https://codecov.io/gh/neutrons/LiquidsReflectometer/graph/badge.svg?token=H90K5RDGK4)](https://codecov.io/gh/neutrons/LiquidsReflectometer)
 [![Documentation Status](https://readthedocs.org/projects/lr-reduction/badge/?version=latest)](https://lr-reduction.readthedocs.io/en/latest/?badge=latest)
 
 
 
 ## Release notes:
+ - reduction v2.1.6 [09/2024] Implement emission time correction
  - reduction v2.0.26 [05/2024] Implement a better dead time correction using weighted events
  - reduction v2.0.25 [04/2024] Use dead time parameters from template
  - reduction v2.0.24 [04/2024] Fix issue with errors when using dead time correction
