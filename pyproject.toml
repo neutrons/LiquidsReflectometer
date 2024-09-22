@@ -41,7 +41,7 @@ where = ["reduction"]
 exclude = ["tests*", "scripts*", "docs*", "notebooks*"]
 
 [tool.setuptools.package-data]
-"*" = ["*.txt"]
+"*" = ["*.txt", "*.json"]
 
 [tool.ruff]
 line-length = 140
@@ -93,4 +93,3 @@ ignore = [
 ]
 doctests = false
 max-line-length = 130
-
