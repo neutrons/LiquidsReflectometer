@@ -286,7 +286,6 @@ def reduce_slices_ws(meas_ws, template_file,
             np.savetxt(os.path.join(output_dir, _filename), _reduced.T)
         except:
             print("reduce_slices_ws: %s" % sys.exc_info()[0])
-            raise
         total_time += time_interval
 
     if create_plot:

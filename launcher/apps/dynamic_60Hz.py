@@ -161,12 +161,14 @@ class Dynamic60Hz(QWidget):
         print("Reduce!")
 
         reduction_script='scripts/time_resolved_reduction.py'
-        args = ['python3', reduction_script, 'template',
-                 self.data_run_number_ledit.text(),
-                 self.template_path.text(),
-                 self.time_slice_ledit.text(),
-                 self.output_dir_label.text(),
-                 '--scan_index', self.idx_ledit.text()
+        args = ['nsd-conda-wrap.sh', 'mantid',
+                '--classic',
+                reduction_script, 'template',
+                self.data_run_number_ledit.text(),
+                self.template_path.text(),
+                self.time_slice_ledit.text(),
+                self.output_dir_label.text(),
+                '--scan_index', self.idx_ledit.text()
                 ]
         offset = self.fix_offset_ledit.text()
         if self.fix_offset_check.isChecked():
