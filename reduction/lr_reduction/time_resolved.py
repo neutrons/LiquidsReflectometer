@@ -15,7 +15,7 @@ from matplotlib import pyplot as plt
 mantid.kernel.config.setLogLevel(3)
 
 from . import template
-from .event_reduction import compute_resolution
+from .event_reduction import apply_dead_time_correction, compute_resolution
 
 
 def reduce_30Hz_from_ws(meas_ws_30Hz, ref_ws_30Hz, data_60Hz, template_data, scan_index=1, # noqa ARG001
@@ -223,6 +223,16 @@ def reduce_slices_ws(meas_ws, template_file,
         :param theta_value: force theta value
         :param theta_offset: add a theta offset, defaults to zero
     """
+    # Save options
+    options = dict(meas_run=meas_ws.getRun()['run_number'].value,
+                   template=template_file,
+                   time_interval=time_interval,
+                   output_dir=output_dir,
+                   scan_index=scan_index,
+                   theta_value=theta_value,
+                   theta_offset=theta_offset)
+    with open(os.path.join(output_dir, 'options.json'), 'w') as fp:
+        json.dump(options, fp)
 
     # Load the template
     print("Reading template")
@@ -243,6 +253,11 @@ def reduce_slices_ws(meas_ws, template_file,
         meas_run = meas_ws.getRun()['run_number'].value
     except:
         meas_run = 0
+
+    # Apply dead time correction up front since we are using the error events but
+    # not filtering them.
+    if template_data.dead_time:
+        apply_dead_time_correction(meas_ws, template_data)
 
     # Time slices
     print("Slicing data")
@@ -265,6 +280,13 @@ def reduce_slices_ws(meas_ws, template_file,
     # Load DB so we do it only once
     ws_db = api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
 
+    # Apply dead time correction up-front
+    if template_data.dead_time:
+        apply_dead_time_correction(ws_db, template_data)
+
+    # Turn off dead time since we already did it
+    template_data.dead_time = False
+
     reduced = []
     total_time = 0
     for name in wsnames:
@@ -286,7 +308,6 @@ def reduce_slices_ws(meas_ws, template_file,
             np.savetxt(os.path.join(output_dir, _filename), _reduced.T)
         except:
             print("reduce_slices_ws: %s" % sys.exc_info()[0])
-            raise
         total_time += time_interval
 
     if create_plot:

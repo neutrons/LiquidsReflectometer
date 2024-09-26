@@ -5,7 +5,7 @@ import time
 import subprocess
 
 
-PYTHON_CMD = 'nsd-conda-wrap.sh mantid-dev'
+PYTHON_CMD = 'nsd-conda-wrap.sh mantid'
 
 if len(sys.argv) < 4:
     print("\nUsage: python3 batch_reduce.py <IPTS> <first run> <last run>")
