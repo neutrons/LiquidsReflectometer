@@ -124,8 +124,6 @@ else:
         from lr_reduction import workflow
 
         first_run_of_set = workflow.reduce(ws, template_file, output_dir,
-                                           offset_from_first=fit_first_peak,
-                                           fixed_offset=theta_offset,
                                            average_overlap=avg_overlap,
                                            theta_offset=theta_offset,
                                            q_summing=const_q, bck_in_q=False)
