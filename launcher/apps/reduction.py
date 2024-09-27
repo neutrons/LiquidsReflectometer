@@ -170,7 +170,7 @@ class Reduction(QWidget):
         options.append(self.template_path.text())
         options.append(str(self.average_overlapp_check.isChecked()))
         options.append(str(self.const_q_check.isChecked()))
-        options.append(False) # Was fit first peak option
+        options.append('False') # Was fit first peak option
         if self.fix_offset_check.isChecked():
             options.append(str(self.fix_offset_ledit.text()))
 
