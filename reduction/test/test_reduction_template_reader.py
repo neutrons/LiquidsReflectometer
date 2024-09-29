@@ -11,14 +11,14 @@ class TestReductionParameters:
         r"""verify the xml dump writes what we want"""
         redparms = ReductionParameters()
         redparms.two_backgrounds = True
-        assert "<two_backgrounds_flag>True</two_backgrounds_flag>" in redparms.to_xml()
+        assert "<two_backgrounds>True</two_backgrounds>" in redparms.to_xml()
 
     def test_emission_delay(self):
         r"""verify the xml dump writes the emission delay option"""
         redparms = ReductionParameters()
 
         # Default should be True
-        assert redparms.use_emission_time == True
+        assert redparms.use_emission_time is True
         assert "<use_emission_time>True</use_emission_time>" in redparms.to_xml()
 
         redparms.use_emission_time = False
@@ -32,7 +32,7 @@ class TestReductionParameters:
         redparms.from_dict(dict(two_backgrounds=True))
         assert redparms.two_backgrounds
         # invalid data dictionary and not permissible
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(ValueError, match="data_dir contains invalid entries") as excinfo:
             redparms.from_dict(dict(nonsense=True), permissible=False)
         assert "data_dir contains invalid entries" == str(excinfo.value)
         # invalid data dictionary and permissible

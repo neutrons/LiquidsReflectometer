@@ -108,7 +108,7 @@ class ReductionParameters(object):
         _xml += "<to_peak_pixels>%s</to_peak_pixels>\n" % str(self.data_peak_range[1])
         _xml += "<peak_discrete_selection>N/A</peak_discrete_selection>\n"
         _xml += "<background_flag>%s</background_flag>\n" % str(self.subtract_background)
-        _xml += "<two_backgrounds_flag>%s</two_backgrounds_flag>\n" % str(self.two_backgrounds)
+        _xml += "<two_backgrounds>%s</two_backgrounds>\n" % str(self.two_backgrounds)
         _xml += "<back_roi1_from>%s</back_roi1_from>\n" % str(self.background_roi[0])
         _xml += "<back_roi1_to>%s</back_roi1_to>\n" % str(self.background_roi[1])
         _xml += "<back_roi2_from>%s</back_roi2_from>\n" % str(self.background_roi[2])
@@ -206,7 +206,7 @@ class ReductionParameters(object):
                                                  default=self.subtract_background)
 
         # use two backgrounds flag
-        self.two_backgrounds = getBoolElement(instrument_dom, "two_backgrounds_flag",
+        self.two_backgrounds = getBoolElement(instrument_dom, "two_backgrounds",
                                               default=self.two_backgrounds)
 
         # background from/to pixels

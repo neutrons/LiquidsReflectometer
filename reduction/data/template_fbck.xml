@@ -14,7 +14,7 @@
    <to_peak_pixels>147</to_peak_pixels>
    <peak_discrete_selection>N/A</peak_discrete_selection>
    <background_flag>True</background_flag>
-   <two_backgrounds_flag>True</two_backgrounds_flag>
+   <two_backgrounds>True</two_backgrounds>
    <back_roi1_from>133</back_roi1_from>
    <back_roi1_to>150</back_roi1_to>
    <back_roi2_from>0</back_roi2_from>
@@ -62,7 +62,7 @@
    <to_peak_pixels>147</to_peak_pixels>
    <peak_discrete_selection>N/A</peak_discrete_selection>
    <background_flag>True</background_flag>
-   <two_backgrounds_flag>True</two_backgrounds_flag>
+   <two_backgrounds>True</two_backgrounds>
    <back_roi1_from>133</back_roi1_from>
    <back_roi1_to>150</back_roi1_to>
    <back_roi2_from>0</back_roi2_from>
@@ -110,7 +110,7 @@
    <to_peak_pixels>147</to_peak_pixels>
    <peak_discrete_selection>N/A</peak_discrete_selection>
    <background_flag>True</background_flag>
-   <two_backgrounds_flag>True</two_backgrounds_flag>
+   <two_backgrounds>True</two_backgrounds>
    <back_roi1_from>133</back_roi1_from>
    <back_roi1_to>150</back_roi1_to>
    <back_roi2_from>0</back_roi2_from>
@@ -158,7 +158,7 @@
    <to_peak_pixels>147</to_peak_pixels>
    <peak_discrete_selection>N/A</peak_discrete_selection>
    <background_flag>True</background_flag>
-   <two_backgrounds_flag>True</two_backgrounds_flag>
+   <two_backgrounds>True</two_backgrounds>
    <back_roi1_from>133</back_roi1_from>
    <back_roi1_to>150</back_roi1_to>
    <back_roi2_from>0</back_roi2_from>
@@ -206,7 +206,7 @@
    <to_peak_pixels>147</to_peak_pixels>
    <peak_discrete_selection>N/A</peak_discrete_selection>
    <background_flag>True</background_flag>
-   <two_backgrounds_flag>True</two_backgrounds_flag>
+   <two_backgrounds>True</two_backgrounds>
    <back_roi1_from>133</back_roi1_from>
    <back_roi1_to>150</back_roi1_to>
    <back_roi2_from>0</back_roi2_from>
@@ -254,7 +254,7 @@
    <to_peak_pixels>147</to_peak_pixels>
    <peak_discrete_selection>N/A</peak_discrete_selection>
    <background_flag>True</background_flag>
-   <two_backgrounds_flag>True</two_backgrounds_flag>
+   <two_backgrounds>True</two_backgrounds>
    <back_roi1_from>126</back_roi1_from>
    <back_roi1_to>131</back_roi1_to>
    <back_roi2_from>153</back_roi2_from>
@@ -302,7 +302,7 @@
    <to_peak_pixels>148</to_peak_pixels>
    <peak_discrete_selection>N/A</peak_discrete_selection>
    <background_flag>True</background_flag>
-   <two_backgrounds_flag>True</two_backgrounds_flag>
+   <two_backgrounds>True</two_backgrounds>
    <back_roi1_from>131</back_roi1_from>
    <back_roi1_to>151</back_roi1_to>
    <back_roi2_from>0</back_roi2_from>
@@ -350,7 +350,7 @@
    <to_peak_pixels>148</to_peak_pixels>
    <peak_discrete_selection>N/A</peak_discrete_selection>
    <background_flag>True</background_flag>
-   <two_backgrounds_flag>True</two_backgrounds_flag>
+   <two_backgrounds>True</two_backgrounds>
    <back_roi1_from>131</back_roi1_from>
    <back_roi1_to>151</back_roi1_to>
    <back_roi2_from>0</back_roi2_from>
