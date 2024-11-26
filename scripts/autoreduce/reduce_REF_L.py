@@ -79,6 +79,8 @@ if template_file is None:
         template_file = default_template_path
 
 print("Using template: %s" % template_file)
+if template_file is None:
+    raise ValueError("No template found: place a template in shared/autoreduce")
 
 # Check the measurement geometry. This will be useful later
 #if ws.getRun().getProperty('BL4B:CS:ExpPl:OperatingMode').value[0] == 'Free Liquid':

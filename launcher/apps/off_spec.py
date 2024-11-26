@@ -116,5 +116,16 @@ class OffSpec(QWidget):
 
         print("Processing!")
 
-        subprocess.run(['python3', 'scripts/off_spec.py',
-                        self.run_number_ledit.text(), self.wl_step_ledit.text(), self.output_dir_label.text()])
+        #subprocess.run(['python3', 'scripts/off_spec.py',
+        #                self.run_number_ledit.text(), self.wl_step_ledit.text(), self.output_dir_label.text()])
+
+        reduction_script='scripts/off_spec.py'
+        args = ['nsd-conda-wrap.sh', 'mantid',
+                '--classic',
+                reduction_script,
+                self.run_number_ledit.text(),
+                self.wl_step_ledit.text(),
+                self.output_dir_label.text()
+                ]
+
+        subprocess.run(args)

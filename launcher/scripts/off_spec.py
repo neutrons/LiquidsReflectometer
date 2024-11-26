@@ -1,4 +1,7 @@
 import sys
+
+sys.path.append("/SNS/REF_L/shared/reduction")
+
 import os
 import argparse
 import numpy as np
@@ -13,13 +16,12 @@ mantid.ConfigService.Instance().setString("default.instrument", "REF_L")
 mantid.ConfigService.Instance().setString("default.facility", "SNS")
 mantid.ConfigService.Instance().setString("datasearch.searcharchive", "sns")
 
-DEFAULT_4B_SAMPLE_DET_DISTANCE = 1.83
-DEFAULT_4B_SOURCE_DET_DISTANCE = 15.75
+from lr_reduction.event_reduction import read_settings, EventReflectivity
 
 
 class PixelData():
-    source_detector_distance = DEFAULT_4B_SOURCE_DET_DISTANCE
-    det_distance = DEFAULT_4B_SAMPLE_DET_DISTANCE
+    source_detector_distance = EventReflectivity.DEFAULT_4B_SOURCE_DET_DISTANCE
+    det_distance = EventReflectivity.DEFAULT_4B_SAMPLE_DET_DISTANCE
 
     def __init__(self, run_number):
         self.ws = api.LoadEventNexus("REF_L_%s" % run_number, OutputWorkspace='r%s' % run_number)
@@ -39,12 +41,14 @@ class PixelData():
         return _repr
 
     def get_parameters(self):
-        if self.ws.getInstrument().hasParameter("sample-det-distance"):
-            self.det_distance = self.ws.getInstrument().getNumberParameter("sample-det-distance")[0]
+        settings = read_settings(self.ws)
 
-        if self.ws.getInstrument().hasParameter("source-det-distance"):
-            self.source_detector_distance = self.ws.getInstrument().getNumberParameter("source-det-distance")[0]
+        if "sample-det-distance" in settings:
+            self.det_distance = settings["sample-det-distance"]
 
+        if "source-det-distance" in settings:
+            self.source_detector_distance = settings["source-det-distance"]
+            
         # Set up basic data
         self.n_x = int(self.ws.getInstrument().getNumberParameter("number-of-x-pixels")[0])
         self.n_y = int(self.ws.getInstrument().getNumberParameter("number-of-y-pixels")[0])
