@@ -167,7 +167,7 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
             ws_db = event_reduction.process_attenuation(ws_db, thickness=attenuator_thickness)
 
     # Apply dead time correction
-    if template_data.dead_time:
+    if normalize and template_data.dead_time:
         ws_db = event_reduction.apply_dead_time_correction(ws_db, template_data)
 
     # If we run in theta-theta geometry, we'll need thi
