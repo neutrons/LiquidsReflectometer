@@ -614,7 +614,7 @@ class EventReflectivity(object):
 
                 # Sign will depend on reflect up or down
                 ths_value = ws.getRun()['ths'].value[-1]
-                delta_theta_f *= ths_value / np.fabs(ths_value)
+                delta_theta_f *= np.sign(ths_value)
 
                 qz=4.0*np.pi/wl_list * np.sin(theta + delta_theta_f - d_theta)
                 qz = np.fabs(qz)
@@ -766,7 +766,7 @@ class EventReflectivity(object):
             delta_theta_f = np.arctan(x_distance / self.det_distance)
             # Sign will depend on reflect up or down
             ths_value = ws.getRun()['ths'].value[-1]
-            delta_theta_f *= ths_value / np.fabs(ths_value)
+            delta_theta_f *= np.sign(ths_value)
             theta_f = theta + delta_theta_f
 
             qz = k * (np.sin(theta_f) + np.sin(theta))
