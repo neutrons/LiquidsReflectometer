@@ -44,7 +44,7 @@ def reduce(ws, template_file, output_dir, average_overlap=False,
     # Call the reduction using the template
     qz_mid, refl, d_refl, meta_data = template.process_from_template_ws(ws, template_data,
                                                                         q_summing=q_summing,
-                                                                        tof_weighted=q_summing,
+                                                                        tof_weighted=False,
                                                                         clean=q_summing,
                                                                         bck_in_q=bck_in_q,
                                                                         info=True)

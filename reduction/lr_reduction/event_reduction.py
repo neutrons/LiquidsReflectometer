@@ -608,9 +608,13 @@ class EventReflectivity(object):
                 d_theta = self.gravity_correction(ws, wl_list)
                 event_weights = evt_list.getWeights()
 
-                # Sign will depend on reflect up or down
                 x_distance = _pixel_width * (j - peak_position)
                 delta_theta_f = np.arctan(x_distance / self.det_distance) / 2.0
+
+                # Sign will depend on reflect up or down
+                ths_value = ws.getRun()['ths'].value[-1]
+                delta_theta_f *= ths_value / np.fabs(ths_value)
+
                 qz=4.0*np.pi/wl_list * np.sin(theta + delta_theta_f - d_theta)
                 qz = np.fabs(qz)
 
@@ -649,6 +653,10 @@ class EventReflectivity(object):
         if wl_dist is not None and wl_bins is not None:
             bin_size = _q_bins[1:] - _q_bins[:-1]
             non_zero = counts > 0
+            # Deal with the case where we don't sum all the bins
+            if not sum_pixels:
+                bin_size = np.tile(bin_size, [counts.shape[0], 1])
+
             d_refl_sq[non_zero] =  refl[non_zero] / np.sqrt(counts[non_zero]) / charge / bin_size[non_zero]
             refl[non_zero] = refl[non_zero] / charge / bin_size[non_zero]
         else:
@@ -670,7 +678,11 @@ class EventReflectivity(object):
                 else:
                     pixel = i * self.n_y + j
                 evt_list = ws.getSpectrum(pixel)
-                wl_list = evt_list.getTofs() / self.constant
+                tofs = evt_list.getTofs()
+                # Correct for emission time as needed
+                if self.use_emission_time:
+                    tofs = self.emission_time_correction(ws, tofs)
+                wl_list = tofs / self.constant
                 wl_events = np.concatenate((wl_events, wl_list))
 
         return wl_events
