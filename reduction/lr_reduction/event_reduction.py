@@ -623,12 +623,7 @@ class EventReflectivity(object):
                     wl_weights = 1.0/np.interp(wl_list, wl_bins, wl_dist, np.inf, np.inf)
                     hist_weights = wl_weights * qz / wl_list
                     hist_weights *= event_weights
-                    #_wl_q_bins = 4.0 * np.pi / _q_bins * np.sin(theta + delta_theta_f)
-                    #_wl_width = np.fabs(_wl_q_bins[1:] - _wl_q_bins[:-1])
                     _counts, _ = np.histogram(qz, bins=_q_bins, weights=hist_weights)
-                    _width = np.fabs(_q_bins[1:] - _q_bins[:-1])
-
-                    _counts /= _width
                     _norm, _ = np.histogram(qz, bins=_q_bins)
                     if sum_pixels:
                         refl += _counts
@@ -663,8 +658,8 @@ class EventReflectivity(object):
             if not sum_pixels:
                 bin_size = np.tile(bin_size, [counts.shape[0], 1])
 
-            d_refl_sq[non_zero] =  refl[non_zero] / np.sqrt(counts[non_zero]) / charge #/ bin_size[non_zero]
-            refl[non_zero] = refl[non_zero] / charge #/ bin_size[non_zero]
+            d_refl_sq[non_zero] =  refl[non_zero] / np.sqrt(counts[non_zero]) / charge / bin_size[non_zero]
+            refl[non_zero] = refl[non_zero] / charge / bin_size[non_zero]
         else:
             d_refl_sq = np.sqrt(np.fabs(refl)) / charge
             refl /= charge
