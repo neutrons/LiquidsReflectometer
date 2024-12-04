@@ -9,7 +9,7 @@ import numpy as np
 from mantid.api import *
 from mantid.kernel import *
 
-from . import event_reduction, reduction_template_reader
+from . import event_reduction, peak_finding, reduction_template_reader
 
 TOLERANCE = 0.07
 OUTPUT_NORM_DATA = False
@@ -167,7 +167,7 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
             ws_db = event_reduction.process_attenuation(ws_db, thickness=attenuator_thickness)
 
     # Apply dead time correction
-    if template_data.dead_time:
+    if normalize and template_data.dead_time:
         ws_db = event_reduction.apply_dead_time_correction(ws_db, template_data)
 
     # If we run in theta-theta geometry, we'll need thi
@@ -207,8 +207,17 @@ def process_from_template_ws(ws_sc, template_data, q_summing=False,
     else:
         peak_bck = None
 
-    #TODO: Fit this peak
     peak_center = (peak[0]+peak[1])/2.0
+
+    # Fit the reflected beam position, which may not be in the middle and is
+    # used in the q-summing calculation
+    if q_summing:
+        x_min=template_data.data_peak_range[0]
+        x_max=template_data.data_peak_range[1]
+        _, _x, _y = peak_finding.process_data(ws_sc, summed=True, tof_step=200)
+        peak_center = np.argmax(_y[x_min:x_max]) + x_min
+        peak_center, sc_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min, x_max=x_max, center=peak_center, sigma=3.)
+        print("Peak center: %g" % peak_center)
 
     if template_data.data_x_range_flag:
         low_res = template_data.data_x_range
