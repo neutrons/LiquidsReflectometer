@@ -482,8 +482,8 @@ class EventReflectivity(object):
         """
         # Event weights for normalization
         db_charge = self._ws_db.getRun().getProtonCharge()
-        wl_events = self._get_events(self._ws_db, self.norm_peak, self.norm_low_res)
-        wl_dist, wl_bins = np.histogram(wl_events, bins=60)
+        wl_events, wl_weights = self._get_events(self._ws_db, self.norm_peak, self.norm_low_res)
+        wl_dist, wl_bins = np.histogram(wl_events, bins=100, weights=wl_weights)
         _bin_width = wl_bins[1:] - wl_bins[:-1]
         wl_dist = wl_dist/db_charge/_bin_width
         wl_middle = [(wl_bins[i+1]+wl_bins[i])/2.0 for i in range(len(wl_bins)-1)]
@@ -671,6 +671,7 @@ class EventReflectivity(object):
             Return an array of wavelengths for a given workspace.
         """
         wl_events = np.asarray([])
+        wl_weights = np.asarray([])
 
         for i in range(low_res[0], int(low_res[1]+1)):
             for j in range(peak[0], int(peak[1]+1)):
@@ -685,8 +686,9 @@ class EventReflectivity(object):
                     tofs = self.emission_time_correction(ws, tofs)
                 wl_list = tofs / self.constant
                 wl_events = np.concatenate((wl_events, wl_list))
-
-        return wl_events
+                weights = evt_list.getWeights()
+                wl_weights = np.concatenate((wl_weights, weights))
+        return wl_events, wl_weights
 
     def off_specular(self, x_axis=None, x_min=-0.015, x_max=0.015, x_npts=50,
                      z_min=None, z_max=None, z_npts=-120, bck_in_q=None):
@@ -714,8 +716,8 @@ class EventReflectivity(object):
         else:
             qx_bins = np.logspace(np.log10(x_min), np.log10(x_max), num=np.abs(x_npts))
 
-        wl_events = self._get_events(self._ws_db, self.norm_peak, self.norm_low_res)
-        wl_dist, wl_bins = np.histogram(wl_events, bins=60)
+        wl_events, wl_weights = self._get_events(self._ws_db, self.norm_peak, self.norm_low_res)
+        wl_dist, wl_bins = np.histogram(wl_events, bins=100, weights=wl_weights)
         wl_middle = [(wl_bins[i+1]+wl_bins[i])/2.0 for i in range(len(wl_bins)-1)]
 
         _refl, _d_refl = self._off_specular(self._ws_sc, wl_dist, wl_middle, qx_bins, qz_bins,
@@ -767,7 +769,7 @@ class EventReflectivity(object):
             # Sign will depend on reflect up or down
             ths_value = ws.getRun()['ths'].value[-1]
             delta_theta_f *= np.sign(ths_value)
-            theta_f = theta + delta_theta_f
+            theta_f = theta - delta_theta_f
 
             qz = k * (np.sin(theta_f) + np.sin(theta))
             qz = np.fabs(qz)
