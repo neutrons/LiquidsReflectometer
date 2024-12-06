@@ -769,7 +769,7 @@ class EventReflectivity(object):
             # Sign will depend on reflect up or down
             ths_value = ws.getRun()['ths'].value[-1]
             delta_theta_f *= np.sign(ths_value)
-            theta_f = theta - delta_theta_f
+            theta_f = theta + delta_theta_f
 
             qz = k * (np.sin(theta_f) + np.sin(theta))
             qz = np.fabs(qz)
