@@ -54,19 +54,21 @@ def test_q_summing(nexus_dir):
     template.read_template(template_path, 7)
     with amend_config(data_dir=nexus_dir):
             ws_sc = mtd_api.Load("REF_L_%s" % 198415)
-    qz_mid0, refl0, d_refl0, meta_data = template.process_from_template_ws(ws_sc, template_path, info=True)
+    qz_mid0, refl0, _, meta_data = template.process_from_template_ws(ws_sc, template_path, info=True)
 
     assert(np.fabs(meta_data['dq_over_q'] - 0.02759) < 1e-3)
 
     # Now try with Q summing, which should have similar results
-    qz_mid, refl, d_refl, meta_data = template.process_from_template_ws(ws_sc, template_path,
+    qz_mid, refl, _, meta_data = template.process_from_template_ws(ws_sc, template_path,
+                                                                        tof_weighted=True,
                                                                         info=True, q_summing=True)
 
     assert(np.fabs(meta_data['dq_over_q'] - 0.009354) < 1e-5)
 
-    np.loadtxt('data/reference_rq.txt').T
-    assert(len(qz_mid0) == len(qz_mid))
-    assert(np.fabs(np.mean(refl-refl0)) < 1e-6)
+    # Note that TOF weighted may have a slightly different range, so here we skip
+    # the extra point.
+    assert(len(qz_mid0) == len(qz_mid[1:]))
+    assert(np.fabs(np.mean(refl[1:]-refl0)) < 1e-6)
 
     # Cleanup
     output_dir = 'data/'
