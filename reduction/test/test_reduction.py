@@ -1,6 +1,6 @@
 # standard imports
-from pathlib import Path
 import os
+from pathlib import Path
 
 # third-party imports
 import mantid
@@ -10,7 +10,6 @@ import numpy as np
 # lr_reduction imports
 from lr_reduction import event_reduction, template, workflow
 from lr_reduction.utils import amend_config
-
 
 mtd_api.config["default.facility"] = "SNS"
 mtd_api.config["default.instrument"] = "REF_L"
@@ -45,6 +44,35 @@ def test_attenuation(nexus_dir):
     with amend_config(data_dir=nexus_dir):
         ws_sc = mtd_api.Load("REF_L_198409")
     event_reduction.process_attenuation(ws_sc, 0.005)
+
+
+def test_q_summing(nexus_dir):
+    """
+        Test Q summing process
+    """
+    template_path = 'data/template.xml'
+    template.read_template(template_path, 7)
+    with amend_config(data_dir=nexus_dir):
+            ws_sc = mtd_api.Load("REF_L_%s" % 198415)
+    qz_mid0, refl0, _, meta_data = template.process_from_template_ws(ws_sc, template_path, info=True)
+
+    assert(np.fabs(meta_data['dq_over_q'] - 0.02759) < 1e-3)
+
+    # Now try with Q summing, which should have similar results
+    qz_mid, refl, _, meta_data = template.process_from_template_ws(ws_sc, template_path,
+                                                                        tof_weighted=True,
+                                                                        info=True, q_summing=True)
+
+    assert(np.fabs(meta_data['dq_over_q'] - 0.009354) < 1e-5)
+
+    # Note that TOF weighted may have a slightly different range, so here we skip
+    # the extra point.
+    assert(len(qz_mid0) == len(qz_mid[1:]))
+    assert(np.fabs(np.mean(refl[1:]-refl0)) < 1e-6)
+
+    # Cleanup
+    output_dir = 'data/'
+    cleanup_partial_files(output_dir, range(198409, 198417))
 
 
 def test_full_reduction(nexus_dir):

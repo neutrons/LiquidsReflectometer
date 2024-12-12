@@ -235,6 +235,8 @@ class EventReflectivity(object):
         self._offspec_x_bins = None
         self._offspec_z_bins = None
         self.summing_threshold = None
+        self.q_summing = False
+        self.dq_over_q = 0
         self.dead_time = dead_time
         self.paralyzable = paralyzable
         self.dead_time_value = dead_time_value
@@ -287,10 +289,15 @@ class EventReflectivity(object):
         else:
             self.wl_range = [self.tof_range[0] / self.constant, self.tof_range[1] /  self.constant]
 
+        # q_min and q_max are the boundaries for the final Q binning
+        # We also hold on to the true Q range covered by the measurement
+        self.q_min_meas = 4.0*np.pi/self.wl_range[1] * np.fabs(np.sin(self.theta))
+        self.q_max_meas = 4.0*np.pi/self.wl_range[0] * np.fabs(np.sin(self.theta))
+
         if self.q_min is None:
-            self.q_min = 4.0*np.pi/self.wl_range[1] * np.fabs(np.sin(self.theta))
+            self.q_min = self.q_min_meas
         if self.q_max is None:
-            self.q_max = 4.0*np.pi/self.wl_range[0] * np.fabs(np.sin(self.theta))
+            self.q_max = self.q_max_meas
 
         # Q binning to use
         self.q_bins = get_q_binning(self.q_min, self.q_max, self.q_step)
@@ -351,7 +358,7 @@ class EventReflectivity(object):
         output += "    source-det: %s\n" % self.source_detector_distance
         output += "    pixel: %s\n" % self.pixel_width
         output += "    WL: %s %s\n" % (self.wl_range[0], self.wl_range[1])
-        output += "    Q: %s %s\n" % (self.q_min, self.q_max)
+        output += "    Q: %s %s\n" % (self.q_min_meas, self.q_max_meas)
         theta_degrees = self.theta * 180 / np.pi
         output += "    Theta = %s\n" % theta_degrees
         output += "    Emission delay = %s" % self.use_emission_time
@@ -377,13 +384,12 @@ class EventReflectivity(object):
             norm_run = 0
 
         dq0 = 0
-        dq_over_q = compute_resolution(self._ws_sc, theta=self.theta)
         return dict(wl_min=self.wl_range[0], wl_max=self.wl_range[1],
-                    q_min=self.q_min, q_max=self.q_max, theta=self.theta,
+                    q_min=self.q_min_meas, q_max=self.q_max_meas, theta=self.theta,
                     start_time=start_time, experiment=experiment, run_number=run_number,
                     run_title=run_title, norm_run=norm_run, time=time.ctime(),
-                    dq0=dq0, dq_over_q=dq_over_q, sequence_number=sequence_number,
-                    sequence_id=sequence_id)
+                    dq0=dq0, dq_over_q=self.dq_over_q, sequence_number=sequence_number,
+                    sequence_id=sequence_id, q_summing=self.q_summing)
 
     def specular(self, q_summing=False, tof_weighted=False, bck_in_q=False,
                  clean=False, normalize=True):
@@ -419,6 +425,10 @@ class EventReflectivity(object):
             self.refl = self.refl[idx[:-1]]
             self.d_refl = self.d_refl[idx[:-1]]
             self.q_bins = self.q_bins[idx]
+
+        # Compute Q resolution
+        self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing)
+        self.q_summing = q_summing
 
         return self.q_bins, self.refl, self.d_refl
 
@@ -873,11 +883,32 @@ class EventReflectivity(object):
         return (theta_sample-theta_in) * np.pi / 180.0
 
 
-def compute_resolution(ws, default_dq=0.027, theta=None):
+def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     """
         Compute the Q resolution from the meta data.
         :param theta: scattering angle in radians
+        :param q_summing: if True, the pixel size will be used for the resolution
     """
+    settings = read_settings(ws)
+
+    if theta is None:
+        theta = abs(ws.getRun().getProperty("ths").value[0]) * np.pi / 180.
+
+    if q_summing:
+        # Q resolution is reported as FWHM, so here we consider this to be
+        # related to the pixel width
+        sdd = 1830
+        if "sample-det-distance" in settings:
+            sdd = settings["sample-det-distance"] * 1000
+        pixel_size = 0.7
+        if "pixel-width" in settings:
+            pixel_size = settings["pixel-width"]
+
+        # All angles here in radians, assuming small angles
+        dq_over_q = np.arcsin(pixel_size / sdd) / theta
+        print("Q summing: %g" % dq_over_q)
+        return dq_over_q
+
     # We can't compute the resolution if the value of xi is not in the logs.
     # Since it was not always logged, check for it here.
     if not ws.getRun().hasProperty("BL4B:Mot:xi.RBV"):
@@ -894,12 +925,10 @@ def compute_resolution(ws, default_dq=0.027, theta=None):
 
     # Distance between the s1 and the sample
     s1_sample_distance = 1485
-    if ws.getInstrument().hasParameter("s1-sample-distance"):
-        s1_sample_distance = ws.getInstrument().getNumberParameter("s1-sample-distance")[0]*1000
+    if "s1-sample-distance" in settings:
+        s1_sample_distance = settings["s1-sample-distance"] * 1000
 
     s1h = abs(ws.getRun().getProperty("S1VHeight").value[0])
-    if theta is None:
-        theta = abs(ws.getRun().getProperty("ths").value[0]) * np.pi / 180.
     xi = abs(ws.getRun().getProperty("BL4B:Mot:xi.RBV").value[0])
     sample_si_distance = xi_reference - xi
     slit_distance = s1_sample_distance - sample_si_distance

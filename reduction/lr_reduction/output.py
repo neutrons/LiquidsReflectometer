@@ -137,8 +137,6 @@ class RunCollection():
                 initial_entry_written = True
 
             # Write R(q)
-            fd.write('# dQ0[1/Angstrom] = %g\n' % _meta['dq0'])
-            fd.write('# dQ/Q = %g\n' % _meta['dq_over_q'])
             fd.write('# %-21s %-21s %-21s %-21s\n' % ('Q [1/Angstrom]', 'R', 'dR', 'dQ [FWHM]'))
             for i in range(len(self.qz_all)):
                 fd.write('%20.16f  %20.16f  %20.16f  %20.16f\n' % (self.qz_all[i], self.refl_all[i], self.d_refl_all[i], self.d_qz_all[i]))
