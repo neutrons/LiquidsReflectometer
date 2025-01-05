@@ -71,8 +71,15 @@ def get_q_binning(q_min=0.001, q_max=0.15, q_step=-0.02):
 
 def get_attenuation_info(ws):
     """
-        Retrieve information about attenuation.
-        Returns the attenuator thickness found in the meta data
+    Retrieve information about attenuation from a Mantid workspace.
+    This function calculates the total thickness of all attenuators that are
+    in the path of the beam by summing up the thicknesses of the attenuators
+    specified in the global variable `CD_ATTENUATORS`.
+
+    :param ws: mantid.api.Workspace
+        Mantid workspace from which to retrieve the attenuation information.
+    :return: float
+        The total thickness of the attenuators in the path of the beam.
     """
     run_info = ws.getRun()
     attenuator_thickness = 0
