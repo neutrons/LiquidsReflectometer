@@ -43,7 +43,22 @@ def get_wl_range(ws):
 
 def get_q_binning(q_min=0.001, q_max=0.15, q_step=-0.02):
     """
-        Determine Q binning
+    Determine Q binning.
+
+    This function calculates the binning for Q values based on the provided minimum, maximum, and step values.
+    If the step value is positive, it generates a linear binning. If the step value is negative, it generates
+    a logarithmic binning.
+
+    :param q_min: float, optional
+        The minimum Q value (default is 0.001).
+    :param q_max: float, optional
+        The maximum Q value (default is 0.15).
+    :param q_step: float, optional
+        The step size for Q binning. If positive, linear binning is used. If negative, logarithmic binning
+        is used (default is -0.02).
+
+    :return: numpy.ndarray
+        An array of Q values based on the specified binning.
     """
     if q_step > 0:
         n_steps = int((q_max-q_min)/q_step)
