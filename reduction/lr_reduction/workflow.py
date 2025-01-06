@@ -108,9 +108,9 @@ def assemble_results(first_run, output_dir, average_overlap=False, is_live=False
 
     Returns
     -------
-    seq_list : tuple
+    seq_list : list
         The sequence identifiers
-    run_list : tuple
+    run_list : list
         The run numbers
     """
     # Keep track of sequence IDs and run numbers so we can make a new template
@@ -149,9 +149,9 @@ def write_template(seq_list, run_list, template_file, output_dir):
 
     Parameters
     ----------
-    seq_list : tuple
+    seq_list : list
         The sequence identifiers
-    run_list : tuple
+    run_list : list
         The run numbers
     template_file : str
         Path to the template file

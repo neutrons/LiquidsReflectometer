@@ -272,19 +272,19 @@ class EventReflectivity(object):
         Mantid workspace containing the reflected data
     direct_workspace
         Mantid workspace containing the direct beam data [if None, normalization won't be applied]
-    signal_peak : tuple
+    signal_peak : list
         Pixel min and max for the specular peak
-    signal_bck : tuple
+    signal_bck : list
         Pixel range of the background [if None, the background won't be subtracted]
-    norm_peak : tuple
+    norm_peak : list
         Pixel range of the direct beam peak
-    norm_bck : tuple
+    norm_bck : list
         Direct background subtraction is not used [deprecated]
     specular_pixel : float
         Pixel of the specular peak
-    signal_low_res : tuple
+    signal_low_res : list
         Pixel range of the specular peak out of the scattering plane
-    norm_low_res : tuple
+    norm_low_res : list
         Pixel range of the direct beam out of the scattering plane
     q_min : float
         Value of lowest q point
@@ -292,7 +292,7 @@ class EventReflectivity(object):
         Step size in Q. Enter a negative value to get a log scale
     q_min : float
         Value of largest q point
-    tof_range : tuple, None
+    tof_range : list, None
         TOF range,or None
     theta : float
         Theta scattering angle in radians
