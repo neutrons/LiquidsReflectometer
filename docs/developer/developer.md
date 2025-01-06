@@ -131,7 +131,8 @@ git push origin --tags main
 ```
 
 - _minor_ or _major_ release, we create a stable release _after_ we have created a Candidate release.  
-   For this customary procedure, follow:
+  For this customary procedure, follow:
+
       - The [Software Maturity Model](https://ornl-neutrons.atlassian.net/wiki/spaces/NDPD/pages/23363585/Software+Maturity+Model) for continous versioning as well as creating release candidates and stable releases.
 
       - Update the :ref:`Release Notes <release_notes>` with major fixes, updates and additions since last stable release.
