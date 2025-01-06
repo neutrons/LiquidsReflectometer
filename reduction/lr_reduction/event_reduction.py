@@ -811,20 +811,11 @@ class EventReflectivity(object):
         """
         Higher-level call for background subtraction for the normalization run.
         """
-        return background.side_background(
-            self._ws_db, self, self.norm_peak, self.norm_bck, self.norm_low_res, normalize_to_single_pixel=False
-        )
+        return background.side_background(self._ws_db, self, self.norm_peak, self.norm_bck,
+                                          self.norm_low_res, normalize_to_single_pixel=False)
 
-    def slice(
-        self,
-        x_min=0.002,
-        x_max=0.004,
-        x_bins=None,
-        z_bins=None,  # noqa A003
-        refl=None,
-        d_refl=None,
-        normalize=False,
-    ):
+    def slice(self, x_min=0.002, x_max=0.004, x_bins=None, z_bins=None,
+              refl=None, d_refl=None, normalize=False):
         """
         Retrieve a slice from the off-specular data.
         """
