@@ -10,12 +10,12 @@ SHELL=/bin/bash
 .PHONY: help conda docs test install
 
 help:
-    # this nifty perl one-liner collects all commnents headed by the double "#" symbols next to each target and recycles them as comments
+    # This nifty perl one-liner collects all commnents headed by the double "#" symbols next to each target and recycles them as comments
 	@perl -nle'print $& if m{^[a-zA-Z_-]+:.*?## .*$$}' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-25s\033[0m %s\n", $$1, $$2}'
 
 
 PREFIX := /SNS/REF_L/shared
-install:  ## install the automated reduction code for LR
+install:  ## Install the automated reduction code for LR
 	versioningit -w
 	cp -R scripts/livereduce/*.py $(PREFIX)/livereduce
 	cp -R scripts/autoreduce/*.py $(PREFIX)/autoreduce
@@ -32,9 +32,8 @@ conda-env:  ## creates conda environment `lr_reduction` and installs package `lr
 	$(CONDA_ACTIVATE) lr_reduction
 	pip install -e .
 
-docs:  ## generates HTML docs under `docs/_build/html/`, treating warnings as errors. Requires activation of the `lr_reduction` conda environment
-	# this will fail on a warning
-	@cd docs&& make html SPHINXOPTS="-W --keep-going -n" && echo -e "##########\n DOCS point your browser to file://$$(pwd)/build/html/index.html\n##########"
+docs: ## Build the documentation
+	mkdocs build
 
-test-all:  ## run all tests
+test-all:  ## Run all tests
 	pytest ./test

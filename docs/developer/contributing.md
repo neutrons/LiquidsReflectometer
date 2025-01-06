@@ -1,7 +1,4 @@
-.. contributing
-
-Guide to Contributing
-=====================
+# Contributing Guide
 
 Contributions to this project are welcome. All contributors agree to the following:
 
@@ -13,7 +10,7 @@ Contributions to this project are welcome. All contributors agree to the followi
 
 All contributions must be "signed off" in the commit log and by doing so you agree to the above.
 
-Getting access to the main project
-----------------------------------
+## Getting access to the main project
+
 Direct commit access to the project is currently restricted to core developers.
 All other contributions should be done through pull requests.

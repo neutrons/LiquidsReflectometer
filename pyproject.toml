@@ -1,37 +1,26 @@
 [project]
 name = "lr_reduction"
-authors = [{name = "Mat", email = "m2d@ornl.gov"}]
+authors = [{ name = "Mat", email = "m2d@ornl.gov" }]
 description = "Reduction scripts for the Liquids Reflectometer. This includes both automated reduction scripts and useful scripts to reprocess data."
-version = "0.0.1"  # initial version, dynamically overriden
-license = {file = "LICENSE"}
+version = "0.0.1" # initial version, dynamically overriden
+license = { file = "LICENSE" }
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
-  "Topic :: Scientific/Engineering :: Neutron reflectometry"
+  "Topic :: Scientific/Engineering :: Neutron reflectometry",
 ]
-dependencies = [
-    "lmfit",
-    "numpy",
-    "matplotlib",
-    "mantid"
-]
+dependencies = ["lmfit", "mantid", "matplotlib", "numpy"]
+
+[project.optional-dependencies]
+dev = ["mkdocs", "mkdocstrings[python]", "ruff"]
+tests = ["pytest"]
 
 # versioningit will generate file _version.py when installing this package, even if installing from sources
 [build-system]
-requires = [
-  "setuptools >= 40.6.0",
-  "wheel",
-  "toml",
-  "versioningit"
-]
+requires = ["setuptools >= 40.6.0", "wheel", "toml", "versioningit"]
 build-backend = "setuptools.build_meta"
-
-[project.optional-dependencies]
-tests = [
-    "pytest"
-]
 
 [project.urls]
 Homepage = "https://github.com/neutrons/LiquidsReflectometer"
@@ -47,11 +36,13 @@ exclude = ["tests*", "scripts*", "docs*", "notebooks*"]
 line-length = 140
 select = ["A", "ARG", "E", "W", "F", "I", "PT", "RUF100"]
 ignore = [
-  "E402",  # module level import not at top of file
-  "E722",  # bare except
-  "E741", "E743",  # ambiguous function name, generally 'l'
-  "F403",  # wild imports
-  "F405", "F821"  # unknown names from probably from wild imports
+  "E402", # module level import not at top of file
+  "E722", # bare except
+  "E741",
+  "E743", # ambiguous function name, generally 'l'
+  "F403", # wild imports
+  "F405",
+  "F821", # unknown names from probably from wild imports
 ]
 
 [tool.versioningit.vcs]
@@ -77,10 +68,20 @@ skip_empty = true
 
 [tool.pytest.ini_options]
 pythonpath = [
-  ".", "reduction", "scripts", "tests/data/liquidsreflectometer-data/nexus/"
+  ".",
+  "reduction",
+  "scripts",
+  "tests/data/liquidsreflectometer-data/nexus/",
 ]
 testpaths = ["tests"]
-norecursedirs = [".git", "tmp*", "_tmp*", "__pycache__", "*dataset*", "*data_set*"]
+norecursedirs = [
+  ".git",
+  "tmp*",
+  "_tmp*",
+  "__pycache__",
+  "*dataset*",
+  "*data_set*",
+]
 markers = [
   "datarepo: mark a test as using LiquidsReflectometer-data repository",
   "scripts: mark a test as a script that should be run manually",
@@ -88,8 +89,22 @@ markers = [
 
 [tool.flake8]
 ignore = [
-    "E114", "E115", "E116", "E121", "E123", "E126", "E133",
-    "E2", "E704", "E722", "E741", "E743", "W503", "F403", "F405", "F999"
+  "E114",
+  "E115",
+  "E116",
+  "E121",
+  "E123",
+  "E126",
+  "E133",
+  "E2",
+  "E704",
+  "E722",
+  "E741",
+  "E743",
+  "W503",
+  "F403",
+  "F405",
+  "F999",
 ]
 doctests = false
 max-line-length = 130

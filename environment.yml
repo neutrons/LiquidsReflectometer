@@ -7,16 +7,20 @@ dependencies:
   - lmfit
   - mantid=6.10
   - matplotlib
-# development dependencies
+  # development dependencies
   - boa
   - codecov
   - conda-build
   - conda-verify
+  - mkdocs
+  - mkdocstrings
+  - mkdocstrings-python
   - pre-commit
   - pytest
   - pytest-cov
   - python-build
-  - sphinx
-  - sphinx-rtd-theme
+  - ruff
+  # - sphinx
+  # - sphinx-rtd-theme
   - versioningit
   - myst-parser
