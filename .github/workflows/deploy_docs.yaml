@@ -1,0 +1,38 @@
+name: Build and Deploy Docs to GitHub Pages
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # otherwise, you will failed to push refs to dest repo
+
+      - name: Set up Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          miniforge-version: latest
+          environment-file: environment.yml
+
+      - name: Install Dependencies
+        run: pip install .[dev]
+
+      - name: Build Documentation
+        run: make docs
+
+      - name: Deploy to gh-pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: site
+          target-folder: docs
+          clean: true
