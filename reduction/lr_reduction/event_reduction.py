@@ -27,7 +27,10 @@ CD_ATTENUATORS = [['BL4B:Actuator:50MRb', 0.0058],
 def get_wl_range(ws):
     """
         Determine TOF range from the data
-        :param workspace ws: workspace to work with
+
+        :param ws: (Mantid workspace) workspace to work with
+
+        :return: (list) [min, max] wavelength range
     """
     run_object = ws.getRun()
 
@@ -49,13 +52,10 @@ def get_q_binning(q_min=0.001, q_max=0.15, q_step=-0.02):
     If the step value is positive, it generates a linear binning. If the step value is negative, it generates
     a logarithmic binning.
 
-    :param q_min: float, optional
-        The minimum Q value (default is 0.001).
-    :param q_max: float, optional
-        The maximum Q value (default is 0.15).
-    :param q_step: float, optional
-        The step size for Q binning. If positive, linear binning is used. If negative, logarithmic binning
-        is used (default is -0.02).
+    :param q_min: (float, optional) The minimum Q value (default is 0.001).
+    :param q_max: (float, optional) The maximum Q value (default is 0.15).
+    :param q_step: (float, optional) The step size for Q binning. If positive,
+        linear binning is used. If negative, logarithmic binning is used (default is -0.02).
 
     :return: numpy.ndarray
         An array of Q values based on the specified binning.
@@ -76,7 +76,7 @@ def get_attenuation_info(ws):
     in the path of the beam by summing up the thicknesses of the attenuators
     specified in the global variable `CD_ATTENUATORS`.
 
-    :param ws: mantid.api.Workspace
+    :param ws: (Mantid workspace)
         Mantid workspace from which to retrieve the attenuation information.
     :return: float
         The total thickness of the attenuators in the path of the beam.
@@ -95,7 +95,9 @@ def get_attenuation_info(ws):
 def read_settings(ws):
     """
         Read settings file and return values for the given timestamp
+
         :param ws: Mantid workspace
+        :return: (dict) dictionary with settings
     """
     settings = dict()
     package_dir, _ = os.path.split(__file__)
@@ -121,8 +123,11 @@ def read_settings(ws):
 def process_attenuation(ws, thickness=0):
     """
         Correct for absorption by assigning weight to each neutron event
-        :param ws: workspace to correct
-        :param thickness: attenuator thickness in cm
+
+        :param ws: (Mantid workspace) workspace to correct
+        :param thickness: (float) attenuator thickness in cm (default is 0).
+
+        :return: (Mantid workspace) corrected workspace
     """
     settings = read_settings(ws)
     if "source-det-distance" in settings:
@@ -156,8 +161,12 @@ def get_dead_time_correction(ws, template_data):
         Compute dead time correction to be applied to the reflectivity curve.
         The method will also try to load the error events from each of the
         data files to ensure that we properly estimate the dead time correction.
-        :param ws: workspace with raw data to compute correction for
-        :param template_data: reduction parameters
+
+        :param ws: (Mantid worksapce) workspace with raw data to compute correction for
+        :param template_data: (reduction_template_reader.ReductionParameters)
+            reduction parameters
+
+        :return: (Mantid workspace) workspace with dead time correction to apply
     """
     tof_min = ws.getTofMin()
     tof_max = ws.getTofMax()
@@ -179,8 +188,12 @@ def apply_dead_time_correction(ws, template_data):
     """
         Apply dead time correction, and ensure that it is done only once
         per workspace.
-        :param ws: workspace with raw data to compute correction for
-        :param template_data: reduction parameters
+
+        :param ws: (Mantid workspace) workspace with raw data to compute correction for
+        :param template_data: (reduction_template_reader.ReductionParameters)
+            reduction parameters
+
+        :return: (Mantid workspace) workspace with dead time correction applied
     """
     if 'dead_time_applied' not in ws.getRun():
         corr_ws = get_dead_time_correction(ws, template_data)
@@ -190,14 +203,38 @@ def apply_dead_time_correction(ws, template_data):
 
 
 class EventReflectivity(object):
-    r"""
-    Event based reflectivity calculation.
+    """
+    Data reduction for the Liquids Reflectometer.
     List of items to be taken care of outside this class:
+
     - Edge points cropping
     - Angle offset
     - Putting runs together in one R(q) curve
     - Scaling factors
+
+    Pixel ranges include the min and max pixels.
+
+    :param scattering_workspace: Mantid workspace containing the reflected data
+    :param direct_workspace: Mantid workspace containing the direct beam data [if None, normalization won't be applied]
+    :param signal_peak: pixel min and max for the specular peak
+    :param signal_bck: pixel range of the background [if None, the background won't be subtracted]
+    :param norm_peak: pixel range of the direct beam peak
+    :param norm_bck: direct background subtraction is not used [deprecated]
+    :param specular_pixel: pixel of the specular peak
+    :param signal_low_res: pixel range of the specular peak out of the scattering plane
+    :param norm_low_res: pixel range of the direct beam out of the scattering plane
+    :param q_min: value of lowest q point
+    :param q_step: step size in Q. Enter a negative value to get a log scale
+    :param q_min: value of largest q point
+    :param tof_range: TOF range,or None
+    :param theta: theta scattering angle in radians
+    :param dead_time: if not zero, dead time correction will be used
+    :param paralyzable: if True, the dead time calculation will use the paralyzable approach
+    :param dead_time_value: value of the dead time in microsecond
+    :param dead_time_tof_step: TOF bin size in microsecond
+    :param use_emmission_time: if True, the emission time delay will be computed
     """
+
     QX_VS_QZ = 0
     KZI_VS_KZF = 1
     DELTA_KZ_VS_QZ = 3
@@ -215,29 +252,7 @@ class EventReflectivity(object):
                  functional_background=False, dead_time=False,
                  paralyzable=True, dead_time_value=4.2,
                  dead_time_tof_step=100, use_emission_time=True):
-        """
-            Pixel ranges include the min and max pixels.
 
-            :param scattering_workspace: Mantid workspace containing the reflected data
-            :param direct_workspace: Mantid workspace containing the direct beam data [if None, normalization won't be applied]
-            :param signal_peak: pixel min and max for the specular peak
-            :param signal_bck: pixel range of the background [if None, the background won't be subtracted]
-            :param norm_peak: pixel range of the direct beam peak
-            :param norm_bck: direct background subtraction is not used [deprecated]
-            :param specular_pixel: pixel of the specular peak
-            :param signal_low_res: pixel range of the specular peak out of the scattering plane
-            :param norm_low_res: pixel range of the direct beam out of the scattering plane
-            :param q_min: value of lowest q point
-            :param q_step: step size in Q. Enter a negative value to get a log scale
-            :param q_min: value of largest q point
-            :param tof_range: TOF range,or None
-            :param theta: theta scattering angle in radians
-            :param dead_time: if not zero, dead time correction will be used
-            :param paralyzable: if True, the dead time calculation will use the paralyzable approach
-            :param dead_time_value: value of the dead time in microsecond
-            :param dead_time_tof_step: TOF bin size in microsecond
-            :param use_emmission_time: if True, the emission time delay will be computed
-        """
         if instrument in [self.INSTRUMENT_4A, self.INSTRUMENT_4B]:
             self.instrument = instrument
         else:

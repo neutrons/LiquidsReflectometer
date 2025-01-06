@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.abspath("../reduction"))
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "lr_reduction"
-copyright = "2024, ORNL"  # noqa A001
+copyright = "2025, ORNL"  # noqa A001
 author = "ORNL"
 version = versioningit.get_version("../")
 # The full version, including alpha/beta/rc tags
