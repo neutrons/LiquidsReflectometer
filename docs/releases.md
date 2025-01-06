@@ -1,11 +1,13 @@
-.. _release_notes:
+# Release Notes
 
-Release Notes
-=============
-Notes for major or minor releases. Notes for patch releases are deferred
+Notes for major or minor releases. Notes for patch releases are deferred.
 
-<Next Major or Minor Release>
------------------------------
+Release notes are written in reverse chronological order, with the most recent release at the top,  
+using the following format:
+
+```markdown
+## <Next Major or Minor Release>
+
 (date of release, format YYYY-MM-DD)
 
 **Of interest to the User**:
@@ -14,10 +16,10 @@ Notes for major or minor releases. Notes for patch releases are deferred
 
 **Of interest to the Developer:**
 
-- PR #40 documentation to create a patch release
+- PR #XYZ one-liner description
+```
 
-2.1.0
------
+## 2.1.0
 
 **Of interest to the User**:
 
@@ -29,6 +31,7 @@ Notes for major or minor releases. Notes for patch releases are deferred
 
 **Of interest to the Developer:**
 
+- PR #40 documentation to create a patch release
 - PR #37 documentation conforming to that of the python project template
 - PR #36 versioning with versioningit
 - PR #25 Read in error events when computing correction

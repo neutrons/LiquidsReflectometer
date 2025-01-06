@@ -14,20 +14,23 @@ jobs:
       run:
         shell: bash -l {0}
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Miniconda
-      uses: conda-incubator/setup-miniconda@v2
-      with:
-        auto-update-conda: true
-        miniforge-version: latest
-        environment-file: environment.yml
-    - name: Test with pytest
-      working-directory: ./reduction
-      run: |
-        git submodule add --force https://code.ornl.gov/sns-hfir-scse/infrastructure/test-data/liquidsreflectometer-data.git tests/data/liquidsreflectometer-data
-        git submodule update --init
-        python -m pytest -vv --cov=. --cov-report=xml --cov-report=term test
-    - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v3
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      - uses: actions/checkout@v4
+
+      - name: Set up Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          miniforge-version: latest
+          environment-file: environment.yml
+
+      - name: Test with pytest
+        working-directory: ./reduction
+        run: |
+          git submodule add --force https://code.ornl.gov/sns-hfir-scse/infrastructure/test-data/liquidsreflectometer-data.git tests/data/liquidsreflectometer-data
+          git submodule update --init
+          python -m pytest -vv --cov=. --cov-report=xml --cov-report=term test
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
