@@ -8,9 +8,10 @@
 import os
 import re
 import time
+
 from mantid.api import *
-from mantid.simpleapi import *
 from mantid.kernel import *
+from mantid.simpleapi import *
 
 import lr_reduction
 from lr_reduction import DeadTimeCorrection

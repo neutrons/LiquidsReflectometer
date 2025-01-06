@@ -1,17 +1,13 @@
 import os
+
+import mantid.simpleapi as mtd_api
 import numpy as np
 
-from lr_reduction.DeadTimeCorrection import SingleReadoutDeadTimeCorrection
-
-import mantid
-import mantid.simpleapi as mtd_api
 mtd_api.config["default.facility"] = "SNS"
 mtd_api.config["default.instrument"] = "REF_L"
 
-from lr_reduction import event_reduction, template, workflow
-from lr_reduction.utils import amend_config
-
 from lr_reduction.scaling_factors import workflow as sf_workflow
+from lr_reduction.utils import amend_config
 
 
 def check_results(data_file, reference):
@@ -172,4 +168,3 @@ def test_compute_sf_with_deadtime_tof_200_sort(nexus_dir):
     assert output is True
 
     check_results(output_cfg, 'data/sf_197912_Si_dt_par_46_200.cfg')
-

@@ -2,12 +2,12 @@
 Dead time correction algorithm for single-readout detectors.
 """
 
-from mantid.api import *
-from mantid.api import AlgorithmFactory, PythonAlgorithm
-from mantid.simpleapi import *
-from mantid.kernel import *
 import numpy as np
 import scipy
+from mantid.api import *
+from mantid.api import AlgorithmFactory, PythonAlgorithm
+from mantid.kernel import *
+from mantid.simpleapi import *
 
 
 class SingleReadoutDeadTimeCorrection(PythonAlgorithm):

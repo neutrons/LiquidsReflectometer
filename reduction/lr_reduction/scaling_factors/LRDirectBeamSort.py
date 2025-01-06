@@ -5,14 +5,15 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init,invalid-name
-from mantid.api import *
-from mantid.simpleapi import *
-from mantid.kernel import *
-import functools
-import numpy as np
-from typing import List, Tuple
 import datetime
+import functools
 from math import ceil
+from typing import List, Tuple
+
+import numpy as np
+from mantid.api import *
+from mantid.kernel import *
+from mantid.simpleapi import *
 
 THI_TOLERANCE = 0.002
 

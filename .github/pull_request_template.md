@@ -23,4 +23,3 @@ Check all that apply:
 - [ ] All the tests are passing
 - [ ] The documentation is up to date
 - [ ] code comments added when explaining intent
-
