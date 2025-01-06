@@ -21,11 +21,28 @@ def reduce(
     If average_overlap is used, overlapping points will be averaged, otherwise they
     will be left in the final data file.
 
-    :param average_overlap: if True, the overlapping points will be averaged
-    :param q_summing: if True, constant-Q binning will be used
-    :param bck_in_q: if True, and constant-Q binning is used, the background will be estimated
-                     along constant-Q lines rather than along TOF/pixel boundaries.
-    :param theta_offset: Theta offset to apply. If None, the template value will be used.
+    Parameters
+    ----------
+    average_overlap : bool
+        If True, the overlapping points will be averaged
+    q_summing : bool
+        If True, constant-Q binning will be used
+    bck_in_q : bool
+        If True, and constant-Q binning is used, the background will be estimated
+        along constant-Q lines rather than along TOF/pixel boundaries.
+    theta_offset : float
+        Theta offset to apply. If None, the template value will be used.
+    is_live : bool
+        If True, the data is live and will be saved in a separate file to avoid conflict with auto-reduction
+    output_dir : str
+        Directory where the output files will be saved
+    template_file : str
+        Path to the template file containing the reduction parameters
+
+    Returns
+    -------
+    int
+        The sequence identifier for the run sequence
     """
     # Get the sequence number
     sequence_number = 1
@@ -77,6 +94,24 @@ def reduce(
 def assemble_results(first_run, output_dir, average_overlap=False, is_live=False):
     """
     Find related runs and assemble them in one R(q) data set
+
+    Parameters
+    ----------
+    first_run : int
+        The first run number in the sequence
+    output_dir : str
+        Directory where the output files are saved
+    average_overlap : bool
+        If True, the overlapping points will be averaged
+    is_live : bool
+        If True, the data is live and will be saved in a separate file to avoid conflict with auto-reduction
+
+    Returns
+    -------
+    seq_list : tuple
+        The sequence identifiers
+    run_list : tuple
+        The run numbers
     """
     # Keep track of sequence IDs and run numbers so we can make a new template
     seq_list = []
@@ -111,6 +146,17 @@ def write_template(seq_list, run_list, template_file, output_dir):
     """
     Read the appropriate entry in a template file and save an updated
     copy with the updated run number.
+
+    Parameters
+    ----------
+    seq_list : tuple
+        The sequence identifiers
+    run_list : tuple
+        The run numbers
+    template_file : str
+        Path to the template file
+    output_dir : str
+        Directory where the output files are saved
     """
     with open(template_file, "r") as fd:
         xml_str = fd.read()
@@ -130,14 +176,26 @@ def write_template(seq_list, run_list, template_file, output_dir):
         fd.write(xml_str)
 
 
-def offset_from_first_run(
-    ws,
-    template_file: str,
-    output_dir: str,
-):
+def offset_from_first_run(ws, template_file: str, output_dir: str):
     """
-    Find a theta offset from the first peak.
-    Used when sample is misaligned.
+    Find a theta offset by comparing the peak location of the reflected and direct beam compared to
+    the theta value in the meta data.
+
+    When processing the first run of a set, store that offset in a file so it can be used for later runs.
+
+    Parameters
+    ----------
+    ws : Mantid workspace
+        The workspace to process
+    template_file : str
+        Path to the template file
+    output_dir : str
+        Directory where the output files are saved
+
+    Returns
+    -------
+    float
+        The theta offset
     """
     from . import peak_finding
 
@@ -203,7 +261,34 @@ def offset_from_first_run(
 
 
 def reduce_explorer(ws, ws_db, theta_pv=None, center_pixel=145, db_center_pixel=145, peak_width=10):
-    """ """
+    """
+    Very simple rough reduction for when playing around.
+
+    Parameters
+    ----------
+    ws : Mantid workspace
+        The workspace to process
+    ws_db : Mantid workspace
+        The workspace with the direct beam data
+    theta_pv : str
+        The PV name for the theta value
+    center_pixel : int
+        The pixel number for the center of the reflected beam
+    db_center_pixel : int
+        The pixel number for the center of the direct beam
+    peak_width : int
+        The width of the peak to use for the reflected beam
+
+    Returns
+    -------
+    qz_mid : numpy.ndarray
+        The Q values
+    refl : numpy.ndarray
+        The reflectivity values
+    d_refl : numpy.ndarray
+        The uncertainty in the reflectivity
+
+    """
     from . import peak_finding
 
     if theta_pv is None:
