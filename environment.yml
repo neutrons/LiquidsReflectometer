@@ -19,3 +19,4 @@ dependencies:
   - sphinx
   - sphinx-rtd-theme
   - versioningit
+  - myst-parser

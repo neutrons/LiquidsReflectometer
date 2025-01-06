@@ -30,9 +30,15 @@ def get_wl_range(ws):
     """
     Determine TOF range from the data
 
-    :param ws: (Mantid workspace) workspace to work with
+    Parameters
+    ----------
+    ws
+        Mantid workspace to work with
 
-    :return: (list) [min, max] wavelength range
+    Returns
+    -------
+      list
+        [min, max] wavelength range
     """
     run_object = ws.getRun()
 
@@ -54,13 +60,20 @@ def get_q_binning(q_min=0.001, q_max=0.15, q_step=-0.02):
     If the step value is positive, it generates a linear binning. If the step value is negative, it generates
     a logarithmic binning.
 
-    :param q_min: (float, optional) The minimum Q value (default is 0.001).
-    :param q_max: (float, optional) The maximum Q value (default is 0.15).
-    :param q_step: (float, optional) The step size for Q binning. If positive,
-        linear binning is used. If negative, logarithmic binning is used (default is -0.02).
+    Parameters
+    ----------
+    q_min : float
+        The minimum Q value.
+    q_max : float
+        The maximum Q value.
+    q_step : float
+        The step size for Q binning. If positive, linear binning is used.
+        If negative, logarithmic binning is used.
 
-    :return: numpy.ndarray
-        An array of Q values based on the specified binning.
+    Returns
+    -------
+    ...
+        A numpy array of Q values based on the specified binning.
     """
     if q_step > 0:
         n_steps = int((q_max - q_min) / q_step)
@@ -78,9 +91,14 @@ def get_attenuation_info(ws):
     in the path of the beam by summing up the thicknesses of the attenuators
     specified in the global variable `CD_ATTENUATORS`.
 
-    :param ws: (Mantid workspace)
+    Parameters
+    ----------
+    ws
         Mantid workspace from which to retrieve the attenuation information.
-    :return: float
+
+    Returns
+    -------
+    float
         The total thickness of the attenuators in the path of the beam.
     """
     run_info = ws.getRun()
@@ -98,8 +116,15 @@ def read_settings(ws):
     """
     Read settings file and return values for the given timestamp
 
-    :param ws: Mantid workspace
-    :return: (dict) dictionary with settings
+    Parameters
+    ----------
+    ws
+        Mantid workspace
+
+    Returns
+    -------
+    dict
+        Dictionary with settings
     """
     settings = dict()
     package_dir, _ = os.path.split(__file__)
@@ -126,10 +151,17 @@ def process_attenuation(ws, thickness=0):
     """
     Correct for absorption by assigning weight to each neutron event
 
-    :param ws: (Mantid workspace) workspace to correct
-    :param thickness: (float) attenuator thickness in cm (default is 0).
+    Parameters
+    ----------
+    ws
+        Mantid workspace to correct
+    thickness: float
+        Attenuator thickness in cm (default is 0).
 
-    :return: (Mantid workspace) corrected workspace
+    Returns
+    -------
+        Mantid workspace
+        Corrected Mantid workspace
     """
     settings = read_settings(ws)
     if "source-det-distance" in settings:
@@ -167,11 +199,17 @@ def get_dead_time_correction(ws, template_data):
     The method will also try to load the error events from each of the
     data files to ensure that we properly estimate the dead time correction.
 
-    :param ws: (Mantid worksapce) workspace with raw data to compute correction for
-    :param template_data: (reduction_template_reader.ReductionParameters)
-        reduction parameters
+    Parameters
+    ----------
+    ws
+        Workspace with raw data to compute correction for
+    template_data : reduction_template_reader.ReductionParameters
+        Reduction parameters
 
-    :return: (Mantid workspace) workspace with dead time correction to apply
+    Returns
+    -------
+    ...
+        Workspace with dead time correction to apply
     """
     tof_min = ws.getTofMin()
     tof_max = ws.getTofMax()
@@ -197,11 +235,17 @@ def apply_dead_time_correction(ws, template_data):
     Apply dead time correction, and ensure that it is done only once
     per workspace.
 
-    :param ws: (Mantid workspace) workspace with raw data to compute correction for
-    :param template_data: (reduction_template_reader.ReductionParameters)
-        reduction parameters
+    Parameters
+    ----------
+    ws
+        Workspace with raw data to compute correction for
+    template_data : reduction_template_reader.ReductionParameters
+        Reduction parameters
 
-    :return: (Mantid workspace) workspace with dead time correction applied
+    Returns
+    -------
+    ...
+        Workspace with dead time correction applied
     """
     if "dead_time_applied" not in ws.getRun():
         corr_ws = get_dead_time_correction(ws, template_data)
@@ -222,25 +266,46 @@ class EventReflectivity(object):
 
     Pixel ranges include the min and max pixels.
 
-    :param scattering_workspace: Mantid workspace containing the reflected data
-    :param direct_workspace: Mantid workspace containing the direct beam data [if None, normalization won't be applied]
-    :param signal_peak: pixel min and max for the specular peak
-    :param signal_bck: pixel range of the background [if None, the background won't be subtracted]
-    :param norm_peak: pixel range of the direct beam peak
-    :param norm_bck: direct background subtraction is not used [deprecated]
-    :param specular_pixel: pixel of the specular peak
-    :param signal_low_res: pixel range of the specular peak out of the scattering plane
-    :param norm_low_res: pixel range of the direct beam out of the scattering plane
-    :param q_min: value of lowest q point
-    :param q_step: step size in Q. Enter a negative value to get a log scale
-    :param q_min: value of largest q point
-    :param tof_range: TOF range,or None
-    :param theta: theta scattering angle in radians
-    :param dead_time: if not zero, dead time correction will be used
-    :param paralyzable: if True, the dead time calculation will use the paralyzable approach
-    :param dead_time_value: value of the dead time in microsecond
-    :param dead_time_tof_step: TOF bin size in microsecond
-    :param use_emmission_time: if True, the emission time delay will be computed
+    Parameters
+    ----------
+    scattering_workspace
+        Mantid workspace containing the reflected data
+    direct_workspace
+        Mantid workspace containing the direct beam data [if None, normalization won't be applied]
+    signal_peak : tuple
+        Pixel min and max for the specular peak
+    signal_bck : tuple
+        Pixel range of the background [if None, the background won't be subtracted]
+    norm_peak : tuple
+        Pixel range of the direct beam peak
+    norm_bck : tuple
+        Direct background subtraction is not used [deprecated]
+    specular_pixel : float
+        Pixel of the specular peak
+    signal_low_res : tuple
+        Pixel range of the specular peak out of the scattering plane
+    norm_low_res : tuple
+        Pixel range of the direct beam out of the scattering plane
+    q_min : float
+        Value of lowest q point
+    q_step : float
+        Step size in Q. Enter a negative value to get a log scale
+    q_min : float
+        Value of largest q point
+    tof_range : tuple, None
+        TOF range,or None
+    theta : float
+        Theta scattering angle in radians
+    dead_time : float
+        If not zero, dead time correction will be used
+    paralyzable : bool
+        If True, the dead time calculation will use the paralyzable approach
+    dead_time_value : float
+        value of the dead time in microsecond
+    dead_time_tof_step : float
+        TOF bin size in microsecond
+    use_emmission_time : bool
+        If True, the emission time delay will be computed
     """
 
     QX_VS_QZ = 0
@@ -416,7 +481,10 @@ class EventReflectivity(object):
         """
         Generate a string representation of the reduction settings.
 
-        :return: (str) string representation of the reduction settings
+        Returns
+        -------
+        str
+            String representation of the reduction settings
         """
         output = "Reduction settings:\n"
         output += "    sample-det: %s\n" % self.det_distance
@@ -433,7 +501,10 @@ class EventReflectivity(object):
         """
         Returns meta-data to be used/stored.
 
-        :return: (dict) dictionary with meta-data
+        Returns
+        -------
+        dict
+            Dictionary with meta-data
         """
         if self._ws_sc.getRun().hasProperty("start_time"):
             start_time = self._ws_sc.getRun().getProperty("start_time").value
@@ -476,17 +547,27 @@ class EventReflectivity(object):
 
         For constant-Q binning, it's preferred to use tof_weighted=True.
 
-        :param q_summing: turns on constant-Q binning
-        :param tof_weighted: if True, binning will be done by weighting each event to the DB distribution
-        :param bck_in_q: if True, the background will be estimated in Q space using the constant-Q binning approach
-        :param clean: if True, and Q summing is True, then leading artifact will be removed
-        :param normalize: if True, and tof_weighted is False, normalization will be skipped
+        Parameters
+        ----------
+        q_summing : bool
+            Turns on constant-Q binning
+        tof_weighted : bool
+            If True, binning will be done by weighting each event to the DB distribution
+        bck_in_q : bool
+            If True, the background will be estimated in Q space using the constant-Q binning approach
+        clean : bool
+            If True, and Q summing is True, then leading artifact will be removed
+        normalize : bool
+            If True, and tof_weighted is False, normalization will be skipped
 
-        :return: A tuple containing:
-
-            - q_bins: The Q bin boundaries
-            - refl: The reflectivity values
-            - d_refl: The uncertainties in the reflectivity values
+        Returns
+        -------
+        q_bins
+            The Q bin boundaries
+        refl
+            The reflectivity values
+        d_refl
+            The uncertainties in the reflectivity values
         """
         if tof_weighted:
             self.specular_weighted(q_summing=q_summing, bck_in_q=bck_in_q)
@@ -523,15 +604,21 @@ class EventReflectivity(object):
         The original approach bins in TOF, then rebins the final results after
         transformation to Q. This approach bins directly to Q.
 
-        :param q_summing: (bool, optional) If True, sum the data in Q-space (default is False).
-        :param normalize: (bool, optional) If True, normalize the reflectivity by the direct 
-            beam (default is True).
+        Parameters
+        ----------
+        q_summing : bool
+            If True, sum the data in Q-space.
+        normalize : bool
+            If True, normalize the reflectivity by the direct beam.
 
-        :return: A tuple containing:
-
-            - q_bins: The Q bin boundaries
-            - refl: The reflectivity values
-            - d_refl: The uncertainties in the reflectivity values
+        Returns
+        -------
+        q_bins
+            The Q bin boundaries
+        refl
+            The reflectivity values
+        d_refl
+            The uncertainties in the reflectivity values
         """
         # Scattering data
         refl, d_refl = self._reflectivity(
@@ -591,14 +678,21 @@ class EventReflectivity(object):
         This allows for summing in Q and to estimate the background in either Q
         or pixels next to the peak.
 
-        :param q_summing: (bool, optional) If True, sum the data in Q-space (default is False).
-        :param bck_in_q: (bool, optional) If True, subtract background along Q lines (default is False).
+        Parameters
+        ----------
+        q_summing : bool
+            If True, sum the data in Q-space.
+        bck_in_q : bool
+            If True, subtract background along Q lines.
 
-        :return: A tuple containing:
-
-            - q_bins: The Q bin boundaries
-            - refl: The reflectivity values
-            - d_refl: The uncertainties in the reflectivity values
+        Returns
+        -------
+        q_bins
+            The Q bin boundaries
+        refl
+            The reflectivity values
+        d_refl
+            The uncertainties in the reflectivity values
         """
         # Event weights for normalization
         db_charge = self._ws_db.getRun().getProtonCharge()
@@ -656,8 +750,29 @@ class EventReflectivity(object):
         return refl_bck, d_refl_bck
 
     def bck_subtraction(self, normalize_to_single_pixel=False, q_bins=None, wl_dist=None, wl_bins=None, q_summing=False):
+
         """
-        Higher-level call for background subtraction. Hides the ranges needed to define the ROI.
+        Perform background subtraction on the signal.
+        This method provides a higher-level call for background subtraction, hiding the ranges needed to define the Region of Interest (ROI).
+
+        Parameters
+        ----------
+        normalize_to_single_pixel : bool
+            If True, normalize the background to a single pixel.
+        q_bins
+            array of bins for the momentum transfer (q) values.
+        wl_dist
+            Array of wavelength (wl) values.
+        wl_bins
+            Array of bins for the wavelength (wl) values.
+        q_summing : bool
+            If True, sum the q values.
+
+        Returns
+        -------
+        mantid.api.Workspace
+            The workspace with the background subtracted.
+
         """
         # Sanity check
         if len(self.signal_bck) == 2 and self.use_functional_bck:

@@ -29,6 +29,9 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
     "sphinx.ext.coverage",
+    "sphinx.ext.mathjax",
+    "sphinx.ext.napoleon",
+    "myst_parser"
 ]
 
 autodoc_mock_imports = [
@@ -72,3 +75,6 @@ html_theme = "sphinx_rtd_theme"  # pylint: disable=C0103
 html_theme_options = {"style_nav_header_background": "#472375"}
 
 epub_show_urls = "footnote"  # pylint: disable=C0103
+
+nitpicky = True
+nitpick_ignore = [('py:class', 'type')]
