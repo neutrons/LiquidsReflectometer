@@ -37,6 +37,7 @@ extensions = [
 autodoc_mock_imports = [
     "mantid",
     "mantid.api",
+    "mantid.api.Workspace",
     "mantid.kernel",
     "mantid.utils",
     "mantid.utils.logging",
@@ -52,6 +53,7 @@ autodoc_mock_imports = [
     "mantid.plots.plotfunctions",
     "mantid.plots.datafunctions",
     "mantid.plots.utility",
+    "numpy,ndarray"
 ]
 
 master_doc = "index"
@@ -75,6 +77,3 @@ html_theme = "sphinx_rtd_theme"  # pylint: disable=C0103
 html_theme_options = {"style_nav_header_background": "#472375"}
 
 epub_show_urls = "footnote"  # pylint: disable=C0103
-
-nitpicky = True
-nitpick_ignore = [('py:class', 'type')]
