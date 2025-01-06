@@ -72,7 +72,7 @@ def get_q_binning(q_min=0.001, q_max=0.15, q_step=-0.02):
 
     Returns
     -------
-    ...
+    numpy.ndarray
         A numpy array of Q values based on the specified binning.
     """
     if q_step > 0:
@@ -208,7 +208,7 @@ def get_dead_time_correction(ws, template_data):
 
     Returns
     -------
-    ...
+    mantid.api.Workspace
         Workspace with dead time correction to apply
     """
     tof_min = ws.getTofMin()
@@ -244,7 +244,7 @@ def apply_dead_time_correction(ws, template_data):
 
     Returns
     -------
-    ...
+    mantid.api.Workspace
         Workspace with dead time correction applied
     """
     if "dead_time_applied" not in ws.getRun():
@@ -772,7 +772,6 @@ class EventReflectivity(object):
         -------
         mantid.api.Workspace
             The workspace with the background subtracted.
-
         """
         # Sanity check
         if len(self.signal_bck) == 2 and self.use_functional_bck:
@@ -964,13 +963,23 @@ class EventReflectivity(object):
     def off_specular(self, x_axis=None, x_min=-0.015, x_max=0.015, x_npts=50, z_min=None, z_max=None, z_npts=-120, bck_in_q=None):
         """
         Compute off-specular
-        :param x_axis: Axis selection
-        :param x_min: Min value on x-axis
-        :param x_max: Max value on x-axis
-        :param x_npts: Number of points in x (negative will produce a log scale)
-        :param z_min: Min value on z-axis (if none, default Qz will be used)
-        :param z_max: Max value on z-axis (if none, default Qz will be used)
-        :param z_npts: Number of points in z (negative will produce a log scale)
+
+        Parameters
+        ----------
+        x_axis : int
+            Axis selection from QX_VS_QZ, KZI_VS_KZF, DELTA_KZ_VS_QZ
+        x_min : float
+            Min value on x-axis
+        x_max : float
+            Max value on x-axis
+        x_npts : int
+            Number of points in x (negative will produce a log scale)
+        z_min : float
+            Min value on z-axis (if none, default Qz will be used)
+        z_max : float
+            Max value on z-axis (if none, default Qz will be used)
+        z_npts : int
+            Number of points in z (negative will produce a log scale)
         """
         # Z axis binning
         qz_bins = self.q_bins
@@ -1072,9 +1081,19 @@ class EventReflectivity(object):
 
     def emission_time_correction(self, ws, tofs):
         """
-        Coorect TOF for emission time delay in the moderator
-        :param ws: Mantid workspace
-        :param tofs: list of TOF values
+        Coorect TOF for emission time delay in the moderator.
+
+        Parameters
+        ----------
+        ws : mantid.api.Workspace
+            Mantid workspace to extract correction meta-data from
+        tofs : numpy.ndarray
+            Array of uncorrected TOF values
+
+        Returns
+        -------
+        numpy.ndarray
+            Array of corrected TOF values
         """
         mt_run = ws.getRun()
         use_emission_delay = False
@@ -1091,6 +1110,18 @@ class EventReflectivity(object):
     def gravity_correction(self, ws, wl_list):
         """
         Gravity correction for each event
+
+        Parameters
+        ----------
+        ws : mantid.api.Workspace
+            Mantid workspace to extract correction meta-data from.
+        wl_list : numpy.ndarray
+            Array of wavelengths for each event.
+
+        Returns
+        -------
+        numpy.ndarray
+            Array of gravity-corrected theta values for each event, in radians.
         """
         # Xi reference would be the position of xi if the si slit were to be positioned
         # at the sample. The distance from the sample to si is then xi_reference - xi.
@@ -1146,8 +1177,20 @@ class EventReflectivity(object):
 def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     """
     Compute the Q resolution from the meta data.
-    :param theta: scattering angle in radians
-    :param q_summing: if True, the pixel size will be used for the resolution
+
+    Parameters
+    ----------
+    ws : mantid.api.Workspace
+        Mantid workspace to extract correction meta-data from.
+    theta : float
+        Scattering angle in radians
+    q_summing : bool
+        If True, the pixel size will be used for the resolution
+
+    Returns
+    -------
+    float
+        The dQ/Q resolution (FWHM)
     """
     settings = read_settings(ws)
 
