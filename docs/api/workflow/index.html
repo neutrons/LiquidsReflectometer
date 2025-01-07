@@ -70,10 +70,6 @@
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Workflow</a>
     <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.workflow.assemble_results--parameters">Parameters</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.workflow.assemble_results--returns">Returns</a>
-    </li>
     </ul>
                   </li>
               </ul>
@@ -152,21 +148,89 @@
     <div class="doc doc-contents ">
 
         <p>Find related runs and assemble them in one R(q) data set</p>
-<h4 id="lr_reduction.workflow.assemble_results--parameters">Parameters</h4>
-<p>first_run : int
-    The first run number in the sequence
-output_dir : str
-    Directory where the output files are saved
-average_overlap : bool
-    If True, the overlapping points will be averaged
-is_live : bool
-    If True, the data is live and will be saved in a separate file to avoid conflict with auto-reduction</p>
-<h4 id="lr_reduction.workflow.assemble_results--returns">Returns</h4>
-<p>seq_list : list
-    The sequence identifiers
-run_list : list
-    The run numbers</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>first_run</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>The first run number in the sequence</p>
+              </div>
+            </li>
+            <li>
+              <b><code>output_dir</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Directory where the output files are saved</p>
+              </div>
+            </li>
+            <li>
+              <b><code>average_overlap</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, the overlapping points will be averaged</p>
+              </div>
+            </li>
+            <li>
+              <b><code>is_live</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, the data is live and will be saved in a separate file to avoid conflict with auto-reduction</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+<b><code>seq_list</code></b>(                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>
+)              –
+              <div class="doc-md-description">
+                <p>The sequence identifiers</p>
+              </div>
+            </li>
+            <li>
+<b><code>run_list</code></b>(                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>
+)              –
+              <div class="doc-md-description">
+                <p>The run numbers</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -185,17 +249,70 @@ run_list : list
         <p>Find a theta offset by comparing the peak location of the reflected and direct beam compared to
 the theta value in the meta data.</p>
 <p>When processing the first run of a set, store that offset in a file so it can be used for later runs.</p>
-<h4 id="lr_reduction.workflow.offset_from_first_run--parameters">Parameters</h4>
-<p>ws : Mantid workspace
-    The workspace to process
-template_file : str
-    Path to the template file
-output_dir : str
-    Directory where the output files are saved</p>
-<h4 id="lr_reduction.workflow.offset_from_first_run--returns">Returns</h4>
-<p>float
-    The theta offset</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>ws</code></b>
+                  (<code>Mantid workspace</code>)
+              –
+              <div class="doc-md-description">
+                <p>The workspace to process</p>
+              </div>
+            </li>
+            <li>
+              <b><code>template_file</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Path to the template file</p>
+              </div>
+            </li>
+            <li>
+              <b><code>output_dir</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Directory where the output files are saved</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>
+              –
+              <div class="doc-md-description">
+                <p>The theta offset</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -215,26 +332,113 @@ output_dir : str
 and is called by the automated reduction workflow.</p>
 <p>If average_overlap is used, overlapping points will be averaged, otherwise they
 will be left in the final data file.</p>
-<h4 id="lr_reduction.workflow.reduce--parameters">Parameters</h4>
-<p>average_overlap : bool
-    If True, the overlapping points will be averaged
-q_summing : bool
-    If True, constant-Q binning will be used
-bck_in_q : bool
-    If True, and constant-Q binning is used, the background will be estimated
-    along constant-Q lines rather than along TOF/pixel boundaries.
-theta_offset : float
-    Theta offset to apply. If None, the template value will be used.
-is_live : bool
-    If True, the data is live and will be saved in a separate file to avoid conflict with auto-reduction
-output_dir : str
-    Directory where the output files will be saved
-template_file : str
-    Path to the template file containing the reduction parameters</p>
-<h4 id="lr_reduction.workflow.reduce--returns">Returns</h4>
-<p>int
-    The sequence identifier for the run sequence</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>average_overlap</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, the overlapping points will be averaged</p>
+              </div>
+            </li>
+            <li>
+              <b><code>q_summing</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, constant-Q binning will be used</p>
+              </div>
+            </li>
+            <li>
+              <b><code>bck_in_q</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, and constant-Q binning is used, the background will be estimated
+along constant-Q lines rather than along TOF/pixel boundaries.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>theta_offset</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>0</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Theta offset to apply. If None, the template value will be used.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>is_live</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, the data is live and will be saved in a separate file to avoid conflict with auto-reduction</p>
+              </div>
+            </li>
+            <li>
+              <b><code>output_dir</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Directory where the output files will be saved</p>
+              </div>
+            </li>
+            <li>
+              <b><code>template_file</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Path to the template file containing the reduction parameters</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>
+              –
+              <div class="doc-md-description">
+                <p>The sequence identifier for the run sequence</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -251,27 +455,116 @@ template_file : str
     <div class="doc doc-contents ">
 
         <p>Very simple rough reduction for when playing around.</p>
-<h4 id="lr_reduction.workflow.reduce_explorer--parameters">Parameters</h4>
-<p>ws : Mantid workspace
-    The workspace to process
-ws_db : Mantid workspace
-    The workspace with the direct beam data
-theta_pv : str
-    The PV name for the theta value
-center_pixel : int
-    The pixel number for the center of the reflected beam
-db_center_pixel : int
-    The pixel number for the center of the direct beam
-peak_width : int
-    The width of the peak to use for the reflected beam</p>
-<h4 id="lr_reduction.workflow.reduce_explorer--returns">Returns</h4>
-<p>qz_mid : numpy.ndarray
-    The Q values
-refl : numpy.ndarray
-    The reflectivity values
-d_refl : numpy.ndarray
-    The uncertainty in the reflectivity</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>ws</code></b>
+                  (<code>Mantid workspace</code>)
+              –
+              <div class="doc-md-description">
+                <p>The workspace to process</p>
+              </div>
+            </li>
+            <li>
+              <b><code>ws_db</code></b>
+                  (<code>Mantid workspace</code>)
+              –
+              <div class="doc-md-description">
+                <p>The workspace with the direct beam data</p>
+              </div>
+            </li>
+            <li>
+              <b><code>theta_pv</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>The PV name for the theta value</p>
+              </div>
+            </li>
+            <li>
+              <b><code>center_pixel</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                      <code>145</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>The pixel number for the center of the reflected beam</p>
+              </div>
+            </li>
+            <li>
+              <b><code>db_center_pixel</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                      <code>145</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>The pixel number for the center of the direct beam</p>
+              </div>
+            </li>
+            <li>
+              <b><code>peak_width</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                      <code>10</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>The width of the peak to use for the reflected beam</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+<b><code>qz_mid</code></b>(                  <code><span title="numpy.ndarray">ndarray</span></code>
+)              –
+              <div class="doc-md-description">
+                <p>The Q values</p>
+              </div>
+            </li>
+            <li>
+<b><code>refl</code></b>(                  <code><span title="numpy.ndarray">ndarray</span></code>
+)              –
+              <div class="doc-md-description">
+                <p>The reflectivity values</p>
+              </div>
+            </li>
+            <li>
+<b><code>d_refl</code></b>(                  <code><span title="numpy.ndarray">ndarray</span></code>
+)              –
+              <div class="doc-md-description">
+                <p>The uncertainty in the reflectivity</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -289,16 +582,55 @@ d_refl : numpy.ndarray
 
         <p>Read the appropriate entry in a template file and save an updated
 copy with the updated run number.</p>
-<h4 id="lr_reduction.workflow.write_template--parameters">Parameters</h4>
-<p>seq_list : list
-    The sequence identifiers
-run_list : list
-    The run numbers
-template_file : str
-    Path to the template file
-output_dir : str
-    Directory where the output files are saved</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>seq_list</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>The sequence identifiers</p>
+              </div>
+            </li>
+            <li>
+              <b><code>run_list</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>The run numbers</p>
+              </div>
+            </li>
+            <li>
+              <b><code>template_file</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Path to the template file</p>
+              </div>
+            </li>
+            <li>
+              <b><code>output_dir</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Directory where the output files are saved</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>

@@ -56,29 +56,11 @@
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Event reduction</a>
     <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity--parameters">Parameters</a>
-    </li>
     <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.__repr__">__repr__</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.__repr__--returns">Returns</a>
-    </li>
-        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.bck_subtraction">bck_subtraction</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.bck_subtraction--parameters">Parameters</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.bck_subtraction--returns">Returns</a>
-    </li>
-        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.emission_time_correction">emission_time_correction</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.emission_time_correction--parameters">Parameters</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.emission_time_correction--returns">Returns</a>
-    </li>
-        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.extract_meta_data">extract_meta_data</a>
     </li>
@@ -87,52 +69,20 @@
     <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.extract_meta_data_4B">extract_meta_data_4B</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.gravity_correction">gravity_correction</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.gravity_correction--parameters">Parameters</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.gravity_correction--returns">Returns</a>
-    </li>
-        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.norm_bck_subtraction">norm_bck_subtraction</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.off_specular">off_specular</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.off_specular--parameters">Parameters</a>
-    </li>
-        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.slice">slice</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular">specular</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular--parameters">Parameters</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular--returns">Returns</a>
-    </li>
-        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular_unweighted">specular_unweighted</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular_unweighted--parameters">Parameters</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular_unweighted--returns">Returns</a>
-    </li>
-        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular_weighted">specular_weighted</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular_weighted--parameters">Parameters</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular_weighted--returns">Returns</a>
-    </li>
-        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.to_dict">to_dict</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.to_dict--returns">Returns</a>
-    </li>
-        </ul>
     </li>
     </ul>
                   </li>
@@ -237,46 +187,191 @@ List of items to be taken care of outside this class:</p>
 <li>Scaling factors</li>
 </ul>
 <p>Pixel ranges include the min and max pixels.</p>
-<h4 id="lr_reduction.event_reduction.EventReflectivity--parameters">Parameters</h4>
-<p>scattering_workspace
-    Mantid workspace containing the reflected data
-direct_workspace
-    Mantid workspace containing the direct beam data [if None, normalization won't be applied]
-signal_peak : list
-    Pixel min and max for the specular peak
-signal_bck : list
-    Pixel range of the background [if None, the background won't be subtracted]
-norm_peak : list
-    Pixel range of the direct beam peak
-norm_bck : list
-    Direct background subtraction is not used [deprecated]
-specular_pixel : float
-    Pixel of the specular peak
-signal_low_res : list
-    Pixel range of the specular peak out of the scattering plane
-norm_low_res : list
-    Pixel range of the direct beam out of the scattering plane
-q_min : float
-    Value of lowest q point
-q_step : float
-    Step size in Q. Enter a negative value to get a log scale
-q_min : float
-    Value of largest q point
-tof_range : list, None
-    TOF range,or None
-theta : float
-    Theta scattering angle in radians
-dead_time : float
-    If not zero, dead time correction will be used
-paralyzable : bool
-    If True, the dead time calculation will use the paralyzable approach
-dead_time_value : float
-    value of the dead time in microsecond
-dead_time_tof_step : float
-    TOF bin size in microsecond
-use_emmission_time : bool
-    If True, the emission time delay will be computed</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>scattering_workspace</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Mantid workspace containing the reflected data</p>
+              </div>
+            </li>
+            <li>
+              <b><code>direct_workspace</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Mantid workspace containing the direct beam data [if None, normalization won't be applied]</p>
+              </div>
+            </li>
+            <li>
+              <b><code>signal_peak</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Pixel min and max for the specular peak</p>
+              </div>
+            </li>
+            <li>
+              <b><code>signal_bck</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Pixel range of the background [if None, the background won't be subtracted]</p>
+              </div>
+            </li>
+            <li>
+              <b><code>norm_peak</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Pixel range of the direct beam peak</p>
+              </div>
+            </li>
+            <li>
+              <b><code>norm_bck</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Direct background subtraction is not used [deprecated]</p>
+              </div>
+            </li>
+            <li>
+              <b><code>specular_pixel</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Pixel of the specular peak</p>
+              </div>
+            </li>
+            <li>
+              <b><code>signal_low_res</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Pixel range of the specular peak out of the scattering plane</p>
+              </div>
+            </li>
+            <li>
+              <b><code>norm_low_res</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Pixel range of the direct beam out of the scattering plane</p>
+              </div>
+            </li>
+            <li>
+              <b><code>q_min</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Value of lowest q point</p>
+              </div>
+            </li>
+            <li>
+              <b><code>q_step</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>-0.02</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Step size in Q. Enter a negative value to get a log scale</p>
+              </div>
+            </li>
+            <li>
+              <b><code>q_min</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Value of largest q point</p>
+              </div>
+            </li>
+            <li>
+              <b><code>tof_range</code></b>
+                  (<code>(<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a>, None)</code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>TOF range,or None</p>
+              </div>
+            </li>
+            <li>
+              <b><code>theta</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>1.0</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Theta scattering angle in radians</p>
+              </div>
+            </li>
+            <li>
+              <b><code>dead_time</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If not zero, dead time correction will be used</p>
+              </div>
+            </li>
+            <li>
+              <b><code>paralyzable</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>True</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, the dead time calculation will use the paralyzable approach</p>
+              </div>
+            </li>
+            <li>
+              <b><code>dead_time_value</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>4.2</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>value of the dead time in microsecond</p>
+              </div>
+            </li>
+            <li>
+              <b><code>dead_time_tof_step</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>100</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>TOF bin size in microsecond</p>
+              </div>
+            </li>
+            <li>
+              <b><code>use_emmission_time</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>If True, the emission time delay will be computed</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
 
 
 
@@ -307,10 +402,30 @@ use_emmission_time : bool
     <div class="doc doc-contents ">
 
         <p>Generate a string representation of the reduction settings.</p>
-<h5 id="lr_reduction.event_reduction.EventReflectivity.__repr__--returns">Returns</h5>
-<p>str
-    String representation of the reduction settings</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
+              –
+              <div class="doc-md-description">
+                <p>String representation of the reduction settings</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -328,21 +443,87 @@ use_emmission_time : bool
 
         <p>Perform background subtraction on the signal.
 This method provides a higher-level call for background subtraction, hiding the ranges needed to define the Region of Interest (ROI).</p>
-<h5 id="lr_reduction.event_reduction.EventReflectivity.bck_subtraction--parameters">Parameters</h5>
-<p>normalize_to_single_pixel : bool
-    If True, normalize the background to a single pixel.
-q_bins
-    array of bins for the momentum transfer (q) values.
-wl_dist
-    Array of wavelength (wl) values.
-wl_bins
-    Array of bins for the wavelength (wl) values.
-q_summing : bool
-    If True, sum the q values.</p>
-<h5 id="lr_reduction.event_reduction.EventReflectivity.bck_subtraction--returns">Returns</h5>
-<p>mantid.api.Workspace
-    The workspace with the background subtracted.</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>normalize_to_single_pixel</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, normalize the background to a single pixel.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>q_bins</code></b>
+              –
+              <div class="doc-md-description">
+                <p>array of bins for the momentum transfer (q) values.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>wl_dist</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Array of wavelength (wl) values.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>wl_bins</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Array of bins for the wavelength (wl) values.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>q_summing</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, sum the q values.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="mantid.api.Workspace">Workspace</span></code>
+              –
+              <div class="doc-md-description">
+                <p>The workspace with the background subtracted.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -359,15 +540,62 @@ q_summing : bool
     <div class="doc doc-contents ">
 
         <p>Coorect TOF for emission time delay in the moderator.</p>
-<h5 id="lr_reduction.event_reduction.EventReflectivity.emission_time_correction--parameters">Parameters</h5>
-<p>ws : mantid.api.Workspace
-    Mantid workspace to extract correction meta-data from
-tofs : numpy.ndarray
-    Array of uncorrected TOF values</p>
-<h5 id="lr_reduction.event_reduction.EventReflectivity.emission_time_correction--returns">Returns</h5>
-<p>numpy.ndarray
-    Array of corrected TOF values</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>ws</code></b>
+                  (<code><span title="mantid.api.Workspace">Workspace</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Mantid workspace to extract correction meta-data from</p>
+              </div>
+            </li>
+            <li>
+              <b><code>tofs</code></b>
+                  (<code><span title="numpy.ndarray">ndarray</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Array of uncorrected TOF values</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+              –
+              <div class="doc-md-description">
+                <p>Array of corrected TOF values</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -437,15 +665,62 @@ to detector distance being determined with Bragg edges to be 15.75 m.</p>
     <div class="doc doc-contents ">
 
         <p>Gravity correction for each event</p>
-<h5 id="lr_reduction.event_reduction.EventReflectivity.gravity_correction--parameters">Parameters</h5>
-<p>ws : mantid.api.Workspace
-    Mantid workspace to extract correction meta-data from.
-wl_list : numpy.ndarray
-    Array of wavelengths for each event.</p>
-<h5 id="lr_reduction.event_reduction.EventReflectivity.gravity_correction--returns">Returns</h5>
-<p>numpy.ndarray
-    Array of gravity-corrected theta values for each event, in radians.</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>ws</code></b>
+                  (<code><span title="mantid.api.Workspace">Workspace</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Mantid workspace to extract correction meta-data from.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>wl_list</code></b>
+                  (<code><span title="numpy.ndarray">ndarray</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Array of wavelengths for each event.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+              –
+              <div class="doc-md-description">
+                <p>Array of gravity-corrected theta values for each event, in radians.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -479,22 +754,93 @@ wl_list : numpy.ndarray
     <div class="doc doc-contents ">
 
         <p>Compute off-specular</p>
-<h5 id="lr_reduction.event_reduction.EventReflectivity.off_specular--parameters">Parameters</h5>
-<p>x_axis : int
-    Axis selection from QX_VS_QZ, KZI_VS_KZF, DELTA_KZ_VS_QZ
-x_min : float
-    Min value on x-axis
-x_max : float
-    Max value on x-axis
-x_npts : int
-    Number of points in x (negative will produce a log scale)
-z_min : float
-    Min value on z-axis (if none, default Qz will be used)
-z_max : float
-    Max value on z-axis (if none, default Qz will be used)
-z_npts : int
-    Number of points in z (negative will produce a log scale)</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>x_axis</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Axis selection from QX_VS_QZ, KZI_VS_KZF, DELTA_KZ_VS_QZ</p>
+              </div>
+            </li>
+            <li>
+              <b><code>x_min</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>-0.015</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Min value on x-axis</p>
+              </div>
+            </li>
+            <li>
+              <b><code>x_max</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>0.015</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Max value on x-axis</p>
+              </div>
+            </li>
+            <li>
+              <b><code>x_npts</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                      <code>50</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Number of points in x (negative will produce a log scale)</p>
+              </div>
+            </li>
+            <li>
+              <b><code>z_min</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Min value on z-axis (if none, default Qz will be used)</p>
+              </div>
+            </li>
+            <li>
+              <b><code>z_max</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Max value on z-axis (if none, default Qz will be used)</p>
+              </div>
+            </li>
+            <li>
+              <b><code>z_npts</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                      <code>-120</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Number of points in z (negative will produce a log scale)</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -529,25 +875,110 @@ z_npts : int
 
         <p>Compute specular reflectivity.</p>
 <p>For constant-Q binning, it's preferred to use tof_weighted=True.</p>
-<h5 id="lr_reduction.event_reduction.EventReflectivity.specular--parameters">Parameters</h5>
-<p>q_summing : bool
-    Turns on constant-Q binning
-tof_weighted : bool
-    If True, binning will be done by weighting each event to the DB distribution
-bck_in_q : bool
-    If True, the background will be estimated in Q space using the constant-Q binning approach
-clean : bool
-    If True, and Q summing is True, then leading artifact will be removed
-normalize : bool
-    If True, and tof_weighted is False, normalization will be skipped</p>
-<h5 id="lr_reduction.event_reduction.EventReflectivity.specular--returns">Returns</h5>
-<p>q_bins
-    The Q bin boundaries
-refl
-    The reflectivity values
-d_refl
-    The uncertainties in the reflectivity values</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>q_summing</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Turns on constant-Q binning</p>
+              </div>
+            </li>
+            <li>
+              <b><code>tof_weighted</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, binning will be done by weighting each event to the DB distribution</p>
+              </div>
+            </li>
+            <li>
+              <b><code>bck_in_q</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, the background will be estimated in Q space using the constant-Q binning approach</p>
+              </div>
+            </li>
+            <li>
+              <b><code>clean</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, and Q summing is True, then leading artifact will be removed</p>
+              </div>
+            </li>
+            <li>
+              <b><code>normalize</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>True</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, and tof_weighted is False, normalization will be skipped</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code>q_bins</code>
+              –
+              <div class="doc-md-description">
+                <p>The Q bin boundaries</p>
+              </div>
+            </li>
+            <li>
+                  <code>refl</code>
+              –
+              <div class="doc-md-description">
+                <p>The reflectivity values</p>
+              </div>
+            </li>
+            <li>
+                  <code>d_refl</code>
+              –
+              <div class="doc-md-description">
+                <p>The uncertainties in the reflectivity values</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -567,19 +998,80 @@ d_refl
 original LR reduction, which sums up pixels without constant-Q binning.
 The original approach bins in TOF, then rebins the final results after
 transformation to Q. This approach bins directly to Q.</p>
-<h5 id="lr_reduction.event_reduction.EventReflectivity.specular_unweighted--parameters">Parameters</h5>
-<p>q_summing : bool
-    If True, sum the data in Q-space.
-normalize : bool
-    If True, normalize the reflectivity by the direct beam.</p>
-<h5 id="lr_reduction.event_reduction.EventReflectivity.specular_unweighted--returns">Returns</h5>
-<p>q_bins
-    The Q bin boundaries
-refl
-    The reflectivity values
-d_refl
-    The uncertainties in the reflectivity values</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>q_summing</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, sum the data in Q-space.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>normalize</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>True</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, normalize the reflectivity by the direct beam.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code>q_bins</code>
+              –
+              <div class="doc-md-description">
+                <p>The Q bin boundaries</p>
+              </div>
+            </li>
+            <li>
+                  <code>refl</code>
+              –
+              <div class="doc-md-description">
+                <p>The reflectivity values</p>
+              </div>
+            </li>
+            <li>
+                  <code>d_refl</code>
+              –
+              <div class="doc-md-description">
+                <p>The uncertainties in the reflectivity values</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -598,19 +1090,80 @@ d_refl
         <p>Compute reflectivity by weighting each event by flux.
 This allows for summing in Q and to estimate the background in either Q
 or pixels next to the peak.</p>
-<h5 id="lr_reduction.event_reduction.EventReflectivity.specular_weighted--parameters">Parameters</h5>
-<p>q_summing : bool
-    If True, sum the data in Q-space.
-bck_in_q : bool
-    If True, subtract background along Q lines.</p>
-<h5 id="lr_reduction.event_reduction.EventReflectivity.specular_weighted--returns">Returns</h5>
-<p>q_bins
-    The Q bin boundaries
-refl
-    The reflectivity values
-d_refl
-    The uncertainties in the reflectivity values</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>q_summing</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>True</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, sum the data in Q-space.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>bck_in_q</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, subtract background along Q lines.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code>q_bins</code>
+              –
+              <div class="doc-md-description">
+                <p>The Q bin boundaries</p>
+              </div>
+            </li>
+            <li>
+                  <code>refl</code>
+              –
+              <div class="doc-md-description">
+                <p>The reflectivity values</p>
+              </div>
+            </li>
+            <li>
+                  <code>d_refl</code>
+              –
+              <div class="doc-md-description">
+                <p>The uncertainties in the reflectivity values</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -627,10 +1180,30 @@ d_refl
     <div class="doc doc-contents ">
 
         <p>Returns meta-data to be used/stored.</p>
-<h5 id="lr_reduction.event_reduction.EventReflectivity.to_dict--returns">Returns</h5>
-<p>dict
-    Dictionary with meta-data</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></code>
+              –
+              <div class="doc-md-description">
+                <p>Dictionary with meta-data</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -657,15 +1230,61 @@ d_refl
 
         <p>Apply dead time correction, and ensure that it is done only once
 per workspace.</p>
-<h4 id="lr_reduction.event_reduction.apply_dead_time_correction--parameters">Parameters</h4>
-<p>ws
-    Workspace with raw data to compute correction for
-template_data : reduction_template_reader.ReductionParameters
-    Reduction parameters</p>
-<h4 id="lr_reduction.event_reduction.apply_dead_time_correction--returns">Returns</h4>
-<p>mantid.api.Workspace
-    Workspace with dead time correction applied</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>ws</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Workspace with raw data to compute correction for</p>
+              </div>
+            </li>
+            <li>
+              <b><code>template_data</code></b>
+                  (<code><a class="autorefs autorefs-internal" title="lr_reduction.reduction_template_reader.ReductionParameters" href="../reduction_template_reader/#lr_reduction.reduction_template_reader.ReductionParameters">ReductionParameters</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Reduction parameters</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="mantid.api.Workspace">Workspace</span></code>
+              –
+              <div class="doc-md-description">
+                <p>Workspace with dead time correction applied</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -682,17 +1301,74 @@ template_data : reduction_template_reader.ReductionParameters
     <div class="doc doc-contents ">
 
         <p>Compute the Q resolution from the meta data.</p>
-<h4 id="lr_reduction.event_reduction.compute_resolution--parameters">Parameters</h4>
-<p>ws : mantid.api.Workspace
-    Mantid workspace to extract correction meta-data from.
-theta : float
-    Scattering angle in radians
-q_summing : bool
-    If True, the pixel size will be used for the resolution</p>
-<h4 id="lr_reduction.event_reduction.compute_resolution--returns">Returns</h4>
-<p>float
-    The dQ/Q resolution (FWHM)</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>ws</code></b>
+                  (<code><span title="mantid.api.Workspace">Workspace</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Mantid workspace to extract correction meta-data from.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>theta</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Scattering angle in radians</p>
+              </div>
+            </li>
+            <li>
+              <b><code>q_summing</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, the pixel size will be used for the resolution</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>
+              –
+              <div class="doc-md-description">
+                <p>The dQ/Q resolution (FWHM)</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -712,13 +1388,53 @@ q_summing : bool
 This function calculates the total thickness of all attenuators that are
 in the path of the beam by summing up the thicknesses of the attenuators
 specified in the global variable <code>CD_ATTENUATORS</code>.</p>
-<h4 id="lr_reduction.event_reduction.get_attenuation_info--parameters">Parameters</h4>
-<p>ws
-    Mantid workspace from which to retrieve the attenuation information.</p>
-<h4 id="lr_reduction.event_reduction.get_attenuation_info--returns">Returns</h4>
-<p>float
-    The total thickness of the attenuators in the path of the beam.</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>ws</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Mantid workspace from which to retrieve the attenuation information.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>
+              –
+              <div class="doc-md-description">
+                <p>The total thickness of the attenuators in the path of the beam.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -737,15 +1453,61 @@ specified in the global variable <code>CD_ATTENUATORS</code>.</p>
         <p>Compute dead time correction to be applied to the reflectivity curve.
 The method will also try to load the error events from each of the
 data files to ensure that we properly estimate the dead time correction.</p>
-<h4 id="lr_reduction.event_reduction.get_dead_time_correction--parameters">Parameters</h4>
-<p>ws
-    Workspace with raw data to compute correction for
-template_data : reduction_template_reader.ReductionParameters
-    Reduction parameters</p>
-<h4 id="lr_reduction.event_reduction.get_dead_time_correction--returns">Returns</h4>
-<p>mantid.api.Workspace
-    Workspace with dead time correction to apply</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>ws</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Workspace with raw data to compute correction for</p>
+              </div>
+            </li>
+            <li>
+              <b><code>template_data</code></b>
+                  (<code><a class="autorefs autorefs-internal" title="lr_reduction.reduction_template_reader.ReductionParameters" href="../reduction_template_reader/#lr_reduction.reduction_template_reader.ReductionParameters">ReductionParameters</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Reduction parameters</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="mantid.api.Workspace">Workspace</span></code>
+              –
+              <div class="doc-md-description">
+                <p>Workspace with dead time correction to apply</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -765,18 +1527,77 @@ template_data : reduction_template_reader.ReductionParameters
 <p>This function calculates the binning for Q values based on the provided minimum, maximum, and step values.
 If the step value is positive, it generates a linear binning. If the step value is negative, it generates
 a logarithmic binning.</p>
-<h4 id="lr_reduction.event_reduction.get_q_binning--parameters">Parameters</h4>
-<p>q_min : float
-    The minimum Q value.
-q_max : float
-    The maximum Q value.
-q_step : float
-    The step size for Q binning. If positive, linear binning is used.
-    If negative, logarithmic binning is used.</p>
-<h4 id="lr_reduction.event_reduction.get_q_binning--returns">Returns</h4>
-<p>numpy.ndarray
-    A numpy array of Q values based on the specified binning.</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>q_min</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>0.001</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>The minimum Q value.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>q_max</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>0.15</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>The maximum Q value.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>q_step</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>-0.02</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>The step size for Q binning. If positive, linear binning is used.
+If negative, logarithmic binning is used.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+              –
+              <div class="doc-md-description">
+                <p>A numpy array of Q values based on the specified binning.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -793,13 +1614,53 @@ q_step : float
     <div class="doc doc-contents ">
 
         <p>Determine TOF range from the data</p>
-<h4 id="lr_reduction.event_reduction.get_wl_range--parameters">Parameters</h4>
-<p>ws
-    Mantid workspace to work with</p>
-<h4 id="lr_reduction.event_reduction.get_wl_range--returns">Returns</h4>
-<p>list
-    [min, max] wavelength range</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>ws</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Mantid workspace to work with</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code>  list</code>
+              –
+              <div class="doc-md-description">
+                <p>[min, max] wavelength range</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -816,16 +1677,60 @@ q_step : float
     <div class="doc doc-contents ">
 
         <p>Correct for absorption by assigning weight to each neutron event</p>
-<h4 id="lr_reduction.event_reduction.process_attenuation--parameters">Parameters</h4>
-<p>ws
-    Mantid workspace to correct
-thickness: float
-    Attenuator thickness in cm (default is 0).</p>
-<h4 id="lr_reduction.event_reduction.process_attenuation--returns">Returns</h4>
-<pre><code>Mantid workspace
-Corrected Mantid workspace
-</code></pre>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>ws</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Mantid workspace to correct</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thickness</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Attenuator thickness in cm (default is 0).</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code>    Mantid workspace</code>
+              –
+              <div class="doc-md-description">
+                <p>Corrected Mantid workspace</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -842,13 +1747,53 @@ Corrected Mantid workspace
     <div class="doc doc-contents ">
 
         <p>Read settings file and return values for the given timestamp</p>
-<h4 id="lr_reduction.event_reduction.read_settings--parameters">Parameters</h4>
-<p>ws
-    Mantid workspace</p>
-<h4 id="lr_reduction.event_reduction.read_settings--returns">Returns</h4>
-<p>dict
-    Dictionary with settings</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>ws</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Mantid workspace</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></code>
+              –
+              <div class="doc-md-description">
+                <p>Dictionary with settings</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>

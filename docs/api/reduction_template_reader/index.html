@@ -63,12 +63,6 @@
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Reduction template reader</a>
     <ul class="current">
     <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.reduction_template_reader.ReductionParameters.from_dict">from_dict</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.reduction_template_reader.ReductionParameters.from_dict--parameters">Parameters</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.reduction_template_reader.ReductionParameters.from_dict--raises">Raises</a>
-    </li>
-        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.reduction_template_reader.ReductionParameters.from_xml_element">from_xml_element</a>
     </li>
@@ -193,14 +187,54 @@ Adapted from Mantid code.</p>
     <div class="doc doc-contents ">
 
         <p>Update object's attributes with a dictionary with entries of the type  attribute_name: attribute_value.</p>
-<h5 id="lr_reduction.reduction_template_reader.ReductionParameters.from_dict--parameters">Parameters</h5>
-<p>permissible: bool
-    allow keys in data_dict that are not attribute names of ReductionParameters instances. Reading from
-    <code>data_dict</code> will result in this instance having new attributes not defined in <code>__init__()</code></p>
-<h5 id="lr_reduction.reduction_template_reader.ReductionParameters.from_dict--raises">Raises</h5>
-<p>ValueError
-    when <code>permissible=False</code> and one entry (or more) of the dictionary is not an attribute of this object</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>permissible</code></b>
+              –
+              <div class="doc-md-description">
+                <p>allow keys in data_dict that are not attribute names of ReductionParameters instances. Reading from
+<code>data_dict</code> will result in this instance having new attributes not defined in <code>__init__()</code></p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Raises:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/exceptions.html#ValueError">ValueError</a></code>
+              –
+              <div class="doc-md-description">
+                <p>when <code>permissible=False</code> and one entry (or more) of the dictionary is not an attribute of this object</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>

@@ -54,10 +54,6 @@
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Background</a>
     <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.background.find_ranges_without_overlap--parameters">Parameters</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.background.find_ranges_without_overlap--returns">Returns</a>
-    </li>
     </ul>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../event_reduction/">Event reduction</a>
@@ -154,15 +150,62 @@ When summing pixels for reflectivity, include the full range,
 which means that for a range [a, b], b is included.
 The range that we return must always exclude the pixels
 included in r2.</p>
-<h4 id="lr_reduction.background.find_ranges_without_overlap--parameters">Parameters</h4>
-<p>r1 : list
-    Range of pixels to consider
-r2 : list
-    Range of pixels to exclude</p>
-<h4 id="lr_reduction.background.find_ranges_without_overlap--returns">Returns</h4>
-<p>list
-    List of ranges that do not overlap with r2</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>r1</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Range of pixels to consider</p>
+              </div>
+            </li>
+            <li>
+              <b><code>r2</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Range of pixels to exclude</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>
+              –
+              <div class="doc-md-description">
+                <p>List of ranges that do not overlap with r2</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -180,33 +223,143 @@ r2 : list
 
         <p>Estimate background using a linear function over a background range that may include the specular peak.
 In the case where the peak is included in the background range, the peak is excluded from the background.</p>
-<h4 id="lr_reduction.background.functional_background--parameters">Parameters</h4>
-<p>ws : Mantid workspace
-    Workspace containing the data
-event_reflectivity : EventReflectivity
-    EventReflectivity object
-peak : list
-    Range of pixels that define the peak
-bck : list
-    Range of pixels that define the background. It contains 4 pixels, defining up to two ranges.
-low_res : list
-    Range in the x direction on the detector
-normalize_to_single_pixel : bool
-    If True, the background is normalized to the number of pixels used to integrate the signal
-q_bins : numpy.ndarray
-    Array of Q bins
-wl_dist : numpy.ndarray
-    Wavelength distribution for the case where we use weighted events for normatization
-wl_bins : numpy.ndarray
-    Array of wavelength bins for the case where we use weighted events for normatization
-q_summing : bool
-    If True, sum the counts in Q bins</p>
-<h4 id="lr_reduction.background.functional_background--returns">Returns</h4>
-<p>numpy.ndarray
-    Reflectivity background
-numpy.ndarray
-    Reflectivity background error</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>ws</code></b>
+                  (<code>Mantid workspace</code>)
+              –
+              <div class="doc-md-description">
+                <p>Workspace containing the data</p>
+              </div>
+            </li>
+            <li>
+              <b><code>event_reflectivity</code></b>
+                  (<code>EventReflectivity</code>)
+              –
+              <div class="doc-md-description">
+                <p>EventReflectivity object</p>
+              </div>
+            </li>
+            <li>
+              <b><code>peak</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Range of pixels that define the peak</p>
+              </div>
+            </li>
+            <li>
+              <b><code>bck</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Range of pixels that define the background. It contains 4 pixels, defining up to two ranges.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>low_res</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Range in the x direction on the detector</p>
+              </div>
+            </li>
+            <li>
+              <b><code>normalize_to_single_pixel</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, the background is normalized to the number of pixels used to integrate the signal</p>
+              </div>
+            </li>
+            <li>
+              <b><code>q_bins</code></b>
+                  (<code><span title="numpy.ndarray">ndarray</span></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Array of Q bins</p>
+              </div>
+            </li>
+            <li>
+              <b><code>wl_dist</code></b>
+                  (<code><span title="numpy.ndarray">ndarray</span></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Wavelength distribution for the case where we use weighted events for normatization</p>
+              </div>
+            </li>
+            <li>
+              <b><code>wl_bins</code></b>
+                  (<code><span title="numpy.ndarray">ndarray</span></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Array of wavelength bins for the case where we use weighted events for normatization</p>
+              </div>
+            </li>
+            <li>
+              <b><code>q_summing</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, sum the counts in Q bins</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+              –
+              <div class="doc-md-description">
+                <p>Reflectivity background</p>
+              </div>
+            </li>
+            <li>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+              –
+              <div class="doc-md-description">
+                <p>Reflectivity background error</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -224,33 +377,143 @@ numpy.ndarray
 
         <p>Original background substration done using two pixels defining the
 area next to the specular peak that are considered background.</p>
-<h4 id="lr_reduction.background.side_background--parameters">Parameters</h4>
-<p>ws : Mantid workspace
-    Workspace containing the data
-event_reflectivity : EventReflectivity
-    EventReflectivity object
-peak : list
-    Range of pixels that define the peak
-bck : list
-    Range of pixels that define the background
-low_res : list
-    Range in the x direction on the detector
-normalize_to_single_pixel : bool
-    If True, the background is normalized to the number of pixels used to integrate the signal
-q_bins : numpy.ndarray
-    Array of Q bins
-wl_dist : numpy.ndarray
-    Wavelength distribution for the case where we use weighted events for normatization
-wl_bins : numpy.ndarray
-    Array of wavelength bins for the case where we use weighted events for normatization
-q_summing : bool
-    If True, sum the counts in Q bins</p>
-<h4 id="lr_reduction.background.side_background--returns">Returns</h4>
-<p>numpy.ndarray
-    Reflectivity background
-numpy.ndarray
-    Reflectivity background error</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>ws</code></b>
+                  (<code>Mantid workspace</code>)
+              –
+              <div class="doc-md-description">
+                <p>Workspace containing the data</p>
+              </div>
+            </li>
+            <li>
+              <b><code>event_reflectivity</code></b>
+                  (<code>EventReflectivity</code>)
+              –
+              <div class="doc-md-description">
+                <p>EventReflectivity object</p>
+              </div>
+            </li>
+            <li>
+              <b><code>peak</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Range of pixels that define the peak</p>
+              </div>
+            </li>
+            <li>
+              <b><code>bck</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Range of pixels that define the background</p>
+              </div>
+            </li>
+            <li>
+              <b><code>low_res</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Range in the x direction on the detector</p>
+              </div>
+            </li>
+            <li>
+              <b><code>normalize_to_single_pixel</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, the background is normalized to the number of pixels used to integrate the signal</p>
+              </div>
+            </li>
+            <li>
+              <b><code>q_bins</code></b>
+                  (<code><span title="numpy.ndarray">ndarray</span></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Array of Q bins</p>
+              </div>
+            </li>
+            <li>
+              <b><code>wl_dist</code></b>
+                  (<code><span title="numpy.ndarray">ndarray</span></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Wavelength distribution for the case where we use weighted events for normatization</p>
+              </div>
+            </li>
+            <li>
+              <b><code>wl_bins</code></b>
+                  (<code><span title="numpy.ndarray">ndarray</span></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Array of wavelength bins for the case where we use weighted events for normatization</p>
+              </div>
+            </li>
+            <li>
+              <b><code>q_summing</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, sum the counts in Q bins</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+              –
+              <div class="doc-md-description">
+                <p>Reflectivity background</p>
+              </div>
+            </li>
+            <li>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+              –
+              <div class="doc-md-description">
+                <p>Reflectivity background error</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>

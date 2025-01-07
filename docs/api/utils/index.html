@@ -68,8 +68,6 @@
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Utils</a>
     <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.utils.amend_config--parameters">Parameters</a>
-    </li>
     </ul>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../workflow/">Workflow</a>
@@ -149,15 +147,54 @@
 
         <p>Context manager to safely modify Mantid Configuration Service while
 the function is executed.</p>
-<h4 id="lr_reduction.utils.amend_config--parameters">Parameters</h4>
-<p>new_config
-    (key, value) pairs to substitute in the configuration service
-data_dir
-    prepend one (when passing a string) or more (when passing a list)
-    directories to the list of data search directories. Alternatively, replace instead of prepend.
-data_dir_insert_mode
-    How to insert the data directories. Options are: "prepend" (default) and "replace".</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>new_config</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>(key, value) pairs to substitute in the configuration service</p>
+              </div>
+            </li>
+            <li>
+              <b><code>data_dir</code></b>
+                  (<code><a class="autorefs autorefs-external" title="typing.Union" href="https://docs.python.org/3/library/typing.html#typing.Union">Union</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a>, <a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a>]</code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>prepend one (when passing a string) or more (when passing a list)
+directories to the list of data search directories. Alternatively, replace instead of prepend.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>data_dir_insert_mode</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>, default:
+                      <code>&#39;prepend&#39;</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>How to insert the data directories. Options are: "prepend" (default) and "replace".</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
