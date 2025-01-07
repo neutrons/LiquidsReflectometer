@@ -18,9 +18,9 @@ A change needs to be in the form of a:
 
 ## API
 
-- [lr_reduction](source/api/lr_reduction.md)
+- [lr_reduction](./api/index.md)
 
 ## Developer Guide
 
-- [Contributing Guide](source/developer/contributing.md)
-- [Developer Documentation](source/developer/developer.md)
+- [Contributing Guide](./developer/contributing.md)
+- [Developer Documentation](./developer/developer.md)
