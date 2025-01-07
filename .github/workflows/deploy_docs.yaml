@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - master
+      - next
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
