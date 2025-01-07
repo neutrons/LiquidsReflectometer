@@ -25,11 +25,14 @@ jobs:
           miniforge-version: latest
           environment-file: environment.yml
 
-      # - name: Install Dependencies
-      #   run: pip install .[dev]
+      - name: Install Dependencies
+        run: pip install .[dev]
 
       - name: Build Documentation
-        run: make docs
+        run: |
+          which python
+          make docs
+
 
       - name: Deploy to gh-pages
         uses: JamesIves/github-pages-deploy-action@v4
