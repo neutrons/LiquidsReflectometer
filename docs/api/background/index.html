@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Background - Liquids Reflectometer</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Background";
+        var mkdocs_page_input_path = "api/background.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Liquids Reflectometer
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Liquids Reflectometer Reduction</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../releases/">Release Notes</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Api</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../">Overview</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Background</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.background.find_ranges_without_overlap--parameters">Parameters</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.background.find_ranges_without_overlap--returns">Returns</a>
+    </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../event_reduction/">Event reduction</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../output/">Output</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../peak_finding/">Peak finding</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../reduction_template_reader/">Reduction template reader</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../template/">Template</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../time_resolved/">Time resolved</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../utils/">Utils</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../workflow/">Workflow</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Developer</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../developer/contributing/">Contributing Guide</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../developer/developer/">Developer Documentation</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">User</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../user/conda_environments/">Conda Environments</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Liquids Reflectometer</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Api</li>
+      <li class="breadcrumb-item active">Background</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/neutrons/LiquidsReflectometer/edit/master/docs/api/background.md">Edit on LiquidsReflectometer</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <div class="doc doc-object doc-module">
+
+
+
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.background.find_ranges_without_overlap" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">find_ranges_without_overlap</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Returns the part of r1 that does not contain r2
+When summing pixels for reflectivity, include the full range,
+which means that for a range [a, b], b is included.
+The range that we return must always exclude the pixels
+included in r2.</p>
+<h4 id="lr_reduction.background.find_ranges_without_overlap--parameters">Parameters</h4>
+<p>r1 : list
+    Range of pixels to consider
+r2 : list
+    Range of pixels to exclude</p>
+<h4 id="lr_reduction.background.find_ranges_without_overlap--returns">Returns</h4>
+<p>list
+    List of ranges that do not overlap with r2</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.background.functional_background" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">functional_background</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Estimate background using a linear function over a background range that may include the specular peak.
+In the case where the peak is included in the background range, the peak is excluded from the background.</p>
+<h4 id="lr_reduction.background.functional_background--parameters">Parameters</h4>
+<p>ws : Mantid workspace
+    Workspace containing the data
+event_reflectivity : EventReflectivity
+    EventReflectivity object
+peak : list
+    Range of pixels that define the peak
+bck : list
+    Range of pixels that define the background. It contains 4 pixels, defining up to two ranges.
+low_res : list
+    Range in the x direction on the detector
+normalize_to_single_pixel : bool
+    If True, the background is normalized to the number of pixels used to integrate the signal
+q_bins : numpy.ndarray
+    Array of Q bins
+wl_dist : numpy.ndarray
+    Wavelength distribution for the case where we use weighted events for normatization
+wl_bins : numpy.ndarray
+    Array of wavelength bins for the case where we use weighted events for normatization
+q_summing : bool
+    If True, sum the counts in Q bins</p>
+<h4 id="lr_reduction.background.functional_background--returns">Returns</h4>
+<p>numpy.ndarray
+    Reflectivity background
+numpy.ndarray
+    Reflectivity background error</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.background.side_background" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">side_background</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Original background substration done using two pixels defining the
+area next to the specular peak that are considered background.</p>
+<h4 id="lr_reduction.background.side_background--parameters">Parameters</h4>
+<p>ws : Mantid workspace
+    Workspace containing the data
+event_reflectivity : EventReflectivity
+    EventReflectivity object
+peak : list
+    Range of pixels that define the peak
+bck : list
+    Range of pixels that define the background
+low_res : list
+    Range in the x direction on the detector
+normalize_to_single_pixel : bool
+    If True, the background is normalized to the number of pixels used to integrate the signal
+q_bins : numpy.ndarray
+    Array of Q bins
+wl_dist : numpy.ndarray
+    Wavelength distribution for the case where we use weighted events for normatization
+wl_bins : numpy.ndarray
+    Array of wavelength bins for the case where we use weighted events for normatization
+q_summing : bool
+    If True, sum the counts in Q bins</p>
+<h4 id="lr_reduction.background.side_background--returns">Returns</h4>
+<p>numpy.ndarray
+    Reflectivity background
+numpy.ndarray
+    Reflectivity background error</p>
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../" class="btn btn-neutral float-left" title="Overview"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../event_reduction/" class="btn btn-neutral float-right" title="Event reduction">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/neutrons/LiquidsReflectometer" class="fa fa-code-fork" style="color: #fcfcfc"> LiquidsReflectometer</a>
+        </span>
+    
+    
+      <span><a href="../" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../event_reduction/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

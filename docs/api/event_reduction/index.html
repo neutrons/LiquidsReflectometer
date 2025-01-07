@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Event reduction - Liquids Reflectometer</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Event reduction";
+        var mkdocs_page_input_path = "api/event_reduction.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Liquids Reflectometer
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Liquids Reflectometer Reduction</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../releases/">Release Notes</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Api</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../background/">Background</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Event reduction</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity--parameters">Parameters</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.__repr__">__repr__</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.__repr__--returns">Returns</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.bck_subtraction">bck_subtraction</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.bck_subtraction--parameters">Parameters</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.bck_subtraction--returns">Returns</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.emission_time_correction">emission_time_correction</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.emission_time_correction--parameters">Parameters</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.emission_time_correction--returns">Returns</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.extract_meta_data">extract_meta_data</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.extract_meta_data_4A">extract_meta_data_4A</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.extract_meta_data_4B">extract_meta_data_4B</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.gravity_correction">gravity_correction</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.gravity_correction--parameters">Parameters</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.gravity_correction--returns">Returns</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.norm_bck_subtraction">norm_bck_subtraction</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.off_specular">off_specular</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.off_specular--parameters">Parameters</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.slice">slice</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular">specular</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular--parameters">Parameters</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular--returns">Returns</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular_unweighted">specular_unweighted</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular_unweighted--parameters">Parameters</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular_unweighted--returns">Returns</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular_weighted">specular_weighted</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular_weighted--parameters">Parameters</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.specular_weighted--returns">Returns</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.to_dict">to_dict</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#lr_reduction.event_reduction.EventReflectivity.to_dict--returns">Returns</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../output/">Output</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../peak_finding/">Peak finding</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../reduction_template_reader/">Reduction template reader</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../template/">Template</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../time_resolved/">Time resolved</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../utils/">Utils</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../workflow/">Workflow</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Developer</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../developer/contributing/">Contributing Guide</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../developer/developer/">Developer Documentation</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">User</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../user/conda_environments/">Conda Environments</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Liquids Reflectometer</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Api</li>
+      <li class="breadcrumb-item active">Event reduction</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/neutrons/LiquidsReflectometer/edit/master/docs/api/event_reduction.md">Edit on LiquidsReflectometer</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <div class="doc doc-object doc-module">
+
+
+
+
+    <div class="doc doc-contents first">
+
+        <p>Event based reduction for the Liquids Reflectometer</p>
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="lr_reduction.event_reduction.EventReflectivity" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">EventReflectivity</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#object">object</a></code></p>
+
+
+        <p>Data reduction for the Liquids Reflectometer.
+List of items to be taken care of outside this class:</p>
+<ul>
+<li>Edge points cropping</li>
+<li>Angle offset</li>
+<li>Putting runs together in one R(q) curve</li>
+<li>Scaling factors</li>
+</ul>
+<p>Pixel ranges include the min and max pixels.</p>
+<h4 id="lr_reduction.event_reduction.EventReflectivity--parameters">Parameters</h4>
+<p>scattering_workspace
+    Mantid workspace containing the reflected data
+direct_workspace
+    Mantid workspace containing the direct beam data [if None, normalization won't be applied]
+signal_peak : list
+    Pixel min and max for the specular peak
+signal_bck : list
+    Pixel range of the background [if None, the background won't be subtracted]
+norm_peak : list
+    Pixel range of the direct beam peak
+norm_bck : list
+    Direct background subtraction is not used [deprecated]
+specular_pixel : float
+    Pixel of the specular peak
+signal_low_res : list
+    Pixel range of the specular peak out of the scattering plane
+norm_low_res : list
+    Pixel range of the direct beam out of the scattering plane
+q_min : float
+    Value of lowest q point
+q_step : float
+    Step size in Q. Enter a negative value to get a log scale
+q_min : float
+    Value of largest q point
+tof_range : list, None
+    TOF range,or None
+theta : float
+    Theta scattering angle in radians
+dead_time : float
+    If not zero, dead time correction will be used
+paralyzable : bool
+    If True, the dead time calculation will use the paralyzable approach
+dead_time_value : float
+    value of the dead time in microsecond
+dead_time_tof_step : float
+    TOF bin size in microsecond
+use_emmission_time : bool
+    If True, the emission time delay will be computed</p>
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="lr_reduction.event_reduction.EventReflectivity.__repr__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__repr__</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Generate a string representation of the reduction settings.</p>
+<h5 id="lr_reduction.event_reduction.EventReflectivity.__repr__--returns">Returns</h5>
+<p>str
+    String representation of the reduction settings</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="lr_reduction.event_reduction.EventReflectivity.bck_subtraction" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">bck_subtraction</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Perform background subtraction on the signal.
+This method provides a higher-level call for background subtraction, hiding the ranges needed to define the Region of Interest (ROI).</p>
+<h5 id="lr_reduction.event_reduction.EventReflectivity.bck_subtraction--parameters">Parameters</h5>
+<p>normalize_to_single_pixel : bool
+    If True, normalize the background to a single pixel.
+q_bins
+    array of bins for the momentum transfer (q) values.
+wl_dist
+    Array of wavelength (wl) values.
+wl_bins
+    Array of bins for the wavelength (wl) values.
+q_summing : bool
+    If True, sum the q values.</p>
+<h5 id="lr_reduction.event_reduction.EventReflectivity.bck_subtraction--returns">Returns</h5>
+<p>mantid.api.Workspace
+    The workspace with the background subtracted.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="lr_reduction.event_reduction.EventReflectivity.emission_time_correction" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">emission_time_correction</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Coorect TOF for emission time delay in the moderator.</p>
+<h5 id="lr_reduction.event_reduction.EventReflectivity.emission_time_correction--parameters">Parameters</h5>
+<p>ws : mantid.api.Workspace
+    Mantid workspace to extract correction meta-data from
+tofs : numpy.ndarray
+    Array of uncorrected TOF values</p>
+<h5 id="lr_reduction.event_reduction.EventReflectivity.emission_time_correction--returns">Returns</h5>
+<p>numpy.ndarray
+    Array of corrected TOF values</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="lr_reduction.event_reduction.EventReflectivity.extract_meta_data" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">extract_meta_data</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract meta data from the loaded data file.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="lr_reduction.event_reduction.EventReflectivity.extract_meta_data_4A" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">extract_meta_data_4A</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>4A-specific meta data</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="lr_reduction.event_reduction.EventReflectivity.extract_meta_data_4B" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">extract_meta_data_4B</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>4B-specific meta data</p>
+<p>Distance from source to sample was 13.63 meters prior to the source
+to detector distance being determined with Bragg edges to be 15.75 m.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="lr_reduction.event_reduction.EventReflectivity.gravity_correction" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">gravity_correction</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Gravity correction for each event</p>
+<h5 id="lr_reduction.event_reduction.EventReflectivity.gravity_correction--parameters">Parameters</h5>
+<p>ws : mantid.api.Workspace
+    Mantid workspace to extract correction meta-data from.
+wl_list : numpy.ndarray
+    Array of wavelengths for each event.</p>
+<h5 id="lr_reduction.event_reduction.EventReflectivity.gravity_correction--returns">Returns</h5>
+<p>numpy.ndarray
+    Array of gravity-corrected theta values for each event, in radians.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="lr_reduction.event_reduction.EventReflectivity.norm_bck_subtraction" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">norm_bck_subtraction</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Higher-level call for background subtraction for the normalization run.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="lr_reduction.event_reduction.EventReflectivity.off_specular" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">off_specular</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute off-specular</p>
+<h5 id="lr_reduction.event_reduction.EventReflectivity.off_specular--parameters">Parameters</h5>
+<p>x_axis : int
+    Axis selection from QX_VS_QZ, KZI_VS_KZF, DELTA_KZ_VS_QZ
+x_min : float
+    Min value on x-axis
+x_max : float
+    Max value on x-axis
+x_npts : int
+    Number of points in x (negative will produce a log scale)
+z_min : float
+    Min value on z-axis (if none, default Qz will be used)
+z_max : float
+    Max value on z-axis (if none, default Qz will be used)
+z_npts : int
+    Number of points in z (negative will produce a log scale)</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="lr_reduction.event_reduction.EventReflectivity.slice" class="doc doc-heading">
+            <code class="highlight language-python"><span class="nb">slice</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Retrieve a slice from the off-specular data.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="lr_reduction.event_reduction.EventReflectivity.specular" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">specular</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute specular reflectivity.</p>
+<p>For constant-Q binning, it's preferred to use tof_weighted=True.</p>
+<h5 id="lr_reduction.event_reduction.EventReflectivity.specular--parameters">Parameters</h5>
+<p>q_summing : bool
+    Turns on constant-Q binning
+tof_weighted : bool
+    If True, binning will be done by weighting each event to the DB distribution
+bck_in_q : bool
+    If True, the background will be estimated in Q space using the constant-Q binning approach
+clean : bool
+    If True, and Q summing is True, then leading artifact will be removed
+normalize : bool
+    If True, and tof_weighted is False, normalization will be skipped</p>
+<h5 id="lr_reduction.event_reduction.EventReflectivity.specular--returns">Returns</h5>
+<p>q_bins
+    The Q bin boundaries
+refl
+    The reflectivity values
+d_refl
+    The uncertainties in the reflectivity values</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="lr_reduction.event_reduction.EventReflectivity.specular_unweighted" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">specular_unweighted</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Simple specular reflectivity calculation. This is the same approach as the
+original LR reduction, which sums up pixels without constant-Q binning.
+The original approach bins in TOF, then rebins the final results after
+transformation to Q. This approach bins directly to Q.</p>
+<h5 id="lr_reduction.event_reduction.EventReflectivity.specular_unweighted--parameters">Parameters</h5>
+<p>q_summing : bool
+    If True, sum the data in Q-space.
+normalize : bool
+    If True, normalize the reflectivity by the direct beam.</p>
+<h5 id="lr_reduction.event_reduction.EventReflectivity.specular_unweighted--returns">Returns</h5>
+<p>q_bins
+    The Q bin boundaries
+refl
+    The reflectivity values
+d_refl
+    The uncertainties in the reflectivity values</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="lr_reduction.event_reduction.EventReflectivity.specular_weighted" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">specular_weighted</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute reflectivity by weighting each event by flux.
+This allows for summing in Q and to estimate the background in either Q
+or pixels next to the peak.</p>
+<h5 id="lr_reduction.event_reduction.EventReflectivity.specular_weighted--parameters">Parameters</h5>
+<p>q_summing : bool
+    If True, sum the data in Q-space.
+bck_in_q : bool
+    If True, subtract background along Q lines.</p>
+<h5 id="lr_reduction.event_reduction.EventReflectivity.specular_weighted--returns">Returns</h5>
+<p>q_bins
+    The Q bin boundaries
+refl
+    The reflectivity values
+d_refl
+    The uncertainties in the reflectivity values</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="lr_reduction.event_reduction.EventReflectivity.to_dict" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">to_dict</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Returns meta-data to be used/stored.</p>
+<h5 id="lr_reduction.event_reduction.EventReflectivity.to_dict--returns">Returns</h5>
+<p>dict
+    Dictionary with meta-data</p>
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.event_reduction.apply_dead_time_correction" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">apply_dead_time_correction</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Apply dead time correction, and ensure that it is done only once
+per workspace.</p>
+<h4 id="lr_reduction.event_reduction.apply_dead_time_correction--parameters">Parameters</h4>
+<p>ws
+    Workspace with raw data to compute correction for
+template_data : reduction_template_reader.ReductionParameters
+    Reduction parameters</p>
+<h4 id="lr_reduction.event_reduction.apply_dead_time_correction--returns">Returns</h4>
+<p>mantid.api.Workspace
+    Workspace with dead time correction applied</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.event_reduction.compute_resolution" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_resolution</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute the Q resolution from the meta data.</p>
+<h4 id="lr_reduction.event_reduction.compute_resolution--parameters">Parameters</h4>
+<p>ws : mantid.api.Workspace
+    Mantid workspace to extract correction meta-data from.
+theta : float
+    Scattering angle in radians
+q_summing : bool
+    If True, the pixel size will be used for the resolution</p>
+<h4 id="lr_reduction.event_reduction.compute_resolution--returns">Returns</h4>
+<p>float
+    The dQ/Q resolution (FWHM)</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.event_reduction.get_attenuation_info" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_attenuation_info</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Retrieve information about attenuation from a Mantid workspace.
+This function calculates the total thickness of all attenuators that are
+in the path of the beam by summing up the thicknesses of the attenuators
+specified in the global variable <code>CD_ATTENUATORS</code>.</p>
+<h4 id="lr_reduction.event_reduction.get_attenuation_info--parameters">Parameters</h4>
+<p>ws
+    Mantid workspace from which to retrieve the attenuation information.</p>
+<h4 id="lr_reduction.event_reduction.get_attenuation_info--returns">Returns</h4>
+<p>float
+    The total thickness of the attenuators in the path of the beam.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.event_reduction.get_dead_time_correction" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_dead_time_correction</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute dead time correction to be applied to the reflectivity curve.
+The method will also try to load the error events from each of the
+data files to ensure that we properly estimate the dead time correction.</p>
+<h4 id="lr_reduction.event_reduction.get_dead_time_correction--parameters">Parameters</h4>
+<p>ws
+    Workspace with raw data to compute correction for
+template_data : reduction_template_reader.ReductionParameters
+    Reduction parameters</p>
+<h4 id="lr_reduction.event_reduction.get_dead_time_correction--returns">Returns</h4>
+<p>mantid.api.Workspace
+    Workspace with dead time correction to apply</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.event_reduction.get_q_binning" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_q_binning</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Determine Q binning.</p>
+<p>This function calculates the binning for Q values based on the provided minimum, maximum, and step values.
+If the step value is positive, it generates a linear binning. If the step value is negative, it generates
+a logarithmic binning.</p>
+<h4 id="lr_reduction.event_reduction.get_q_binning--parameters">Parameters</h4>
+<p>q_min : float
+    The minimum Q value.
+q_max : float
+    The maximum Q value.
+q_step : float
+    The step size for Q binning. If positive, linear binning is used.
+    If negative, logarithmic binning is used.</p>
+<h4 id="lr_reduction.event_reduction.get_q_binning--returns">Returns</h4>
+<p>numpy.ndarray
+    A numpy array of Q values based on the specified binning.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.event_reduction.get_wl_range" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_wl_range</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Determine TOF range from the data</p>
+<h4 id="lr_reduction.event_reduction.get_wl_range--parameters">Parameters</h4>
+<p>ws
+    Mantid workspace to work with</p>
+<h4 id="lr_reduction.event_reduction.get_wl_range--returns">Returns</h4>
+<p>list
+    [min, max] wavelength range</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.event_reduction.process_attenuation" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">process_attenuation</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Correct for absorption by assigning weight to each neutron event</p>
+<h4 id="lr_reduction.event_reduction.process_attenuation--parameters">Parameters</h4>
+<p>ws
+    Mantid workspace to correct
+thickness: float
+    Attenuator thickness in cm (default is 0).</p>
+<h4 id="lr_reduction.event_reduction.process_attenuation--returns">Returns</h4>
+<pre><code>Mantid workspace
+Corrected Mantid workspace
+</code></pre>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.event_reduction.read_settings" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">read_settings</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Read settings file and return values for the given timestamp</p>
+<h4 id="lr_reduction.event_reduction.read_settings--parameters">Parameters</h4>
+<p>ws
+    Mantid workspace</p>
+<h4 id="lr_reduction.event_reduction.read_settings--returns">Returns</h4>
+<p>dict
+    Dictionary with settings</p>
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../background/" class="btn btn-neutral float-left" title="Background"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../output/" class="btn btn-neutral float-right" title="Output">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/neutrons/LiquidsReflectometer" class="fa fa-code-fork" style="color: #fcfcfc"> LiquidsReflectometer</a>
+        </span>
+    
+    
+      <span><a href="../background/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../output/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

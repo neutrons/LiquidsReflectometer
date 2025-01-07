@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Developer Documentation - Liquids Reflectometer</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Developer Documentation";
+        var mkdocs_page_input_path = "developer/developer.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Liquids Reflectometer
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Liquids Reflectometer Reduction</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../releases/">Release Notes</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Api</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../api/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../api/background/">Background</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../api/event_reduction/">Event reduction</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../api/output/">Output</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../api/peak_finding/">Peak finding</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../api/reduction_template_reader/">Reduction template reader</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../api/template/">Template</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../api/time_resolved/">Time resolved</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../api/utils/">Utils</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../api/workflow/">Workflow</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Developer</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../contributing/">Contributing Guide</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Developer Documentation</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#local-environment">Local Environment</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#pre-commit-hooks">pre-commit Hooks</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#development-procedure">Development procedure</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#updating-mantid-dependency">Updating mantid dependency</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#using-the-data-repository">Using the Data Repository</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#coverage-reports">Coverage reports</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#building-the-documentation">Building the documentation</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#creating-a-stable-release">Creating a stable release</a>
+    </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">User</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../user/conda_environments/">Conda Environments</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Liquids Reflectometer</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Developer</li>
+      <li class="breadcrumb-item active">Developer Documentation</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/neutrons/LiquidsReflectometer/edit/master/docs/developer/developer.md">Edit on LiquidsReflectometer</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="developer-documentation">Developer Documentation</h1>
+<ul>
+<li><a href="#local-environment">Local Environment</a></li>
+<li><a href="#pre-commit-hooks">pre-commit Hooks</a></li>
+<li><a href="#development-procedure">Development procedure</a></li>
+<li><a href="#updating-mantid-dependency">Updating mantid dependency</a></li>
+<li><a href="#using-the-data-repository">Using the Data Repository</a></li>
+<li><a href="#coverage-reports">Coverage reports</a></li>
+<li><a href="#building-the-documentation">Building the documentation</a></li>
+<li><a href="#creating-a-stable-release">Creating a stable release</a></li>
+</ul>
+<h2 id="local-environment">Local Environment</h2>
+<p>For purposes of development, create conda environment <code>lr_reduction</code> with file <code>environment.yml</code>, and then
+install the package in development mode with <code>pip</code>:</p>
+<pre><code class="language-bash">$ cd /path/to/lr_reduction/
+$ conda create env --solver libmamba --file ./environment.yml
+$ conda activate lr_reduction
+(lr_reduction)$ pip install -e ./
+</code></pre>
+<p>By installing the package in development mode, one doesn't need to re-install package <code>lr_reduction</code> in conda
+environment <code>lr_reduction</code> after every change to the source code.</p>
+<h2 id="pre-commit-hooks">pre-commit Hooks</h2>
+<p>Activate the hooks by typing in the terminal:</p>
+<pre><code class="language-bash">$ cd /path/to/mr_reduction/
+$ conda activate mr_reduction
+(mr_reduction)$ pre-commit install
+</code></pre>
+<h2 id="development-procedure">Development procedure</h2>
+<ol>
+<li>A developer is assigned with a task during neutron status meeting and changes the task's status to <strong>In Progress</strong>.</li>
+<li>The developer creates a branch off <em>next</em> and completes the task in this branch.</li>
+<li>The developer creates a pull request (PR) off <em>next</em>.</li>
+<li>Any new features or bugfixes must be covered by new and/or refactored automated tests.</li>
+<li>The developer asks for another developer as a reviewer to review the PR.
+   A PR can only be approved and merged by the reviewer.</li>
+<li>The developer changes the task’s status to <strong>Complete</strong> and closes the associated issue.</li>
+</ol>
+<h2 id="updating-mantid-dependency">Updating mantid dependency</h2>
+<p>The mantid version and the mantid conda channel (<code>mantid/label/main</code> or <code>mantid/label/nightly</code>) <strong>must</strong> be
+synchronized across these files:</p>
+<ul>
+<li>environment.yml</li>
+<li>conda.recipe/meta.yml</li>
+<li>.github/workflows/package.yml</li>
+</ul>
+<h2 id="using-the-data-repository">Using the Data Repository</h2>
+<p>To run the integration tests in your local environment, it is necessary first to download the data files.
+Because of their size, the files are stored in the Git LFS repository
+<code>lr_reduction-data &lt;https://code.ornl.gov/sns-hfir-scse/infrastructure/test-data/liquidsreflectometer-data&gt;</code>_.</p>
+<p>It is necessary to have package <code>git-lfs</code> installed in your machine.</p>
+<pre><code class="language-bash">$ sudo apt install git-lfs
+</code></pre>
+<p>After this step, initialize or update the data repository:</p>
+<pre><code class="language-bash">$ cd /path/to/lr_reduction
+$ git submodule update --init
+</code></pre>
+<p>This will either clone <code>liquidsreflectometer-data</code> into <code>/path/to/lr_reduction/tests/liquidsreflectometer-data</code> or
+bring the <code>liquidsreflectometer-data</code>'s refspec in sync with the refspec listed within file
+<code>/path/to/liquidsreflectometer/.gitmodules</code>.</p>
+<p>An intro to Git LFS in the context of the Neutron Data Project is found in the
+<code>Confluence pages &lt;https://ornl-neutrons.atlassian.net/wiki/spaces/NDPD/pages/19103745/Using+git-lfs+for+test+data&gt;</code>_
+(login required).</p>
+<h2 id="coverage-reports">Coverage reports</h2>
+<p>GitHuh actions create reports for unit and integration tests, then combine into one report and upload it to
+<code>Codecov &lt;https://app.codecov.io/gh/neutrons/lr_reduction&gt;</code>_.</p>
+<h2 id="building-the-documentation">Building the documentation</h2>
+<p>A repository webhook is setup to automatically trigger the latest documentation build by GitHub actions.
+To manually build the documentation:</p>
+<pre><code class="language-bash">$ conda activate lr_reduction
+(lr_reduction)$ make docs
+</code></pre>
+<p>After this, point your browser to
+<code>file:///path/to/lr_reduction/docs/build/html/index.html</code></p>
+<h2 id="creating-a-stable-release">Creating a stable release</h2>
+<ul>
+<li><em>patch</em> release, it may be allowed to bypass the creation of a candidate release.
+  Still, we must update branch <code>qa</code> first, then create the release tag in branch <code>main</code>.
+  For instance, to create patch version "v2.1.1":</li>
+</ul>
+<pre><code class="language-bash">VERSION=&quot;v2.1.2&quot;
+
+# update the local repository
+git fetch --all --prune
+git fetch --prune --prune-tags origin
+
+# update branch qa from next, possibly bringing work done in qa missing in next
+git switch next
+git rebase -v origin/next
+git merge --no-edit origin/qa # commit message is automatically generated
+git push origin next # required to &quot;link&quot; qa to next, for future fast-forward
+git switch qa
+git rebase -v origin/qa
+git merge --ff-only origin/next
+
+# update branch main from qa
+git merge --no-edit origin/main # commit message is automatically generated
+git push origin qa # required to &quot;link&quot; main to qa, for future fast-forward
+git switch main
+git rebase -v origin/main
+git merge --ff-only origin/qa
+git tag $VERSION
+git push origin --tags main
+</code></pre>
+<ul>
+<li>
+<p><em>minor</em> or <em>major</em> release, we create a stable release <em>after</em> we have created a Candidate release.<br />
+  For this customary procedure, follow:</p>
+<ul>
+<li>
+<p>The <a href="https://ornl-neutrons.atlassian.net/wiki/spaces/NDPD/pages/23363585/Software+Maturity+Model">Software Maturity Model</a> for continous versioning as well as creating release candidates and stable releases.</p>
+</li>
+<li>
+<p>Update the :ref:<code>Release Notes &lt;release_notes&gt;</code> with major fixes, updates and additions since last stable release.</p>
+</li>
+</ul>
+</li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../contributing/" class="btn btn-neutral float-left" title="Contributing Guide"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../../user/conda_environments/" class="btn btn-neutral float-right" title="Conda Environments">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/neutrons/LiquidsReflectometer" class="fa fa-code-fork" style="color: #fcfcfc"> LiquidsReflectometer</a>
+        </span>
+    
+    
+      <span><a href="../contributing/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../../user/conda_environments/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
