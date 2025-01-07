@@ -19,7 +19,7 @@ plugins:
             - https://mkdocstrings.github.io/griffe/objects.inv
           options:
             # See: https://mkdocstrings.github.io/usage/handlers/?h=docstring_style#selection-options
-            docstring_style: google
+            docstring_style: numpy
             docstring_options:
               docstring_section_style: table
               ignore_init_summary: yes
