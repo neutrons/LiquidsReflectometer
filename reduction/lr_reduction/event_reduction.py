@@ -254,7 +254,7 @@ def apply_dead_time_correction(ws, template_data):
     return ws
 
 
-class EventReflectivity(object):
+class EventReflectivity():
     """
     Data reduction for the Liquids Reflectometer.
     List of items to be taken care of outside this class:
