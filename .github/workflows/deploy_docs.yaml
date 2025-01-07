@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - next
+      - docs
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -24,8 +25,8 @@ jobs:
           miniforge-version: latest
           environment-file: environment.yml
 
-      - name: Install Dependencies
-        run: pip install .[dev]
+      # - name: Install Dependencies
+      #   run: pip install .[dev]
 
       - name: Build Documentation
         run: make docs
