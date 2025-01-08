@@ -2,6 +2,8 @@
 
 ## User Guide
 
+- [Workflow overview](./user/workflow.md)
+- [Event processing](./user/event_processing.md)
 - [Conda Environments](./user/conda_environments.md)
 - [Releases](./releases.md)
 

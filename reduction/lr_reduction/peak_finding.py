@@ -10,11 +10,28 @@ from lmfit.models import GaussianModel
 
 
 def process_data(workspace, summed=True, tof_step=200):
-    r"""
+    """
         Process a Mantid workspace to extract counts vs pixel.
-        :param workspace: Mantid workspace
-        :param summed: if True, the x pixels with be summed
-        :param tof_step: TOF bin size
+
+        Parameters
+        ----------
+        workspace : Mantid workspace
+            The Mantid workspace to process.
+        summed : bool, optional
+            If True, the x pixels will be summed (default is True).
+        tof_step : int, optional
+            The TOF bin size (default is 200).
+
+        Returns
+        -------
+        tuple
+            A tuple containing:
+            - tof : numpy.ndarray
+                The time-of-flight values.
+            - _x : numpy.ndarray
+                The pixel indices.
+            - _y : numpy.ndarray
+                The summed counts for each pixel.
     """
     tof_min = workspace.getTofMin()
     tof_max = workspace.getTofMax()
@@ -35,15 +52,34 @@ def process_data(workspace, summed=True, tof_step=200):
 
 def fit_signal_flat_bck(x, y, x_min=110, x_max=170, center=None, sigma=None,
                         background=None):
-    r"""
-        Fit a Gaussian peak.
-        :param x: list of x values
-        :param y: list of y values
-        :param x_min: start index of the list of points
-        :param x_max: end index of the list of points
-        :param center: estimated center position
-        :param sigma: if provided, the sigma will be fixed to the given value
-        :param background: if provided, the value will be subtracted from y
+    """
+    Fit a Gaussian peak.
+
+    Parameters
+    ----------
+    x : list
+        List of x values.
+    y : list
+        List of y values.
+    x_min : int, optional
+        Start index of the list of points, by default 110.
+    x_max : int, optional
+        End index of the list of points, by default 170.
+    center : float, optional
+        Estimated center position, by default None.
+    sigma : float, optional
+        If provided, the sigma will be fixed to the given value, by default None.
+    background : float, optional
+        If provided, the value will be subtracted from y, by default None.
+
+    Returns
+    -------
+    c : float
+        Fitted center position of the Gaussian peak.
+    width : float
+        Fitted width (sigma) of the Gaussian peak.
+    fit : lmfit.model.ModelResult
+        The result of the fit.
     """
     gauss = GaussianModel(prefix='g_')
 
