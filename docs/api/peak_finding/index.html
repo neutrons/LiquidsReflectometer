@@ -84,6 +84,10 @@
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../../user/conda_environments/">Conda Environments</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../user/event_processing/">Event processing</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../user/workflow/">Specular reflectivity reduction workflow</a>
+                  </li>
               </ul>
       </div>
     </div>
@@ -145,15 +149,127 @@
 
     <div class="doc doc-contents ">
 
-        <p>Fit a Gaussian peak.
-:param x: list of x values
-:param y: list of y values
-:param x_min: start index of the list of points
-:param x_max: end index of the list of points
-:param center: estimated center position
-:param sigma: if provided, the sigma will be fixed to the given value
-:param background: if provided, the value will be subtracted from y</p>
+        <p>Fit a Gaussian peak.</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>x</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>List of x values.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>y</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>List of y values.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>x_min</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                      <code>110</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Start index of the list of points, by default 110.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>x_max</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                      <code>170</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>End index of the list of points, by default 170.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>center</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Estimated center position, by default None.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>sigma</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If provided, the sigma will be fixed to the given value, by default None.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>background</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If provided, the value will be subtracted from y, by default None.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+<b><code>c</code></b>(                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>
+)              –
+              <div class="doc-md-description">
+                <p>Fitted center position of the Gaussian peak.</p>
+              </div>
+            </li>
+            <li>
+<b><code>width</code></b>(                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>
+)              –
+              <div class="doc-md-description">
+                <p>Fitted width (sigma) of the Gaussian peak.</p>
+              </div>
+            </li>
+            <li>
+<b><code>fit</code></b>(                  <code><span title="lmfit.model.ModelResult">ModelResult</span></code>
+)              –
+              <div class="doc-md-description">
+                <p>The result of the fit.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -169,11 +285,81 @@
 
     <div class="doc doc-contents ">
 
-        <p>Process a Mantid workspace to extract counts vs pixel.
-:param workspace: Mantid workspace
-:param summed: if True, the x pixels with be summed
-:param tof_step: TOF bin size</p>
+        <p>Process a Mantid workspace to extract counts vs pixel.</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>workspace</code></b>
+                  (<code>Mantid workspace</code>)
+              –
+              <div class="doc-md-description">
+                <p>The Mantid workspace to process.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>summed</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>True</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, the x pixels will be summed (default is True).</p>
+              </div>
+            </li>
+            <li>
+              <b><code>tof_step</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                      <code>200</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>The TOF bin size (default is 200).</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a></code>
+              –
+              <div class="doc-md-description">
+                <p>A tuple containing:
+- tof : numpy.ndarray
+    The time-of-flight values.
+- _x : numpy.ndarray
+    The pixel indices.
+- _y : numpy.ndarray
+    The summed counts for each pixel.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>

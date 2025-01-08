@@ -90,6 +90,10 @@
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../../user/conda_environments/">Conda Environments</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../user/event_processing/">Event processing</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../user/workflow/">Specular reflectivity reduction workflow</a>
+                  </li>
               </ul>
       </div>
     </div>
@@ -153,9 +157,9 @@ Adapted from Mantid code.</p>
 
 
     <div class="doc doc-contents ">
-            <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#object">object</a></code></p>
 
+
+        <p>Class that hold the parameters for the reduction of a single data set.</p>
 
 
 
@@ -201,6 +205,9 @@ Adapted from Mantid code.</p>
         <ul class="first simple">
             <li>
               <b><code>permissible</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>True</code>
+)
               –
               <div class="doc-md-description">
                 <p>allow keys in data_dict that are not attribute names of ReductionParameters instances. Reading from
@@ -250,9 +257,32 @@ Adapted from Mantid code.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Read in data from XML
-@param xml_str: text to read the data from</p>
+        <p>Read in data from XML</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>instrument_dom</code></b>
+                  (<code><span title="xml.dom.Document">Document</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -296,6 +326,189 @@ Adapted from Mantid code.</p>
 
         <p>Read in data from XML string</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>xml_str</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>String representation of a list of ReductionParameters instances</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>
+              –
+              <div class="doc-md-description">
+                <p>List of ReductionParameters instances</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.reduction_template_reader.getBoolElement" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">getBoolElement</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Parse a boolean element from the dom object</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.reduction_template_reader.getContent" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">getContent</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Returns the content of a tag within a dom object</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.reduction_template_reader.getFloatElement" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">getFloatElement</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Parse a float element from the dom object</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.reduction_template_reader.getFloatList" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">getFloatList</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Parse a list of floats from the dom object</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.reduction_template_reader.getIntElement" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">getIntElement</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Parse an integer element from the dom object</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.reduction_template_reader.getIntList" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">getIntList</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Parse a list of integers from the dom object</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.reduction_template_reader.getStringElement" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">getStringElement</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Parse a string element from the dom object</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="lr_reduction.reduction_template_reader.getStringList" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">getStringList</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Parse a list of strings from the dom object</p>
+
     </div>
 
 </div>
@@ -330,6 +543,53 @@ Adapted from Mantid code.</p>
 
         <p>Create XML from the current data.</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>data_sets</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>List of ReductionParameters instances</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
+              –
+              <div class="doc-md-description">
+                <p>XML string</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>

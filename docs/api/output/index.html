@@ -92,6 +92,10 @@
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../../user/conda_environments/">Conda Environments</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../user/event_processing/">Event processing</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../user/workflow/">Specular reflectivity reduction workflow</a>
+                  </li>
               </ul>
       </div>
     </div>
@@ -189,6 +193,64 @@
 
         <p>Add a partial R(q) to the collection</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>q</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/array.html#module-array">array</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Q values</p>
+              </div>
+            </li>
+            <li>
+              <b><code>r</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/array.html#module-array">array</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>R values</p>
+              </div>
+            </li>
+            <li>
+              <b><code>dr</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/array.html#module-array">array</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Error in R values</p>
+              </div>
+            </li>
+            <li>
+              <b><code>meta_data</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>Meta data for the run</p>
+              </div>
+            </li>
+            <li>
+              <b><code>dq</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/array.html#module-array">array</a></code>, default:
+                      <code>None</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>Q resolution</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -206,6 +268,30 @@
 
         <p>Read a partial result file and add it to the collection</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>file_path</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>The path to the file to be read</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -238,8 +324,46 @@
 
     <div class="doc doc-contents ">
 
-        <p>Save R(Q) in ascii format</p>
+        <p>Save R(Q) in ASCII format.
+This function merges the data before saving. It writes metadata and R(Q) data
+to the specified file in ASCII format. The metadata includes experiment details,
+reduction version, run title, start time, reduction time, and other optional
+parameters. The R(Q) data includes Q, R, dR, and dQ values.</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>file_path</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>The path to the file where the ASCII data will be saved.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>meta_as_json</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                      <code>False</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>If True, metadata will be written in JSON format. Default is False.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
@@ -266,6 +390,30 @@
 
         <p>Read a data file and extract meta data</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Parameters:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>file_path</code></b>
+                  (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>)
+              –
+              <div class="doc-md-description">
+                <p>The path to the file to be read</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
 
 </div>
