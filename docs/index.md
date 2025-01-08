@@ -2,6 +2,7 @@
 
 ## User Guide
 
+- [Workflow overview](./user/workflow.md)
 - [Conda Environments](./user/conda_environments.md)
 - [Releases](./releases.md)
 
