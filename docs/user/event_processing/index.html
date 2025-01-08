@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
         <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="https://unpkg.com/katex@0/dist/katex.min.css" rel="stylesheet" />
     
       <script>
         // Current page data
@@ -137,7 +138,7 @@
                 <h1 id="event-processing">Event processing</h1>
 <p>The BL4B instrument leverages the concept of weighted events for several aspects of
 the reduction process. Following this approach, each event is treated separately and is
-assigned a weigth $w$ to accound for various corrections. Summing events then becomes the
+assigned a weigth <span class="arithmatex">\(w\)</span> to accound for various corrections. Summing events then becomes the
 sum of the weights for all events.</p>
 <h2 id="loading-events-and-dead-time-correction">Loading events and dead time correction</h2>
 <p>A dead time correction is available for rates above around 2000 counts/sec. Both
@@ -150,33 +151,33 @@ the following for the paralyzing case:</p>
 <p>$$
 C_{par} = -{\cal Re}W_0(-R\tau/\Delta_{TOF}) \Delta_{TOF}/R
 $$
-where $R$ is the number of triggers per accelerator pulse within a time-of-flight bin $\Delta_{TOF}$.
-The dead time for the current BL4B detector is $\tau=4.2$ $\mu s$. In the equation avove, ${\cal Re}W_0$ referes to the principal branch of the Lambert W function.</p>
+where <span class="arithmatex">\(R\)</span> is the number of triggers per accelerator pulse within a time-of-flight bin <span class="arithmatex">\(\Delta_{TOF}\)</span>.
+The dead time for the current BL4B detector is <span class="arithmatex">\(\tau=4.2\)</span> <span class="arithmatex">\(\mu s\)</span>. In the equation avove, <span class="arithmatex">\({\cal Re}W_0\)</span> referes to the principal branch of the Lambert W function.</p>
 <p>The following is used for the non-paralyzing case:
 $$
 C_{non-par} = 1/(1-R\tau/\Delta_{TOF})
 $$</p>
-<p>By default, we use a paralyzing dead time correction with $\Delta_{TOF}=100$ $\mu s$. These parameters can be changed.</p>
+<p>By default, we use a paralyzing dead time correction with <span class="arithmatex">\(\Delta_{TOF}=100\)</span> <span class="arithmatex">\(\mu s\)</span>. These parameters can be changed.</p>
 <p>The BL4B detector is a wire chamber with a detector readout that includes digitization of the
 position of each event. For a number of reasons, like event pileup, it is possible for the 
 electronics to be unable to assign a coordinate to a particular trigger event. These events are
 labelled as error events and stored along with the good events. While only good events are used
-to compute reflectivity, error events are included in the $R$ value defined above. For clarity, we chose to define $R$ in terms of number of triggers as opposed to events.</p>
+to compute reflectivity, error events are included in the <span class="arithmatex">\(R\)</span> value defined above. For clarity, we chose to define <span class="arithmatex">\(R\)</span> in terms of number of triggers as opposed to events.</p>
 <p>Once the dead time correction as a function for time-of-flight is computed, each event
 in the run being processed is assigned a weight according to the correction. </p>
-<p>$w_i = C(t_i)$</p>
-<p>where $t_i$ is the time-of-flight of event $i$. The value of $C$ is interpolated from the 
+<p><span class="arithmatex">\(w_i = C(t_i)\)</span></p>
+<p>where <span class="arithmatex">\(t_i\)</span> is the time-of-flight of event <span class="arithmatex">\(i\)</span>. The value of <span class="arithmatex">\(C\)</span> is interpolated from the 
 computed dead time correction distribution.</p>
 <p>[1] V. Bécares, J. Blázquez, Detector Dead Time Determination and OptimalCounting Rate for a Detector Near a Spallation Source ora Subcritical Multiplying System, Science and Technology of Nuclear Installations, 2012, 240693, https://doi.org/10.1155/2012/240693</p>
 <h3 id="correct-for-emission-time">Correct for emission time</h3>
 <p>Since neutrons of different wavelength will spend different amount of time on average
 within the moderator, a linear approximation is used by the data acquisition system to
 account for emission time when phasing choppers.</p>
-<p>The time of flight for each event $i$ is corrected by an small value given by</p>
+<p>The time of flight for each event <span class="arithmatex">\(i\)</span> is corrected by an small value given by</p>
 <p>$\Delta t_i = -t_{off} +  \frac{h L}{m_n} A  t_i $</p>
-<p>where $h$ is Planck's constant, $m_n$ is the mass of the neutron, and $L$ is the distance
+<p>where <span class="arithmatex">\(h\)</span> is Planck's constant, <span class="arithmatex">\(m_n\)</span> is the mass of the neutron, and <span class="arithmatex">\(L\)</span> is the distance
 between the moderator and the detector.</p>
-<p>The $t_{off}$, $A$, and $L$ parameters are process variables that are stored in the
+<p>The <span class="arithmatex">\(t_{off}\)</span>, <span class="arithmatex">\(A\)</span>, and <span class="arithmatex">\(L\)</span> parameters are process variables that are stored in the
 data file and can be changed in the data acquisition system.</p>
 <h3 id="gravity-correction">Gravity correction</h3>
 <p>The reflected angle of each neutron is corrected for the effect of gravity according to
@@ -184,73 +185,73 @@ reference Campbell et al [2]. This correction is done individually for each neut
 <p>[2] R.A. Campbell et al, Eur. Phys. J. Plus (2011) 126: 107. https://doi.org/10.1140/epjp/i2011-11107-8</p>
 <h3 id="event-selection">Event selection</h3>
 <p>Following the correction described above, we are left with a list of events, each having
-a detector position ($p_x, p_y$) and a wavelength $\lambda$.
+a detector position (<span class="arithmatex">\(p_x, p_y\)</span>) and a wavelength <span class="arithmatex">\(\lambda\)</span>.
 As necessary, regions of interests can be defined to identify events to include in the specular
 reflectivity calculation, and which will be used to estimate and subtract background.
 Event selection is performed before computing the reflectivity as described in the following sections.</p>
 <h3 id="q-calculation">Q calculation</h3>
-<p>The reflectivity $R(q)$ is computed by computing the $q$ value for each even and histogramming
+<p>The reflectivity <span class="arithmatex">\(R(q)\)</span> is computed by computing the <span class="arithmatex">\(q\)</span> value for each even and histogramming
 in a predefined binning of the user's choice. This approach is slightly different from the
-traditional approach of binning events in TOF, and then converting the TOF axis to $q$.
-The event-based approach allows us to bin directly into a $q$ binning of our choice and avoid
+traditional approach of binning events in TOF, and then converting the TOF axis to <span class="arithmatex">\(q\)</span>.
+The event-based approach allows us to bin directly into a <span class="arithmatex">\(q\)</span> binning of our choice and avoid
 the need for a final rebinning.</p>
-<p>The standard way of computing the reflected signal is simply to compute $q$ for each event $i$
+<p>The standard way of computing the reflected signal is simply to compute <span class="arithmatex">\(q\)</span> for each event <span class="arithmatex">\(i\)</span>
 using the following equation:</p>
-<p>$q_{z, i} = \frac{4\pi}{\lambda_i}\sin(\theta - \delta_{g,i})$</p>
-<p>where the $\delta_{g,i}$ refers to the angular offset caused by gravity.</p>
-<p>Once $q$ is computed for each neutron, they can be histogrammed, taking into account the
+<p><span class="arithmatex">\(q_{z, i} = \frac{4\pi}{\lambda_i}\sin(\theta - \delta_{g,i})\)</span></p>
+<p>where the <span class="arithmatex">\(\delta_{g,i}\)</span> refers to the angular offset caused by gravity.</p>
+<p>Once <span class="arithmatex">\(q\)</span> is computed for each neutron, they can be histogrammed, taking into account the
 weight assigned to each event:</p>
-<p>$S(q_z) = \frac{1}{Q} \sum_{i \in q_z \pm \Delta{q_z}/2}  w_i$</p>
-<p>where the sum is over all event falling in the $q_z$ bin or width $\Delta q_z$, and $w_i$ is the 
-weight if the $i^{th}$ event. At this point we have an unnormalized $S(q_z)$, which remains to be
-corrected for the neutron flux. The value of $Q$ is the integrated proton charge for the</p>
+<p><span class="arithmatex">\(S(q_z) = \frac{1}{Q} \sum_{i \in q_z \pm \Delta{q_z}/2}  w_i\)</span></p>
+<p>where the sum is over all event falling in the <span class="arithmatex">\(q_z\)</span> bin or width <span class="arithmatex">\(\Delta q_z\)</span>, and <span class="arithmatex">\(w_i\)</span> is the 
+weight if the <span class="arithmatex">\(i^{th}\)</span> event. At this point we have an unnormalized <span class="arithmatex">\(S(q_z)\)</span>, which remains to be
+corrected for the neutron flux. The value of <span class="arithmatex">\(Q\)</span> is the integrated proton charge for the</p>
 <h3 id="constant-q-binning">Constant-Q binning</h3>
 <p>When using a divergent beam, or when measuring a warped sample, it may be beneficial to take 
 into accound where a neutron landed on the detector in order to recalculate its angle, and its
-$q$ value.</p>
-<p>In this case, the $q_{z, i}$ equation above becomes:</p>
-<p>$q_{z, i} = \frac{4\pi}{\lambda_i}\sin(\theta + \delta_{f,i} - \delta_{g,i})$</p>
-<p>where $\delta_{f,i}$ is the angular offset between where the specular peak appears on the
+<span class="arithmatex">\(q\)</span> value.</p>
+<p>In this case, the <span class="arithmatex">\(q_{z, i}\)</span> equation above becomes:</p>
+<p><span class="arithmatex">\(q_{z, i} = \frac{4\pi}{\lambda_i}\sin(\theta + \delta_{f,i} - \delta_{g,i})\)</span></p>
+<p>where <span class="arithmatex">\(\delta_{f,i}\)</span> is the angular offset between where the specular peak appears on the
 detector and where the neutron was detected:</p>
-<p>$\delta_{f,i} = \mathrm{sgn}(\theta)\arctan(d(p_i-p_{spec})/L_{det})/2$</p>
-<p>where $d$ is the size of a pixel, $p_i$ is the pixel where event $i$ was detected,
-$p_{spec}$ is the pixel at the center of the peak distribution, $L_{det}$ is the distance
+<p><span class="arithmatex">\(\delta_{f,i} = \mathrm{sgn}(\theta)\arctan(d(p_i-p_{spec})/L_{det})/2\)</span></p>
+<p>where <span class="arithmatex">\(d\)</span> is the size of a pixel, <span class="arithmatex">\(p_i\)</span> is the pixel where event <span class="arithmatex">\(i\)</span> was detected,
+<span class="arithmatex">\(p_{spec}\)</span> is the pixel at the center of the peak distribution, <span class="arithmatex">\(L_{det}\)</span> is the distance
 between the sample and the detector. Care should be taken to asign the correct sign to
-the angle offset. For this reason, we add the sign the scattering angle $\mathrm{sgn}(\theta)$ on from of the
+the angle offset. For this reason, we add the sign the scattering angle <span class="arithmatex">\(\mathrm{sgn}(\theta)\)</span> on from of the
 previous equation to account for when we reflect up or down.</p>
 <h2 id="normalization-options">Normalization options</h2>
 <p>The scattering signal computed above needs to be normalized by the incoming flux in order
-to produce $R(q_z)$. For the simplest case, we follow the same procedure as above for the 
-relevant direct beam run, and simply compute the $S_1(q_z)$ using the standard procedure above,
-using the same $q_z$ binning,
-and replacing $\theta$ by the value at which the reflected beam was measured. We are then effectively computing what the measured signal would be if all neutron from the beam would reflect with a probability of 1. We refer this distribution at $S_1(q_z)$.</p>
+to produce <span class="arithmatex">\(R(q_z)\)</span>. For the simplest case, we follow the same procedure as above for the 
+relevant direct beam run, and simply compute the <span class="arithmatex">\(S_1(q_z)\)</span> using the standard procedure above,
+using the same <span class="arithmatex">\(q_z\)</span> binning,
+and replacing <span class="arithmatex">\(\theta\)</span> by the value at which the reflected beam was measured. We are then effectively computing what the measured signal would be if all neutron from the beam would reflect with a probability of 1. We refer this distribution at <span class="arithmatex">\(S_1(q_z)\)</span>.</p>
 <p>The measured reflectivity then becomes</p>
-<p>$$
+<div class="arithmatex">\[
     R(q_z) = S(q_z) / S_1(q_z)
-$$</p>
+\]</div>
 <p>This approach is equivalent to predetermining the TOF binning that would be needed to produce
-the $q_z$ binning we actually want, summing counts in TOF for both scattered and direct beam, 
-taking the ratio of the two, and finally converting TOF to $q_z$. The only difference is that we
-don't bother with the TOF bins and assign events directly into the $q_z$ we know they will contribute to the denominator of for normalization.</p>
+the <span class="arithmatex">\(q_z\)</span> binning we actually want, summing counts in TOF for both scattered and direct beam, 
+taking the ratio of the two, and finally converting TOF to <span class="arithmatex">\(q_z\)</span>. The only difference is that we
+don't bother with the TOF bins and assign events directly into the <span class="arithmatex">\(q_z\)</span> we know they will contribute to the denominator of for normalization.</p>
 <h3 id="normalization-using-weighted-events">Normalization using weighted events</h3>
 <p>An alternative approach to the normalization described above is also implemented to BL4B.
 It leverages the weighted event approach. Using this approach, we can simply histogram the direct
 beam event in a wavelenth distribution. In such a histogram, each bin in wavelength will have 
 a flux</p>
-<p>$$\phi(\lambda) = N_{\lambda} / Q / \Delta_{\lambda}$$</p>
-<p>where $N_{\lambda}$ is the number of neutrons in the bin of center $\lambda$, $Q$ is the
-integrated proton charge, and $\Delta(\lambda)$ is the wavelength bin width for the distribution.</p>
+<div class="arithmatex">\[\phi(\lambda) = N_{\lambda} / Q / \Delta_{\lambda}\]</div>
+<p>where <span class="arithmatex">\(N_{\lambda}\)</span> is the number of neutrons in the bin of center <span class="arithmatex">\(\lambda\)</span>, <span class="arithmatex">\(Q\)</span> is the
+integrated proton charge, and <span class="arithmatex">\(\Delta(\lambda)\)</span> is the wavelength bin width for the distribution.</p>
 <p>Coming back to the calculation of the reflected signal above, we now can add a new weight for 
 each event according to the flux for its particular wavelength:</p>
-<p>$$
+<div class="arithmatex">\[
 w_i \rightarrow w_i / \phi(\lambda_i) q_{z,i} / \lambda_i
-$$</p>
-<p>where $\phi(\lambda)$ is interpolated from the distribution we measured above. The $q_z/\lambda$
-term is the Jacobian to account for the transformation of wavelength to $q$.
-With this new weigth, we can compute reflectivity directly from the $S(q_z)$ equation above:</p>
-<p>$$
+\]</div>
+<p>where <span class="arithmatex">\(\phi(\lambda)\)</span> is interpolated from the distribution we measured above. The <span class="arithmatex">\(q_z/\lambda\)</span>
+term is the Jacobian to account for the transformation of wavelength to <span class="arithmatex">\(q\)</span>.
+With this new weigth, we can compute reflectivity directly from the <span class="arithmatex">\(S(q_z)\)</span> equation above:</p>
+<div class="arithmatex">\[
 R(q_z) = \frac{1}{Q} \sum_{i \in q_z \pm \Delta{q_z}/2}  w_i / \phi(\lambda_i) q_{z,i} / \lambda_i
-$$</p>
+\]</div>
               
             </div>
           </div><footer>
@@ -294,6 +295,9 @@ $$</p>
     <script>var base_url = "../..";</script>
     <script src="../../js/theme_extra.js"></script>
     <script src="../../js/theme.js"></script>
+      <script src="../../javascripts/katex.js"></script>
+      <script src="https://unpkg.com/katex@0/dist/katex.min.js"></script>
+      <script src="https://unpkg.com/katex@0/dist/contrib/auto-render.min.js"></script>
       <script src="../../search/main.js"></script>
     <script>
         jQuery(function () {
