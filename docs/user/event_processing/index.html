@@ -148,15 +148,15 @@ to process events, while non-paralyzing refers to a detector that always becomes
 after the dead time period [1].</p>
 <p>The dead time correction to be multiplied by the measured detector counts is given by
 the following for the paralyzing case:</p>
-<p>$$
+<div class="arithmatex">\[
 C_{par} = -{\cal Re}W_0(-R\tau/\Delta_{TOF}) \Delta_{TOF}/R
-$$
-where <span class="arithmatex">\(R\)</span> is the number of triggers per accelerator pulse within a time-of-flight bin <span class="arithmatex">\(\Delta_{TOF}\)</span>.
+\]</div>
+<p>where <span class="arithmatex">\(R\)</span> is the number of triggers per accelerator pulse within a time-of-flight bin <span class="arithmatex">\(\Delta_{TOF}\)</span>.
 The dead time for the current BL4B detector is <span class="arithmatex">\(\tau=4.2\)</span> <span class="arithmatex">\(\mu s\)</span>. In the equation avove, <span class="arithmatex">\({\cal Re}W_0\)</span> referes to the principal branch of the Lambert W function.</p>
-<p>The following is used for the non-paralyzing case:
-$$
+<p>The following is used for the non-paralyzing case:</p>
+<div class="arithmatex">\[
 C_{non-par} = 1/(1-R\tau/\Delta_{TOF})
-$$</p>
+\]</div>
 <p>By default, we use a paralyzing dead time correction with <span class="arithmatex">\(\Delta_{TOF}=100\)</span> <span class="arithmatex">\(\mu s\)</span>. These parameters can be changed.</p>
 <p>The BL4B detector is a wire chamber with a detector readout that includes digitization of the
 position of each event. For a number of reasons, like event pileup, it is possible for the 
