@@ -17,10 +17,12 @@ the following for the paralyzing case:
 $$
 C_{par} = -{\cal Re}W_0(-R\tau/\Delta_{TOF}) \Delta_{TOF}/R
 $$
+
 where $R$ is the number of triggers per accelerator pulse within a time-of-flight bin $\Delta_{TOF}$.
 The dead time for the current BL4B detector is $\tau=4.2$ $\mu s$. In the equation avove, ${\cal Re}W_0$ referes to the principal branch of the Lambert W function.
 
 The following is used for the non-paralyzing case:
+
 $$
 C_{non-par} = 1/(1-R\tau/\Delta_{TOF})
 $$
