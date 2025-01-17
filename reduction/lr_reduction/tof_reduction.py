@@ -5,11 +5,8 @@ from lr_reduction.event_reduction import EventReflectivity
 
 class TOFReduction(EventReflectivity):
 
-    def __init__(self, **kwargs):
-        super(TOFReduction, self).__init__(**kwargs)
-
     def _reflectivity(
-        self, ws, peak_position, peak, low_res, theta, wl_bins=None, sum_pixels=True, **kwargs
+        self, ws, _, peak, low_res, sum_pixels=True, **__
     ):
         """
         Unused parameters:
@@ -17,16 +14,11 @@ class TOFReduction(EventReflectivity):
 
 
         """
-        print(peak_position, peak, low_res, theta, wl_bins, sum_pixels, kwargs)
         charge = ws.getRun().getProtonCharge()
-        self.n_tof_bins = 100
-
-        shape = len(wl_bins) - 1 if sum_pixels else ((peak[1] - peak[0] + 1), len(wl_bins) - 1)
-        tof_bins = np.linspace(self.tof_range[0], self.tof_range[1], self.n_tof_bins + 1)
+        shape = len(self.tof_bins) - 1 if sum_pixels else ((peak[1] - peak[0] + 1), len(self.tof_bins) - 1)
 
         refl = np.zeros(shape)
         d_refl_sq = np.zeros(shape)
-        #counts = np.zeros(shape)
 
         for i in range(low_res[0], int(low_res[1] + 1)):
             for j in range(peak[0], int(peak[1] + 1)):
@@ -44,14 +36,18 @@ class TOFReduction(EventReflectivity):
 
                 event_weights = evt_list.getWeights()
 
-                _counts, _ = np.histogram(tofs, bins=tof_bins, weights=event_weights)
+                _counts, _ = np.histogram(tofs, bins=self.tof_bins, weights=event_weights)
+                _err, _ = np.histogram(tofs, bins=self.tof_bins, weights=event_weights**2)
+
                 if sum_pixels:
                     refl += _counts
+                    d_refl_sq += _err
                 else:
                     refl[j - peak[0]] += _counts
+                    d_refl_sq[j - peak[0]] += _err
 
-            d_refl_sq = np.sqrt(np.fabs(refl)) / charge
-            refl /= charge
+        d_refl_sq = np.sqrt(d_refl_sq) / charge
+        refl /= charge
 
         return refl, d_refl_sq
 
@@ -77,6 +73,12 @@ class TOFReduction(EventReflectivity):
         d_refl
             The uncertainties in the reflectivity values
         """
+        # TODO: make this a parameter
+        self.n_tof_bins = 260
+
+        tof_bins = np.linspace(self.tof_range[0], self.tof_range[1], self.n_tof_bins + 1)
+        self.tof_bins = tof_bins
+
         # Scattering data
         refl, d_refl = self._reflectivity(
             self._ws_sc,
@@ -84,18 +86,17 @@ class TOFReduction(EventReflectivity):
             peak=self.signal_peak,
             low_res=self.signal_low_res,
             theta=self.theta,
+            sum_pixels=not q_summing
         )
         # Remove background
-        if False and self.signal_bck is not None:
-            refl_bck, d_refl_bck = self.bck_subtraction()
+        if self.signal_bck is not None:
+            refl_bck, d_refl_bck = self.bck_subtraction(normalize_to_single_pixel=q_summing, q_summing=q_summing)
             refl -= refl_bck
             d_refl = np.sqrt(d_refl**2 + d_refl_bck**2)
 
         if normalize:
-            # Normalize by monitor
-            self._normalize(refl, d_refl)
             norm, d_norm = self._reflectivity(
-                self._ws_db, peak_position=0, peak=self.norm_peak, low_res=self.norm_low_res, theta=self.theta, q_summing=False
+                self._ws_db, peak_position=0, peak=self.norm_peak, low_res=self.norm_low_res, sum_pixels=True
             )
 
             # Direct beam background could be added here. The effect will be negligible.
@@ -103,28 +104,24 @@ class TOFReduction(EventReflectivity):
                 norm_bck, d_norm_bck = self.norm_bck_subtraction()
                 norm -= norm_bck
                 d_norm = np.sqrt(d_norm**2 + d_norm_bck**2)
-            db_bins = norm > 0
 
-            refl[db_bins] = refl[db_bins] / norm[db_bins]
-            d_refl[db_bins] = np.sqrt(
-                d_refl[db_bins] ** 2 / norm[db_bins] ** 2 + refl[db_bins] ** 2 * d_norm[db_bins] ** 2 / norm[db_bins] ** 4
+            refl = refl / norm
+            d_refl = np.sqrt(
+                d_refl ** 2 / norm ** 2 + refl ** 2 * d_norm ** 2 / norm ** 4
             )
 
-            # Hold on to normalization to be able to diagnose issues later
-            self.norm = norm[db_bins]
-            self.d_norm = d_norm[db_bins]
-
-            # Clean up points where we have no direct beam
-            zero_db = [not v for v in db_bins]
-            refl[zero_db] = 0
-            d_refl[zero_db] = 0
-
         # Convert to Q
+        wl_list = self.tof_bins / self.constant
+        d_theta = self.gravity_correction(self._ws_sc, wl_list)
 
-        self.refl = refl
-        self.d_refl = d_refl
-
-
+        if q_summing:
+            refl, d_refl = self.constant_q (wl_list, refl, d_refl)
+            self.refl = refl
+            self.d_refl = d_refl
+        else:
+            self.q_bins = np.flip(4.0 * np.pi / wl_list * np.sin(self.theta - d_theta))
+            self.refl = np.flip(refl)
+            self.d_refl = np.flip(d_refl)
 
         # Remove leading zeros
         r = np.trim_zeros(self.refl, "f")
@@ -133,10 +130,59 @@ class TOFReduction(EventReflectivity):
         self.d_refl = self.d_refl[trim:]
         self.q_bins = self.q_bins[trim:]
 
-
-
-        # Compute Q resolution
-        #self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing)
-        self.q_summing = q_summing
-
         return self.q_bins, self.refl, self.d_refl
+
+
+    def constant_q(self, wl_values, signal, signal_err):
+        """
+        Compute reflectivity using constant-Q binning
+        """
+        pixels = np.arange(self.signal_peak[0], self.signal_peak[1]+1)
+
+        _pixel_width = self.pixel_width
+
+        # TODO gravity correction
+        x_distance = _pixel_width * (pixels - self.specular_pixel )
+        delta_theta_f = np.arctan(x_distance / self.det_distance) / 2.0
+
+        # Sign will depend on reflect up or down
+        ths_value = self._ws_sc.getRun()["ths"].value[-1]
+        delta_theta_f *= np.sign(ths_value)
+
+        # Calculate Qz for each pixel
+        LL, TT = np.meshgrid(wl_values, delta_theta_f)
+        qz = 4 * np.pi / LL * np.sin(self.theta + TT) * np.cos(TT)
+        qz = qz.T
+
+        # We use np.digitize to bin. The output of digitize is a bin
+        # number for each entry, starting at 1. The first bin (0) is
+        # for underflow entries, and the last bin is for overflow entries.
+        n_q_values = len(self.q_bins)
+        refl = np.zeros(n_q_values - 1)
+        refl_err = np.zeros(n_q_values - 1)
+        signal_n = np.zeros(n_q_values - 1)
+
+        # Number of wavelength bins
+        n_wl = qz.shape[0]-1
+        # Number of pixels
+        n_pix = qz.shape[1]
+
+        for tof in range(n_wl):
+            # When digitizing, the first and last bins are out-of-bounds values
+            z_inds = np.digitize(qz[tof], self.q_bins)
+
+            # Move the indices so the valid bin numbers start at zero,
+            # since this is how we are going to address the output array
+            z_inds -= 1
+
+            for ix in range(n_pix):
+                if z_inds[ix] < n_q_values - 1 and z_inds[ix] >= 0 and not np.isnan(signal[ix][tof]):
+                    refl[z_inds[ix]] += signal[ix][tof]
+                    refl_err[z_inds[ix]] += signal_err[ix][tof] ** 2
+                    signal_n[z_inds[ix]] += 1.0
+
+        signal_n = np.where(signal_n > 0, signal_n, 1)
+        refl = float(signal.shape[0]) * refl / signal_n
+        refl_err = float(signal.shape[0]) * np.sqrt(refl_err) / signal_n
+
+        return refl, refl_err
