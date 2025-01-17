@@ -1,18 +1,56 @@
+"""
+Implementation of reflectivity reduction for time-of-flight data using histograms of time-of-flight values.
+"""
+
 import numpy as np
 
 from lr_reduction.event_reduction import EventReflectivity
 
 
 class TOFReduction(EventReflectivity):
+    """
+    Traditional implementation of reflectivity reduction for time-of-flight data.
+    As opposed to the event-based reduction, this implementation is based on
+    histograms of time-of-flight values.
+    """
 
     def _reflectivity(
-        self, ws, _, peak, low_res, sum_pixels=True, **__
+        self,
+        ws,
+        peak_position,
+        peak,
+        low_res,
+        sum_pixels=True,
+        **__,  # noqa: ARG002
     ):
         """
-        Unused parameters:
-        - q_bins
+        Overloads the _reflectivity method from EventReflectivity.
+        This method histograms counts into time-of-flight bins in the selected region
+        of interest of the detector.
 
+        TODO: This method should be renamed to something more descriptive.
 
+        Parameters
+        ----------
+        ws : Mantid workspace
+            The workspace containing the data
+        peak_position : int
+            The position of the peak, unused in this implementation
+        peak : list
+            The range of pixels that define the peak
+        low_res : list
+            The range in the transverse direction on the detector
+        sum_pixels : bool
+            If True, the counts are summed over the pixels in the peak range
+
+        Returns
+        -------
+        tuple
+            A tuple containing:
+            - refl : numpy.ndarray
+                The reflectivity values
+            - d_refl_sq : numpy.ndarray
+                The uncertainties in the reflectivity values
         """
         charge = ws.getRun().getProtonCharge()
         shape = len(self.tof_bins) - 1 if sum_pixels else ((peak[1] - peak[0] + 1), len(self.tof_bins) - 1)
@@ -51,7 +89,7 @@ class TOFReduction(EventReflectivity):
 
         return refl, d_refl_sq
 
-    def specular(self, q_summing=False, normalize=True):
+    def specular(self, q_summing=False, normalize=True, number_of_bins=300):
         """
         Compute specular reflectivity.
 
@@ -63,18 +101,22 @@ class TOFReduction(EventReflectivity):
             Turns on constant-Q binning
         normalize : bool
             If True, and tof_weighted is False, normalization will be skipped
+        number_of_bins : int
+            Number of bins for the time-of-flight axis
 
         Returns
         -------
-        q_bins
-            The Q bin boundaries
-        refl
-            The reflectivity values
-        d_refl
-            The uncertainties in the reflectivity values
+        tuple
+            A tuple containing:
+            - q_bins : numpy.ndarray
+                The Q bin boundaries
+            - refl : numpy.ndarray
+                The reflectivity values
+            - d_refl_sq : numpy.ndarray
+                The uncertainties in the reflectivity values
         """
         # TODO: make this a parameter
-        self.n_tof_bins = 260
+        self.n_tof_bins = number_of_bins
 
         tof_bins = np.linspace(self.tof_range[0], self.tof_range[1], self.n_tof_bins + 1)
         self.tof_bins = tof_bins
@@ -86,7 +128,7 @@ class TOFReduction(EventReflectivity):
             peak=self.signal_peak,
             low_res=self.signal_low_res,
             theta=self.theta,
-            sum_pixels=not q_summing
+            sum_pixels=not q_summing,
         )
         # Remove background
         if self.signal_bck is not None:
@@ -95,9 +137,7 @@ class TOFReduction(EventReflectivity):
             d_refl = np.sqrt(d_refl**2 + d_refl_bck**2)
 
         if normalize:
-            norm, d_norm = self._reflectivity(
-                self._ws_db, peak_position=0, peak=self.norm_peak, low_res=self.norm_low_res, sum_pixels=True
-            )
+            norm, d_norm = self._reflectivity(self._ws_db, peak_position=0, peak=self.norm_peak, low_res=self.norm_low_res, sum_pixels=True)
 
             # Direct beam background could be added here. The effect will be negligible.
             if self.norm_bck is not None:
@@ -106,16 +146,14 @@ class TOFReduction(EventReflectivity):
                 d_norm = np.sqrt(d_norm**2 + d_norm_bck**2)
 
             refl = refl / norm
-            d_refl = np.sqrt(
-                d_refl ** 2 / norm ** 2 + refl ** 2 * d_norm ** 2 / norm ** 4
-            )
+            d_refl = np.sqrt(d_refl**2 / norm**2 + refl**2 * d_norm**2 / norm**4)
 
         # Convert to Q
         wl_list = self.tof_bins / self.constant
         d_theta = self.gravity_correction(self._ws_sc, wl_list)
 
         if q_summing:
-            refl, d_refl = self.constant_q (wl_list, refl, d_refl)
+            refl, d_refl = self.constant_q(wl_list, refl, d_refl)
             self.refl = refl
             self.d_refl = d_refl
         else:
@@ -132,17 +170,34 @@ class TOFReduction(EventReflectivity):
 
         return self.q_bins, self.refl, self.d_refl
 
-
     def constant_q(self, wl_values, signal, signal_err):
         """
         Compute reflectivity using constant-Q binning
+
+        Parameters
+        ----------
+        wl_values : numpy.ndarray
+            The wavelength values
+        signal : numpy.ndarray
+            The normalized counts per pixel and wavelength
+        signal_err : numpy.ndarray
+            The uncertainties in the counts
+
+        Returns
+        -------
+        tuple
+            A tuple containing:
+            - refl : numpy.ndarray
+                The reflectivity values
+            - refl_err : numpy.ndarray
+                The uncertainties in the reflectivity values
         """
-        pixels = np.arange(self.signal_peak[0], self.signal_peak[1]+1)
+        pixels = np.arange(self.signal_peak[0], self.signal_peak[1] + 1)
 
         _pixel_width = self.pixel_width
 
         # TODO gravity correction
-        x_distance = _pixel_width * (pixels - self.specular_pixel )
+        x_distance = _pixel_width * (pixels - self.specular_pixel)
         delta_theta_f = np.arctan(x_distance / self.det_distance) / 2.0
 
         # Sign will depend on reflect up or down
@@ -163,7 +218,7 @@ class TOFReduction(EventReflectivity):
         signal_n = np.zeros(n_q_values - 1)
 
         # Number of wavelength bins
-        n_wl = qz.shape[0]-1
+        n_wl = qz.shape[0] - 1
         # Number of pixels
         n_pix = qz.shape[1]
 
