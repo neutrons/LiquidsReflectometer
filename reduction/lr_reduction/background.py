@@ -139,36 +139,31 @@ def functional_background(
         intercept = fit.params["intercept"].value
 
         # Compute background under the peak
-        for k in range(peak[0], peak[1] + 1):
-            if q_summing:
-                refl_bck[k - peak[0]][i] = intercept + k * slope
-                d_refl_bck[k - peak[0]][i] = np.sqrt(fit.covar[1][1] + k**2 * fit.covar[0][0]
-                                                     + 2 * k * fit.covar[0][1])
-            else:
-                refl_bck[i] += intercept + k * slope
-                d_refl_bck[i] += fit.covar[1][1]**2 + k**2 * fit.covar[0][0]**2
-
-        #_pixel_area = peak[1] - peak[0] + 1.0
-
-        #refl_bck[i] = (slope * (peak[1] + peak[0] + 1) + 2 * intercept) * _pixel_area / 2
-        #d_refl_bck[i] = (
-        #    np.sqrt(d_slope**2 * (peak[1] + peak[0] + 1) ** 2 + 4 * d_intercept**2 + 4 * (peak[1] + peak[0] + 1) * fit.covar[0][1])
-        #    * _pixel_area
-        #    / 2
-        #)
-
-        if not q_summing:
-            d_refl_bck = np.sqrt(d_refl_bck)
-
-        # In case we neen the background per pixel as opposed to the total sum under the peak
-        if normalize_to_single_pixel and not q_summing:
+        if q_summing:
+            for k in range(peak[0], peak[1] + 1):
+                if q_summing:
+                    refl_bck[k - peak[0]][i] = intercept + k * slope
+                    d_refl_bck[k - peak[0]][i] = np.sqrt(fit.covar[1][1] + k**2 * fit.covar[0][0]
+                                                        + 2 * k * fit.covar[0][1])
+            if not normalize_to_single_pixel:
+                _pixel_area = peak[1] - peak[0] + 1.0
+                refl_bck *= _pixel_area
+                d_refl_bck *= _pixel_area
+        else:
             _pixel_area = peak[1] - peak[0] + 1.0
-            refl_bck /= _pixel_area
-            d_refl_bck /= _pixel_area
-        elif q_summing and not normalize_to_single_pixel:
-            _pixel_area = peak[1] - peak[0] + 1.0
-            refl_bck *= _pixel_area
-            d_refl_bck *= _pixel_area
+
+            refl_bck[i] = (slope * (peak[1] + peak[0] + 1) + 2 * intercept) * _pixel_area / 2
+            d_refl_bck[i] = (
+                np.sqrt(fit.covar[0][0] * (peak[1] + peak[0] + 1) ** 2 + 4 * fit.covar[1][1]
+                        + 4 * (peak[1] + peak[0] + 1) * fit.covar[0][1]
+                        ) * _pixel_area / 2
+            )
+
+            # In case we neen the background per pixel as opposed to the total sum under the peak
+            if normalize_to_single_pixel:
+                _pixel_area = peak[1] - peak[0] + 1.0
+                refl_bck /= _pixel_area
+                d_refl_bck /= _pixel_area
 
     return refl_bck, d_refl_bck
 
