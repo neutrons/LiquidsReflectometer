@@ -17,11 +17,11 @@ class TOFReduction(EventReflectivity):
     def _reflectivity(
         self,
         ws,
-        peak_position,
+        peak_position,  # noqa: ARG002
         peak,
         low_res,
         sum_pixels=True,
-        **__,  # noqa: ARG002
+        **__,
     ):
         """
         Overloads the _reflectivity method from EventReflectivity.
@@ -89,7 +89,7 @@ class TOFReduction(EventReflectivity):
 
         return refl, d_refl_sq
 
-    def specular(self, q_summing=False, normalize=True, number_of_bins=300):
+    def specular(self, q_summing=False, normalize=True, number_of_bins=100):
         """
         Compute specular reflectivity.
 
@@ -115,6 +115,7 @@ class TOFReduction(EventReflectivity):
             - d_refl_sq : numpy.ndarray
                 The uncertainties in the reflectivity values
         """
+
         # TODO: make this a parameter
         self.n_tof_bins = number_of_bins
 
@@ -132,7 +133,7 @@ class TOFReduction(EventReflectivity):
         )
         # Remove background
         if self.signal_bck is not None:
-            refl_bck, d_refl_bck = self.bck_subtraction(normalize_to_single_pixel=q_summing, q_summing=q_summing)
+            refl_bck, d_refl_bck = self.bck_subtraction(normalize_to_single_pixel=True, q_summing=q_summing)
             refl -= refl_bck
             d_refl = np.sqrt(d_refl**2 + d_refl_bck**2)
 
@@ -153,7 +154,7 @@ class TOFReduction(EventReflectivity):
         d_theta = self.gravity_correction(self._ws_sc, wl_list)
 
         if q_summing:
-            refl, d_refl = self.constant_q(wl_list, refl, d_refl)
+            refl, d_refl = self.constant_q(wl_list, refl, d_refl, d_theta)
             self.refl = refl
             self.d_refl = d_refl
         else:
@@ -170,7 +171,7 @@ class TOFReduction(EventReflectivity):
 
         return self.q_bins, self.refl, self.d_refl
 
-    def constant_q(self, wl_values, signal, signal_err):
+    def constant_q(self, wl_values, signal, signal_err, d_theta):
         """
         Compute reflectivity using constant-Q binning
 
@@ -182,6 +183,8 @@ class TOFReduction(EventReflectivity):
             The normalized counts per pixel and wavelength
         signal_err : numpy.ndarray
             The uncertainties in the counts
+        d_theta : numpy.ndarray
+            Theta offset due to gravity correction
 
         Returns
         -------
@@ -196,7 +199,6 @@ class TOFReduction(EventReflectivity):
 
         _pixel_width = self.pixel_width
 
-        # TODO gravity correction
         x_distance = _pixel_width * (pixels - self.specular_pixel)
         delta_theta_f = np.arctan(x_distance / self.det_distance) / 2.0
 
@@ -206,7 +208,8 @@ class TOFReduction(EventReflectivity):
 
         # Calculate Qz for each pixel
         LL, TT = np.meshgrid(wl_values, delta_theta_f)
-        qz = 4 * np.pi / LL * np.sin(self.theta + TT) * np.cos(TT)
+        dTT, _ = np.meshgrid(d_theta, delta_theta_f)
+        qz = 4 * np.pi / LL * np.sin(self.theta - dTT + TT)
         qz = qz.T
 
         # We use np.digitize to bin. The output of digitize is a bin
@@ -239,5 +242,18 @@ class TOFReduction(EventReflectivity):
         signal_n = np.where(signal_n > 0, signal_n, 1)
         refl = float(signal.shape[0]) * refl / signal_n
         refl_err = float(signal.shape[0]) * np.sqrt(refl_err) / signal_n
+
+        # The following is for information purposes
+        x0 = _pixel_width * (self.specular_pixel - self.signal_peak[0])
+        x1 = _pixel_width * (self.specular_pixel - self.signal_peak[1])
+        delta_theta_f0 = np.arctan(x0 / self.det_distance) / 2.0
+        delta_theta_f1 = np.arctan(x1 / self.det_distance) / 2.0
+
+        qz_max = 4.0 * np.pi / self.tof_range[1] * self.constant * np.fabs(np.sin(self.theta + delta_theta_f0))
+        qz_min = 4.0 * np.pi / self.tof_range[1] * self.constant * np.fabs(np.sin(self.theta + delta_theta_f1))
+        mid_point = (qz_max + qz_min) / 2.0
+
+        print("Qz range: ", mid_point)
+        self.summing_threshold = mid_point
 
         return refl, refl_err
