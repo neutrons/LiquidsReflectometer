@@ -36,4 +36,4 @@ docs: ## Build the documentation
 	mkdocs build
 
 test-all:  ## Run all tests
-	pytest ./test
+	pytest ./reduction/tests

@@ -246,8 +246,8 @@ def offset_from_first_run(ws, template_file: str, output_dir: str):
         print("    SC center: %g\t Width: %g" % (sc_center, sc_width))
 
         settings = event_reduction.read_settings(ws)
-        sample_det_distance = settings["sample-det-distance"]
-        pixel_width = settings["pixel-width"] / 1000.0
+        sample_det_distance = settings.sample_detector_distance
+        pixel_width = settings.pixel_width / 1000.0
 
         theta = np.arctan((sc_center - db_center) * pixel_width / sample_det_distance) / 2.0 * 180 / np.pi
         theta_offset = theta - ths_value
