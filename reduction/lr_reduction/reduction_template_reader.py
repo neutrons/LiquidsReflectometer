@@ -17,7 +17,7 @@ except:
     MANTID_VERSION = "None"
 
 
-class ReductionParameters():
+class ReductionParameters:
     """
     Class that hold the parameters for the reduction of a single data set.
     """
@@ -75,6 +75,15 @@ class ReductionParameters():
         self.paralyzable: bool = True
         self.dead_time_value = 4.2
         self.dead_time_tof_step = 100
+
+        # Instrument geometry parameters
+        self.source_detector_distance: float = 0.0
+        self.sample_detector_distance: float = 0.0
+        self.num_x_pixels: int = 0
+        self.num_y_pixels: int = 0
+        self.pixel_width: float = 0.0
+        self.xi_reference: float = 0.0
+        self.s1_sample_distance: float = 0.0
 
         # Calculate emission time delay instead of using an effective distance for all wavelengths
         self.use_emission_time: bool = True
