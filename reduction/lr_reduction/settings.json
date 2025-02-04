@@ -1,5 +1,5 @@
 {
-    "source_detector_distance": [
+    "source-det-distance": [
         {
             "from": "2014-10-10",
             "value": 15.75
@@ -13,7 +13,7 @@
             "value": 15.75
         }
     ],
-     "sample_detector_distance": [
+     "sample-det-distance": [
         {
             "from":"2014-10-10",
             "value": 1.83
@@ -27,31 +27,31 @@
             "value": 1.83
         }
     ],
-    "num_x_pixels": [
+    "number-of-x-pixels": [
         {
             "from":"2014-10-10",
             "value": 256
         }
     ],
-    "num_y_pixels": [
+    "number-of-y-pixels": [
         {
             "from":"2014-10-10",
             "value": 304
         }
     ],
-    "pixel_width": [
+    "pixel-width": [
         {
             "from":"2014-10-10",
             "value": 0.70
         }
     ],
-    "xi_reference": [
+    "xi-reference": [
         {
             "from":"2014-10-10",
             "value": 445
         }
     ],
-    "s1_sample_distance": [
+    "s1-sample-distance": [
         {
             "from":"2014-10-10",
             "value": 1.485
