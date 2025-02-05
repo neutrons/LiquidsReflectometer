@@ -6,7 +6,8 @@ Adapted from Mantid code.
 import time
 import xml.dom.minidom
 
-from . import __version__ as VERSION
+from lr_reduction import __version__ as VERSION
+from lr_reduction.instrument_settings import InstrumentSettings
 
 # Get the mantid version being used, if available
 try:
@@ -77,13 +78,9 @@ class ReductionParameters:
         self.dead_time_tof_step = 100
 
         # Instrument geometry parameters
-        self.source_detector_distance: float = 0.0
-        self.sample_detector_distance: float = 0.0
-        self.num_x_pixels: int = 0
-        self.num_y_pixels: int = 0
-        self.pixel_width: float = 0.0
-        self.xi_reference: float = 0.0
-        self.s1_sample_distance: float = 0.0
+        instrument_settings = InstrumentSettings()
+        for key, value in instrument_settings.__dict__.items():
+            setattr(self, key, value)
 
         # Calculate emission time delay instead of using an effective distance for all wavelengths
         self.use_emission_time: bool = True
@@ -175,6 +172,16 @@ class ReductionParameters:
         _xml += "<dead_time_paralyzable>%s</dead_time_paralyzable>\n" % str(self.paralyzable)
         _xml += "<dead_time_value>%s</dead_time_value>\n" % str(self.dead_time_value)
         _xml += "<dead_time_tof_step>%s</dead_time_tof_step>\n" % str(self.dead_time_tof_step)
+
+        # Instrument settings
+        _xml += "<apply_instrument_settings>%s</apply_instrument_settings>\n" % str(self.apply_instrument_settings)
+        _xml += "<source_detector_distance>%s</source_detector_distance>\n" % str(self.source_detector_distance)
+        _xml += "<sample_detector_distance>%s</sample_detector_distance>\n" % str(self.sample_detector_distance)
+        _xml += "<num_x_pixels>%s</num_x_pixels>\n" % str(self.num_x_pixels)
+        _xml += "<num_y_pixels>%s</num_y_pixels>\n" % str(self.num_y_pixels)
+        _xml += "<pixel_width>%s</pixel_width>\n" % str(self.pixel_width)
+        _xml += "<xi_reference>%s</xi_reference>\n" % str(self.xi_reference)
+        _xml += "<s1_sample_distance>%s</s1_sample_distance>\n" % str(self.s1_sample_distance)
 
         # Emission time correction
         _xml += "<use_emission_time>%s</use_emission_time>\n" % str(self.use_emission_time)
@@ -281,6 +288,16 @@ class ReductionParameters:
         self.paralyzable = getBoolElement(instrument_dom, "dead_time_paralyzable", default=self.paralyzable)
         self.dead_time_value = getFloatElement(instrument_dom, "dead_time_value", default=self.dead_time_value)
         self.dead_time_tof_step = getFloatElement(instrument_dom, "dead_time_tof_step", default=self.dead_time_tof_step)
+
+        # Instrument settings
+        self.apply_instrument_settings = getBoolElement(instrument_dom, "apply_instrument_settings", default=False)
+        self.source_detector_distance = getFloatElement(instrument_dom, "source_detector_distance", default=self.source_detector_distance)
+        self.sample_detector_distance = getFloatElement(instrument_dom, "sample_detector_distance", default=self.sample_detector_distance)
+        self.num_x_pixels = getIntElement(instrument_dom, "num_x_pixels", default=self.num_x_pixels)
+        self.num_y_pixels = getIntElement(instrument_dom, "num_y_pixels", default=self.num_y_pixels)
+        self.pixel_width = getFloatElement(instrument_dom, "pixel_width", default=self.pixel_width)
+        self.xi_reference = getFloatElement(instrument_dom, "xi_reference", default=self.xi_reference)
+        self.s1_sample_distance = getFloatElement(instrument_dom, "s1_sample_distance", default=self.s1_sample_distance)
 
         # Emission time
         # Defaults to True, but will be skipped if the necessary meta data is not found

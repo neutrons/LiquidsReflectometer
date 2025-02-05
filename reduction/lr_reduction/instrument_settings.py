@@ -5,6 +5,7 @@ from dataclasses import dataclass
 class InstrumentSettings:
     """
     Dataclass to store the instrument geometry parameters.
+    Default values determined from settings.json
 
     Attributes
     ----------
@@ -17,10 +18,11 @@ class InstrumentSettings:
     s1_sample_distance : float - Distance from the sample to the s1 aperture in mm
     """
 
-    source_detector_distance: float = None
-    sample_detector_distance: float = None
-    num_x_pixels: int = None
-    num_y_pixels: int = None
-    pixel_width: float = None
-    xi_reference: float = None
-    s1_sample_distance: float = None
+    apply_instrument_settings: bool = False
+    source_detector_distance: float = 15.75
+    sample_detector_distance: float = 1.83
+    num_x_pixels: int = 256
+    num_y_pixels: int = 304
+    pixel_width: float = 0.70
+    xi_reference: float = 445
+    s1_sample_distance: float = 1.485

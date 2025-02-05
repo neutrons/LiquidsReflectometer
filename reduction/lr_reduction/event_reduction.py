@@ -347,6 +347,7 @@ class EventReflectivity:
         paralyzable=True,
         dead_time_value=4.2,
         dead_time_tof_step=100,
+        instrument_settings: InstrumentSettings = None,
         use_emission_time=True,
     ):
         if instrument in [self.INSTRUMENT_4A, self.INSTRUMENT_4B]:
@@ -374,6 +375,7 @@ class EventReflectivity:
         self.paralyzable = paralyzable
         self.dead_time_value = dead_time_value
         self.dead_time_tof_step = dead_time_tof_step
+        self.instrument_settings = instrument_settings
         self.use_emission_time = use_emission_time
 
         # Turn on functional background estimation
@@ -402,7 +404,10 @@ class EventReflectivity:
         Extract meta data from the loaded data file.
         """
         # Get instrument parameters
-        settings = read_settings(self._ws_sc)
+        if self.instrument_settings is None:
+            settings = read_settings(self._ws_sc)
+        else:
+            settings = self.instrument_settings
 
         self.n_x = settings.num_x_pixels
         self.n_y = settings.num_y_pixels
@@ -461,9 +466,12 @@ class EventReflectivity:
         Distance from source to sample was 13.63 meters prior to the source
         to detector distance being determined with Bragg edges to be 15.75 m.
         """
-        settings = read_settings(self._ws_sc)
+        if self.instrument_settings is None:
+            settings = read_settings(self._ws_sc)
+        else:
+            settings = self.instrument_settings
 
-        if settings.sample_detector_distance is not None:
+        if settings.apply_instrument_settings:
             self.det_distance = settings.sample_detector_distance
         else:
             self.det_distance = self.DEFAULT_4B_SAMPLE_DET_DISTANCE
@@ -478,7 +486,7 @@ class EventReflectivity:
         if self.use_emission_time:
             # Read the true distance from the data file. We will compute an emission time delay later
             self.source_detector_distance = self._ws_sc.getRun().getProperty("BL4B:Det:TH:DlyDet:BasePath").value[0]
-        elif settings.source_detector_distance is not None:
+        elif settings.apply_instrument_settings:
             # Use an effective source-detector distance that account for the average emission time delay
             self.source_detector_distance = settings.source_detector_distance
         else:

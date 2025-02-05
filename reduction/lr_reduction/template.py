@@ -10,7 +10,7 @@ import numpy as np
 from mantid.api import *
 from mantid.kernel import *
 
-from . import event_reduction, peak_finding, reduction_template_reader
+from lr_reduction import event_reduction, peak_finding, reduction_template_reader
 
 TOLERANCE = 0.07
 OUTPUT_NORM_DATA = False
@@ -179,6 +179,11 @@ def process_from_template_ws(
     # Apply dead time correction
     if normalize and template_data.dead_time:
         ws_db = event_reduction.apply_dead_time_correction(ws_db, template_data)
+
+    # Apply instrument settings
+    if template_data.apply_instrument_settings:
+        # Get the instrument settings
+        ...
 
     # If we run in theta-theta geometry, we'll need thi
     thi_value = ws_sc.getRun()["thi"].value[0]
