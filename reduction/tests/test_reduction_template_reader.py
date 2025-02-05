@@ -1,7 +1,5 @@
-# third-party imports
 import pytest
-
-# lr_reduction imports
+from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.reduction_template_reader import ReductionParameters
 
 
@@ -27,7 +25,7 @@ class TestReductionParameters:
     def test_instrument_settings(self):
         r"""verify the xml dump writes the instrument settings"""
         redparms = ReductionParameters()
-        for key, val in redparms.__dict__.items():
+        for key, val in InstrumentSettings().__dict__.items():
             assert f"<{key}>{val}</{key}>" in redparms.to_xml()
 
     def test_from_dict(self):
