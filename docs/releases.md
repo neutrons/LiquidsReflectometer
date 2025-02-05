@@ -19,6 +19,16 @@ using the following format:
 - PR #XYZ one-liner description
 ```
 
+## Next
+
+**Of interest to the User**:
+
+- PR #61 Add support for custom instrument geometry settings
+
+**Of interest to the Developer:**
+
+- PR #XYZ one-liner description
+
 ## 2.1.0
 
 **Of interest to the User**:
