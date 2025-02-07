@@ -404,7 +404,7 @@ class EventReflectivity:
         Extract meta data from the loaded data file.
         """
         # Get instrument parameters
-        if self.instrument_settings is None:
+        if self.instrument_settings is None or self.instrument_settings.apply_instrument_settings:
             settings = read_settings(self._ws_sc)
         else:
             settings = self.instrument_settings
@@ -466,7 +466,7 @@ class EventReflectivity:
         Distance from source to sample was 13.63 meters prior to the source
         to detector distance being determined with Bragg edges to be 15.75 m.
         """
-        if self.instrument_settings is None:
+        if self.instrument_settings is None or self.instrument_settings.apply_instrument_settings:
             settings = read_settings(self._ws_sc)
         else:
             settings = self.instrument_settings

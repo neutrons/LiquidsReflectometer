@@ -14,7 +14,7 @@ class InstrumentSettings:
     num_x_pixels : int - Number of pixels in the x direction
     num_y_pixels : int - Number of pixels in the y direction
     pixel_width : float - Width of the pixels in mm
-    xi_reference : float - xi reference value in mm
+    xi_reference : float - Zero-position of slit relative to sample, in mm
     s1_sample_distance : float - Distance from the sample to the s1 aperture in mm
     """
 
