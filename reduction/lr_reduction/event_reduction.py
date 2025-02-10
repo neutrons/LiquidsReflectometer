@@ -404,7 +404,7 @@ class EventReflectivity:
         Extract meta data from the loaded data file.
         """
         # Get instrument parameters
-        if self.instrument_settings is None or self.instrument_settings.apply_instrument_settings:
+        if self.instrument_settings is None or not self.instrument_settings.apply_instrument_settings:
             settings = read_settings(self._ws_sc)
         else:
             settings = self.instrument_settings
@@ -451,13 +451,13 @@ class EventReflectivity:
         4A-specific meta data
         """
         run_object = self._ws_sc.getRun()
-        self.det_distance = run_object["SampleDetDis"].getStatistics().mean
+        self.sample_detector_distance = run_object["SampleDetDis"].getStatistics().mean
         source_sample_distance = run_object["ModeratorSamDis"].getStatistics().mean
         if run_object["SampleDetDis"].units not in ["m", "meter"]:
-            self.det_distance /= 1000.0
+            self.sample_detector_distance /= 1000.0
         if run_object["ModeratorSamDis"].units not in ["m", "meter"]:
             source_sample_distance /= 1000.0
-        self.source_detector_distance = source_sample_distance + self.det_distance
+        self.source_detector_distance = source_sample_distance + self.sample_detector_distance
 
     def extract_meta_data_4B(self):
         """
@@ -472,9 +472,9 @@ class EventReflectivity:
             settings = self.instrument_settings
 
         if settings.apply_instrument_settings:
-            self.det_distance = settings.sample_detector_distance
+            self.sample_detector_distance = settings.sample_detector_distance
         else:
-            self.det_distance = self.DEFAULT_4B_SAMPLE_DET_DISTANCE
+            self.sample_detector_distance = self.DEFAULT_4B_SAMPLE_DET_DISTANCE
 
         # Check that we have the needed meta data for the emission delay calculation
         if self.use_emission_time:
@@ -503,9 +503,9 @@ class EventReflectivity:
             String representation of the reduction settings
         """
         output = "Reduction settings:\n"
-        output += "    sample-det: %s\n" % self.det_distance
+        output += "    sample-det: %s\n" % self.sample_detector_distance
         output += "    source-det: %s\n" % self.source_detector_distance
-        output += "    pixel: %s\n" % self.pixel_width
+        output += "    pixel-width: %s\n" % self.pixel_width
         output += "    WL: %s %s\n" % (self.wl_range[0], self.wl_range[1])
         output += "    Q: %s %s\n" % (self.q_min_meas, self.q_max_meas)
         theta_degrees = self.theta * 180 / np.pi
@@ -887,7 +887,7 @@ class EventReflectivity:
                 event_weights = evt_list.getWeights()
 
                 x_distance = _pixel_width * (j - peak_position)
-                delta_theta_f = np.arctan(x_distance / self.det_distance) / 2.0
+                delta_theta_f = np.arctan(x_distance / self.sample_detector_distance) / 2.0
 
                 # Sign will depend on reflect up or down
                 ths_value = ws.getRun()["ths"].value[-1]
@@ -919,8 +919,8 @@ class EventReflectivity:
         if q_summing:
             x0 = _pixel_width * (peak_position - peak[0])
             x1 = _pixel_width * (peak_position - peak[1])
-            delta_theta_f0 = np.arctan(x0 / self.det_distance) / 2.0
-            delta_theta_f1 = np.arctan(x1 / self.det_distance) / 2.0
+            delta_theta_f0 = np.arctan(x0 / self.sample_detector_distance) / 2.0
+            delta_theta_f1 = np.arctan(x1 / self.sample_detector_distance) / 2.0
 
             qz_max = 4.0 * np.pi / self.tof_range[1] * self.constant * np.fabs(np.sin(theta + delta_theta_f0))
             qz_min = 4.0 * np.pi / self.tof_range[1] * self.constant * np.fabs(np.sin(theta + delta_theta_f1))
@@ -1051,7 +1051,7 @@ class EventReflectivity:
             wl_weights = 1.0 / np.interp(wl_list, wl_bins, wl_dist, np.inf, np.inf)
 
             x_distance = float(j - peak_position) * self.pixel_width
-            delta_theta_f = np.arctan(x_distance / self.det_distance)
+            delta_theta_f = np.arctan(x_distance / self.sample_detector_distance)
             # Sign will depend on reflect up or down
             ths_value = ws.getRun()["ths"].value[-1]
             delta_theta_f *= np.sign(ths_value)

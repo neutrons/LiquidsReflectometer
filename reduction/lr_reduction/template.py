@@ -291,7 +291,7 @@ def process_from_template_ws(
         instrument_settings=instrument_settings,
         use_emission_time=template_data.use_emission_time,
     )
-    print(event_refl)
+    print(f"{'*'*88}\nevent_refl:\n{event_refl}\n{'*'*88}")
 
     # R(Q)
     qz, refl, d_refl = event_refl.specular(
