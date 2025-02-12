@@ -467,7 +467,7 @@ class EventReflectivity:
         Distance from source to sample was 13.63 meters prior to the source
         to detector distance being determined with Bragg edges to be 15.75 m.
         """
-        if self.instrument_settings is None or self.instrument_settings.apply_instrument_settings:
+        if self.instrument_settings is None or not self.instrument_settings.apply_instrument_settings:
             settings = read_settings(self._ws_sc)
         else:
             settings = self.instrument_settings
@@ -504,14 +504,14 @@ class EventReflectivity:
             String representation of the reduction settings
         """
         output = "Reduction settings:\n"
-        output += "    sample-det: %s\n" % self.sample_detector_distance
-        output += "    source-det: %s\n" % self.source_detector_distance
-        output += "    pixel-width: %s\n" % self.pixel_width
-        output += "    WL: %s %s\n" % (self.wl_range[0], self.wl_range[1])
-        output += "    Q: %s %s\n" % (self.q_min_meas, self.q_max_meas)
-        theta_degrees = self.theta * 180 / np.pi
-        output += "    Theta = %s\n" % theta_degrees
-        output += "    Emission delay = %s" % self.use_emission_time
+        output += f"    sample-det: {self.sample_detector_distance}\n"
+        output += f"    source-det: {self.source_detector_distance}\n"
+        output += f"    pixel-width: {self.pixel_width}\n"
+        output += f"    pixel-dimensions: {self.n_x} x {self.n_y}\n"
+        output += f"    WL: {self.wl_range[0]} {self.wl_range[1]}\n"
+        output += f"    Q: {self.q_min_meas} {self.q_max_meas}\n"
+        output += f"    Theta = {self.theta * 180 / np.pi}\n"
+        output += f"    Emission delay = {self.use_emission_time}"
         return output
 
     def to_dict(self):

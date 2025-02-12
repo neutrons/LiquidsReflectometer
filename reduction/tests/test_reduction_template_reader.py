@@ -22,7 +22,7 @@ class TestReductionParameters:
         redparms.use_emission_time = False
         assert "<use_emission_time>False</use_emission_time>" in redparms.to_xml()
 
-    def test_instrument_settings(self):
+    def test_default_instrument_settings(self):
         r"""verify the xml dump writes the instrument settings"""
         redparms = ReductionParameters()
         for key, val in InstrumentSettings().__dict__.items():
