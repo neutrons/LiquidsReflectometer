@@ -144,6 +144,7 @@ def read_settings(ws) -> InstrumentSettings:
                     chosen_value = item["value"]
             settings_dict[key] = chosen_value
     settings = InstrumentSettings(
+        apply_instrument_settings=True,
         source_detector_distance=settings_dict["source-det-distance"],
         sample_detector_distance=settings_dict["sample-det-distance"],
         num_x_pixels=settings_dict["number-of-x-pixels"],
