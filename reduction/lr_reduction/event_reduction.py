@@ -405,7 +405,7 @@ class EventReflectivity:
         Extract meta data from the loaded data file.
         """
         # Get instrument parameters
-        if self.instrument_settings is None or not self.instrument_settings.apply_instrument_settings:
+        if (self.instrument_settings is None) or (not self.instrument_settings.apply_instrument_settings):
             settings = read_settings(self._ws_sc)
         else:
             settings = self.instrument_settings
@@ -467,7 +467,7 @@ class EventReflectivity:
         Distance from source to sample was 13.63 meters prior to the source
         to detector distance being determined with Bragg edges to be 15.75 m.
         """
-        if self.instrument_settings is None or not self.instrument_settings.apply_instrument_settings:
+        if (self.instrument_settings is None) or (not self.instrument_settings.apply_instrument_settings):
             settings = read_settings(self._ws_sc)
         else:
             settings = self.instrument_settings
@@ -484,12 +484,12 @@ class EventReflectivity:
                 print("Moderator information unavailable: skipping emission time calculation")
                 self.use_emission_time = False
 
-        if self.use_emission_time:
-            # Read the true distance from the data file. We will compute an emission time delay later
-            self.source_detector_distance = self._ws_sc.getRun().getProperty("BL4B:Det:TH:DlyDet:BasePath").value[0]
-        elif settings.apply_instrument_settings:
+        if settings.apply_instrument_settings:
             # Use an effective source-detector distance that account for the average emission time delay
             self.source_detector_distance = settings.source_detector_distance
+        elif self.use_emission_time:
+            # Read the true distance from the data file. We will compute an emission time delay later
+            self.source_detector_distance = self._ws_sc.getRun().getProperty("BL4B:Det:TH:DlyDet:BasePath").value[0]
         else:
             # Use the nominal/default source-detector distance
             self.source_detector_distance = self.DEFAULT_4B_SOURCE_DET_DISTANCE
@@ -504,8 +504,8 @@ class EventReflectivity:
             String representation of the reduction settings
         """
         output = "Reduction settings:\n"
-        output += f"    sample-det: {self.sample_detector_distance}\n"
         output += f"    source-det: {self.source_detector_distance}\n"
+        output += f"    sample-det: {self.sample_detector_distance}\n"
         output += f"    pixel-width: {self.pixel_width}\n"
         output += f"    pixel-dimensions: {self.n_x} x {self.n_y}\n"
         output += f"    WL: {self.wl_range[0]} {self.wl_range[1]}\n"

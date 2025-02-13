@@ -304,7 +304,11 @@ class ReductionParameters:
         self.use_emission_time = getBoolElement(instrument_dom, "use_emission_time", default=True)
 
 
-###### Utility functions to read XML content ########################
+#############################################
+### Utility functions to read XML content ###
+#############################################
+
+
 def getText(nodelist):
     """Utility method to extract text out of an XML node"""
     rc = ""
@@ -372,7 +376,11 @@ def getBoolElement(dom, tag, true_tag="true", default=False):
     return value.lower() == true_tag.lower() if value is not None else default
 
 
-###### Functions to read/write a template file ######################
+###############################################
+### Functions to read/write a template file ###
+###############################################
+
+
 def to_xml(data_sets):
     """
     Create XML from the current data.
