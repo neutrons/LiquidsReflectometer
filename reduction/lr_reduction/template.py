@@ -10,13 +10,15 @@ import numpy as np
 from mantid.api import *
 from mantid.kernel import *
 
-from . import event_reduction, peak_finding, reduction_template_reader
+from lr_reduction import event_reduction, peak_finding, reduction_template_reader
+from lr_reduction.instrument_settings import InstrumentSettings
+from lr_reduction.reduction_template_reader import ReductionParameters
 
 TOLERANCE = 0.07
 OUTPUT_NORM_DATA = False
 
 
-def read_template(template_file, sequence_number):
+def read_template(template_file: str, sequence_number: int) -> ReductionParameters:
     """
     Read template from file.
     @param sequence_number: the ID of the data set within the sequence of runs
@@ -180,6 +182,21 @@ def process_from_template_ws(
     if normalize and template_data.dead_time:
         ws_db = event_reduction.apply_dead_time_correction(ws_db, template_data)
 
+    # Apply instrument settings
+    if template_data.apply_instrument_settings:
+        instrument_settings = InstrumentSettings(
+            template_data.apply_instrument_settings,
+            template_data.source_detector_distance,
+            template_data.sample_detector_distance,
+            template_data.num_x_pixels,
+            template_data.num_y_pixels,
+            template_data.pixel_width,
+            template_data.xi_reference,
+            template_data.s1_sample_distance,
+        )
+    else:
+        instrument_settings = None
+
     # If we run in theta-theta geometry, we'll need thi
     thi_value = ws_sc.getRun()["thi"].value[0]
     ths_value = ws_sc.getRun()["ths"].value[0]
@@ -265,15 +282,16 @@ def process_from_template_ws(
         q_max=None,
         tof_range=[tof_min, tof_max],
         theta=np.abs(theta),
+        instrument=event_reduction.EventReflectivity.INSTRUMENT_4B,
+        functional_background=template_data.two_backgrounds,
         dead_time=template_data.dead_time,
         paralyzable=template_data.paralyzable,
         dead_time_value=template_data.dead_time_value,
         dead_time_tof_step=template_data.dead_time_tof_step,
+        instrument_settings=instrument_settings,
         use_emission_time=template_data.use_emission_time,
-        functional_background=template_data.two_backgrounds,
-        instrument=event_reduction.EventReflectivity.INSTRUMENT_4B,
     )
-    print(event_refl)
+    print(f"{'*'*88}\nevent_refl:\n{event_refl}\n{'*'*88}")
 
     # R(Q)
     qz, refl, d_refl = event_refl.specular(

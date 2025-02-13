@@ -10,6 +10,7 @@ import time
 import mantid.simpleapi as api
 import numpy as np
 
+from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.utils import mantid_algorithm_exec
 
 from . import DeadTimeCorrection, background
@@ -112,21 +113,19 @@ def get_attenuation_info(ws):
     return attenuator_thickness
 
 
-def read_settings(ws):
+def read_settings(ws) -> InstrumentSettings:
     """
     Read settings file and return values for the given timestamp
 
     Parameters
     ----------
-    ws
-        Mantid workspace
+    ws: Mantid workspace
 
     Returns
     -------
-    dict
-        Dictionary with settings
+    settings: InstrumentSettings
     """
-    settings = dict()
+    settings_dict = dict()
     package_dir, _ = os.path.split(__file__)
 
     t = ws.getRun()["start_time"].value.split("T")[0]
@@ -143,7 +142,17 @@ def read_settings(ws):
                 if delta_time is None or (delta.total_seconds() < 0 and delta > delta_time):
                     delta_time = delta
                     chosen_value = item["value"]
-            settings[key] = chosen_value
+            settings_dict[key] = chosen_value
+    settings = InstrumentSettings(
+        apply_instrument_settings=True,
+        source_detector_distance=settings_dict["source-det-distance"],
+        sample_detector_distance=settings_dict["sample-det-distance"],
+        num_x_pixels=settings_dict["number-of-x-pixels"],
+        num_y_pixels=settings_dict["number-of-y-pixels"],
+        pixel_width=settings_dict["pixel-width"],
+        xi_reference=settings_dict["xi-reference"],
+        s1_sample_distance=settings_dict["s1-sample-distance"],
+    )
     return settings
 
 
@@ -164,8 +173,8 @@ def process_attenuation(ws, thickness=0):
         Corrected Mantid workspace
     """
     settings = read_settings(ws)
-    if "source-det-distance" in settings:
-        SDD = settings["source-det-distance"]
+    if settings.source_detector_distance is not None:
+        SDD = settings.source_detector_distance
     else:
         SDD = EventReflectivity.DEFAULT_4B_SOURCE_DET_DISTANCE
 
@@ -254,7 +263,7 @@ def apply_dead_time_correction(ws, template_data):
     return ws
 
 
-class EventReflectivity():
+class EventReflectivity:
     """
     Data reduction for the Liquids Reflectometer.
     List of items to be taken care of outside this class:
@@ -339,6 +348,7 @@ class EventReflectivity():
         paralyzable=True,
         dead_time_value=4.2,
         dead_time_tof_step=100,
+        instrument_settings: InstrumentSettings = None,
         use_emission_time=True,
     ):
         if instrument in [self.INSTRUMENT_4A, self.INSTRUMENT_4B]:
@@ -366,6 +376,7 @@ class EventReflectivity():
         self.paralyzable = paralyzable
         self.dead_time_value = dead_time_value
         self.dead_time_tof_step = dead_time_tof_step
+        self.instrument_settings = instrument_settings
         self.use_emission_time = use_emission_time
 
         # Turn on functional background estimation
@@ -394,11 +405,14 @@ class EventReflectivity():
         Extract meta data from the loaded data file.
         """
         # Get instrument parameters
-        settings = read_settings(self._ws_sc)
+        if (self.instrument_settings is None) or (not self.instrument_settings.apply_instrument_settings):
+            settings = read_settings(self._ws_sc)
+        else:
+            settings = self.instrument_settings
 
-        self.n_x = settings["number-of-x-pixels"]
-        self.n_y = settings["number-of-y-pixels"]
-        self.pixel_width = settings["pixel-width"] / 1000.0
+        self.n_x = settings.num_x_pixels
+        self.n_y = settings.num_y_pixels
+        self.pixel_width = settings.pixel_width / 1000.0
 
         if self.instrument == self.INSTRUMENT_4B:
             self.extract_meta_data_4B()
@@ -438,13 +452,13 @@ class EventReflectivity():
         4A-specific meta data
         """
         run_object = self._ws_sc.getRun()
-        self.det_distance = run_object["SampleDetDis"].getStatistics().mean
+        self.sample_detector_distance = run_object["SampleDetDis"].getStatistics().mean
         source_sample_distance = run_object["ModeratorSamDis"].getStatistics().mean
         if run_object["SampleDetDis"].units not in ["m", "meter"]:
-            self.det_distance /= 1000.0
+            self.sample_detector_distance /= 1000.0
         if run_object["ModeratorSamDis"].units not in ["m", "meter"]:
             source_sample_distance /= 1000.0
-        self.source_detector_distance = source_sample_distance + self.det_distance
+        self.source_detector_distance = source_sample_distance + self.sample_detector_distance
 
     def extract_meta_data_4B(self):
         """
@@ -453,12 +467,15 @@ class EventReflectivity():
         Distance from source to sample was 13.63 meters prior to the source
         to detector distance being determined with Bragg edges to be 15.75 m.
         """
-        settings = read_settings(self._ws_sc)
-
-        if "sample-det-distance" in settings:
-            self.det_distance = settings["sample-det-distance"]
+        if (self.instrument_settings is None) or (not self.instrument_settings.apply_instrument_settings):
+            settings = read_settings(self._ws_sc)
         else:
-            self.det_distance = self.DEFAULT_4B_SAMPLE_DET_DISTANCE
+            settings = self.instrument_settings
+
+        if settings.apply_instrument_settings:
+            self.sample_detector_distance = settings.sample_detector_distance
+        else:
+            self.sample_detector_distance = self.DEFAULT_4B_SAMPLE_DET_DISTANCE
 
         # Check that we have the needed meta data for the emission delay calculation
         if self.use_emission_time:
@@ -467,12 +484,12 @@ class EventReflectivity():
                 print("Moderator information unavailable: skipping emission time calculation")
                 self.use_emission_time = False
 
-        if self.use_emission_time:
+        if settings.apply_instrument_settings:
+            # Use an effective source-detector distance that account for the average emission time delay
+            self.source_detector_distance = settings.source_detector_distance
+        elif self.use_emission_time:
             # Read the true distance from the data file. We will compute an emission time delay later
             self.source_detector_distance = self._ws_sc.getRun().getProperty("BL4B:Det:TH:DlyDet:BasePath").value[0]
-        elif "source-det-distance" in settings:
-            # Use an effective source-detector distance that account for the average emission time delay
-            self.source_detector_distance = settings["source-det-distance"]
         else:
             # Use the nominal/default source-detector distance
             self.source_detector_distance = self.DEFAULT_4B_SOURCE_DET_DISTANCE
@@ -487,14 +504,14 @@ class EventReflectivity():
             String representation of the reduction settings
         """
         output = "Reduction settings:\n"
-        output += "    sample-det: %s\n" % self.det_distance
-        output += "    source-det: %s\n" % self.source_detector_distance
-        output += "    pixel: %s\n" % self.pixel_width
-        output += "    WL: %s %s\n" % (self.wl_range[0], self.wl_range[1])
-        output += "    Q: %s %s\n" % (self.q_min_meas, self.q_max_meas)
-        theta_degrees = self.theta * 180 / np.pi
-        output += "    Theta = %s\n" % theta_degrees
-        output += "    Emission delay = %s" % self.use_emission_time
+        output += f"    source-det: {self.source_detector_distance}\n"
+        output += f"    sample-det: {self.sample_detector_distance}\n"
+        output += f"    pixel-width: {self.pixel_width}\n"
+        output += f"    pixel-dimensions: {self.n_x} x {self.n_y}\n"
+        output += f"    WL: {self.wl_range[0]} {self.wl_range[1]}\n"
+        output += f"    Q: {self.q_min_meas} {self.q_max_meas}\n"
+        output += f"    Theta = {self.theta * 180 / np.pi}\n"
+        output += f"    Emission delay = {self.use_emission_time}"
         return output
 
     def to_dict(self):
@@ -750,10 +767,10 @@ class EventReflectivity():
         return refl_bck, d_refl_bck
 
     def bck_subtraction(self, normalize_to_single_pixel=False, q_bins=None, wl_dist=None, wl_bins=None, q_summing=False):
-
         """
         Perform background subtraction on the signal.
-        This method provides a higher-level call for background subtraction, hiding the ranges needed to define the Region of Interest (ROI).
+        This method provides a higher-level call for background subtraction,
+        hiding the ranges needed to define the Region of Interest (ROI).
 
         Parameters
         ----------
@@ -811,11 +828,11 @@ class EventReflectivity():
         """
         Higher-level call for background subtraction for the normalization run.
         """
-        return background.side_background(self._ws_db, self, self.norm_peak, self.norm_bck,
-                                          self.norm_low_res, normalize_to_single_pixel=False)
+        return background.side_background(
+            self._ws_db, self, self.norm_peak, self.norm_bck, self.norm_low_res, normalize_to_single_pixel=False
+        )
 
-    def slice(self, x_min=0.002, x_max=0.004, x_bins=None, z_bins=None,
-              refl=None, d_refl=None, normalize=False):
+    def slice(self, x_min=0.002, x_max=0.004, x_bins=None, z_bins=None, refl=None, d_refl=None, normalize=False):
         """
         Retrieve a slice from the off-specular data.
         """
@@ -871,7 +888,7 @@ class EventReflectivity():
                 event_weights = evt_list.getWeights()
 
                 x_distance = _pixel_width * (j - peak_position)
-                delta_theta_f = np.arctan(x_distance / self.det_distance) / 2.0
+                delta_theta_f = np.arctan(x_distance / self.sample_detector_distance) / 2.0
 
                 # Sign will depend on reflect up or down
                 ths_value = ws.getRun()["ths"].value[-1]
@@ -903,8 +920,8 @@ class EventReflectivity():
         if q_summing:
             x0 = _pixel_width * (peak_position - peak[0])
             x1 = _pixel_width * (peak_position - peak[1])
-            delta_theta_f0 = np.arctan(x0 / self.det_distance) / 2.0
-            delta_theta_f1 = np.arctan(x1 / self.det_distance) / 2.0
+            delta_theta_f0 = np.arctan(x0 / self.sample_detector_distance) / 2.0
+            delta_theta_f1 = np.arctan(x1 / self.sample_detector_distance) / 2.0
 
             qz_max = 4.0 * np.pi / self.tof_range[1] * self.constant * np.fabs(np.sin(theta + delta_theta_f0))
             qz_min = 4.0 * np.pi / self.tof_range[1] * self.constant * np.fabs(np.sin(theta + delta_theta_f1))
@@ -1035,7 +1052,7 @@ class EventReflectivity():
             wl_weights = 1.0 / np.interp(wl_list, wl_bins, wl_dist, np.inf, np.inf)
 
             x_distance = float(j - peak_position) * self.pixel_width
-            delta_theta_f = np.arctan(x_distance / self.det_distance)
+            delta_theta_f = np.arctan(x_distance / self.sample_detector_distance)
             # Sign will depend on reflect up or down
             ths_value = ws.getRun()["ths"].value[-1]
             delta_theta_f *= np.sign(ths_value)
@@ -1192,11 +1209,11 @@ def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
         # Q resolution is reported as FWHM, so here we consider this to be
         # related to the pixel width
         sdd = 1830
-        if "sample-det-distance" in settings:
-            sdd = settings["sample-det-distance"] * 1000
+        if settings.sample_detector_distance:
+            sdd = settings.sample_detector_distance * 1000
         pixel_size = 0.7
-        if "pixel-width" in settings:
-            pixel_size = settings["pixel-width"]
+        if settings.pixel_width:
+            pixel_size = settings.pixel_width
 
         # All angles here in radians, assuming small angles
         dq_over_q = np.arcsin(pixel_size / sdd) / theta
@@ -1219,8 +1236,8 @@ def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
 
     # Distance between the s1 and the sample
     s1_sample_distance = 1485
-    if "s1-sample-distance" in settings:
-        s1_sample_distance = settings["s1-sample-distance"] * 1000
+    if settings.s1_sample_distance is not None:
+        s1_sample_distance = settings.s1_sample_distance * 1000
 
     s1h = abs(ws.getRun().getProperty("S1VHeight").value[0])
     xi = abs(ws.getRun().getProperty("BL4B:Mot:xi.RBV").value[0])

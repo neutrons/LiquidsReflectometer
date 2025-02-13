@@ -246,8 +246,12 @@ def offset_from_first_run(ws, template_file: str, output_dir: str):
         print("    SC center: %g\t Width: %g" % (sc_center, sc_width))
 
         settings = event_reduction.read_settings(ws)
-        sample_det_distance = settings["sample-det-distance"]
-        pixel_width = settings["pixel-width"] / 1000.0
+        if template_data.apply_instrument_settings:
+            sample_det_distance = template_data.sample_detector_distance
+            pixel_width = template_data.pixel_width / 1000.0
+        else:
+            sample_det_distance = settings.sample_detector_distance
+            pixel_width = settings.pixel_width / 1000.0
 
         theta = np.arctan((sc_center - db_center) * pixel_width / sample_det_distance) / 2.0 * 180 / np.pi
         theta_offset = theta - ths_value
@@ -287,7 +291,6 @@ def reduce_explorer(ws, ws_db, theta_pv=None, center_pixel=145, db_center_pixel=
         The reflectivity values
     d_refl : numpy.ndarray
         The uncertainty in the reflectivity
-
     """
     from . import peak_finding
 
