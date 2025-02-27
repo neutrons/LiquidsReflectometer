@@ -68,13 +68,13 @@ $ sudo apt install git-lfs
 After this step, initialize or update the data repository:
 
 ```bash
-$ cd /path/to/lr_reduction
+$ cd /path/to/LiquidsReflectometer
 $ git submodule update --init
 ```
 
 This will either clone `liquidsreflectometer-data` into `/path/to/lr_reduction/tests/liquidsreflectometer-data` or
 bring the `liquidsreflectometer-data`'s refspec in sync with the refspec listed within file
-`/path/to/liquidsreflectometer/.gitmodules`.
+`/path/to/LiquidsReflectometer/.gitmodules`.
 
 An intro to Git LFS in the context of the Neutron Data Project is found in the
 `Confluence pages <https://ornl-neutrons.atlassian.net/wiki/spaces/NDPD/pages/19103745/Using+git-lfs+for+test+data>`\_
@@ -130,7 +130,7 @@ git tag $VERSION
 git push origin --tags main
 ```
 
-- _minor_ or _major_ release, we create a stable release _after_ we have created a Candidate release.  
+- _minor_ or _major_ release, we create a stable release _after_ we have created a Candidate release.
   For this customary procedure, follow:
 
       - The [Software Maturity Model](https://ornl-neutrons.atlassian.net/wiki/spaces/NDPD/pages/23363585/Software+Maturity+Model) for continous versioning as well as creating release candidates and stable releases.
