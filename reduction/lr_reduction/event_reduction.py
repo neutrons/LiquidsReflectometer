@@ -323,7 +323,7 @@ class EventReflectivity:
     THETAF_VS_WL = 4
     INSTRUMENT_4A = 0
     INSTRUMENT_4B = 1
-    DEFAULT_4B_SAMPLE_DET_DISTANCE = 1.83
+    # DEFAULT_4B_SAMPLE_DET_DISTANCE = 1.83
     DEFAULT_4B_SOURCE_DET_DISTANCE = 15.75
 
     def __init__(
@@ -472,10 +472,7 @@ class EventReflectivity:
         else:
             settings = self.instrument_settings
 
-        if settings.apply_instrument_settings:
-            self.sample_detector_distance = settings.sample_detector_distance
-        else:
-            self.sample_detector_distance = self.DEFAULT_4B_SAMPLE_DET_DISTANCE
+        self.sample_detector_distance = settings.sample_detector_distance
 
         # Check that we have the needed meta data for the emission delay calculation
         if self.use_emission_time:
@@ -486,14 +483,9 @@ class EventReflectivity:
 
         # Get the source-detector distance
         if self.use_emission_time and not settings.apply_instrument_settings:
-            # If we are using the emission time, and not overriding the instrument settings,
             self.source_detector_distance = self._ws_sc.getRun().getProperty("BL4B:Det:TH:DlyDet:BasePath").value[0]
-        elif settings.apply_instrument_settings:
-            # If we are overriding the instrument settings, use the provided source-detector distance
-            self.source_detector_distance = settings.source_detector_distance
         else:
-            # Use the nominal/default source-detector distance
-            self.source_detector_distance = self.DEFAULT_4B_SOURCE_DET_DISTANCE
+            self.source_detector_distance = settings.source_detector_distance
 
     def __repr__(self):
         """
