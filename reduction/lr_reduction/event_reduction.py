@@ -144,7 +144,7 @@ def read_settings(ws) -> InstrumentSettings:
                     chosen_value = item["value"]
             settings_dict[key] = chosen_value
     settings = InstrumentSettings(
-        apply_instrument_settings=True,
+        apply_instrument_settings=False,
         source_detector_distance=settings_dict["source-det-distance"],
         sample_detector_distance=settings_dict["sample-det-distance"],
         num_x_pixels=settings_dict["number-of-x-pixels"],
@@ -472,10 +472,7 @@ class EventReflectivity:
         else:
             settings = self.instrument_settings
 
-        if settings.apply_instrument_settings:
-            self.sample_detector_distance = settings.sample_detector_distance
-        else:
-            self.sample_detector_distance = self.DEFAULT_4B_SAMPLE_DET_DISTANCE
+        self.sample_detector_distance = settings.sample_detector_distance
 
         # Check that we have the needed meta data for the emission delay calculation
         if self.use_emission_time:
@@ -484,15 +481,11 @@ class EventReflectivity:
                 print("Moderator information unavailable: skipping emission time calculation")
                 self.use_emission_time = False
 
-        if settings.apply_instrument_settings:
-            # Use an effective source-detector distance that account for the average emission time delay
-            self.source_detector_distance = settings.source_detector_distance
-        elif self.use_emission_time:
-            # Read the true distance from the data file. We will compute an emission time delay later
+        # Get the source-detector distance
+        if self.use_emission_time and not settings.apply_instrument_settings:
             self.source_detector_distance = self._ws_sc.getRun().getProperty("BL4B:Det:TH:DlyDet:BasePath").value[0]
         else:
-            # Use the nominal/default source-detector distance
-            self.source_detector_distance = self.DEFAULT_4B_SOURCE_DET_DISTANCE
+            self.source_detector_distance = settings.source_detector_distance
 
     def __repr__(self):
         """

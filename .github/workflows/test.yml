@@ -26,7 +26,6 @@ jobs:
       - name: Test with pytest
         working-directory: ./reduction
         run: |
-          git submodule add --force https://code.ornl.gov/sns-hfir-scse/infrastructure/test-data/liquidsreflectometer-data.git tests/data/liquidsreflectometer-data
           git submodule update --init
           python -m pytest -vv --cov=. --cov-report=xml --cov-report=term tests
 
