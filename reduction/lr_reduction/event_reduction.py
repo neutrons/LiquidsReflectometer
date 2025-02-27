@@ -144,7 +144,7 @@ def read_settings(ws) -> InstrumentSettings:
                     chosen_value = item["value"]
             settings_dict[key] = chosen_value
     settings = InstrumentSettings(
-        apply_instrument_settings=True,
+        apply_instrument_settings=False,
         source_detector_distance=settings_dict["source-det-distance"],
         sample_detector_distance=settings_dict["sample-det-distance"],
         num_x_pixels=settings_dict["number-of-x-pixels"],
@@ -484,12 +484,13 @@ class EventReflectivity:
                 print("Moderator information unavailable: skipping emission time calculation")
                 self.use_emission_time = False
 
-        if settings.apply_instrument_settings:
-            # Use an effective source-detector distance that account for the average emission time delay
-            self.source_detector_distance = settings.source_detector_distance
-        elif self.use_emission_time:
-            # Read the true distance from the data file. We will compute an emission time delay later
+        # Get the source-detector distance
+        if self.use_emission_time and not settings.apply_instrument_settings:
+            # If we are using the emission time, and not overriding the instrument settings,
             self.source_detector_distance = self._ws_sc.getRun().getProperty("BL4B:Det:TH:DlyDet:BasePath").value[0]
+        elif settings.apply_instrument_settings:
+            # If we are overriding the instrument settings, use the provided source-detector distance
+            self.source_detector_distance = settings.source_detector_distance
         else:
             # Use the nominal/default source-detector distance
             self.source_detector_distance = self.DEFAULT_4B_SOURCE_DET_DISTANCE
