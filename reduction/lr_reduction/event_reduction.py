@@ -884,8 +884,8 @@ class EventReflectivity:
                 delta_theta_f = np.arctan(x_distance / self.sample_detector_distance) / 2.0
 
                 # Sign will depend on reflect up or down
-                tthd_value = ws.getRun()["tthd"].value[-1]
-                delta_theta_f *= np.sign(tthd_value)
+                ths_value = ws.getRun()["ths"].value[-1]
+                delta_theta_f *= np.sign(ths_value)
 
                 qz = 4.0 * np.pi / wl_list * np.sin(theta + delta_theta_f - d_theta)
                 qz = np.fabs(qz)
@@ -1047,8 +1047,10 @@ class EventReflectivity:
             x_distance = float(j - peak_position) * self.pixel_width
             delta_theta_f = np.arctan(x_distance / self.sample_detector_distance)
             # Sign will depend on reflect up or down
-            tthd_value = ws.getRun()["tthd"].value[-1]
-            delta_theta_f *= np.sign(tthd_value)
+            ths_value = ws.getRun()["ths"].value[-1]
+            delta_theta_f *= np.sign(ths_value)
+
+            
             theta_f = theta + delta_theta_f
 
             qz = k * (np.sin(theta_f) + np.sin(theta))
