@@ -5,7 +5,7 @@ channels:
   - defaults
 dependencies:
   - lmfit
-  - mantid=6.10
+  - mantid=6.12
   - matplotlib
   # development dependencies
   - boa
