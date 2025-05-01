@@ -184,12 +184,12 @@ Because of their size, the files are stored in the Git LFS repository
 <pre><code class="language-bash">$ sudo apt install git-lfs
 </code></pre>
 <p>After this step, initialize or update the data repository:</p>
-<pre><code class="language-bash">$ cd /path/to/lr_reduction
+<pre><code class="language-bash">$ cd /path/to/LiquidsReflectometer
 $ git submodule update --init
 </code></pre>
 <p>This will either clone <code>liquidsreflectometer-data</code> into <code>/path/to/lr_reduction/tests/liquidsreflectometer-data</code> or
 bring the <code>liquidsreflectometer-data</code>'s refspec in sync with the refspec listed within file
-<code>/path/to/liquidsreflectometer/.gitmodules</code>.</p>
+<code>/path/to/LiquidsReflectometer/.gitmodules</code>.</p>
 <p>An intro to Git LFS in the context of the Neutron Data Project is found in the
 <code>Confluence pages &lt;https://ornl-neutrons.atlassian.net/wiki/spaces/NDPD/pages/19103745/Using+git-lfs+for+test+data&gt;</code>_
 (login required).</p>
@@ -236,7 +236,7 @@ git push origin --tags main
 </code></pre>
 <ul>
 <li>
-<p><em>minor</em> or <em>major</em> release, we create a stable release <em>after</em> we have created a Candidate release.<br />
+<p><em>minor</em> or <em>major</em> release, we create a stable release <em>after</em> we have created a Candidate release.
   For this customary procedure, follow:</p>
 <ul>
 <li>
