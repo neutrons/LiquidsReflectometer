@@ -7,7 +7,6 @@ using the following format:
 
 ```markdown
 ## <Next Major or Minor Release>
-
 (date of release, format YYYY-MM-DD)
 
 **Of interest to the User**:
@@ -19,7 +18,8 @@ using the following format:
 - PR #XYZ one-liner description
 ```
 
-## Next
+## 2.1.13
+2025-05-01
 
 **Of interest to the User**:
 
@@ -27,7 +27,7 @@ using the following format:
 
 **Of interest to the Developer:**
 
-- PR #XYZ one-liner description
+- PR #66 Update mantid to 6.12.0
 
 ## 2.1.0
 
