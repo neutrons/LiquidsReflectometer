@@ -27,7 +27,7 @@ using the following format:
 
 **Of interest to the Developer:**
 
-- PR #XYZ one-liner description
+- PR #66 Update mantid to 6.12.0
 
 ## 2.1.0
 
