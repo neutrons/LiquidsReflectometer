@@ -20,6 +20,7 @@ Notes for major or minor releases. Notes for patch releases are deferred.
     **Of interest to the Developer:**
 
     - PR #67 Make the documentation work with readthedocs
+    - PR #66 Build and publish conda packages
 
 2.1.13
 ------
@@ -31,7 +32,7 @@ Notes for major or minor releases. Notes for patch releases are deferred.
 
 **Of interest to the Developer:**
 
-- PR #66 Update mantid to 6.12.0
+- PR #65 Update mantid to 6.12.0
 
 2.1.0
 -----
