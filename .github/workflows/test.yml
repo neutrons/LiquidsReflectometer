@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
   pull_request:
   push:
-    branches:
-      - master
+    branches: [next, qa, main]
+    tags: ['v*']
 
 jobs:
   tests:
@@ -22,6 +22,10 @@ jobs:
           auto-update-conda: true
           miniforge-version: latest
           environment-file: environment.yml
+          use-mamba: true
+
+      - name: Dependencies synced
+        run: python scripts/shared/check_dependencies_sync.py
 
       - name: Test with pytest
         working-directory: ./reduction
@@ -33,3 +37,12 @@ jobs:
         uses: codecov/codecov-action@v5
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Build conda package
+        run: |
+          # test that the conda package builds
+          cd conda.recipe
+          echo "versioningit $(versioningit ../)"
+          CHANNELS="--channel mantid-ornl/label/main --channel conda-forge"
+          VERSION=$(versioningit ../) conda mambabuild $CHANNELS --output-folder . .
+          conda verify noarch/lr_reduction-*.tar.bz2
