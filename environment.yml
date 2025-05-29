@@ -17,7 +17,7 @@ dependencies:
   - pytest-cov
   - python-build
   - ruff
-  # - sphinx
-  # - sphinx-rtd-theme
+  - sphinx
+  - sphinx-rtd-theme
   - versioningit
   - myst-parser
