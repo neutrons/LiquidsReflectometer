@@ -18,7 +18,7 @@ Notes for major or minor releases. Notes for patch releases are deferred.
 
     **Of interest to the Developer:**
 
-    - PR #XYZ one-liner description
+    - PR #67 Make the documentation work with readthedocs
 
 2.1.13
 ------
