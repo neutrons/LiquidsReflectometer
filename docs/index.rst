@@ -9,8 +9,8 @@ User Guide
 .. toctree::
    :titlesonly:
 
-   /user/conda_environments
-   /releases
+   user/conda_environments
+   releases
 
 Contacting the Team
 +++++++++++++++++++
