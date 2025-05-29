@@ -12,9 +12,6 @@ dependencies:
   - codecov
   - conda-build
   - conda-verify
-  - mkdocs
-  - mkdocstrings
-  - mkdocstrings-python
   - pre-commit
   - pytest
   - pytest-cov
