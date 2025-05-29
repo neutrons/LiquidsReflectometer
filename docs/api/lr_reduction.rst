@@ -1,4 +1,4 @@
-.. api_lr_reduction:
+.. _api_lr_reduction:
 
 lr_reduction package
 ====================

@@ -1,4 +1,4 @@
-.. conda_environments
+.. _conda_environments:
 
 Conda Environments
 ==================

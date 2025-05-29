@@ -1,4 +1,4 @@
-.. contributing
+.. _developer-contributing:
 
 Guide to Contributing
 =====================

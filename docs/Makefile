@@ -101,7 +101,7 @@ htmlhelp:
 qthelp:
 	$(SPHINXBUILD) -b qthelp $(ALLSPHINXOPTS) $(BUILDDIR)/qthelp
 	@echo
-	@echo "Build finished; now you can run "qcollectiongenerator" with the" \
+	@echo "Build finished; now you can run \"qcollectiongenerator\" with the" \
 	      ".qhcp project file in $(BUILDDIR)/qthelp, like this:"
 	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/sdf.qhcp"
 	@echo "To view the help file:"

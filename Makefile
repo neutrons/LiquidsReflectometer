@@ -32,7 +32,7 @@ conda-env:  ## creates conda environment `lr_reduction` and installs package `lr
 	$(CONDA_ACTIVATE) lr_reduction
 	pip install -e .
 
-docs:  ## generates HTML docs under `docs/_build/html/`, treating warnings as errors. Requires activation of the `lr_reduction` conda environment
+docs:  ## generates HTML docs under `docs/build/html/`, treating warnings as errors. Requires activation of the `lr_reduction` conda environment
 	# this will fail on a warning
 	@cd docs&& make html SPHINXOPTS="-W --keep-going -n" && echo -e "##########\n DOCS point your browser to file://$$(pwd)/build/html/index.html\n##########"
 

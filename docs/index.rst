@@ -1,4 +1,4 @@
-.. :lr_reduction:
+.. _lr_reduction:
 
 Welcome to lr_reduction (Liquids Reflectometer Reduction) documentation
 =======================================================================
