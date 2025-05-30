@@ -16,7 +16,7 @@ copyright = "2024, ORNL"  # noqa A001
 author = "ORNL"
 version = versioningit.get_version("../")
 # The full version, including alpha/beta/rc tags
-release = "source/".join(version.split("source/")[:-1])
+release = ".".join(version.split(".")[:-1])
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

@@ -30,7 +30,7 @@ API
 .. toctree::
    :titlesonly:
 
-   /api/lr_reduction
+   api/lr_reduction
 
 Developer Guide
 ---------------
@@ -38,5 +38,5 @@ Developer Guide
 .. toctree::
    :titlesonly:
 
-   /developer/contributing
-   /developer/developer
+   developer/contributing
+   developer/developer

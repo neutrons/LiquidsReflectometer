@@ -9,7 +9,8 @@ Notes for major or minor releases. Notes for patch releases are deferred.
     Release notes are written in reverse chronological order, with the most recent release at the top,
     using the following format:
 
-    ## <Next Major or Minor Release>
+    <Next Major or Minor Release>
+    -----------------------------
     (date of release, format YYYY-MM-DD)
 
     **Of interest to the User**:
