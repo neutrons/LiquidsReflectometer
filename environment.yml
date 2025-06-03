@@ -1,26 +1,22 @@
 name: lr_reduction
 channels:
-  - mantid/label/main
+  - mantid-ornl
   - conda-forge
-  - defaults
 dependencies:
   - lmfit
-  - mantid=6.12
+  - mantid>=6.12.0.2
   - matplotlib
   # development dependencies
   - boa
   - codecov
   - conda-build
   - conda-verify
-  - mkdocs
-  - mkdocstrings
-  - mkdocstrings-python
   - pre-commit
   - pytest
   - pytest-cov
   - python-build
   - ruff
-  # - sphinx
-  # - sphinx-rtd-theme
+  - sphinx
+  - sphinx-rtd-theme
   - versioningit
   - myst-parser

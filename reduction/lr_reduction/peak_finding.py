@@ -11,27 +11,30 @@ from lmfit.models import GaussianModel
 
 def process_data(workspace, summed=True, tof_step=200):
     """
-        Process a Mantid workspace to extract counts vs pixel.
+    Process a Mantid workspace to extract counts vs pixel.
 
-        Parameters
-        ----------
-        workspace : Mantid workspace
-            The Mantid workspace to process.
-        summed : bool, optional
-            If True, the x pixels will be summed (default is True).
-        tof_step : int, optional
-            The TOF bin size (default is 200).
+    Parameters
+    ----------
+    workspace : Mantid workspace
+        The Mantid workspace to process.
+    summed : bool, optional
+        If True, the x pixels will be summed (default is True).
+    tof_step : int, optional
+        The TOF bin size (default is 200).
 
-        Returns
-        -------
-        tuple
-            A tuple containing:
-            - tof : numpy.ndarray
-                The time-of-flight values.
-            - _x : numpy.ndarray
-                The pixel indices.
-            - _y : numpy.ndarray
-                The summed counts for each pixel.
+    Returns
+    -------
+    tuple of numpy.ndarray
+        A tuple containing:
+
+        - **tof** : numpy.ndarray
+          The time-of-flight values.
+
+        - **_x** : numpy.ndarray
+          The pixel indices.
+
+        - **_y** : numpy.ndarray
+          The summed counts for each pixel.
     """
     tof_min = workspace.getTofMin()
     tof_max = workspace.getTofMax()
