@@ -15,8 +15,9 @@ project = "lr_reduction"
 copyright = "2024, ORNL"  # noqa A001
 author = "ORNL"
 version = versioningit.get_version("../")
-# The full version, including alpha/beta/rc tags
-release = ".".join(version.split(".")[:-1])
+# The full version (major.minor.patch) without pre-/post-release metadata
+from packaging.version import Version
+release = Version(version).base_version
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
