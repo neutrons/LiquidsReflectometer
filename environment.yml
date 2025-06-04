@@ -1,6 +1,7 @@
 name: lr_reduction
 channels:
   - mantid-ornl
+  - mantid
   - conda-forge
 dependencies:
   - lmfit
