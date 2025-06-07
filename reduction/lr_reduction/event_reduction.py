@@ -77,11 +77,11 @@ def get_q_binning(q_min=0.001, q_max=0.15, q_step=-0.02):
         A numpy array of Q values based on the specified binning.
     """
     if q_step > 0:
-        n_steps = int((q_max - q_min) / q_step)
+        n_steps = int((q_max - q_min) / q_step) + 1
         return q_min + np.asarray([q_step * i for i in range(n_steps)])
     else:
         _step = 1.0 + np.abs(q_step)
-        n_steps = int(np.log(q_max / q_min) / np.log(_step))
+        n_steps = int(np.log(q_max / q_min) / np.log(_step)) + 1
         return q_min * np.asarray([_step**i for i in range(n_steps)])
 
 
@@ -1050,7 +1050,7 @@ class EventReflectivity:
             ths_value = ws.getRun()["ths"].value[-1]
             delta_theta_f *= np.sign(ths_value)
 
-            
+
             theta_f = theta + delta_theta_f
 
             qz = k * (np.sin(theta_f) + np.sin(theta))
@@ -1234,9 +1234,11 @@ def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     if settings.s1_sample_distance is not None:
         s1_sample_distance = settings.s1_sample_distance * 1000
 
+    # Adjusted to include si height. Calculation assumes small angle approximation.
     s1h = abs(ws.getRun().getProperty("S1VHeight").value[0])
+    sih = abs(ws.getRun().getProperty("SiVHeight").value[0])
     xi = abs(ws.getRun().getProperty("BL4B:Mot:xi.RBV").value[0])
     sample_si_distance = xi_reference - xi
     slit_distance = s1_sample_distance - sample_si_distance
-    dq_over_q = s1h / slit_distance / theta
+    dq_over_q = (s1h+sih)*0.5 / slit_distance / theta
     return dq_over_q

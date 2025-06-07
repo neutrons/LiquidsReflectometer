@@ -47,9 +47,9 @@ class ReductionParameters:
         self.data_files = [0]
         self.norm_file = 0
 
-        # Clean up options: cut first and last points as needed
-        self.pre_cut = 1
-        self.post_cut = 1
+        # Clean up options: cut first and last points as needed. Default set to 0.
+        self.pre_cut = 0
+        self.post_cut = 0
 
         # Q range
         self.q_min = 0.001
