@@ -19,9 +19,22 @@ Notes for major or minor releases. Notes for patch releases are deferred.
 
     **Of interest to the Developer:**
 
-    - PR #67 Make the documentation work with readthedocs
-    - PR #66 Build and publish conda packages
+    - PR #XYZ one-liner description
 
+
+2.2.0
+------
+2025-06-10
+
+**Of interest to the User**:
+
+- 
+
+**Of interest to the Developer:**
+
+- PR #67 Make the documentation work with readthedocs
+- PR #66 Modernizes conda packaging
+      
 2.1.13
 ------
 2025-05-01
