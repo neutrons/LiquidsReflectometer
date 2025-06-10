@@ -25,6 +25,11 @@ class ReductionParameters:
 
     def __init__(self):
         # Signal selection
+        """
+        Initializes a ReductionParameters instance with default values for data reduction.
+        
+        Sets default parameters for signal selection, normalization, data files, cleanup options, Q range, scattering angles, scaling factors, incident medium, dead time correction, and instrument geometry. Instrument-specific settings are imported from an InstrumentSettings instance.
+        """
         self.data_peak_range = [140, 150]
         self.subtract_background = True
         self.two_backgrounds: bool = False

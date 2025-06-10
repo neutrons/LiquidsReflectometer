@@ -55,26 +55,17 @@ def get_wl_range(ws):
 
 def get_q_binning(q_min=0.001, q_max=0.15, q_step=-0.02):
     """
-    Determine Q binning.
-
-    This function calculates the binning for Q values based on the provided minimum, maximum, and step values.
-    If the step value is positive, it generates a linear binning. If the step value is negative, it generates
-    a logarithmic binning.
-
-    Parameters
-    ----------
-    q_min : float
-        The minimum Q value.
-    q_max : float
-        The maximum Q value.
-    q_step : float
-        The step size for Q binning. If positive, linear binning is used.
-        If negative, logarithmic binning is used.
-
-    Returns
-    -------
-    numpy.ndarray
-        A numpy array of Q values based on the specified binning.
+    Returns an array of Q bin edges using linear or logarithmic binning.
+    
+    If `q_step` is positive, linear binning is used; if negative, logarithmic binning is applied. The returned array includes both endpoints.
+    	
+    Args:
+    	q_min: Minimum Q value.
+    	q_max: Maximum Q value.
+    	q_step: Step size for binning; positive for linear, negative for logarithmic.
+    
+    Returns:
+    	A NumPy array of Q bin edges spanning the specified range.
     """
     if q_step > 0:
         n_steps = int((q_max - q_min) / q_step) + 1
@@ -1026,6 +1017,26 @@ class EventReflectivity:
         return qx_bins, qz_bins, _refl, _d_refl
 
     def _off_specular(self, ws, wl_dist, wl_bins, x_bins, z_bins, peak_position, theta, x_axis=None):
+        """
+        Bins events from the workspace into a 2D off-specular reflectivity map.
+        
+        Aggregates neutron events over specified pixel and wavelength ranges, applies flux weighting, and bins the results in user-defined x and z axes (e.g., Qx vs Qz). Supports multiple axis conventions for off-specular analysis and normalizes by proton charge and bin size.
+        
+        Args:
+            ws: Mantid workspace containing event data.
+            wl_dist: Wavelength distribution for flux normalization.
+            wl_bins: Bin edges for the wavelength distribution.
+            x_bins: Bin edges for the x-axis (e.g., Qx or related variable).
+            z_bins: Bin edges for the z-axis (e.g., Qz or related variable).
+            peak_position: Pixel index corresponding to the specular peak.
+            theta: Incident angle in radians.
+            x_axis: Optional; specifies the x-axis variable for binning.
+        
+        Returns:
+            Tuple of (refl, d_refl_sq):
+                refl: 2D array of normalized off-specular reflectivity.
+                d_refl_sq: 2D array of statistical uncertainties for each bin.
+        """
         charge = ws.getRun().getProtonCharge()
         refl = np.zeros([len(x_bins) - 1, len(z_bins) - 1])
         counts = np.zeros([len(x_bins) - 1, len(z_bins) - 1])
@@ -1179,21 +1190,18 @@ class EventReflectivity:
 
 def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     """
-    Compute the Q resolution from the meta data.
-
-    Parameters
-    ----------
-    ws : mantid.api.Workspace
-        Mantid workspace to extract correction meta-data from.
-    theta : float
-        Scattering angle in radians
-    q_summing : bool
-        If True, the pixel size will be used for the resolution
-
-    Returns
-    -------
-    float
-        The dQ/Q resolution (FWHM)
+    Calculates the fractional Q resolution (dQ/Q) for a Mantid workspace using instrument metadata.
+    
+    If `q_summing` is True, the resolution is determined by the pixel width and sample-detector distance. Otherwise, the resolution is computed from slit heights and distances using run logs. Returns a default value if required metadata is unavailable.
+    
+    Args:
+        ws: Mantid workspace containing instrument and run metadata.
+        default_dq: Default dQ/Q value to use if metadata is missing.
+        theta: Scattering angle in radians. If None, extracted from workspace logs.
+        q_summing: If True, uses pixel size for resolution calculation.
+    
+    Returns:
+        The fractional Q resolution (dQ/Q, FWHM).
     """
     settings = read_settings(ws)
 
