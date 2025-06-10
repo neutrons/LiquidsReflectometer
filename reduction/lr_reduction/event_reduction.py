@@ -1234,11 +1234,11 @@ def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     if settings.s1_sample_distance is not None:
         s1_sample_distance = settings.s1_sample_distance * 1000
 
-    # Adjusted to include si height. Calculation assumes small angle approximation.
+    # Adjusted to include si height.
     s1h = abs(ws.getRun().getProperty("S1VHeight").value[0])
     sih = abs(ws.getRun().getProperty("SiVHeight").value[0])
     xi = abs(ws.getRun().getProperty("BL4B:Mot:xi.RBV").value[0])
     sample_si_distance = xi_reference - xi
     slit_distance = s1_sample_distance - sample_si_distance
-    dq_over_q = (s1h+sih)*0.5 / slit_distance / theta
+    dq_over_q = np.arctan((s1h+sih) / (2*slit_distance)) / theta
     return dq_over_q
