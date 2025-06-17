@@ -45,7 +45,7 @@ This command will start a bash shell with the conda environment activated. To ex
    $> exit
 
 Pixi also offers a set of commands to help with the development of the project,
-like building the documentation,= and creating conda packages.
+like building the documentation, and creating conda packages.
 To see the list of available commands, type in the terminal:
 
 .. code-block:: bash
