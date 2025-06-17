@@ -7,20 +7,61 @@ Developer Documentation
    :local:
    :depth: 1
 
+
 Local Environment
 -----------------
-For purposes of development, create conda environment `lr_reduction` with file `environment.yml`, and then
-install the package in development mode with `pip`:
+We use `pixi <https://pixi.sh/latest/>`_ to create the conda environment for local development of the project,
+as well as for creating conda packages for this project.
+
+If you don't have `pixi` installed in your Linux machine, you can install it with:
+
+.. code-block:: bash
+
+   $> curl -fsSL https://pixi.sh/install.sh | sh
+
+See the `pixi installation page <https://pixi.sh/latest/installation/>`_ for more options.
+
+Then, you can create the conda environment for local development with:
 
 .. code-block:: bash
 
    $> cd /path/to/lr_reduction/
-   $> conda create env --solver libmamba --file ./environment.yml
-   $> conda activate lr_reduction
-   (lr_reduction)$> pip install -e ./
+   $> pixi install
 
-By installing the package in development mode, one doesn't need to re-install package `lr_reduction` in conda
-environment `lr_reduction` after every change to the source code.
+This command will also install project `lr_reduction` in editable mode.
+By installing the project in editable mode,
+one doesn't need to re-install the project after a change in the source code.
+
+To activate the conda environment, type in the terminal:
+
+.. code-block:: bash
+
+   $> pixi shell
+
+This command will start a bash shell with the conda environment activated. To exit the shell, type:
+
+.. code-block:: bash
+
+   $> exit
+
+Pixi also offers a set of commands to help with the development of the project,
+like building the documentation,= and creating conda packages.
+To see the list of available commands, type in the terminal:
+
+.. code-block:: bash
+
+   $> pixi run
+   Available tasks:
+      build-conda
+      build-docs
+      clean-all
+      clean-conda
+      clean-docs
+      conda-builder
+      reset-version
+      sync-version
+
+Each task has a brief description in file pyproject.toml, under the section `[tool.pixi.tasks]`.
 
 pre-commit Hooks
 ----------------
@@ -30,8 +71,9 @@ Activate the hooks by typing in the terminal:
 .. code-block:: bash
 
    $> cd /path/to/lr_reduction/
-   $> conda activate lr_reduction
-   (lr_reduction)$> pre-commit install
+   $> pixi shell
+   $> pre-commit install
+
 
 Development procedure
 ---------------------
@@ -44,14 +86,6 @@ Development procedure
    A PR can only be approved and merged by the reviewer.
 6. The developer changes the task’s status to **Complete** and closes the associated issue.
 
-Updating mantid dependency
---------------------------
-The mantid version and the mantid conda channel (`mantid/label/main` or `mantid/label/nightly`) **must** be
-synchronized across these files:
-
-- environment.yml
-- conda.recipe/meta.yml
-- .github/workflows/package.yml
 
 Using the Data Repository liquidsreflectometer-data
 ---------------------------------------------------
@@ -95,8 +129,7 @@ To manually build the documentation:
 
 .. code-block:: bash
 
-   $> conda activate lr_reduction
-   (lr_reduction)$> make docs
+   $> pixi run build-docs
 
 After this, point your browser to
 `file:///path/to/lr_reduction/docs/build/html/index.html`
