@@ -52,14 +52,15 @@ To see the list of available commands, type in the terminal:
 
    $> pixi run
    Available tasks:
-      build-conda
-      build-docs
-      clean-all
-      clean-conda
-      clean-docs
-      conda-builder
-      reset-version
-      sync-version
+     clean-all
+     conda-build
+     conda-builder
+     conda-clean
+     docs-build
+     docs-clean
+     reset-version
+     sync-version
+
 
 Each task has a brief description in file pyproject.toml, under the section `[tool.pixi.tasks]`.
 
@@ -156,7 +157,7 @@ To manually build the documentation:
 
 .. code-block:: bash
 
-   $> pixi run build-docs
+   $> pixi run docs-build
 
 After this, point your browser to
 `file:///path/to/lr_reduction/docs/build/html/index.html`

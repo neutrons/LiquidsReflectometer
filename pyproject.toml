@@ -86,6 +86,7 @@ matplotlib = ">=3.9.4,<4"
 # Conda packages to be installed in the environments. Includes all the run-dependencies.
 [tool.pixi.dependencies]
 argcomplete = ">=3.6.2,<4"
+hatchling = ">=1.27.0,<2"
 #   run-dependiencies replicated here
 python = ">=3.10"
 lmfit = "*"
@@ -103,6 +104,10 @@ version = "0.0.0"  # a placeholder overwritten when Pixi task "sync-version" is 
 
 [tool.pixi.package.build]
 backend = { name = "pixi-build-python", version = "0.1.*" }
+
+[tool.pixi.package.host-dependencies]
+hatchling= ">=1.27.0,<2"hat
+versioningit = "*"
 
 
 ###################################
@@ -132,7 +137,7 @@ myst-parser = "*"
 
 [tool.pixi.environments]
 default = {features = ["installer", "developer", "package", "docs"], solve-group = "default"}  # created by `pixi install`
-docs = {features = ["installer", "docs"], solve-group = "default"}  # created by `pixi install docs`
+docs = {features = ["installer", "docs"], solve-group = "default"}  # readthedocs.org uses this environment
 
 ###############
 #  PIXI TASKS
@@ -144,11 +149,11 @@ sync-version = { cmd = 'version=$(python -m versioningit); toml set tool.pixi.pa
 reset-version = { cmd = "toml set tool.pixi.package.version \"0.0.0\" --toml-path pyproject.toml", description = "Reset the package version to 0.0.0" }
 conda-builder = { cmd = "pixi build", description = "Command that creates the conda package" }
 # Packaging
-build-conda = { description = "Build the conda package", depends-on = ["sync-version", "conda-builder", "reset-version"] }
-clean-conda = { cmd = "rm -f *.conda", description = "Clean the local .conda build artifacts" }
+conda-build = { depends-on = ["sync-version", "conda-builder", "reset-version"], description = "Build the conda package" }
+conda-clean = { cmd = "rm -f *.conda", description = "Clean the local .conda build artifacts" }
 # Documentation
-build-docs = { cmd = 'cd docs && make html SPHINXOPTS="-W --keep-going -n" && echo -e "##########\n DOCS point your browser to file://$(pwd)/build/html/index.html\n##########"', description = "Build the documentation" }
-clean-docs = { cmd = "rm -rf docs/build", description = "Clean the documentation build artifacts" }
+docs-build = { cmd = 'cd docs && make html SPHINXOPTS="-W --keep-going -n" && echo -e "##########\n DOCS point your browser to file://$(pwd)/build/html/index.html\n##########"', description = "Build the documentation" }
+docs-clean = { cmd = "rm -rf docs/build", description = "Clean the documentation build artifacts" }
 
 #############
 #  COVERAGE
