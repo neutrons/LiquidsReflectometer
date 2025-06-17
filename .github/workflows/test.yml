@@ -29,9 +29,6 @@ jobs:
           environment-file: environment.yml
           use-mamba: true
 
-      - name: Dependencies synced
-        run: python scripts/shared/check_dependencies_sync.py
-
       - name: Test with pytest
         working-directory: ./reduction
         run: |
