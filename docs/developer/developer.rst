@@ -63,6 +63,33 @@ To see the list of available commands, type in the terminal:
 
 Each task has a brief description in file pyproject.toml, under the section `[tool.pixi.tasks]`.
 
+
+Activating the Environment Automatically
+----------------------------------------
+Wouldn't be nice if every time you enter the project directory, the conda environment is activated automatically?
+To achieve this, install `direnv <https://direnv.net/docs/installation.html>`_
+and create file `.envrc` in the project root directory with the following content:
+
+.. code-block:: bash
+
+   watch_file pixi.lock
+   eval "$(pixi shell-hook)"
+   unset PS1
+
+Then, in the terminal, type:
+
+.. code-block:: bash
+
+   $> direnv allow
+
+Now direnv activates the environment when you enter the project directory,
+and deactivates it when you leave the directory.
+
+Line `watch_file pixi.lock` directs direnv to re-evaluate the environment whenever file `pixi.lock` changes.
+Line `unset PS1` prevents direnv from
+`reporting on a nagging, albeit harmless, error message <https://github.com/direnv/direnv/wiki/PS1>`_.
+
+
 pre-commit Hooks
 ----------------
 
