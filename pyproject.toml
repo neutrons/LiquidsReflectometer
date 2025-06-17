@@ -144,7 +144,7 @@ conda-builder = { cmd = "pixi build", description = "Command that creates the co
 build-conda = { description = "Build the conda package", depends-on = ["sync-version", "conda-builder", "reset-version"] }
 clean-conda = { cmd = "rm -f *.conda", description = "Clean the local .conda build artifacts" }
 # Documentation
-build-docs = { cmd = 'cd docs&& make html SPHINXOPTS="-W --keep-going -n" && echo -e "##########\n DOCS point your browser to file://$(pwd)/build/html/index.html\n##########"', description = "Build the documentation" }
+build-docs = { cmd = 'cd docs && make html SPHINXOPTS="-W --keep-going -n" && echo -e "##########\n DOCS point your browser to file://$(pwd)/build/html/index.html\n##########"', description = "Build the documentation" }
 clean-docs = { cmd = "rm -rf docs/build", description = "Clean the documentation build artifacts" }
 
 #############
@@ -201,7 +201,7 @@ select = ["E", "F", "I"]
 ignore = []
 
 [tool.ruff.lint.isort]
-known-first-party = ["packagenamepy"]
+known-first-party = ["lr_reduction"]
 
 [tool.ruff.format]
 quote-style = "double"

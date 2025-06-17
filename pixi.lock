@@ -1718,6 +1718,7 @@ packages:
   - libgcc >=13
   - libstdcxx >=13
   license: LGPL-2.0-or-later
+  license_family: LGPL
   purls: []
   size: 98419
   timestamp: 1750079957535
@@ -3208,8 +3209,8 @@ packages:
   timestamp: 1741832212476
 - pypi: ./
   name: lr-reduction
-  version: 2.2.0rc1+d20250617
-  sha256: cbdc378515a7ebe49e48222845e3eb9041fb43313f458b36a24dfa941de91262
+  version: 2.3.0.dev3+d202506171628
+  sha256: 9770180db18992e53308d800f1f9ea1c64df754942e7aacc89f38feb2cf5ead8
   requires_python: '>=3.10'
   editable: true
 - conda: https://conda.anaconda.org/conda-forge/linux-64/lz4-c-1.10.0-h5888daf_1.conda

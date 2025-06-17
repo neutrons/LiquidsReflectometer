@@ -39,12 +39,3 @@ jobs:
         uses: codecov/codecov-action@v5
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: Build conda package
-        run: |
-          # test that the conda package builds
-          cd conda.recipe
-          echo "versioningit $(versioningit ../)"
-          CHANNELS="--channel mantid-ornl/label/main --channel conda-forge"
-          VERSION=$(versioningit ../) conda mambabuild $CHANNELS --output-folder . .
-          conda verify noarch/lr_reduction-*.tar.bz2
