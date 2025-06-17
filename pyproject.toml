@@ -106,7 +106,7 @@ version = "0.0.0"  # a placeholder overwritten when Pixi task "sync-version" is 
 backend = { name = "pixi-build-python", version = "0.1.*" }
 
 [tool.pixi.package.host-dependencies]
-hatchling= ">=1.27.0,<2"hat
+hatchling= ">=1.27.0,<2"
 versioningit = "*"
 
 
