@@ -31,8 +31,9 @@ jobs:
         working-directory: ./reduction
         run: |
           git submodule update --init
+          echo "data repo size: $(du -sh tests/data/liquidsreflectometer-data)"
 
-      - name: Test with pytest
+      - name: Test with coverage
         run: |
           pixi run test-all
 
