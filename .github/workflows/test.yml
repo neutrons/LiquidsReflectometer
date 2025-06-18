@@ -33,7 +33,7 @@ jobs:
 
       - name: Install the package
         run: |
-          micromamba install --yes -c conda-forge conda-build,conda-verify
+          micromamba install --yes -c conda-forge conda-build conda-verify
 
 
   tests:
@@ -118,7 +118,7 @@ jobs:
 
       - name: Install the package
         run: |
-          micromamba install --yes -c conda-forge conda-build,conda-verify
+          micromamba install --yes -c conda-forge conda-build conda-verify
           python -m conda_index /tmp/local-channel
           micromamba install --yes -c /tmp/local-channel -c mantid-ornl -c conda-forge lr_reduction
 
