@@ -52,7 +52,7 @@ jobs:
           test -f lr_reduction-*.conda
 
       - name: upload conda package
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: conda-package
           path: lr_reduction-*.conda
@@ -82,14 +82,13 @@ jobs:
           python-version: 3.10
 
       - name: Download conda package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: conda-package
+          path: /tmp/local-channel/linux-64
 
       - name: Install the package
         run: |
-          mkdir -p /tmp/local-channel/linux-64
-          cp lr_reduction*.conda /tmp/local-channel/linux-64/
           mamba install --yes conda-build,conda-verify
           python -m conda_index /tmp/local-channel
           mamba install --yes -c /tmp/local-channel -c mantid-ornl -c conda-forge lr_reduction
