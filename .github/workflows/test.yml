@@ -9,11 +9,39 @@ on:
 
 jobs:
 
-  tests:
+  micromamba:
     runs-on: ubuntu-24.04
     defaults:
       run:
-        shell: bash -l {0}
+        shell: bash -el {0}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 100
+          fetch-tags: true
+          ref: ${{ github.ref }}
+
+      - name: Setup micromamba
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: test
+          init-shell: bash
+          create-args: >-
+            python=3.10
+
+      - name: Install the package
+        run: |
+          micromamba install --yes -c conda-forge conda-build,conda-verify
+
+
+  tests:
+    needs: micromamba
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash -el {0}
 
     steps:
       - name: Checkout
@@ -53,7 +81,7 @@ jobs:
           pixi run conda-build
           test -f lr_reduction-*.conda
 
-      - name: upload conda package
+      - name: upload conda package as artifact
         uses: actions/upload-artifact@v4
         with:
           name: conda-package
@@ -64,7 +92,7 @@ jobs:
     runs-on: ubuntu-24.04
     defaults:
       run:
-        shell: bash -l {0}
+        shell: bash -el {0}
 
     steps:
       - name: Checkout
@@ -74,16 +102,15 @@ jobs:
           fetch-tags: true
           ref: ${{ github.ref }}
 
-      - name: Setup Conda
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Setup micromamba
+        uses: mamba-org/setup-micromamba@v2
         with:
-          auto-update-conda: true
-          miniforge-version: latest
-          use-mamba: true
-          channels: mantid-ornl,conda-forge
-          python-version: 3.10
+          environment-name: test
+          init-shell: bash
+          create-args: >-
+            python=3.10
 
-      - name: Download conda package
+      - name: Download conda package artifact
         uses: actions/download-artifact@v4
         with:
           name: conda-package
@@ -91,9 +118,9 @@ jobs:
 
       - name: Install the package
         run: |
-          mamba install --yes conda-build,conda-verify
+          micromamba install --yes -c conda-forge conda-build,conda-verify
           python -m conda_index /tmp/local-channel
-          mamba install --yes -c /tmp/local-channel -c mantid-ornl -c conda-forge lr_reduction
+          micromamba install --yes -c /tmp/local-channel -c mantid-ornl -c conda-forge lr_reduction
 
       - name: Verify the installation
         run: |
