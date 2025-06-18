@@ -3249,8 +3249,8 @@ packages:
   timestamp: 1741832212476
 - pypi: ./
   name: lr-reduction
-  version: 2.3.0.dev21
-  sha256: 81fd4c200292388322982be0c19dd2debb151f8dd1da90a8ae091c3df1cc5657
+  version: 2.3.0.dev22+d202506182358
+  sha256: ae8b72ff59caf37c6efeaec0d5d8a098c19ca31d27511b09ad58630e3b54f00e
   requires_python: '>=3.10'
   editable: true
 - conda: https://conda.anaconda.org/conda-forge/linux-64/lz4-c-1.10.0-h5888daf_1.conda

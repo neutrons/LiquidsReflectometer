@@ -69,7 +69,7 @@ html:
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
 readthedocs:
-	$(SPHINXBUILD) -T -j auto -b html $$READTHEDOCS_OUTPUT/html
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $$READTHEDOCS_OUTPUT/html
 
 livehtml:
 	sphinx-autobuild --port 4444 -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
