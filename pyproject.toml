@@ -71,8 +71,7 @@ preview = ["pixi-build"]
 channels = [
   "mantid-ornl",
   "conda-forge",
-  "https://prefix.dev/pixi-build-backends",
-  "https://prefix.dev/conda-forge"
+  "https://prefix.dev/pixi-build-backends"
 ]
 platforms = ["linux-64"]  # add additional platforms as needed
 
@@ -92,6 +91,8 @@ python = ">=3.10"
 lmfit = "*"
 mantid = ">=6.12.0.2"
 matplotlib = ">=3.9.4,<4"
+conda-verify = ">=3.4.2,<4"
+conda-build = ">=24.5.1,<25"
 
 # Pypi packages to be installed in the environments with `pip`
 [tool.pixi.pypi-dependencies]

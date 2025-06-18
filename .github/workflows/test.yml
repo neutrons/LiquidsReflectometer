@@ -8,26 +8,24 @@ on:
     tags: ['v*']
 
 jobs:
+
   tests:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     defaults:
       run:
         shell: bash -l {0}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 100
-          fetch-tags: true
-          ref: ${{ github.ref }}
+          fetch-depth: 100  # Fetch all history for accurate versioning
+          fetch-tags: true  # Fetch tags to ensure versioning works correctly
 
-      - name: Set up Miniconda
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Set up Pixi
+        uses: prefix-dev/setup-pixi@v0.8.10
         with:
-          auto-update-conda: true
-          miniforge-version: latest
-          environment-file: environment.yml
-          use-mamba: true
+          manifest-path: pyproject.toml
 
       - name: Test with pytest
         working-directory: ./reduction
@@ -37,5 +35,67 @@ jobs:
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
+        if: github.actor != 'dependabot[bot]'
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Build documentation
+        run: |
+          pixi run docs-build --environment docs
+          test -f ./docs/build/html/index.html
+
+      - name: build conda package
+        run: |
+          pixi run conda-build
+          test -f lr_reduction-*.conda
+
+      - name: upload conda package
+        uses: actions/upload-artifact@v3
+        with:
+          name: conda-package
+          path: lr_reduction-*.conda
+
+  verify_conda_package:
+    needs: tests
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 100
+          fetch-tags: true
+          ref: ${{ github.ref }}
+
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          miniforge-version: latest
+          use-mamba: true
+          channels: mantid-ornl,conda-forge
+          python-version: 3.10
+
+      - name: Download conda package
+        uses: actions/download-artifact@v3
+        with:
+          name: conda-package
+
+      - name: Install the package
+        run: |
+          mkdir -p /tmp/local-channel/linux-64
+          cp lr_reduction*.conda /tmp/local-channel/linux-64/
+          mamba install --yes conda-build,conda-verify
+          python -m conda_index /tmp/local-channel
+          mamba install --yes -c /tmp/local-channel -c mantid-ornl -c conda-forge lr_reduction
+
+      - name: Verify the installation
+        run: |
+          python -c "import lr_reduction"
+          python -c "import mantid"
+          python -c "import lmfit"
