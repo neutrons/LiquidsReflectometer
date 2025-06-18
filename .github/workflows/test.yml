@@ -1,4 +1,4 @@
-name: CI
+name: Test and Conda packaging
 
 on:
   workflow_dispatch:
@@ -56,10 +56,10 @@ jobs:
       - name: upload conda package as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: conda-package
+          name: artifact-conda-package
           path: lr_reduction-*.conda
 
-  verify_conda_package:
+  conda-verify:
     needs: tests
     runs-on: ubuntu-24.04
     defaults:
@@ -85,7 +85,7 @@ jobs:
       - name: Download conda package artifact
         uses: actions/download-artifact@v4
         with:
-          name: conda-package
+          name: artifact-conda-package
           path: /tmp/local-channel/linux-64
 
       - name: Install the package
