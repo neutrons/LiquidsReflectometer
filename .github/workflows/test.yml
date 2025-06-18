@@ -31,13 +31,11 @@ jobs:
         working-directory: ./reduction
         run: |
           git submodule update --init
-          python -m pytest -vv --cov=. --cov-report=xml --cov-report=term tests
+          pixi run test-all
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         if: github.actor != 'dependabot[bot]'
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 

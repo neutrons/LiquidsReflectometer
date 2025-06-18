@@ -149,6 +149,8 @@ clean-all = { description = "Clean all build artifacts", depends-on = ["clean-do
 sync-version = { cmd = 'version=$(python -m versioningit); toml set tool.pixi.package.version "$version" --toml-path pyproject.toml', description = "Sync pyproject.toml version with Git version" }
 reset-version = { cmd = "toml set tool.pixi.package.version \"0.0.0\" --toml-path pyproject.toml", description = "Reset the package version to 0.0.0" }
 conda-builder = { cmd = "pixi build", description = "Command that creates the conda package" }
+# Testing
+test-all = { cmd = "python -m pytest -vv --cov=. --cov-report=xml --cov-report=term tests"}
 # Packaging
 conda-build = { depends-on = ["sync-version", "conda-builder", "reset-version"], description = "Build the conda package" }
 conda-clean = { cmd = "rm -f *.conda", description = "Clean the local .conda build artifacts" }
