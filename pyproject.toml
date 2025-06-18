@@ -157,6 +157,7 @@ conda-clean = { cmd = "rm -f *.conda", description = "Clean the local .conda bui
 # Documentation
 docs-build = { cmd = 'cd docs && make html SPHINXOPTS="-W --keep-going -n" && echo -e "##########\n DOCS point your browser to file://$(pwd)/build/html/index.html\n##########"', description = "Build the documentation" }
 docs-clean = { cmd = "rm -rf docs/build", description = "Clean the documentation build artifacts" }
+readthedocs = { cmd = 'cd docs && make readthedocs', description = "Build the documentation for ReadTheDocs" }
 
 #############
 #  COVERAGE
