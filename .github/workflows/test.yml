@@ -27,10 +27,13 @@ jobs:
         with:
           manifest-path: pyproject.toml
 
-      - name: Test with pytest
+      - name: Download test data
         working-directory: ./reduction
         run: |
           git submodule update --init
+
+      - name: Test with pytest
+        run: |
           pixi run test-all
 
       - name: Upload coverage reports to Codecov
