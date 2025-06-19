@@ -10,7 +10,7 @@ User Guide
    :titlesonly:
 
    user/conda_environments
-   releases
+   release_notes
 
 Contacting the Team
 +++++++++++++++++++
