@@ -10,7 +10,7 @@ Developer Documentation
 
 Local Environment
 -----------------
-We use `pixi <https://pixi.sh/latest/>`_ to create the conda environment for local development of the project,
+We use `pixi <https://pixi.sh/latest/>`_ to create the virtual environment for local development of the project,
 as well as for creating conda packages for this project.
 
 If you don't have `pixi` installed in your Linux machine, you can install it with:
@@ -21,7 +21,7 @@ If you don't have `pixi` installed in your Linux machine, you can install it wit
 
 See the `pixi installation page <https://pixi.sh/latest/installation/>`_ for more options.
 
-Then, you can create the conda environment for local development with:
+Then, you can create the virtual environment for local development with:
 
 .. code-block:: bash
 

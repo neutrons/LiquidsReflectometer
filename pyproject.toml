@@ -155,7 +155,7 @@ test-all = { cmd = "cd reduction/ && python -m pytest -vv --cov=. --cov-report=x
 conda-build = { depends-on = ["sync-version", "conda-builder", "reset-version"], description = "Build the conda package" }
 conda-clean = { cmd = "rm -f *.conda", description = "Clean the local .conda build artifacts" }
 # Documentation
-docs-build = { cmd = 'cd docs && make html SPHINXOPTS="-W --keep-going -n" && echo -e "##########\n DOCS point your browser to file://$(pwd)/build/html/index.html\n##########"', description = "Build the documentation" }
+docs-build = { cmd = 'sphinx-build -W --keep-going -n -T -b html docs  docs/build/html && echo -e "##########\n DOCS point your browser to file://$(pwd)/build/html/index.html\n##########"', description = "Build the documentation" }
 docs-clean = { cmd = "rm -rf docs/build", description = "Clean the documentation build artifacts" }
 
 #############
