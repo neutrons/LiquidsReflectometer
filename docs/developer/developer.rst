@@ -50,16 +50,19 @@ To see the list of available commands, type in the terminal:
 
 .. code-block:: bash
 
-   $> pixi run
-   Available tasks:
-     clean-all
-     conda-build
-     conda-builder
-     conda-clean
-     docs-build
-     docs-clean
-     reset-version
-     sync-version
+   $> pixi task list
+   Tasks that can run on this machine:
+   -----------------------------------
+   clean-all, conda-build, conda-builder, conda-clean, docs-build, docs-clean, reset-version, sync-version, test-all
+   Task           Description
+   clean-all      Clean all build artifacts
+   conda-build    Build the conda package
+   conda-builder  Command that creates the conda package
+   conda-clean    Clean the local .conda build artifacts
+   docs-build     Build the documentation
+   docs-clean     Clean the documentation build artifacts
+   reset-version  Reset the package version to 0.0.0
+   sync-version   Sync pyproject.toml version with Git version
 
 
 Each task has a brief description in file pyproject.toml, under the section `[tool.pixi.tasks]`.
@@ -68,7 +71,7 @@ Each task has a brief description in file pyproject.toml, under the section `[to
 Activating the Environment Automatically
 ----------------------------------------
 Wouldn't be nice if every time you enter the project directory, the conda environment is activated automatically?
-To achieve this, install `direnv <https://direnv.net/docs/installation.html>`_
+To achieve this, install `direnv <https://pixi.sh/latest/integration/third_party/direnv/>`_
 and create file `.envrc` in the project root directory with the following content:
 
 .. code-block:: bash
