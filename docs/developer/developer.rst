@@ -7,20 +7,92 @@ Developer Documentation
    :local:
    :depth: 1
 
+
 Local Environment
 -----------------
-For purposes of development, create conda environment `lr_reduction` with file `environment.yml`, and then
-install the package in development mode with `pip`:
+We use `pixi <https://pixi.sh/latest/>`_ to create the virtual environment for local development of the project,
+as well as for creating conda packages for this project.
+
+If you don't have `pixi` installed in your Linux machine, you can install it with:
+
+.. code-block:: bash
+
+   $> curl -fsSL https://pixi.sh/install.sh | sh
+
+See the `pixi installation page <https://pixi.sh/latest/installation/>`_ for more options.
+
+Then, you can create the virtual environment for local development with:
 
 .. code-block:: bash
 
    $> cd /path/to/lr_reduction/
-   $> conda create env --solver libmamba --file ./environment.yml
-   $> conda activate lr_reduction
-   (lr_reduction)$> pip install -e ./
+   $> pixi install
 
-By installing the package in development mode, one doesn't need to re-install package `lr_reduction` in conda
-environment `lr_reduction` after every change to the source code.
+This command will also install project `lr_reduction` in editable mode.
+By installing the project in editable mode,
+one doesn't need to re-install the project after a change in the source code.
+
+To activate the conda environment, type in the terminal:
+
+.. code-block:: bash
+
+   $> pixi shell
+
+This command will start a bash shell with the conda environment activated. To exit the shell, type:
+
+.. code-block:: bash
+
+   $> exit
+
+Pixi also offers a set of commands to help with the development of the project,
+like building the documentation, and creating conda packages.
+To see the list of available commands, type in the terminal:
+
+.. code-block:: bash
+
+   $> pixi task list
+   Tasks that can run on this machine:
+   -----------------------------------
+   clean-all, conda-build, conda-builder, conda-clean, docs-build, docs-clean, reset-version, sync-version, test-all
+   Task           Description
+   clean-all      Clean all build artifacts
+   conda-build    Build the conda package
+   conda-builder  Command that creates the conda package
+   conda-clean    Clean the local .conda build artifacts
+   docs-build     Build the documentation
+   docs-clean     Clean the documentation build artifacts
+   reset-version  Reset the package version to 0.0.0
+   sync-version   Sync pyproject.toml version with Git version
+
+
+Each task has a brief description in file pyproject.toml, under the section `[tool.pixi.tasks]`.
+
+
+Activating the Environment Automatically
+----------------------------------------
+Wouldn't be nice if every time you enter the project directory, the conda environment is activated automatically?
+To achieve this, install `direnv <https://pixi.sh/latest/integration/third_party/direnv/>`_
+and create file `.envrc` in the project root directory with the following content:
+
+.. code-block:: bash
+
+   watch_file pixi.lock
+   eval "$(pixi shell-hook)"
+   unset PS1
+
+Then, in the terminal, type:
+
+.. code-block:: bash
+
+   $> direnv allow
+
+Now direnv activates the environment when you enter the project directory,
+and deactivates it when you leave the directory.
+
+Line `watch_file pixi.lock` directs direnv to re-evaluate the environment whenever file `pixi.lock` changes.
+Line `unset PS1` prevents direnv from
+`reporting on a nagging, albeit harmless, error message <https://github.com/direnv/direnv/wiki/PS1>`_.
+
 
 pre-commit Hooks
 ----------------
@@ -30,8 +102,9 @@ Activate the hooks by typing in the terminal:
 .. code-block:: bash
 
    $> cd /path/to/lr_reduction/
-   $> conda activate lr_reduction
-   (lr_reduction)$> pre-commit install
+   $> pixi shell
+   $> pre-commit install
+
 
 Development procedure
 ---------------------
@@ -44,14 +117,6 @@ Development procedure
    A PR can only be approved and merged by the reviewer.
 6. The developer changes the task’s status to **Complete** and closes the associated issue.
 
-Updating mantid dependency
---------------------------
-The mantid version and the mantid conda channel (`mantid/label/main` or `mantid/label/nightly`) **must** be
-synchronized across these files:
-
-- environment.yml
-- conda.recipe/meta.yml
-- .github/workflows/package.yml
 
 Using the Data Repository liquidsreflectometer-data
 ---------------------------------------------------
@@ -95,8 +160,7 @@ To manually build the documentation:
 
 .. code-block:: bash
 
-   $> conda activate lr_reduction
-   (lr_reduction)$> make docs
+   $> pixi run docs-build
 
 After this, point your browser to
 `file:///path/to/lr_reduction/docs/build/html/index.html`

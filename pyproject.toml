@@ -1,53 +1,53 @@
 [project]
 name = "lr_reduction"
 authors = [{ name = "Mat", email = "m2d@ornl.gov" }]
-description = "Reduction scripts for the Liquids Reflectometer. This includes both automated reduction scripts and useful scripts to reprocess data."
-version = "0.0.1" # initial version, dynamically overriden
+description = "Reduction backend for the Liquids Reflectometer."
+keywords = ["neutrons", "reflectometry", "reduction"]
+dynamic = ["version"]
 license = { file = "LICENSE" }
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
-  "Topic :: Scientific/Engineering :: Neutron reflectometry",
+  "Topic :: Scientific/Engineering :: Physics",
 ]
-dependencies = [
-  "lmfit",
-  "mantid>=6.12.0.2",
-]
-
-[project.optional-dependencies]
-dev = ["mkdocs", "mkdocstrings[python]", "ruff"]
-tests = ["pytest"]
-
-# versioningit will generate file _version.py when installing this package, even if installing from sources
-[build-system]
-requires = ["setuptools >= 42", "wheel", "toml", "versioningit"]
-build-backend = "setuptools.build_meta"
 
 [project.urls]
-Homepage = "https://github.com/neutrons/LiquidsReflectometer"
+homepage = "https://github.com/neutrons/LiquidsReflectometer"
+repository = "https://github.com/neutrons/LiquidsReflectometer"
+documentation = "https://lr-reduction.readthedocs.io/latest/index.html"
 
-[tool.setuptools.packages.find]
-where = ["reduction"]
-exclude = ["tests*", "scripts*", "docs*", "notebooks*"]
+#####################################
+#  BUILDING FROM SOURCES WITH HATCH
+#####################################
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling>=1.27.0", "toml", "versioningit"]
 
-[tool.setuptools.package-data]
-"*" = ["*.txt", "*.json"]
 
-[tool.ruff]
-line-length = 140
-select = ["A", "ARG", "E", "W", "F", "I", "PT", "RUF100"]
-ignore = [
-  "E402", # module level import not at top of file
-  "E722", # bare except
-  "E741",
-  "E743", # ambiguous function name, generally 'l'
-  "F403", # wild imports
-  "F405",
-  "F821", # unknown names from probably from wild imports
+[tool.hatch.version]
+source = "versioningit"
+
+[tool.hatch.build.hooks.versioningit-onbuild]
+source-file = "reduction/lr_reduction/_version.py"
+build-file = "lr_reduction/_version.py"
+replacement = '"{next_version}"'
+
+[tool.hatch.build]
+artifacts = [
+  "reduction/lr_reduction/_version.py",
+  "reduction/lr_reduction/**/*.yml",
+  "reduction/lr_reduction/**/*.yaml",
+  "reduction/lr_reduction/**/*.ini"
 ]
 
+[tool.hatch.build.targets.wheel]
+packages = ["reduction/lr_reduction"]
+
+#################
+#  VERSIONINGIT
+#################
 [tool.versioningit.vcs]
 method = "git"
 default-tag = "0.0.1"
@@ -63,12 +63,111 @@ distance-dirty = "{next_version}.dev{distance}+d{build_date:%Y%m%d%H%M}"
 [tool.versioningit.write]
 file = "reduction/lr_reduction/_version.py"
 
+####################################################################
+#  CREATING CONDA ENVIRONMENT AND BUILDING CONDA PACKAGE WITH PIXI
+####################################################################
+[tool.pixi.workspace]
+preview = ["pixi-build"]
+channels = [
+  "mantid-ornl",
+  "conda-forge",
+  "https://prefix.dev/pixi-build-backends"
+]
+platforms = ["linux-64"]  # add additional platforms as needed
+
+# Conda packages (no PyPi) to be enumerated within the conda package to be built.
+[tool.pixi.package.run-dependencies]
+python = ">=3.10"
+lmfit = ">=1.3.0,<1.4.0"
+mantid = ">=6.12.0.2"
+matplotlib = ">=3.9.4,<4"
+
+# Conda packages to be installed in the environments. Includes all the run-dependencies.
+[tool.pixi.dependencies]
+argcomplete = ">=3.6.2,<4"
+hatchling = ">=1.27.0,<2"
+#   run-dependiencies replicated here
+python = ">=3.10"
+lmfit = "*"
+mantid = ">=6.12.0.2"
+matplotlib = ">=3.9.4,<4"
+conda-build = ">=24.5.1,<25"
+
+# Pypi packages to be installed in the environments with `pip`
+[tool.pixi.pypi-dependencies]
+lr_reduction = { path = ".", editable = true }  # editable install of lr_reduction
+toml-cli = "*"
+
+[tool.pixi.package]
+name = "lr_reduction"
+version = "0.0.0"  # a placeholder overwritten when Pixi task "sync-version" is executed
+
+[tool.pixi.package.build]
+backend = { name = "pixi-build-python", version = "0.1.*" }
+
+[tool.pixi.package.host-dependencies]
+hatchling= ">=1.27.0,<2"
+versioningit = "*"
+
+
+###################################
+#  PIXI FEATURES AND ENVIRONMENTS
+###################################
+[tool.pixi.feature.installer.dependencies]  # necessary to install and inspect
+hatch= "*"
+pip = "*"
+versioningit = "*"
+conda-tree = "*"
+
+[tool.pixi.feature.developer.dependencies]  # necessary for development and testing
+pre-commit = "*"
+ruff = "*"
+codecov = "*"
+pytest = "*"
+pytest-cov = "*"
+
+[tool.pixi.feature.package.dependencies]  # necessary to build the conda package
+anaconda-client = ">=1.13.0,<2"
+
+[tool.pixi.feature.docs.dependencies]  # necessary for building the documentation
+sphinx = "*"
+sphinx_rtd_theme = "*"
+myst-parser = "*"
+
+[tool.pixi.environments]
+default = {features = ["installer", "developer", "package", "docs"], solve-group = "default"}  # created by `pixi install`
+docs = {features = ["installer", "docs"], solve-group = "default"}  # readthedocs.org uses this environment
+
+###############
+#  PIXI TASKS
+###############
+[tool.pixi.tasks]
+# Subtasks (tasks other tasks depend on)
+clean-all = { description = "Clean all build artifacts", depends-on = ["clean-docs", "clean-conda"] }
+sync-version = { cmd = 'version=$(python -m versioningit); toml set tool.pixi.package.version "$version" --toml-path pyproject.toml', description = "Sync pyproject.toml version with Git version" }
+reset-version = { cmd = "toml set tool.pixi.package.version \"0.0.0\" --toml-path pyproject.toml", description = "Reset the package version to 0.0.0" }
+conda-builder = { cmd = "pixi build", description = "Command that creates the conda package" }
+# Testing
+test-all = { cmd = "cd reduction/ && python -m pytest -vv --cov=. --cov-report=xml --cov-report=term tests"}
+# Packaging
+conda-build = { depends-on = ["sync-version", "conda-builder", "reset-version"], description = "Build the conda package" }
+conda-clean = { cmd = "rm -f *.conda", description = "Clean the local .conda build artifacts" }
+# Documentation
+docs-build = { cmd = 'sphinx-build -W --keep-going -n -T -b html docs  docs/build/html && echo -e "##########\n DOCS point your browser to file://$(pwd)/build/html/index.html\n##########"', description = "Build the documentation" }
+docs-clean = { cmd = "rm -rf docs/build", description = "Clean the documentation build artifacts" }
+
+#############
+#  COVERAGE
+#############
 [tool.coverage.run]
 branch = true
 
 [tool.coverage.report]
 skip_empty = true
 
+###########
+#  PYTEST
+###########
 [tool.pytest.ini_options]
 pythonpath = [
   ".",
@@ -90,24 +189,30 @@ markers = [
   "scripts: mark a test as a script that should be run manually",
 ]
 
-[tool.flake8]
+#########
+#  RUFF
+#########
+[tool.ruff]
+line-length = 120
+select = ["A", "ARG","ASYNC","BLE","C90", "E", "F", "I", "N", "UP032", "W"]
+exclude = ["notebooks/**", "**/*.ipynb"]
 ignore = [
-  "E114",
-  "E115",
-  "E116",
-  "E121",
-  "E123",
-  "E126",
-  "E133",
-  "E2",
-  "E704",
-  "E722",
+  "E402", # module level import not at top of file
+  "E722", # bare except
   "E741",
-  "E743",
-  "W503",
-  "F403",
+  "E743", # ambiguous function name, generally 'l'
+  "F403", # wild imports
   "F405",
-  "F999",
+  "F821", # unknown names from probably from wild imports
 ]
-doctests = false
-max-line-length = 130
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["lr_reduction"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

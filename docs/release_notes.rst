@@ -6,11 +6,8 @@ Release Notes
 Notes for major or minor releases. Notes for patch releases are deferred.
 
 ..
-    Release notes are written in reverse chronological order, with the most recent release at the top,
-    using the following format:
-
-    <Next Major or Minor Release>
-    -----------------------------
+    2.3.0
+    -----
     (date of release, format YYYY-MM-DD)
 
     **Of interest to the User**:
@@ -19,22 +16,20 @@ Notes for major or minor releases. Notes for patch releases are deferred.
 
     **Of interest to the Developer:**
 
-    - PR #XYZ one-liner description
+    - PR #70 Introduce pixi to the project
+..
 
 
 2.2.0
 ------
 2025-06-10
 
-**Of interest to the User**:
-
-- 
-
 **Of interest to the Developer:**
 
 - PR #67 Make the documentation work with readthedocs
 - PR #66 Modernizes conda packaging
-      
+
+
 2.1.13
 ------
 2025-05-01
@@ -46,6 +41,7 @@ Notes for major or minor releases. Notes for patch releases are deferred.
 **Of interest to the Developer:**
 
 - PR #65 Update mantid to 6.12.0
+
 
 2.1.0
 -----
