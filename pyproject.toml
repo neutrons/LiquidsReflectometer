@@ -127,7 +127,6 @@ pytest = "*"
 pytest-cov = "*"
 
 [tool.pixi.feature.package.dependencies]  # necessary to build the conda package
-boa = "*"
 anaconda-client = ">=1.13.0,<2"
 
 [tool.pixi.feature.docs.dependencies]  # necessary for building the documentation
