@@ -156,7 +156,7 @@ conda-clean = { cmd = "rm -f *.conda", description = "Clean the local .conda bui
 # Testing
 test-reduction = { cmd = "cd reduction/ && python -m pytest -vv --cov=. --cov-report=xml --cov-report=term tests"}
 # Subtasks (tasks other tasks depend on)
-clean-all = { description = "Clean all build artifacts", depends-on = ["clean-docs", "clean-conda"] }
+clean-all = { description = "Clean all build artifacts", depends-on = ["docs-clean", "conda-clean"] }
 sync-version = { cmd = 'version=$(python -m versioningit); toml set tool.pixi.package.version "$version" --toml-path pyproject.toml', description = "Sync pyproject.toml version with Git version" }
 reset-version = { cmd = "toml set tool.pixi.package.version \"0.0.0\" --toml-path pyproject.toml", description = "Reset the package version to 0.0.0" }
 conda-builder = { cmd = "pixi build", description = "Command that creates the conda package" }
