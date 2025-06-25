@@ -2,8 +2,9 @@ version: 6
 environments:
   default:
     channels:
-    - url: https://conda.anaconda.org/mantid-ornl/
     - url: https://conda.anaconda.org/conda-forge/
+    - url: https://conda.anaconda.org/mantid-ornl/
+    - url: https://conda.anaconda.org/mantid/
     - url: https://prefix.dev/pixi-build-backends/
     indexes:
     - https://pypi.org/simple
@@ -385,8 +386,9 @@ environments:
       - pypi: ./
   docs:
     channels:
-    - url: https://conda.anaconda.org/mantid-ornl/
     - url: https://conda.anaconda.org/conda-forge/
+    - url: https://conda.anaconda.org/mantid-ornl/
+    - url: https://conda.anaconda.org/mantid/
     - url: https://prefix.dev/pixi-build-backends/
     indexes:
     - https://pypi.org/simple
@@ -3436,8 +3438,8 @@ packages:
   timestamp: 1741832212476
 - pypi: ./
   name: lr-reduction
-  version: 2.3.0.dev2+d202506251728
-  sha256: edac8446d8f1636c960391a7db74a03865de159a72c5840f3a7bfdb1d90c6e08
+  version: 2.3.0.dev3+d202506251858
+  sha256: d0fe664e558f915e6ce546b0aa9a4a5316361505232238bf21efaf225868920f
   requires_python: '>=3.10'
   editable: true
 - conda: https://conda.anaconda.org/conda-forge/linux-64/lz4-c-1.10.0-h5888daf_1.conda
