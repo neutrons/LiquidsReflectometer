@@ -53,7 +53,7 @@ To see the list of available commands, type in the terminal:
    $> pixi task list
    Tasks that can run on this machine:
    -----------------------------------
-   clean-all, conda-build, conda-builder, conda-clean, docs-build, docs-clean, reset-version, sync-version, test-all
+   clean-all, conda-build, conda-builder, conda-clean, docs-build, docs-clean, reset-version, sync-version, test-reduction
    Task           Description
    clean-all      Clean all build artifacts
    conda-build    Build the conda package
