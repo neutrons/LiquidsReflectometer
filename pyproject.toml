@@ -71,16 +71,10 @@ preview = ["pixi-build"]
 channels = [
   "mantid-ornl",
   "conda-forge",
+  # "mantid",
   "https://prefix.dev/pixi-build-backends"
 ]
 platforms = ["linux-64"]  # add additional platforms as needed
-
-# Conda packages (no PyPi) to be enumerated within the conda package to be built.
-[tool.pixi.package.run-dependencies]
-python = ">=3.10"
-lmfit = ">=1.3.0,<1.4.0"
-mantid = ">=6.12.0.2"
-matplotlib = ">=3.9.4,<4"
 
 # Conda packages to be installed in the environments. Includes all the run-dependencies.
 [tool.pixi.dependencies]
@@ -90,13 +84,22 @@ hatchling = ">=1.27.0,<2"
 python = ">=3.10"
 lmfit = "*"
 mantid = ">=6.12.0.2"
-matplotlib = ">=3.9.4,<4"
-conda-build = ">=24.5.1,<25"
+matplotlib = "==3.9.4"
+qtpy = "*"
+# conda-build = ">=24.5.1,<25"
 
 # Pypi packages to be installed in the environments with `pip`
 [tool.pixi.pypi-dependencies]
 lr_reduction = { path = ".", editable = true }  # editable install of lr_reduction
 toml-cli = "*"
+
+# Conda packages (no PyPi) to be enumerated within the conda package to be built.
+[tool.pixi.package.run-dependencies]
+python = ">=3.10"
+lmfit = ">=1.3.0,<1.4.0"
+mantid = ">=6.12.0.2"
+matplotlib = "==3.9.4"
+qtpy = "*"
 
 [tool.pixi.package]
 name = "lr_reduction"
@@ -141,20 +144,21 @@ docs = {features = ["installer", "docs"], solve-group = "default"}  # readthedoc
 ###############
 #  PIXI TASKS
 ###############
+
 [tool.pixi.tasks]
+# Documentation
+docs-build = { cmd = 'sphinx-build -W --keep-going -n -T -b html docs  docs/build/html && echo -e "##########\n DOCS point your browser to file://$(pwd)/build/html/index.html\n##########"', description = "Build the documentation" }
+docs-clean = { cmd = "rm -rf docs/build", description = "Clean the documentation build artifacts" }
+# Packaging
+conda-build = { depends-on = ["sync-version", "conda-builder", "reset-version"], description = "Build the conda package" }
+conda-clean = { cmd = "rm -f *.conda", description = "Clean the local .conda build artifacts" }
+# Testing
+test-reduction = { cmd = "cd reduction/ && python -m pytest -vv --cov=. --cov-report=xml --cov-report=term tests"}
 # Subtasks (tasks other tasks depend on)
 clean-all = { description = "Clean all build artifacts", depends-on = ["clean-docs", "clean-conda"] }
 sync-version = { cmd = 'version=$(python -m versioningit); toml set tool.pixi.package.version "$version" --toml-path pyproject.toml', description = "Sync pyproject.toml version with Git version" }
 reset-version = { cmd = "toml set tool.pixi.package.version \"0.0.0\" --toml-path pyproject.toml", description = "Reset the package version to 0.0.0" }
 conda-builder = { cmd = "pixi build", description = "Command that creates the conda package" }
-# Testing
-test-all = { cmd = "cd reduction/ && python -m pytest -vv --cov=. --cov-report=xml --cov-report=term tests"}
-# Packaging
-conda-build = { depends-on = ["sync-version", "conda-builder", "reset-version"], description = "Build the conda package" }
-conda-clean = { cmd = "rm -f *.conda", description = "Clean the local .conda build artifacts" }
-# Documentation
-docs-build = { cmd = 'sphinx-build -W --keep-going -n -T -b html docs  docs/build/html && echo -e "##########\n DOCS point your browser to file://$(pwd)/build/html/index.html\n##########"', description = "Build the documentation" }
-docs-clean = { cmd = "rm -rf docs/build", description = "Clean the documentation build artifacts" }
 
 #############
 #  COVERAGE
