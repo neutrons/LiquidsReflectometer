@@ -1,5 +1,5 @@
 # File introduces automated checks triggered on git events
-# to enable run `pip install pre-commit && pre-commit install`
+# to enable run `pixi shell && pre-commit install`
 
 exclude: "(reduction/data|reduction/notebooks|scripts|scans)/.*"
 repos:
@@ -22,6 +22,7 @@ repos:
       - id: pixi-lock-check
         name: pixi-lock-check
         entry: bash -c "pixi lock --check"
+        stage: pre-push
         language: system
 
 ci:
