@@ -1,7 +1,8 @@
-# File introduces automated checks triggered on git events
-# to enable run `pixi shell && pre-commit install`
+ci:
+  skip: [pixi-lock-check]
 
 exclude: "(reduction/data|reduction/notebooks|scripts|scans)/.*"
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
