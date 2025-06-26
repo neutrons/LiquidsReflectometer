@@ -3438,7 +3438,7 @@ packages:
   timestamp: 1741832212476
 - pypi: ./
   name: lr-reduction
-  version: 2.3.0.dev8
+  version: 2.3.0.dev9+d202506261353
   sha256: 9d1e931b05768a7e1cbd59af56c5753baf77f46634c1ab66cd5b509674392305
   requires_python: '>=3.10'
   editable: true
