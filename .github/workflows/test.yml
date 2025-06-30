@@ -60,7 +60,7 @@ jobs:
           path: lr_reduction-*.conda
 
   conda-verify:
-    needs: [tests, package]
+    needs: tests
     runs-on: ubuntu-24.04
     defaults:
       run:
