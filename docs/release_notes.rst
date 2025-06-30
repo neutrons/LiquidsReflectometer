@@ -22,7 +22,7 @@ Notes for major or minor releases. Notes for patch releases are deferred.
 
 2.2.0
 ------
-2025-06-10
+2025-07-08
 
 **Of interest to the Developer:**
 
