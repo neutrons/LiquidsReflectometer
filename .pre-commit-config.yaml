@@ -1,5 +1,6 @@
 ci:
-  skip: [pixi-lock-check]
+  autoupdate_schedule: monthly
+  skip: [eslint, pixi-lock-check]
 
 exclude: "(reduction/data|reduction/notebooks|scripts|scans)/.*"
 
@@ -25,7 +26,3 @@ repos:
         entry: bash -c "pixi lock --check"
         stage: pre-push
         language: system
-
-ci:
-  autoupdate_schedule: monthly
-  skip: [eslint]

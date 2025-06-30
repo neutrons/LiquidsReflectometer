@@ -88,7 +88,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 100  # Fetch all history for accurate versioning
+          fetch-depth: 0  # Fetch all history for accurate versioning
           fetch-tags: true  # Fetch tags to ensure versioning works correctly
 
       - name: Set up Pixi
