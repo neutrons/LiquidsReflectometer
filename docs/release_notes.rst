@@ -16,6 +16,7 @@ Notes for major or minor releases. Notes for patch releases are deferred.
 
     **Of interest to the Developer:**
 
+    - PR #73 merge test and deploy workflows
     - PR #70 Introduce pixi to the project
 ..
 
