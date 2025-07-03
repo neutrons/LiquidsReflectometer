@@ -32,7 +32,6 @@ source = "versioningit"
 [tool.hatch.build.hooks.versioningit-onbuild]
 source-file = "reduction/lr_reduction/_version.py"
 build-file = "lr_reduction/_version.py"
-replacement = '"{next_version}"'
 
 [tool.hatch.build]
 artifacts = [
@@ -57,8 +56,8 @@ method = "minor"
 
 [tool.versioningit.format]
 distance = "{next_version}.dev{distance}"
-dirty = "{version}+d{build_date:%Y%m%d}"
-distance-dirty = "{next_version}.dev{distance}+d{build_date:%Y%m%d%H%M}"
+dirty = "{version}"
+distance-dirty = "{next_version}.dev{distance}"
 
 [tool.versioningit.write]
 file = "reduction/lr_reduction/_version.py"
