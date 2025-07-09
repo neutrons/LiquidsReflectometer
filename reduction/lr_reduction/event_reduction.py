@@ -683,11 +683,18 @@ class EventReflectivity:
                 d_norm = np.sqrt(d_norm**2 + d_norm_bck**2)
             db_bins = norm > 0
 
-            refl[db_bins] = refl[db_bins] / norm[db_bins]
-            d_refl[db_bins] = np.sqrt(
-                d_refl[db_bins] ** 2 / norm[db_bins] ** 2 +
-                refl[db_bins] ** 2 * d_norm[db_bins] ** 2 / norm[db_bins] ** 4
+            # Clarify error calculation:
+            refl_norm = refl.copy() # create a copy of correct dimensions
+            d_refl_norm = np.zeros(len(d_refl))
+            refl_norm[db_bins] = refl[db_bins] / norm[db_bins]
+            d_refl_norm[db_bins] = abs(refl_norm[db_bins]) * np.sqrt(
+                            (d_refl[db_bins] ** 2 / refl[db_bins] ** 2) +
+                            (d_norm[db_bins] ** 2 / norm[db_bins] ** 2)
             )
+
+            # rename to match prior code and avoid issues
+            refl[db_bins] = refl_norm[db_bins]
+            d_refl[db_bins] = d_refl_norm[db_bins]
 
             # Hold on to normalization to be able to diagnose issues later
             self.norm = norm[db_bins]
@@ -750,6 +757,8 @@ class EventReflectivity:
             refl_bck, d_refl_bck = self.bck_subtraction(wl_dist=wl_dist, wl_bins=wl_middle, q_summing=bck_in_q)
             refl -= refl_bck
             d_refl = np.sqrt(d_refl**2 + d_refl_bck**2)
+
+        # Does there need to be a clean-up of non-zeros like in the unweighted version?
 
         self.refl = refl
         self.d_refl = d_refl
@@ -983,8 +992,28 @@ class EventReflectivity:
             if not sum_pixels:
                 bin_size = np.tile(bin_size, [counts.shape[0], 1])
 
-            d_refl_sq[non_zero] = refl[non_zero] / np.sqrt(counts[non_zero]) / charge / bin_size[non_zero]
-            refl[non_zero] = refl[non_zero] / charge / bin_size[non_zero]
+            # Want to include the Poisson error in the DB normalization too.
+            refl_norm = refl.copy() # create initial copy of correct dimensions. (weights of the histogram in qz)
+            refl_norm = refl / charge / bin_size
+
+            # Poisson error for RB
+            d_refl = np.zeros(shape)
+            d_refl[non_zero] = np.sqrt(counts[non_zero]) / charge / bin_size[non_zero]
+
+            # Poisson error for DB
+            d_wl_dist = np.zeros(shape)
+            d_wl_dist[non_zero] = np.sqrt(wl_dist[non_zero]) # wl_dist has already been divided by charge and bin size
+
+            # Propagate errors:
+            d_refl_sq[non_zero] = abs(refl_norm[non_zero]) * np.sqrt(
+                # (error RB ** 2 / RB ** 2) + (error DB ** 2 / DB ** 2)
+                (d_refl[non_zero] ** 2 / refl_norm[non_zero] ** 2) +
+                (d_wl_dist[non_zero] ** 2 / wl_dist[non_zero] ** 2)
+            )
+
+            ## Rename back to prior to avoid errors:
+            refl = refl_norm
+
         else:
             d_refl_sq = np.sqrt(np.fabs(refl)) / charge
             refl /= charge
@@ -1300,11 +1329,12 @@ def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     xi = abs(ws.getRun().getProperty("BL4B:Mot:xi.RBV").value[0])
     sample_si_distance = xi_reference - xi
     slit_distance = s1_sample_distance - sample_si_distance
-    dq_over_q = (s1h + sih)*0.5 / slit_distance / theta
+    dq_over_q = (s1h + sih) * 0.5 / slit_distance / theta
     return dq_over_q
 
 ## New function for resolution, ready for testing.
 ## Check choices of returned values once ready to implement.
+## Needs update for q-summing.
 def trapezoidal_distribution_params(ws, Theta_deg=None, FootPrint=None, SlitRatio=None):
     """
     Calculate trapezoidal parameters L, l from beam/slit geometry and
@@ -1355,7 +1385,7 @@ def trapezoidal_distribution_params(ws, Theta_deg=None, FootPrint=None, SlitRati
     dS1Si = dS1Samp - dSiSamp
 
     if Theta_deg is None:
-        Theta_deg = abs(ws.getRun().getProperty("ths").value[0]) * np.pi / 180.0
+        Theta_deg = abs(ws.getRun().getProperty("ths").value[0])
 
     # Slit openings - can be taken from a FootPrint and SlitRatio if provided, or the logs
     if FootPrint is not None and SlitRatio is not None:
@@ -1400,10 +1430,11 @@ def trapezoidal_distribution_params(ws, Theta_deg=None, FootPrint=None, SlitRati
     return L_bottom, l_top, sigma_equiv, dth_over_th
 
 
-## Fix the resolution to include si
+## Fix the resolution to include si - Done
 ## Add new function for correction for the shape correction - Done.
+## Add to new function the q-summing part
 ## Add new function for the lambda correction (Jose?)
-## Fix the error propagation in the reflectivity
+## Fix the error propagation in the reflectivity - Needs testing
 ## Fix the qz set to 0
 ## Fix the pixel angle using the top/bottom
 ## Function to create DB
