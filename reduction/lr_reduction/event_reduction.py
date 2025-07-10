@@ -729,6 +729,9 @@ class EventReflectivity:
         wl_dist = wl_dist / db_charge / _bin_width
         wl_middle = [(wl_bins[i + 1] + wl_bins[i]) / 2.0 for i in range(len(wl_bins) - 1)]
 
+        wl_var, _ = np.histogram(wl_events, bins=wl_bins, weights=wl_weights**2)
+        wl_std = np.sqrt(wl_var) / (db_charge * _bin_width)
+
         refl, d_refl = self._reflectivity(
             self._ws_sc,
             peak_position=self.specular_pixel,
@@ -738,10 +741,12 @@ class EventReflectivity:
             q_summing=q_summing,
             wl_dist=wl_dist,
             wl_bins=wl_middle,
+            wl_error=wl_std
         )
 
         if self.signal_bck is not None:
-            refl_bck, d_refl_bck = self.bck_subtraction(wl_dist=wl_dist, wl_bins=wl_middle, q_summing=bck_in_q)
+            refl_bck, d_refl_bck = self.bck_subtraction(wl_dist=wl_dist, wl_bins=wl_middle,
+                                                        q_summing=bck_in_q, wl_std=wl_std)
             refl -= refl_bck
             d_refl = np.sqrt(d_refl**2 + d_refl_bck**2)
 
@@ -751,7 +756,8 @@ class EventReflectivity:
         self.d_refl = d_refl
         return self.q_bins, refl, d_refl
 
-    def _roi_integration(self, ws, peak, low_res, q_bins=None, wl_dist=None, wl_bins=None, q_summing=False):
+    def _roi_integration(self, ws, peak, low_res, q_bins=None, wl_dist=None, wl_bins=None,
+                         q_summing=False, wl_std=None):
         """
         Integrate a region of interest and normalize by the number of included pixels.
 
@@ -771,6 +777,7 @@ class EventReflectivity:
             q_summing=q_summing,
             wl_dist=wl_dist,
             wl_bins=wl_bins,
+            wl_error=wl_std
         )
 
         _pixel_area = peak[1] - peak[0] + 1.0
@@ -779,7 +786,7 @@ class EventReflectivity:
         return refl_bck, d_refl_bck
 
     def bck_subtraction(self, normalize_to_single_pixel=False, q_bins=None,
-                        wl_dist=None, wl_bins=None, q_summing=False):
+                        wl_dist=None, wl_bins=None, q_summing=False, wl_std=None):
         """
         Perform background subtraction on the signal.
         This method provides a higher-level call for background subtraction,
@@ -797,6 +804,8 @@ class EventReflectivity:
             Array of bins for the wavelength (wl) values.
         q_summing : bool
             If True, sum the q values.
+        wl_std
+            Array of errors for wavelength normalization.
 
         Returns
         -------
@@ -822,6 +831,7 @@ class EventReflectivity:
                 wl_dist=wl_dist,
                 wl_bins=wl_bins,
                 q_summing=q_summing,
+                wl_std=wl_std
             )
         else:
             return background.side_background(
@@ -835,6 +845,7 @@ class EventReflectivity:
                 wl_dist=wl_dist,
                 wl_bins=wl_bins,
                 q_summing=q_summing,
+                wl_std=wl_std
             )
 
     def norm_bck_subtraction(self):
@@ -868,7 +879,7 @@ class EventReflectivity:
 
     def _reflectivity(
         self, ws, peak_position, peak, low_res, theta, q_bins=None, q_summing=False,
-        wl_dist=None, wl_bins=None, sum_pixels=True
+        wl_dist=None, wl_bins=None, sum_pixels=True, wl_error=None
     ):
         """
         Assumes that the input workspace is normalized by proton charge. <-- is this true?
@@ -914,7 +925,7 @@ class EventReflectivity:
                 tofs = evt_list.getTofs()
                 if self.use_emission_time:
                     tofs = self.emission_time_correction(ws, tofs=tofs)
-                # convert tof values to wavelength. Note: the emission_time_correction could be done in lambda instead.
+                # convert tof values to wavelength.
                 wl_list = tofs / self.constant
 
                 # Gravity correction
@@ -939,18 +950,23 @@ class EventReflectivity:
                 # matches the bins (in wavelength) of the norm run and refl run.
                 # Then converts into q and applies the event weighting.
                 if wl_dist is not None and wl_bins is not None:
+                    if wl_error is None:
+                        wl_error = np.zeros(len(wl_dist))
+                        print("No error provided for the normalization weighting")
                     # Computer wavelength weights
                     wl_weights = 1.0 / np.interp(wl_list, wl_bins, wl_dist, np.inf, np.inf)
                     hist_weights = wl_weights * qz / wl_list
 
-                    # Relative error in weights from Poisson statistics
-                    wl_errors_pc = np.sqrt(wl_dist) / wl_dist
-                    rel_err_weights = np.interp(wl_list, wl_bins, wl_errors_pc, 0, 0)
+                    # Relative error in weights from Poisson statistics.
+                    # ***** This needs looking at as wl_dist is already processed and not just the raw counts
+                    wl_interp_std = np.interp(wl_list, wl_bins, wl_error, left=0, right=0)
+                    wl_interp_dist = np.interp(wl_list, wl_bins, wl_dist, left=np.inf, right=np.inf)
+                    rel_err_weights = wl_interp_std / wl_interp_dist
 
                     #Relative error in wl_list also from Poisson statistics
                     rel_err_wl_list = np.sqrt(wl_list) / wl_list
 
-                    # Combine relative errors
+                    #Combine relative errors
                     rel_err_hist_weights = np.sqrt(rel_err_weights**2 + rel_err_wl_list**2)
 
                     # Absolute error in histogram weights
