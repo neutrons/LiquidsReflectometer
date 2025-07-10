@@ -905,6 +905,7 @@ class EventReflectivity:
         refl = np.zeros(shape)
         d_refl_sq = np.zeros(shape)
         counts = np.zeros(shape)
+        keep_weights = np.zeros(shape)
         # pixel_width only used for q_summing:
         _pixel_width = self.pixel_width if q_summing else 0.0
 
@@ -951,17 +952,39 @@ class EventReflectivity:
                 # matches the bins (in wavelength) of the norm run and refl run.
                 # Then converts into q and applies the event weighting.
                 if wl_dist is not None and wl_bins is not None:
+                    # Computer wavelength weights
                     wl_weights = 1.0 / np.interp(wl_list, wl_bins, wl_dist, np.inf, np.inf)
                     hist_weights = wl_weights * qz / wl_list
+
+                    # Relative error in weights from Poisson statistics
+                    wl_errors_pc = np.sqrt(wl_dist) / wl_dist
+                    rel_err_weights = np.interp(wl_list, wl_bins, wl_errors_pc, 0, 0)
+
+                    #Relative error in wl_list also from Poisson statistics
+                    rel_err_wl_list = np.sqrt(wl_list) / wl_list
+
+                    # Combine relative errors
+                    rel_err_hist_weights = np.sqrt(rel_err_weights**2 + rel_err_wl_list**2)
+
+                    # Absolute error in histogram weights
+                    d_hist_weights = hist_weights * rel_err_hist_weights
+
+                    # Apply event weights
                     hist_weights *= event_weights
+                    d_hist_weights *= event_weights
+
+                    # Histogram the data and errors
                     _counts, _ = np.histogram(qz, bins=_q_bins, weights=hist_weights)
                     _norm, _ = np.histogram(qz, bins=_q_bins)
+                    _for_errors, _ = np.histogram(qz, bins=_q_bins, weights=d_hist_weights**2)
                     if sum_pixels:
                         refl += _counts
                         counts += _norm
+                        keep_weights += _for_errors
                     else:
                         refl[j - peak[0]] += _counts
                         counts[j - peak[0]] += _norm
+                        keep_weights[j - peak[0]] += _for_errors
                 # this workflow is used for specular_unweighted:
                 else:
                     _counts, _ = np.histogram(qz, bins=_q_bins, weights=event_weights)
@@ -987,29 +1010,15 @@ class EventReflectivity:
         # for the specular weighted workflow, normalises to charge and bin_size
         if wl_dist is not None and wl_bins is not None:
             bin_size = _q_bins[1:] - _q_bins[:-1]
-            non_zero = counts > 0
+            #non_zero = counts > 0
             # Deal with the case where we don't sum all the bins
             if not sum_pixels:
                 bin_size = np.tile(bin_size, [counts.shape[0], 1])
 
-            # Want to include the Poisson error in the DB normalization too.
-            refl_norm = refl.copy() # create initial copy of correct dimensions. (weights of the histogram in qz)
+            # Normalize the reflection and error
             refl_norm = refl / charge / bin_size
-
-            # Poisson error for RB
-            d_refl = np.zeros(shape)
-            d_refl[non_zero] = np.sqrt(counts[non_zero]) / charge / bin_size[non_zero]
-
-            # Poisson error for DB
-            d_wl_dist = np.zeros(shape)
-            d_wl_dist[non_zero] = np.sqrt(wl_dist[non_zero]) # wl_dist has already been divided by charge and bin size
-
-            # Propagate errors:
-            d_refl_sq[non_zero] = abs(refl_norm[non_zero]) * np.sqrt(
-                # (error RB ** 2 / RB ** 2) + (error DB ** 2 / DB ** 2)
-                (d_refl[non_zero] ** 2 / refl_norm[non_zero] ** 2) +
-                (d_wl_dist[non_zero] ** 2 / wl_dist[non_zero] ** 2)
-            )
+            d_refl_sq = np.sqrt(keep_weights) / charge / bin_size
+            # this is actually d_refl not d_refl_sq but kept name for consistency
 
             ## Rename back to prior to avoid errors:
             refl = refl_norm
