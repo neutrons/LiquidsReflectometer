@@ -7,8 +7,8 @@ from functools import reduce
 
 import mantid.simpleapi as api
 import numpy as np
-from mantid.api import *
-from mantid.kernel import *
+from mantid.api import *  #noqa: F403
+from mantid.kernel import *  #noqa: F403
 
 from lr_reduction import event_reduction, peak_finding, reduction_template_reader
 from lr_reduction.instrument_settings import InstrumentSettings
@@ -130,8 +130,9 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
 
 
 def process_from_template(
-    run_number, template_path, q_summing=False, normalize=True, tof_weighted=False, bck_in_q=False, clean=False, info=False
-):
+    run_number, template_path, q_summing=False, normalize=True, tof_weighted=False, bck_in_q=False,
+    clean=False, info=False
+    ):
     """
     The clean option removes leading zeros and the drop when doing q-summing
     """
@@ -142,7 +143,8 @@ def process_from_template(
     # Load data
     ws_sc = api.Load("REF_L_%s" % run_number, OutputWorkspace="REF_L_%s" % run_number)
     return process_from_template_ws(
-        ws_sc, template_path, q_summing=q_summing, tof_weighted=tof_weighted, bck_in_q=bck_in_q, clean=clean, info=info, normalize=normalize
+        ws_sc, template_path, q_summing=q_summing, tof_weighted=tof_weighted, bck_in_q=bck_in_q,
+        clean=clean, info=info, normalize=normalize
     )
 
 
@@ -223,7 +225,8 @@ def process_from_template_ws(
         theta += template_data.angle_offset * np.pi / 180.0
 
     theta_degrees = theta * 180 / np.pi
-    print("wl=%g; ths=%g; thi=%g; offset=%g; theta used=%g" % (_wl, ths_value, thi_value, template_data.angle_offset, theta_degrees))
+    print("wl=%g; ths=%g; thi=%g; offset=%g; theta used=%g" % (_wl, ths_value, thi_value,
+                                                               template_data.angle_offset, theta_degrees))
 
     # Get the reduction parameters from the template
     peak = template_data.data_peak_range
@@ -243,7 +246,8 @@ def process_from_template_ws(
         x_max = template_data.data_peak_range[1]
         _, _x, _y = peak_finding.process_data(ws_sc, summed=True, tof_step=200)
         peak_center = np.argmax(_y[x_min:x_max]) + x_min
-        peak_center, sc_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min, x_max=x_max, center=peak_center, sigma=3.0)
+        peak_center, sc_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min,
+                                                                    x_max=x_max, center=peak_center, sigma=3.0)
         print("Peak center: %g" % peak_center)
 
     if template_data.data_x_range_flag:
@@ -319,13 +323,10 @@ def process_from_template_ws(
         print("Normalization options: %s %s" % (normalize, template_data.scaling_factor_flag))
         # Get the scaling factors
         a, b, err_a, err_b = scaling_factor(template_data.scaling_factor_file, ws_sc)
-
         _tof = 4 * np.pi * np.sin(event_refl.theta) * event_refl.constant / qz
         _tof_mid = (_tof[1:] + _tof[:-1]) / 2.0
-
         a_q = _tof_mid * b + a
         d_a_q = np.sqrt(_tof_mid**2 * err_b**2 + err_a**2)
-
         d_refl = np.sqrt(d_refl**2 / a_q**2 + refl**2 * d_a_q**2 / a_q**4)
         refl /= a_q
     else:

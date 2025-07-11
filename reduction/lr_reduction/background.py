@@ -46,7 +46,7 @@ def find_ranges_without_overlap(r1, r2):
 
 def functional_background(
     ws, event_reflectivity, peak, bck, low_res, normalize_to_single_pixel=False, q_bins=None, wl_dist=None,
-    wl_bins=None, q_summing=False
+    wl_bins=None, q_summing=False, wl_std=None
 ):
     """
     Estimate background using a linear function over a background range that may include the specular peak.
@@ -74,6 +74,8 @@ def functional_background(
         Array of wavelength bins for the case where we use weighted events for normatization
     q_summing : bool
         If True, sum the counts in Q bins
+    wl_std: numpy.ndarray
+        Array of errors for wl_dist arrau
 
     Returns
     -------
@@ -109,6 +111,7 @@ def functional_background(
                 wl_dist=wl_dist,
                 wl_bins=wl_bins,
                 sum_pixels=False,
+                wl_error=wl_std
             )
             bck_counts.append(_b)
             d_bck_counts.append(_d_b)
