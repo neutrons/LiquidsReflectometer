@@ -14,7 +14,7 @@ try:
     import mantid
 
     MANTID_VERSION = mantid.__version__
-except:
+except:  #noqa: E722
     MANTID_VERSION = "None"
 
 
@@ -48,8 +48,8 @@ class ReductionParameters:
         self.norm_file = 0
 
         # Clean up options: cut first and last points as needed
-        self.pre_cut = 1
-        self.post_cut = 1
+        self.pre_cut = 0
+        self.post_cut = 0
 
         # Q range
         self.q_min = 0.001
@@ -165,7 +165,8 @@ class ReductionParameters:
 
         # Incident medium
         _xml += "<incident_medium_list>%s</incident_medium_list>\n" % str(self.incident_medium_list[0])
-        _xml += "<incident_medium_index_selected>%s</incident_medium_index_selected>\n" % str(self.incident_medium_index_selected)
+        _xml += "<incident_medium_index_selected>%s</incident_medium_index_selected>\n"% str(
+            self.incident_medium_index_selected)
 
         # Dead time correction
         _xml += "<dead_time_correction>%s</dead_time_correction>\n" % str(self.dead_time)
@@ -198,7 +199,8 @@ class ReductionParameters:
         instrument_dom : xml.dom.Document
         """
         # Peak from/to pixels
-        self.data_peak_range = [getIntElement(instrument_dom, "from_peak_pixels"), getIntElement(instrument_dom, "to_peak_pixels")]
+        self.data_peak_range = [getIntElement(instrument_dom, "from_peak_pixels"),
+                                getIntElement(instrument_dom, "to_peak_pixels")]
 
         # data metadata
         _tthd_value = getStringElement(instrument_dom, "tthd_value")
@@ -236,7 +238,8 @@ class ReductionParameters:
 
         # TOF range
         self.select_tof_range = getBoolElement(instrument_dom, "tof_range_flag", default=self.select_tof_range)
-        self.tof_range = [getFloatElement(instrument_dom, "from_tof_range"), getFloatElement(instrument_dom, "to_tof_range")]
+        self.tof_range = [getFloatElement(instrument_dom, "from_tof_range"),
+                          getFloatElement(instrument_dom, "to_tof_range")]
 
         self.data_files = getIntList(instrument_dom, "data_sets")
 
@@ -250,7 +253,8 @@ class ReductionParameters:
         ]
 
         # Background subtraction option
-        self.subtract_norm_background = getBoolElement(instrument_dom, "norm_background_flag", default=self.subtract_norm_background)
+        self.subtract_norm_background = getBoolElement(instrument_dom,
+                                                "norm_background_flag", default=self.subtract_norm_background)
 
         self.norm_background_roi = [
             getIntElement(instrument_dom, "norm_from_back_pixels"),
@@ -291,8 +295,10 @@ class ReductionParameters:
 
         # Instrument settings
         self.apply_instrument_settings = getBoolElement(instrument_dom, "apply_instrument_settings", default=False)
-        self.source_detector_distance = getFloatElement(instrument_dom, "source_detector_distance", default=self.source_detector_distance)
-        self.sample_detector_distance = getFloatElement(instrument_dom, "sample_detector_distance", default=self.sample_detector_distance)
+        self.source_detector_distance = getFloatElement(instrument_dom, "source_detector_distance",
+                                                        default=self.source_detector_distance)
+        self.sample_detector_distance = getFloatElement(instrument_dom, "sample_detector_distance",
+                                                        default=self.sample_detector_distance)
         self.num_x_pixels = getIntElement(instrument_dom, "num_x_pixels", default=self.num_x_pixels)
         self.num_y_pixels = getIntElement(instrument_dom, "num_y_pixels", default=self.num_y_pixels)
         self.pixel_width = getFloatElement(instrument_dom, "pixel_width", default=self.pixel_width)
@@ -365,8 +371,8 @@ def getStringList(dom, tag, _default=[]):
     elem_list = []
     element_list = dom.getElementsByTagName(tag)
     if len(element_list) > 0:
-        for l in element_list:
-            elem_list.append(getText(l.childNodes).strip())
+        for l_ in element_list:
+            elem_list.append(getText(l_.childNodes).strip())
     return elem_list
 
 
