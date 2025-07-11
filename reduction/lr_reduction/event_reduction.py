@@ -6,9 +6,11 @@ import datetime
 import json
 import os
 import time
+from typing import Optional
 
 import mantid.simpleapi as api
 import numpy as np
+from mantid.kernel import Property
 
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.utils import mantid_algorithm_exec
@@ -231,6 +233,7 @@ def get_dead_time_correction(ws, template_data):
         InputErrorEventsWorkspace=error_ws,
         Paralyzable=template_data.paralyzable,
         DeadTime=template_data.dead_time_value,
+        ThresholdRatio=template_data.dead_time_threshold_ratio,
         TOFStep=template_data.dead_time_tof_step,
         TOFRange=[tof_min, tof_max],
         OutputWorkspace="corr",
@@ -313,6 +316,8 @@ class EventReflectivity:
         value of the dead time in microsecond
     dead_time_tof_step : float
         TOF bin size in microsecond
+    dead_time_threshold_ratio : float [optional]
+        If passed, dead time correction ratios greater than this will be set to 0
     use_emmission_time : bool
         If True, the emission time delay will be computed
     """
@@ -348,6 +353,7 @@ class EventReflectivity:
         paralyzable=True,
         dead_time_value=4.2,
         dead_time_tof_step=100,
+        dead_time_threshold_ratio: Optional[float] = Property.EMPTY_DBL,
         instrument_settings: InstrumentSettings = None,
         use_emission_time=True,
     ):
@@ -376,6 +382,7 @@ class EventReflectivity:
         self.paralyzable = paralyzable
         self.dead_time_value = dead_time_value
         self.dead_time_tof_step = dead_time_tof_step
+        self.dead_time_threshold_ratio = dead_time_threshold_ratio
         self.instrument_settings = instrument_settings
         self.use_emission_time = use_emission_time
 
@@ -1050,7 +1057,7 @@ class EventReflectivity:
             ths_value = ws.getRun()["ths"].value[-1]
             delta_theta_f *= np.sign(ths_value)
 
-            
+
             theta_f = theta + delta_theta_f
 
             qz = k * (np.sin(theta_f) + np.sin(theta))
