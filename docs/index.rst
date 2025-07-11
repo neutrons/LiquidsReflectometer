@@ -10,6 +10,7 @@ User Guide
    :titlesonly:
 
    user/conda_environments
+   user/dead_time_correction
    release_notes
 
 Contacting the Team
