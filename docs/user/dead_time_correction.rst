@@ -83,7 +83,7 @@ Properties
 
 Usage
 -----
-Example using ``SingleReadoutDeadTimeCorrection`` (requires :any:`test-data` files)
+Example using ``SingleReadoutDeadTimeCorrection``
 
 .. testcode::
 
