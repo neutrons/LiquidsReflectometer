@@ -882,8 +882,7 @@ class EventReflectivity:
         wl_dist=None, wl_bins=None, wl_error=None, sum_pixels=True
     ):
         """
-        Assumes that the input workspace is normalized by proton charge. <-- is this true?
-        It does a charge normalisation at the end... think it should say the opposite.
+        Assumes that the input workspace is not normalized by proton charge.
 
         In the current workflow, for specular_unweighted this is applied separately to the reflectivity
         run and the normalisation run.
@@ -1025,7 +1024,7 @@ class EventReflectivity:
             # Normalize the reflection and error
             refl_norm = refl / charge / bin_size
             d_refl_sq = np.sqrt(keep_weights) / charge / bin_size
-            # this is actually d_refl not d_refl_sq but kept name for consistency
+            # this is actually d_refl not d_refl_sq but kept name for consistency with unweighted workflow naming
 
             ## Rename back to prior to avoid errors:
             refl = refl_norm
@@ -1414,36 +1413,35 @@ def trapezoidal_distribution_params(ws, Theta_deg=None, FootPrint=None, SlitRati
     L_bottom = np.degrees(np.arctan((S1Y + SiY) / (2 * dS1Si)))  # full half-width
     l_top = np.degrees(np.arctan((S1Y - SiY) / (2 * dS1Si)))  # flat-top half-width
 
-    # Analytic trapezoidal CDF
-    def trapezoidal_cdf_analytic(x, L_, l_):
-        h = 1 / (L_ + l_)
-        cdf = np.zeros_like(x)
-        left_tail = x < -L_
-        left_slope = (x >= -L_) & (x < -l_)
-        flat_top = (x >= -l_) & (x < l_)
-        right_slope = (x >= l_) & (x <= L_)
-        right_tail = x > L_
-
-        cdf[left_tail] = 0
-        cdf[left_slope] = (h / (L_ - l_)) * 0.5 * (x[left_slope] + L_)**2
-        F_neg_l = (h / (L_ - l_)) * 0.5 * (L_ - l_)**2
-        cdf[flat_top] = F_neg_l + h * (x[flat_top] + l_)
-        cdf[right_slope] = 1 - (h / (L_ - l_)) * 0.5 * (L_ - x[right_slope])**2
-        cdf[right_tail] = 1
-        return cdf
-
-    # Find equivalent normal sigma for 68% central interval
-    def find_sigma_68(L_, l_, target_prob=0.68):
-        def func(x):
-            return trapezoidal_cdf_analytic(np.array([x]), L_, l_)[0] - \
-                   trapezoidal_cdf_analytic(np.array([-x]), L_, l_)[0] - target_prob
-        return brentq(func, 0, L_)
-
-    sigma_equiv = find_sigma_68(L_bottom, l_top)
+    sigma_equiv = _find_sigma_68(L_bottom, l_top)
     dth_over_th = sigma_equiv / Theta_deg
 
     return L_bottom, l_top, sigma_equiv, dth_over_th
 
+# Analytic trapezoidal CDF for use in trapezoial_distribution_params
+def _trapezoidal_cdf_analytic(x, L_, l_):
+    h = 1 / (L_ + l_)
+    cdf = np.zeros_like(x)
+    left_tail = x < -L_
+    left_slope = (x >= -L_) & (x < -l_)
+    flat_top = (x >= -l_) & (x < l_)
+    right_slope = (x >= l_) & (x <= L_)
+    right_tail = x > L_
+
+    cdf[left_tail] = 0
+    cdf[left_slope] = (h / (L_ - l_)) * 0.5 * (x[left_slope] + L_)**2
+    F_neg_l = (h / (L_ - l_)) * 0.5 * (L_ - l_)**2
+    cdf[flat_top] = F_neg_l + h * (x[flat_top] + l_)
+    cdf[right_slope] = 1 - (h / (L_ - l_)) * 0.5 * (L_ - x[right_slope])**2
+    cdf[right_tail] = 1
+    return cdf
+
+# Find equivalent normal sigma for 68% central interval for use in trapezoidal_distribution_params
+def _find_sigma_68(L_, l_, target_prob=0.68):
+    def func(x):
+        return _trapezoidal_cdf_analytic(np.array([x]), L_, l_)[0] - \
+                _trapezoidal_cdf_analytic(np.array([-x]), L_, l_)[0] - target_prob
+    return brentq(func, 0, L_)
 
 ## Fix the resolution to include si - Done
 ## Add new function for correction for the shape correction - Done.
