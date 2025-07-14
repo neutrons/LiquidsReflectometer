@@ -944,7 +944,11 @@ class EventReflectivity:
 
                 # convert wavelengths into qz. This could be separated to enable output in lam and q.
                 qz = 4.0 * np.pi / wl_list * np.sin(theta + delta_theta_f - d_theta)
-                qz = np.fabs(qz) ##why? Think anything negative needs to be removed not made positive...
+                # Remove negative values:
+                valid_mask = qz > 0
+                qz = qz[valid_mask]
+                wl_list = wl_list[valid_mask]
+                event_weights = event_weights[valid_mask]
 
                 # this workflow is used for specular_weighted:
                 # matches the bins (in wavelength) of the norm run and refl run.
