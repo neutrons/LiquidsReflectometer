@@ -1,7 +1,7 @@
 .. _lr_reduction:
 
-Welcome to lr_reduction (Liquids Reflectometer Reduction) documentation
-=======================================================================
+Liquids Reflectometer Reduction
+===============================
 
 User Guide
 ----------
@@ -9,7 +9,6 @@ User Guide
 .. toctree::
    :titlesonly:
 
-   user/conda_environments
    user/dead_time_correction
    release_notes
 
