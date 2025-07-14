@@ -671,34 +671,34 @@ class EventReflectivity:
             # we can bin the DB according to the same transform instead of binning and dividing in TOF.
             # This is mathematically equivalent and convenient in terms of abstraction for later
             # use for the constant-Q calculation elsewhere in the code.
-            norm, d_norm = self._reflectivity(
+            direct_beam, d_direct_beam = self._reflectivity(
                 self._ws_db, peak_position=0, peak=self.norm_peak, low_res=self.norm_low_res,
                 theta=self.theta, q_summing=False
             )
 
             # Direct beam background could be added here. The effect will be negligible.
             if self.norm_bck is not None:
-                norm_bck, d_norm_bck = self.norm_bck_subtraction()
-                norm -= norm_bck
-                d_norm = np.sqrt(d_norm**2 + d_norm_bck**2)
-            db_bins = norm > 0
+                direct_beam_bck, d_direct_beam_bck = self.norm_bck_subtraction()
+                direct_beam -= direct_beam_bck
+                d_direct_beam = np.sqrt(d_direct_beam**2 + d_direct_beam_bck**2)
+            db_bins = direct_beam > 0
 
             # Clarify error calculation:
-            refl_norm = refl.copy() # create a copy of correct dimensions
-            d_refl_norm = np.zeros(len(d_refl))
-            refl_norm[db_bins] = refl[db_bins] / norm[db_bins]
-            d_refl_norm[db_bins] = abs(refl_norm[db_bins]) * np.sqrt(
+            refl_normalized = refl.copy() # create a copy of correct dimensions
+            d_refl_normalized = np.zeros(len(d_refl))
+            refl_normalized[db_bins] = refl[db_bins] / direct_beam[db_bins]
+            d_refl_normalized[db_bins] = abs(refl_normalized[db_bins]) * np.sqrt(
                             (d_refl[db_bins] ** 2 / refl[db_bins] ** 2) +
-                            (d_norm[db_bins] ** 2 / norm[db_bins] ** 2)
+                            (d_direct_beam[db_bins] ** 2 / direct_beam[db_bins] ** 2)
             )
 
             # rename to match prior code and avoid issues
-            refl[db_bins] = refl_norm[db_bins]
-            d_refl[db_bins] = d_refl_norm[db_bins]
+            refl[db_bins] = refl_normalized[db_bins]
+            d_refl[db_bins] = d_refl_normalized[db_bins]
 
             # Hold on to normalization to be able to diagnose issues later
-            self.norm = norm[db_bins]
-            self.d_norm = d_norm[db_bins]
+            self.norm = direct_beam[db_bins]
+            self.d_norm = d_direct_beam[db_bins]
 
             # Clean up points where we have no direct beam
             zero_db = [not v for v in db_bins]
