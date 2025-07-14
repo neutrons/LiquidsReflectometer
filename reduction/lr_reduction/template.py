@@ -7,8 +7,6 @@ from functools import reduce
 
 import mantid.simpleapi as api
 import numpy as np
-from mantid.api import *  #noqa: F403
-from mantid.kernel import *  #noqa: F403
 
 from lr_reduction import event_reduction, peak_finding, reduction_template_reader
 from lr_reduction.instrument_settings import InstrumentSettings
