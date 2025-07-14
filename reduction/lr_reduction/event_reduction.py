@@ -79,11 +79,11 @@ def get_q_binning(q_min=0.001, q_max=0.15, q_step=-0.02):
         A numpy array of Q values based on the specified binning.
     """
     if q_step > 0:
-        n_steps = int((q_max - q_min) / q_step) + 1
+        n_steps = int((q_max - q_min) / q_step) + 1  # the +1 is to include q_max
         return q_min + np.asarray([q_step * i for i in range(n_steps)])
     else:
         _step = 1.0 + np.abs(q_step)
-        n_steps = int(np.log(q_max / q_min) / np.log(_step)) + 1
+        n_steps = int(np.log(q_max / q_min) / np.log(_step)) + 1  # the +1 is to include q_max
         return q_min * np.asarray([_step**i for i in range(n_steps)])
 
 
