@@ -46,7 +46,7 @@ def find_ranges_without_overlap(r1, r2):
 
 def functional_background(
     ws, event_reflectivity, peak, bck, low_res, normalize_to_single_pixel=False, q_bins=None, wl_dist=None,
-    wl_bins=None, q_summing=False, wl_std=None
+    wl_bins=None, wl_std=None, q_summing=False
 ):
     """
     Estimate background using a linear function over a background range that may include the specular peak.
@@ -72,10 +72,10 @@ def functional_background(
         Wavelength distribution for the case where we use weighted events for normatization
     wl_bins : numpy.ndarray
         Array of wavelength bins for the case where we use weighted events for normatization
+    wl_std: numpy.ndarray
+        Array of errors for wl_dist array
     q_summing : bool
         If True, sum the counts in Q bins
-    wl_std: numpy.ndarray
-        Array of errors for wl_dist arrau
 
     Returns
     -------
@@ -172,7 +172,7 @@ def functional_background(
 
 def side_background(
     ws, event_reflectivity, peak, bck, low_res, normalize_to_single_pixel=False, q_bins=None,
-    wl_dist=None, wl_bins=None, q_summing=False, wl_std=None
+    wl_dist=None, wl_bins=None, wl_std=None, q_summing=False
 ):
     """
     Original background substration done using two pixels defining the
@@ -198,10 +198,10 @@ def side_background(
         Wavelength distribution for the case where we use weighted events for normatization
     wl_bins : numpy.ndarray
         Array of wavelength bins for the case where we use weighted events for normatization
-    q_summing : bool
-        If True, sum the counts in Q bins
     wl_std : numpy.nparray
         Array of errors for the normalization
+    q_summing : bool
+        If True, sum the counts in Q bins
 
     Returns
     -------

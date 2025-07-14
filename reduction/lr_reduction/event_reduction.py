@@ -770,7 +770,7 @@ class EventReflectivity:
         return self.q_bins, refl, d_refl
 
     def _roi_integration(self, ws, peak, low_res, q_bins=None, wl_dist=None, wl_bins=None,
-                         q_summing=False, wl_std=None):
+                         wl_std=None, q_summing=False):
         """
         Integrate a region of interest and normalize by the number of included pixels.
 
@@ -799,7 +799,7 @@ class EventReflectivity:
         return refl_bck, d_refl_bck
 
     def bck_subtraction(self, normalize_to_single_pixel=False, q_bins=None,
-                        wl_dist=None, wl_bins=None, q_summing=False, wl_std=None):
+                        wl_dist=None, wl_bins=None, wl_std=None, q_summing=False):
         """
         Perform background subtraction on the signal.
         This method provides a higher-level call for background subtraction,
@@ -815,10 +815,10 @@ class EventReflectivity:
             Array of wavelength (wl) values.
         wl_bins
             Array of bins for the wavelength (wl) values.
-        q_summing : bool
-            If True, sum the q values.
         wl_std
             Array of errors for wavelength normalization.
+        q_summing : bool
+            If True, sum the q values.
 
         Returns
         -------
@@ -843,8 +843,8 @@ class EventReflectivity:
                 q_bins=q_bins,
                 wl_dist=wl_dist,
                 wl_bins=wl_bins,
-                q_summing=q_summing,
-                wl_std=wl_std
+                wl_std=wl_std,
+                q_summing=q_summing
             )
         else:
             return background.side_background(
@@ -857,8 +857,8 @@ class EventReflectivity:
                 q_bins=q_bins,
                 wl_dist=wl_dist,
                 wl_bins=wl_bins,
-                q_summing=q_summing,
-                wl_std=wl_std
+                wl_std=wl_std,
+                q_summing=q_summing
             )
 
     def norm_bck_subtraction(self):
@@ -892,7 +892,7 @@ class EventReflectivity:
 
     def _reflectivity(
         self, ws, peak_position, peak, low_res, theta, q_bins=None, q_summing=False,
-        wl_dist=None, wl_bins=None, sum_pixels=True, wl_error=None
+        wl_dist=None, wl_bins=None, wl_error=None, sum_pixels=True
     ):
         """
         Assumes that the input workspace is normalized by proton charge. <-- is this true?
