@@ -10,7 +10,6 @@ from typing import Optional
 
 import mantid.simpleapi as api
 import numpy as np
-from mantid.kernel import Property
 
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.utils import mantid_algorithm_exec
@@ -233,6 +232,7 @@ def get_dead_time_correction(ws, template_data):
         InputErrorEventsWorkspace=error_ws,
         Paralyzable=template_data.paralyzable,
         DeadTime=template_data.dead_time_value,
+        UseDeadTimeThreshold=template_data.use_deadtime_threshold,
         DeadTimeThreshold=template_data.dead_time_threshold,
         TOFStep=template_data.dead_time_tof_step,
         TOFRange=[tof_min, tof_max],
@@ -316,8 +316,10 @@ class EventReflectivity:
         value of the dead time in microsecond
     dead_time_tof_step : float
         TOF bin size in microsecond
+    use_dead_time_threshold : bool
+        If True, use a correction of 0 for TOF bins requiring corrections greater than ``DeadTimeThreshold``
     dead_time_threshold : float [optional]
-        If passed, dead time correction ratios greater than this will be set to 0
+        If ``UseDeadTimeThreshold`` is True, this is the upper limit for dead-time correction ratios
     use_emmission_time : bool
         If True, the emission time delay will be computed
     """
@@ -353,7 +355,8 @@ class EventReflectivity:
         paralyzable=True,
         dead_time_value=4.2,
         dead_time_tof_step=100,
-        dead_time_threshold: Optional[float] = Property.EMPTY_DBL,
+        use_dead_time_threshold=False,
+        dead_time_threshold: Optional[float] = 1.5,
         instrument_settings: InstrumentSettings = None,
         use_emission_time=True,
     ):
@@ -382,6 +385,7 @@ class EventReflectivity:
         self.paralyzable = paralyzable
         self.dead_time_value = dead_time_value
         self.dead_time_tof_step = dead_time_tof_step
+        self.use_dead_time_threshold = use_dead_time_threshold
         self.dead_time_threshold = dead_time_threshold
         self.instrument_settings = instrument_settings
         self.use_emission_time = use_emission_time

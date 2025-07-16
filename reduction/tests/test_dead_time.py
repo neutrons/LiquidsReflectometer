@@ -60,6 +60,7 @@ def test_deadtime_threshold(nexus_dir):
     algo.PyInit()
     algo.setProperty("InputWorkspace", ws)
     algo.setProperty("OutputWorkspace", "dead_time_corr")
+    algo.setProperty("UseDeadTimeThreshold", True)
     algo.setProperty("DeadTimeThreshold", 1.1)
     algo.PyExec()
     corr_ws = algo.getProperty("OutputWorkspace").value

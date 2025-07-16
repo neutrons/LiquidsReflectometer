@@ -55,11 +55,16 @@ Properties
      - number
      - 4.2
      - Dead time in microseconds
+   * - UseDeadTimeThreshold
+     - Input
+     - boolean
+     - False
+     - If True, use a correction of 0 for TOF bins requiring corrections greater than ``DeadTimeThreshold``
    * - DeadTimeThreshold
      - Input, Optional
      - number
-     - EMPTY_DBL
-     - The upper value on the dead-time correction ratios. TOF bins requiring correction ratios greater than this will use a correction of 0
+     - 1.5
+     - If ``UseDeadTimeThreshold`` is True, this is the upper limit for dead-time correction ratios
    * - TOFStep
      - Input
      - number

@@ -13,7 +13,6 @@ from lr_reduction.instrument_settings import InstrumentSettings
 # Get the mantid version being used, if available
 try:
     import mantid
-    from mantid.kernel import Property
 
     MANTID_VERSION = mantid.__version__
 except:
@@ -78,7 +77,8 @@ class ReductionParameters:
         self.paralyzable: bool = True
         self.dead_time_value = 4.2
         self.dead_time_tof_step = 100
-        self.dead_time_threshold: Optional[Float] = Property.EMPTY_DBL
+        self.use_dead_time_threshold = False
+        self.dead_time_threshold: Optional[Float] = 1.5
 
         # Instrument geometry parameters
         instrument_settings = InstrumentSettings()
@@ -175,6 +175,7 @@ class ReductionParameters:
         _xml += "<dead_time_paralyzable>%s</dead_time_paralyzable>\n" % str(self.paralyzable)
         _xml += "<dead_time_value>%s</dead_time_value>\n" % str(self.dead_time_value)
         _xml += "<dead_time_tof_step>%s</dead_time_tof_step>\n" % str(self.dead_time_tof_step)
+        _xml += "<use_dead_time_threshold>%s</use_dead_time_threshold>\n" % str(self.use_dead_time_threshold)
         _xml += "<dead_time_threshold>%s</dead_time_threshold>\n" % str(self.dead_time_threshold)
 
         # Instrument settings
@@ -292,6 +293,7 @@ class ReductionParameters:
         self.paralyzable = getBoolElement(instrument_dom, "dead_time_paralyzable", default=self.paralyzable)
         self.dead_time_value = getFloatElement(instrument_dom, "dead_time_value", default=self.dead_time_value)
         self.dead_time_tof_step = getFloatElement(instrument_dom, "dead_time_tof_step", default=self.dead_time_tof_step)
+        self.use_dead_time_threshold = getBoolElement(instrument_dom, "use_dead_time_threshold", default=self.use_dead_time_threshold)
         self.dead_time_threshold = getFloatElement(instrument_dom, "dead_time_threshold", default=self.dead_time_threshold)
 
         # Instrument settings
