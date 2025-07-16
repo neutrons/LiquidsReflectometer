@@ -232,7 +232,7 @@ def get_dead_time_correction(ws, template_data):
         InputErrorEventsWorkspace=error_ws,
         Paralyzable=template_data.paralyzable,
         DeadTime=template_data.dead_time_value,
-        UseDeadTimeThreshold=template_data.use_deadtime_threshold,
+        UseDeadTimeThreshold=template_data.use_dead_time_threshold,
         DeadTimeThreshold=template_data.dead_time_threshold,
         TOFStep=template_data.dead_time_tof_step,
         TOFRange=[tof_min, tof_max],
