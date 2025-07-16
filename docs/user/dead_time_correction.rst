@@ -55,7 +55,7 @@ Properties
      - number
      - 4.2
      - Dead time in microseconds
-   * - ThresholdRatio
+   * - DeadTimeThreshold
      - Input, Optional
      - number
      - EMPTY_DBL

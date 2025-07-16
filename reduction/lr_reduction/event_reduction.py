@@ -15,7 +15,7 @@ from mantid.kernel import Property
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.utils import mantid_algorithm_exec
 
-from . import DeadTimeCorrection, background
+from . import background, dead_time_correction
 
 PLANCK_CONSTANT = 6.626e-34  # m^2 kg s^-1
 NEUTRON_MASS = 1.675e-27  # kg
@@ -228,12 +228,12 @@ def get_dead_time_correction(ws, template_data):
     run_number = ws.getRun().getProperty("run_number").value
     error_ws = api.LoadErrorEventsNexus("REF_L_%s" % run_number)
     corr_ws = mantid_algorithm_exec(
-        DeadTimeCorrection.SingleReadoutDeadTimeCorrection,
+        dead_time_correction.SingleReadoutDeadTimeCorrection,
         InputWorkspace=ws,
         InputErrorEventsWorkspace=error_ws,
         Paralyzable=template_data.paralyzable,
         DeadTime=template_data.dead_time_value,
-        ThresholdRatio=template_data.dead_time_threshold_ratio,
+        DeadTimeThreshold=template_data.dead_time_threshold,
         TOFStep=template_data.dead_time_tof_step,
         TOFRange=[tof_min, tof_max],
         OutputWorkspace="corr",
@@ -316,7 +316,7 @@ class EventReflectivity:
         value of the dead time in microsecond
     dead_time_tof_step : float
         TOF bin size in microsecond
-    dead_time_threshold_ratio : float [optional]
+    dead_time_threshold : float [optional]
         If passed, dead time correction ratios greater than this will be set to 0
     use_emmission_time : bool
         If True, the emission time delay will be computed
@@ -353,7 +353,7 @@ class EventReflectivity:
         paralyzable=True,
         dead_time_value=4.2,
         dead_time_tof_step=100,
-        dead_time_threshold_ratio: Optional[float] = Property.EMPTY_DBL,
+        dead_time_threshold: Optional[float] = Property.EMPTY_DBL,
         instrument_settings: InstrumentSettings = None,
         use_emission_time=True,
     ):
@@ -382,7 +382,7 @@ class EventReflectivity:
         self.paralyzable = paralyzable
         self.dead_time_value = dead_time_value
         self.dead_time_tof_step = dead_time_tof_step
-        self.dead_time_threshold_ratio = dead_time_threshold_ratio
+        self.dead_time_threshold = dead_time_threshold
         self.instrument_settings = instrument_settings
         self.use_emission_time = use_emission_time
 

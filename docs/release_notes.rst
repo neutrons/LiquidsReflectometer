@@ -12,7 +12,7 @@ Notes for major or minor releases. Notes for patch releases are deferred.
 
     **Of interest to the User**:
 
-    - PR #XYZ one-liner description
+    - PR #76 Adds new option, dead-time threshold - an upper limit for dead-time correction ratios
 
     **Of interest to the Developer:**
 
@@ -27,7 +27,6 @@ Notes for major or minor releases. Notes for patch releases are deferred.
 
 **Of interest to the Developer:**
 
-- PR #76 Adds new option, dead-time threshold - an upper limit for dead-time correction ratios
 - PR #74 Update actions, documentation, and versioningit
 - PR #67 Make the documentation work with readthedocs
 - PR #66 Modernizes conda packaging

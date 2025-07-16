@@ -288,7 +288,7 @@ def process_from_template_ws(
         paralyzable=template_data.paralyzable,
         dead_time_value=template_data.dead_time_value,
         dead_time_tof_step=template_data.dead_time_tof_step,
-        dead_time_threshold_ratio=template_data.dead_time_threshold_ratio,
+        dead_time_threshold=template_data.dead_time_threshold,
         instrument_settings=instrument_settings,
         use_emission_time=template_data.use_emission_time,
     )

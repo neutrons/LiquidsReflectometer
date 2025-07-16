@@ -78,7 +78,7 @@ class ReductionParameters:
         self.paralyzable: bool = True
         self.dead_time_value = 4.2
         self.dead_time_tof_step = 100
-        self.dead_time_threshold_ratio: Optional[Float] = Property.EMPTY_DBL
+        self.dead_time_threshold: Optional[Float] = Property.EMPTY_DBL
 
         # Instrument geometry parameters
         instrument_settings = InstrumentSettings()
@@ -175,7 +175,7 @@ class ReductionParameters:
         _xml += "<dead_time_paralyzable>%s</dead_time_paralyzable>\n" % str(self.paralyzable)
         _xml += "<dead_time_value>%s</dead_time_value>\n" % str(self.dead_time_value)
         _xml += "<dead_time_tof_step>%s</dead_time_tof_step>\n" % str(self.dead_time_tof_step)
-        _xml += "<dead_time_threshold_ratio>%s</dead_time_threshold_ratio>\n" % str(self.dead_time_threshold_ratio)
+        _xml += "<dead_time_threshold>%s</dead_time_threshold>\n" % str(self.dead_time_threshold)
 
         # Instrument settings
         _xml += "<apply_instrument_settings>%s</apply_instrument_settings>\n" % str(self.apply_instrument_settings)
@@ -292,7 +292,7 @@ class ReductionParameters:
         self.paralyzable = getBoolElement(instrument_dom, "dead_time_paralyzable", default=self.paralyzable)
         self.dead_time_value = getFloatElement(instrument_dom, "dead_time_value", default=self.dead_time_value)
         self.dead_time_tof_step = getFloatElement(instrument_dom, "dead_time_tof_step", default=self.dead_time_tof_step)
-        self.dead_time_threshold_ratio = getFloatElement(instrument_dom, "dead_time_threshold_ratio", default=self.dead_time_threshold_ratio)
+        self.dead_time_threshold = getFloatElement(instrument_dom, "dead_time_threshold", default=self.dead_time_threshold)
 
         # Instrument settings
         self.apply_instrument_settings = getBoolElement(instrument_dom, "apply_instrument_settings", default=False)

@@ -201,9 +201,8 @@ line-length = 120
 exclude = ["notebooks/**", "**/*.ipynb"]
 
 [tool.ruff.lint]
-select = ["A", "ARG","ASYNC","BLE","C90", "E", "F", "I", "N", "UP032", "W"]
+select = ["A", "ARG","ASYNC","BLE", "E", "F", "I", "N", "UP032", "W"]
 ignore = [
-  "C901", # too complex
   "E402", # module level import not at top of file
   "E501", # line too long
   "E722", # bare except
@@ -213,6 +212,7 @@ ignore = [
   "F405",
   "F821", # unknown names from probably from wild imports
   "N802", # function should be lowercase
+  "N803", # argument should be lowercase
   "N806", # variable should be lowercase
   "N812", # version should be lowercase
   "N999", # invalid module name
