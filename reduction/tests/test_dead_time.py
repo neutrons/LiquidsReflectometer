@@ -60,13 +60,21 @@ def test_deadtime_threshold(nexus_dir):
     algo.PyInit()
     algo.setProperty("InputWorkspace", ws)
     algo.setProperty("OutputWorkspace", "dead_time_corr")
+
+    # set the deadtime threshold
+    # the mean corr is 1.0003, so use that as test value
     algo.setProperty("UseDeadTimeThreshold", True)
-    algo.setProperty("DeadTimeThreshold", 1.1)
+    algo.setProperty("DeadTimeThreshold", 1.0003)
+
     algo.PyExec()
     corr_ws = algo.getProperty("OutputWorkspace").value
     corr = corr_ws.readY(0)
+
+    # manual inspection showed 88 corrections were above the threshold
+    assert len(corr[corr == 0]) == 88
+
     for c in corr:
-        assert c <= 1.1
+        assert c <= 1.0003
 
 def test_full_reduction(nexus_dir):
     """
