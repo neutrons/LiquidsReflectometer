@@ -9,6 +9,7 @@ User Guide
 .. toctree::
    :titlesonly:
 
+   user/dead_time_correction
    release_notes
 
 Contacting the Team

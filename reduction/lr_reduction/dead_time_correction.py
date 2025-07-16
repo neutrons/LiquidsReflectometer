@@ -30,6 +30,10 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         self.declareProperty(IEventWorkspaceProperty("InputErrorEventsWorkspace", "", Direction.Input, PropertyMode.Optional),
                              "Input workspace with error events use to compute dead time correction")
         self.declareProperty("DeadTime", 4.2, doc="Dead time in microseconds")
+        self.declareProperty("UseDeadTimeThreshold", False,
+                             doc="If True, use a correction of 0 for TOF bins requiring corrections greater than ``DeadTimeThreshold``")
+        self.declareProperty("DeadTimeThreshold", 1.5, validator=FloatBoundedValidator(lower=1.0),
+                             doc="If ``UseDeadTimeThreshold`` is True, this is the upper limit for dead-time correction ratios" )
         self.declareProperty("TOFStep", 100.0,
                              doc="TOF bins to compute deadtime correction for, in microseconds")
         self.declareProperty("Paralyzable", False,
@@ -44,6 +48,8 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         ws_event_data = self.getProperty("InputWorkspace").value
         ws_error_events = self.getProperty("InputErrorEventsWorkspace").value
         dead_time = self.getProperty("DeadTime").value
+        use_dead_time_threshold = self.getProperty("UseDeadTimeThreshold").value
+        dead_time_threshold = self.getProperty("DeadTimeThreshold").value
         tof_step = self.getProperty("TOFStep").value
         paralyzing = self.getProperty("Paralyzable").value
         output_workspace = self.getPropertyValue("OutputWorkspace")
@@ -80,6 +86,10 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
             corr[rate==0] = 1
         else:
             corr = 1/(1-rate * dead_time / tof_step)
+
+        # apply the dead time threshold if passed
+        if use_dead_time_threshold:
+            corr[corr > dead_time_threshold] = 0
 
         if np.min(corr) < 0:
             error = ( "Corrupted dead time correction:\n"

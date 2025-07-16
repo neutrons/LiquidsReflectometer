@@ -6,6 +6,7 @@ import datetime
 import json
 import os
 import time
+from typing import Optional
 
 import mantid.simpleapi as api
 import numpy as np
@@ -13,7 +14,7 @@ import numpy as np
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.utils import mantid_algorithm_exec
 
-from . import DeadTimeCorrection, background
+from . import background, dead_time_correction
 
 PLANCK_CONSTANT = 6.626e-34  # m^2 kg s^-1
 NEUTRON_MASS = 1.675e-27  # kg
@@ -226,11 +227,13 @@ def get_dead_time_correction(ws, template_data):
     run_number = ws.getRun().getProperty("run_number").value
     error_ws = api.LoadErrorEventsNexus("REF_L_%s" % run_number)
     corr_ws = mantid_algorithm_exec(
-        DeadTimeCorrection.SingleReadoutDeadTimeCorrection,
+        dead_time_correction.SingleReadoutDeadTimeCorrection,
         InputWorkspace=ws,
         InputErrorEventsWorkspace=error_ws,
         Paralyzable=template_data.paralyzable,
         DeadTime=template_data.dead_time_value,
+        UseDeadTimeThreshold=template_data.use_dead_time_threshold,
+        DeadTimeThreshold=template_data.dead_time_threshold,
         TOFStep=template_data.dead_time_tof_step,
         TOFRange=[tof_min, tof_max],
         OutputWorkspace="corr",
@@ -313,6 +316,10 @@ class EventReflectivity:
         value of the dead time in microsecond
     dead_time_tof_step : float
         TOF bin size in microsecond
+    use_dead_time_threshold : bool
+        If True, use a correction of 0 for TOF bins requiring corrections greater than ``DeadTimeThreshold``
+    dead_time_threshold : float [optional]
+        If ``UseDeadTimeThreshold`` is True, this is the upper limit for dead-time correction ratios
     use_emmission_time : bool
         If True, the emission time delay will be computed
     """
@@ -348,6 +355,8 @@ class EventReflectivity:
         paralyzable=True,
         dead_time_value=4.2,
         dead_time_tof_step=100,
+        use_dead_time_threshold=False,
+        dead_time_threshold: Optional[float] = 1.5,
         instrument_settings: InstrumentSettings = None,
         use_emission_time=True,
     ):
@@ -376,6 +385,8 @@ class EventReflectivity:
         self.paralyzable = paralyzable
         self.dead_time_value = dead_time_value
         self.dead_time_tof_step = dead_time_tof_step
+        self.use_dead_time_threshold = use_dead_time_threshold
+        self.dead_time_threshold = dead_time_threshold
         self.instrument_settings = instrument_settings
         self.use_emission_time = use_emission_time
 
@@ -1050,7 +1061,7 @@ class EventReflectivity:
             ths_value = ws.getRun()["ths"].value[-1]
             delta_theta_f *= np.sign(ths_value)
 
-            
+
             theta_f = theta + delta_theta_f
 
             qz = k * (np.sin(theta_f) + np.sin(theta))

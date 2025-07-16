@@ -46,7 +46,7 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
 
     # Get the wavelength
     lr = workspace.getRun().getProperty("LambdaRequest").value[0]
-    lr_value = float("{0:.2f}".format(lr))
+    lr_value = float(f"{lr:.2f}")
 
     s1h = abs(workspace.getRun().getProperty("S1VHeight").value[0])
     s1w = abs(workspace.getRun().getProperty("S1HWidth").value[0])
@@ -288,6 +288,8 @@ def process_from_template_ws(
         paralyzable=template_data.paralyzable,
         dead_time_value=template_data.dead_time_value,
         dead_time_tof_step=template_data.dead_time_tof_step,
+        use_dead_time_threshold=template_data.use_dead_time_threshold,
+        dead_time_threshold=template_data.dead_time_threshold,
         instrument_settings=instrument_settings,
         use_emission_time=template_data.use_emission_time,
     )

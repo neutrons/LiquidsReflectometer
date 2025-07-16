@@ -198,20 +198,25 @@ markers = [
 #########
 [tool.ruff]
 line-length = 120
-select = ["A", "ARG","ASYNC","BLE","C90", "E", "F", "I", "N", "UP032", "W"]
 exclude = ["notebooks/**", "**/*.ipynb"]
+
+[tool.ruff.lint]
+select = ["A", "ARG","ASYNC","BLE", "E", "F", "I", "N", "UP032", "W"]
 ignore = [
   "E402", # module level import not at top of file
+  "E501", # line too long
   "E722", # bare except
   "E741",
   "E743", # ambiguous function name, generally 'l'
   "F403", # wild imports
   "F405",
   "F821", # unknown names from probably from wild imports
+  "N802", # function should be lowercase
+  "N803", # argument should be lowercase
+  "N806", # variable should be lowercase
+  "N812", # version should be lowercase
+  "N999", # invalid module name
 ]
-[tool.ruff.lint]
-select = ["E", "F", "I"]
-ignore = []
 
 [tool.ruff.lint.isort]
 known-first-party = ["lr_reduction"]
