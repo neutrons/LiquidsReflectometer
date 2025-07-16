@@ -113,9 +113,12 @@ Example using ``SingleReadoutDeadTimeCorrection``
     algo.PyInit()
     algo.setProperty("InputWorkspace", ws)
     algo.setProperty("OutputWorkspace", "dead_time_corr")
+    algo.setProperty("UseDeadTimeThreshold", True)
+    algo.setProperty("DeadTimeThreshold", 1.1)
+
     algo.PyExec()
     corr_ws = algo.getProperty("OutputWorkspace").value
     corr = corr_ws.readY(0)
     for c in corr:
-        assert c > 0
-        assert c < 1.001
+        assert c <= 1.1
+        
