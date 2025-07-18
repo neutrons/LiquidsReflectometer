@@ -913,7 +913,7 @@ class EventReflectivity:
 
         shape = len(_q_bins) - 1 if sum_pixels else ((peak[1] - peak[0] + 1), len(_q_bins) - 1)
         refl = np.zeros(shape)
-        d_refl_sq = np.zeros(shape)
+        d_refl = np.zeros(shape)
         counts = np.zeros(shape)
         keep_weights = np.zeros(shape)
         # pixel_width only used for q_summing:
@@ -956,7 +956,7 @@ class EventReflectivity:
 
                 # convert wavelengths into qz. This could be separated to enable output in lam and q.
                 qz = 4.0 * np.pi / wl_list * np.sin(theta + delta_theta_f - d_theta)
-                # Remove negative values:
+                # Remove unfeasible negative values:
                 valid_mask = qz > 0
                 qz = qz[valid_mask]
                 wl_list = wl_list[valid_mask]
@@ -1036,17 +1036,16 @@ class EventReflectivity:
 
             # Normalize the reflection and error
             refl_norm = refl / charge / bin_size
-            d_refl_sq = np.sqrt(keep_weights) / charge / bin_size
-            # this is actually d_refl not d_refl_sq but kept name for consistency with unweighted workflow naming
+            d_refl = np.sqrt(keep_weights) / charge / bin_size
 
             ## Rename back to prior to avoid errors:
             refl = refl_norm
 
         else:
-            d_refl_sq = np.sqrt(np.fabs(refl)) / charge
+            d_refl = np.sqrt(np.fabs(refl)) / charge
             refl /= charge
 
-        return refl, d_refl_sq
+        return refl, d_refl
 
     def _get_events(self, ws, peak, low_res):
         """
