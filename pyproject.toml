@@ -69,7 +69,6 @@ file = "reduction/lr_reduction/_version.py"
 preview = ["pixi-build"]
 channels = [
   "conda-forge",
-  "mantid-ornl",
   "mantid",
   "https://prefix.dev/pixi-build-backends"
 ]
