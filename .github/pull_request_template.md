@@ -1,7 +1,6 @@
 ## Description of work:
 
 Check all that apply:
-- [ ] added [release notes](https://github.com/neutrons/LiquidsReflectometer/blob/next/docs/source/releases.rst) (if not, provide an explanation in the work description)
 - [ ] updated documentation
 - [ ] Source added/refactored
 - [ ] Added unit tests
@@ -12,11 +11,10 @@ Check all that apply:
 - Links to IBM EWM items:
 - Links to related issues or pull requests:
 
-## Manual test for the reviewer
+## :warning: Manual test for the reviewer
 (Instructions for testing here)
 
 ## Check list for the reviewer
-- [ ] [release notes](https://github.com/neutrons/LiquidsReflectometer/blob/next/docs/source/releases.rst) updated, or an explanation is provided as to why release notes are unnecessary
 - [ ] best software practices
     + [ ] clearly named variables (better to be verbose in variable names)
     + [ ] code comments explaining the intent of code blocks
