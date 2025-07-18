@@ -129,7 +129,7 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
 
 def process_from_template(
     run_number, template_path, q_summing=False, normalize=True, tof_weighted=False, bck_in_q=False,
-    clean=False, info=False
+    clean=False, info=False, db_number=None
     ):
     """
     The clean option removes leading zeros and the drop when doing q-summing
@@ -142,7 +142,7 @@ def process_from_template(
     ws_sc = api.Load("REF_L_%s" % run_number, OutputWorkspace="REF_L_%s" % run_number)
     return process_from_template_ws(
         ws_sc, template_path, q_summing=q_summing, tof_weighted=tof_weighted, bck_in_q=bck_in_q,
-        clean=clean, info=info, normalize=normalize
+        clean=clean, info=info, normalize=normalize, ws_db=db_number
     )
 
 
@@ -173,6 +173,12 @@ def process_from_template_ws(
     # Load normalization run
     normalize = normalize and template_data.apply_normalization
     if ws_db is None and normalize:
+        #if template_data.norm_file.startswith("DB_"): # act on a string first.
+        #    print("DB_xxxxxx style input, direct beam will be loaded from pre-processed file")
+        #    ws_db = template_data.norm_file
+            # Load provisionally added into event_reduction workflow. Check if best place once completed.
+            # Might need to add a flag to only use the new workflow.
+        #else:
         ws_db = api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
         attenuator_thickness = event_reduction.get_attenuation_info(ws_db)
         if attenuator_thickness > 0:
@@ -180,6 +186,9 @@ def process_from_template_ws(
 
     # Apply dead time correction
     if normalize and template_data.dead_time:
+        #if template_data.norm_file.startswith("DB_"): #act on a string first.
+        #    print("Assuming dead time correction already applied to pre-processed direct beam.")
+        #else:
         ws_db = event_reduction.apply_dead_time_correction(ws_db, template_data)
 
     # Apply instrument settings

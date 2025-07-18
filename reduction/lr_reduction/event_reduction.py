@@ -1059,6 +1059,331 @@ class EventReflectivity:
                 wl_weights = np.concatenate((wl_weights, weights))
         return wl_events, wl_weights
 
+    def specular_DB(self, q_summing=True, lam_step=0.0025, jacobian=True):
+        """
+        Process the specular with a supplied DB.
+
+        ....add the details!
+
+        we have a self.wl_range, self.q_min, self.q_max and self.q_bins.
+        default lam step matches output from dead_time_correction.
+        """
+        ## Handle which things to set and which to be default. e.g. pixel ranges etc.
+
+        # Run a test on the type of DB input and process as required:
+        if self._ws_db.startswith("DB_"):
+            # This is for a pre-processed input.
+            # Extract the bits from the pre-processed values!
+            db_pixel, db_lam, db_tof_norm, db_weight_norm = np.load() ## add logic here.
+            ## add into template to bypass the correction with this syntax.
+        else:
+            # Process the DB if a number
+            db_pixel, db_lam, db_tof, db_weight = self._get_events_new(self._ws_db, self.norm_peak, self.norm_low_res)
+            # Normalise by charge
+            charge_db = self._ws_db.getRun().getProtonCharge()
+            #db_tof_norm = db_tof / charge_db
+            db_weight_norm = db_weight / charge_db
+
+        # Get the events for the run:
+        rb_pixel, rb_lam, rb_tof, rb_weight = self._get_events_new(self._ws_sc,
+                                                                   self.specular_pixel, self.signal_low_res)
+        # Normalise by charge
+        charge_rb = self._ws_sc.getRun().getProtonCharge()
+        #rb_tof_norm = rb_tof / charge_rb
+        rb_weight_norm = rb_weight / charge_rb
+
+        # Divide through by DB:
+        if not q_summing:
+            # make histograms in lam
+            lam_bins = np.arange(self.wl_range[0], self.wl_range[1], step=lam_step)
+
+            rb_lam_hist, rb_lam_edges = self.create_histogram_lam(rb_lam, rb_weight_norm, lam_bins)
+            db_lam_hist, db_lam_edges = self.create_histogram_lam(db_lam, db_weight_norm, lam_bins)
+
+            # Gravity correction:
+            d_theta = self.gravity_correction(self._ws_sc, rb_lam_hist)
+            corrected_angle = self.theta - d_theta ## this needs to be the same length as the rb_normalized hist
+
+            # Add Background subtraction - current functions work in q-space...
+
+            # Divide run by DB to get reflectivity in lambda:
+            rb_normalized_hist = rb_lam_hist / db_lam_hist
+
+            # Two options for the q conversion to be tested for best method.
+            if jacobian:
+                # Option with the jacobian
+                q_edges, counts_q, sigma_q = self.lambda_to_q_jacobian(rb_lam_edges,
+                                                                       rb_normalized_hist, corrected_angle)
+                ## need to do a rebin...
+                q_centers = 0.5*(q_edges[:-1] + q_edges[1:])
+                q_rebinned, q_rebinned_errors = self.rebin_histogram_with_errors(q_centers,
+                                                                                 counts_q, sigma_q, self.q_bins)
+                refl = q_rebinned
+                d_refl = q_rebinned_errors
+            else:
+                # Option with the interpolate
+                q_edges, counts_q, sigma_q = self.lambda_to_q_interp(rb_lam_edges, rb_normalized_hist,
+                                                                     corrected_angle, self.q_bins)
+                refl = counts_q
+                d_refl = sigma_q
+
+            ## apply some masking...check on zero handling throughout.
+
+            return self.q_bins, refl, d_refl#, rvsL
+
+        else:
+            # Make DB histogram in lam:
+            lam_bins = np.arange(self.wl_range[0], self.wl_range[1], step=lam_step)
+            db_lam_hist, db_lam_edges = self.create_histogram_lam(db_lam, db_weight_norm, lam_bins)
+
+            ## Might be same workflow but each row in turn? If so, might need to reorganise after...
+            # might just need a different selection of the low_res direction for the non q_summing instead...
+            refl_array = [] # specify length?
+            d_refl_array = []
+            len_low_res = self.signal_low_res[1] - self.signal_low_res[0] + 1
+            len_high_res = self.specular_pixel[1] - self.specular_pixel[0] + 1
+            for pixel_row in range(len_low_res):
+                # Find the pixel idx in the row and apply this mask to run counts:
+                pixel_idx = np.arange(0 + (pixel_row * len_high_res), len_high_res + (pixel_row * len_high_res))
+                #rb_pixel_row = rb_pixel[pixel_idx]
+                rb_lam_row = rb_lam[pixel_idx]
+                #rb_tof_norm_row = rb_tof_norm[pixel_idx]
+                rb_weight_norm_row = rb_weight_norm[pixel_idx]
+
+                # make rb histograms in lam
+                rb_lam_hist, rb_lam_edges = self.create_histogram_lam(rb_lam_row, rb_weight_norm_row, lam_bins)
+                # Might want to store these in an array??
+
+                # Angle component for q conversion (gravity and q-summing)
+                d_theta = self.gravity_correction(self._ws_sc, rb_lam_hist)
+
+                x_distance = self.pixel_width #* (j - self.specular_peak) ## fix the vertical position calculation.
+                delta_theta_f = np.arctan(x_distance / self.sample_detector_distance) / 2.0
+                # Sign depends on reflect up or down
+                ths_value = self._ws_sc.getRun()["ths"].value[-1]
+                delta_theta_f *= np.sign(ths_value)
+
+                corrected_angle = self.theta - d_theta + delta_theta_f
+
+                # Add Background subtraction - current functions work in q-space...
+
+                # Divide run by DB to get reflectivity in lambda:
+                rb_normalized_hist = rb_lam_hist / db_lam_hist
+
+
+                ## Need to decide where to do the adding of the row together and where we want things output separately.
+
+                # Two options for the q conversion to be tested for best method.
+                if jacobian:
+                    # Option with the jacobian
+                    q_edges, counts_q, sigma_q = self.lambda_to_q_jacobian(rb_lam_edges,
+                                                                           rb_normalized_hist, corrected_angle)
+                    ## need to do a rebin...
+                    q_centers = 0.5*(q_edges[:-1] + q_edges[1:])
+                    q_rebinned, q_rebinned_errors = self.rebin_histogram_with_errors(q_centers,
+                                                                                     counts_q, sigma_q, self.q_bins)
+                    refl_array.append(q_rebinned)
+                    d_refl_array.append(q_rebinned_errors)
+                else:
+                    # Option with the interpolate
+                    q_edges, counts_q, sigma_q = self.lambda_to_q_interp(rb_lam_edges, rb_normalized_hist,
+                                                                         corrected_angle, self.q_bins)
+                    refl_array.append(counts_q)
+                    d_refl_array.append(sigma_q)
+
+            # Do each through and then concatenate??
+            refl = np.concatenate(refl_array)
+            d_refl = np.concatenate(d_refl_array)
+
+
+            # want output of the specular_angle map too??
+            ## apply some masking...check on zero handling throughout.
+
+            return self.q_bins, refl, d_refl#, rvsL
+
+    #maybe this isn't needed...?
+    def create_histogram_lam(self, event_list, weight_list, lam_bin=100):
+        """
+        Generate
+        """
+        ## calculate the bins...
+        values, weights = np.histogram(event_list, weights=weight_list, bins=lam_bin)
+        return values, weights
+
+
+    def lambda_to_q_jacobian(self, lambda_edges, counts_lambda, theta_list):
+        """
+        Convert lambda histogram into q, using option via the Jacobian.
+        Add more....
+        Angle is in radians.
+        Theta list needs to be the same length as counts_lambda
+        """
+
+        lambda_centers = 0.5 * (lambda_edges[:-1] + lambda_edges[1:])
+        delta_lambda = np.diff(lambda_edges)
+        assert np.all(delta_lambda > 0), "lambda_edges must be ascending"
+
+        q_centers = 4 * np.pi * np.sin(theta_list) / lambda_centers
+
+        sort_idx = np.argsort(q_centers)
+        q_centers_sorted = q_centers[sort_idx]
+        counts_sorted = counts_lambda[sort_idx]
+        delta_lambda_sorted = delta_lambda[sort_idx]
+        lambda_centers_sorted = lambda_centers[sort_idx]
+        theta_sorted = theta_list[sort_idx]
+
+        density_lambda = counts_sorted / delta_lambda_sorted
+        jacobian = 4 * np.pi * np.sin(theta_sorted) / (lambda_centers_sorted ** 2)
+        density_q = density_lambda / jacobian
+
+        # Reconstruct q bin edges from sorted q centers
+        q_edges_sorted = np.zeros(len(q_centers_sorted) + 1)
+        q_edges_sorted[1:-1] = 0.5 * (q_centers_sorted[:-1] + q_centers_sorted[1:])
+        q_edges_sorted[0] = q_centers_sorted[0] - 0.5 * (q_centers_sorted[1] - q_centers_sorted[0])
+        q_edges_sorted[-1] = q_centers_sorted[-1] + 0.5 * (q_centers_sorted[-1] - q_centers_sorted[-2])
+
+        delta_q = np.diff(q_edges_sorted)
+        assert np.all(delta_q > 0), "q_edges_sorted must be ascending"
+
+        counts_q = density_q * delta_q
+
+        # Propagate Poisson errors: variance in input counts = counts_lambda
+        var_lambda = counts_sorted  # Poisson assumption
+        # Variance propagation factor = (delta_q / (jacobian * delta_lambda))^2
+        var_q = (delta_q / (jacobian * delta_lambda_sorted))**2 * var_lambda
+        sigma_q = np.sqrt(var_q)
+
+        return q_edges_sorted, counts_q, sigma_q
+
+    def lambda_to_q_interp(self, lambda_edges, counts_lambda, theta_list, q_bin_edges):
+        """
+        Convert lambda histogram into q, using option via the interpolation.
+        Add more....
+        Angle is in radians.
+        Theta list needs to be the same length as counts_lambda
+        """
+
+        lambda_centers = 0.5 * (lambda_edges[:-1] + lambda_edges[1:])
+        delta_lambda = np.diff(lambda_edges)
+        assert np.all(delta_lambda > 0), "lambda_edges must be ascending"
+
+        density_lambda = counts_lambda / delta_lambda
+        var_density_lambda = counts_lambda / (delta_lambda**2)  # variance of density_lambda
+
+        q_centers = 4 * np.pi * np.sin(theta_list) / lambda_centers
+
+        sort_idx = np.argsort(q_centers)
+        q_centers_sorted = q_centers[sort_idx]
+        density_lambda_sorted = density_lambda[sort_idx]
+        var_density_lambda_sorted = var_density_lambda[sort_idx]
+
+        q_bin_centers = 0.5 * (q_bin_edges[:-1] + q_bin_edges[1:])
+
+        # Interpolate density values
+        interp_density = np.interp(q_bin_centers, q_centers_sorted, density_lambda_sorted, left=0, right=0)
+
+        # Interpolate variances using linear interpolation weights
+        sigma_density_lambda_sorted = np.sqrt(var_density_lambda_sorted)
+        sigma_density_interp = np.zeros_like(q_bin_centers)
+
+        for i, q_val in enumerate(q_bin_centers):
+            # Find indices for interpolation
+            idx = np.searchsorted(q_centers_sorted, q_val) - 1
+            if idx < 0 or idx >= len(q_centers_sorted) - 1:
+                sigma_density_interp[i] = 0  # outside interpolation range
+            else:
+                x0, x1 = q_centers_sorted[idx], q_centers_sorted[idx+1]
+                w = (q_val - x0) / (x1 - x0)
+                s0 = sigma_density_lambda_sorted[idx]
+                s1 = sigma_density_lambda_sorted[idx+1]
+                # Variance interpolated as weighted sum of variances (uncorrelated)
+                sigma_density_interp[i] = np.sqrt((1 - w)**2 * s0**2 + w**2 * s1**2)
+
+        delta_q = np.diff(q_bin_edges)
+        assert np.all(delta_q > 0), "q_bin_edges must be ascending"
+
+        counts_q = interp_density * delta_q
+        sigma_q = sigma_density_interp * delta_q
+
+        return q_bin_edges, counts_q, sigma_q
+
+    def _get_events_new(self, ws, peak, low_res):
+        """
+        Return events with pixel, lambda, tofs
+        """
+        pixel_list = []
+        lambda_list = []
+        tof_list = []
+        weight_list = []
+
+        for i in range(low_res[0], int(low_res[1] + 1)):
+            for j in range(peak[0], int(peak[1] + 1)):
+                if self.instrument == self.INSTRUMENT_4A:
+                    pixel = j * self.n_y + i
+                else:
+                    pixel = i * self.n_y + j
+                evt_list = ws.getSpectrum(pixel)
+                tofs = evt_list.getTofs()
+                weights = evt_list.getWeights()
+                pixel_out = np.full(len(tofs), pixel)
+
+                # Correct for emission time as needed
+                if self.use_emission_time:
+                    tofs = self.emission_time_correction(ws, tofs=tofs)
+                # Convert to lambda
+                wl_list = tofs / self.constant
+
+                pixel_list.append(pixel_out)
+                lambda_list.append(wl_list)
+                tof_list.append(tofs)
+                weight_list.append(weights)
+
+        pixel_list = np.concatenate(pixel_list)
+        lambda_list = np.concatenate(lambda_list)
+        tof_list = np.concatenate(tof_list)
+        weight_list = np.concatenate(weight_list)
+
+        return pixel_list, lambda_list, tof_list, weight_list
+
+    def rebin_histogram_with_errors(self, hist_centers, counts, errors, new_edges):
+        """
+        Rebin histogram data with propagated errors into new q bins.
+
+        Parameters
+        ----------
+        hist_centers : ndarray
+            Bin centers of original histogram (1D).
+        counts : ndarray
+            Counts per bin in original histogram (same length as q_centers).
+        errors : ndarray
+            Uncertainties (standard deviations) on counts (same length).
+        new_edges : ndarray
+            Edges of the new bins to rebin into.
+
+        Returns
+        -------
+        rebinned_counts : ndarray
+            Rebinned counts in each new bin.
+        rebinned_errors : ndarray
+            Propagated uncertainties in each new bin.
+        """
+        rebinned_counts = np.zeros(len(new_edges) - 1)
+        rebinned_var = np.zeros(len(new_edges) - 1)
+
+        # Assign each original bin center to a target bin
+        bin_indices = np.digitize(hist_centers, new_edges) - 1
+
+        for i in range(len(hist_centers)):
+            bin_idx = bin_indices[i]
+            if 0 <= bin_idx < len(rebinned_counts):
+                rebinned_counts[bin_idx] += counts[i]
+                rebinned_var[bin_idx] += errors[i] ** 2
+
+        rebinned_errors = np.sqrt(rebinned_var)
+        return rebinned_counts, rebinned_errors
+
+
+
     def off_specular(self, x_axis=None, x_min=-0.015, x_max=0.015, x_npts=50, z_min=None, z_max=None,
                       z_npts=-120, bck_in_q=None):
         """
@@ -1413,10 +1738,15 @@ def trapezoidal_distribution_params(ws, Theta_deg=None, FootPrint=None, SlitRati
     L_bottom = np.degrees(np.arctan((S1Y + SiY) / (2 * dS1Si)))  # full half-width
     l_top = np.degrees(np.arctan((S1Y - SiY) / (2 * dS1Si)))  # flat-top half-width
 
-    sigma_equiv = _find_sigma_68(L_bottom, l_top)
-    dth_over_th = sigma_equiv / Theta_deg
+    # Analytical equation for the sigma of a symmetric trapezoidal function
+    Trap_sigma = np.sqrt(((2 * L_bottom) ** 2 + (2 * l_top) ** 2 + L_bottom * l_top) / 24)
+    dth_over_th = Trap_sigma / Theta_deg
 
-    return L_bottom, l_top, sigma_equiv, dth_over_th
+    # Alternative option using 68 percentile.
+    #sigma_equiv = _find_sigma_68(L_bottom, l_top)
+    #dth_over_th = sigma_equiv / Theta_deg
+
+    return L_bottom, l_top, Trap_sigma, dth_over_th
 
 # Analytic trapezoidal CDF for use in trapezoial_distribution_params
 def _trapezoidal_cdf_analytic(x, L_, l_):
@@ -1454,3 +1784,4 @@ def _find_sigma_68(L_, l_, target_prob=0.68):
 ## Function to process from the DB run number or pre-processed
 ## Fix the q-summing saving into the template and being read back in
 ## Fix q-bin error and auto trimming points
+## look at get_wl_ranges with the 2.6 chopper width?
