@@ -6,19 +6,32 @@ Release Notes
 Notes for major or minor releases. Notes for patch releases are deferred.
 
 ..
-    2.3.0
+    X.Y.Z
     -----
     (date of release, format YYYY-MM-DD)
 
     **Of interest to the User**:
 
-    - PR #76 Adds new option, dead-time threshold - an upper limit for dead-time correction ratios
+    - PR #N one liner description
 
     **Of interest to the Developer:**
 
-    - PR #73 merge test and deploy workflows
-    - PR #70 Introduce pixi to the project
+    - PR #M one liner description
 ..
+
+
+2.3.0
+-----
+(date of release, format YYYY-MM-DD)
+
+**Of interest to the User**:
+
+- PR #76 Adds new option, dead-time threshold - an upper limit for dead-time correction ratios
+
+  **Of interest to the Developer:**
+
+  - PR #73 merge test and deploy workflows
+  - PR #70 Introduce pixi to the project
 
 
 2.2.0
