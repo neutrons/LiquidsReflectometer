@@ -16,7 +16,7 @@ def find_ranges_without_overlap(r1, r2):
         Range of pixels to consider
     r2 : list
         Range of pixels to exclude
-    
+
     Returns
     -------
     list
@@ -119,55 +119,57 @@ def functional_background(
     pixels = np.asarray(pixels)
 
     # Loop over the Q or TOF bins and fit the background
-    refl_bck = np.zeros(_bck.shape[1])
-    d_refl_bck = np.zeros(_bck.shape[1])
+    shape = [peak[1]-peak[0]+1, _bck.shape[1]] if q_summing else _bck.shape[1]
+    refl_bck = np.zeros(shape)
+    d_refl_bck = np.zeros(shape)
 
     for i in range(_bck.shape[1]):
         # Use average signal for background estimate
         _estimate = np.mean(_bck[:, i])
         linear = LinearModel()
         pars = linear.make_params(slope=0, intercept=_estimate)
-
         weights = 1 / _d_bck[:, i]
         # Here we have counts normalized by proton charge, so if we want to
-        # assign an error of 1 on the counts, it should be 1/charge.
+        # assign an error of 1 on the counts, it should be scaled by charge.
         weights[_bck[:, i] == 0] = charge
 
         fit = linear.fit(_bck[:, i], pars, method="leastsq", x=pixels, weights=weights)
 
         slope = fit.params["slope"].value
         intercept = fit.params["intercept"].value
-        d_slope = np.sqrt(fit.covar[0][0])
-        d_intercept = np.sqrt(fit.covar[1][1])
 
         # Compute background under the peak
-        total_bck = 0
-        total_err = 0
-        for k in range(peak[0], peak[1] + 1):
-            total_bck += intercept + k * slope
-            total_err += d_intercept**2 + k**2 * d_slope**2
-
-        _pixel_area = peak[1] - peak[0] + 1.0
-
-        refl_bck[i] = (slope * (peak[1] + peak[0] + 1) + 2 * intercept) * _pixel_area / 2
-        d_refl_bck[i] = (
-            np.sqrt(d_slope**2 * (peak[1] + peak[0] + 1) ** 2 + 4 * d_intercept**2 + 4 * (peak[1] + peak[0] + 1) * fit.covar[0][1])
-            * _pixel_area
-            / 2
-        )
-
-        # In case we neen the background per pixel as opposed to the total sum under the peak
-        if normalize_to_single_pixel:
+        if q_summing:
+            for k in range(peak[0], peak[1] + 1):
+                if q_summing:
+                    refl_bck[k - peak[0]][i] = intercept + k * slope
+                    d_refl_bck[k - peak[0]][i] = np.sqrt(fit.covar[1][1] + k**2 * fit.covar[0][0]
+                                                        + 2 * k * fit.covar[0][1])
+            if not normalize_to_single_pixel:
+                _pixel_area = peak[1] - peak[0] + 1.0
+                refl_bck *= _pixel_area
+                d_refl_bck *= _pixel_area
+        else:
             _pixel_area = peak[1] - peak[0] + 1.0
-            refl_bck /= _pixel_area
-            d_refl_bck /= _pixel_area
+
+            refl_bck[i] = (slope * (peak[1] + peak[0] + 1) + 2 * intercept) * _pixel_area / 2
+            d_refl_bck[i] = (
+                np.sqrt(fit.covar[0][0] * (peak[1] + peak[0] + 1) ** 2 + 4 * fit.covar[1][1]
+                        + 4 * (peak[1] + peak[0] + 1) * fit.covar[0][1]
+                        ) * _pixel_area / 2
+            )
+
+            # In case we neen the background per pixel as opposed to the total sum under the peak
+            if normalize_to_single_pixel:
+                _pixel_area = peak[1] - peak[0] + 1.0
+                refl_bck /= _pixel_area
+                d_refl_bck /= _pixel_area
 
     return refl_bck, d_refl_bck
 
 
 def side_background(
-    ws, event_reflectivity, peak, bck, low_res, normalize_to_single_pixel=False, q_bins=None, 
-    wl_dist=None, wl_bins=None, q_summing=False
+    ws, event_reflectivity, peak, bck, low_res, normalize_to_single_pixel=False, q_bins=None, wl_dist=None, wl_bins=None, q_summing=False
 ):
     """
     Original background substration done using two pixels defining the
@@ -195,7 +197,7 @@ def side_background(
         Array of wavelength bins for the case where we use weighted events for normatization
     q_summing : bool
         If True, sum the counts in Q bins
-    
+
     Returns
     -------
     numpy.ndarray
