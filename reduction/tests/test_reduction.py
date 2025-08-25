@@ -89,7 +89,8 @@ def test_full_reduction(nexus_dir):
 
         if first_run is None:
             first_run = run_number
-            resolution = event_reduction.compute_resolution(ws_sc)
+            angular_resolution = event_reduction.compute_angular_resolution(ws_sc)
+            wavelength_resolution = event_reduction.compute_wavelength_resolution(ws_sc)
 
         for i in range(len(qz_mid)):
             qz_all.append(qz_mid[i])
@@ -105,7 +106,8 @@ def test_full_reduction(nexus_dir):
     refl_all = np.take_along_axis(refl_all, idx, axis=None)
     d_refl_all = np.take_along_axis(d_refl_all, idx, axis=None)
 
-    assert np.fabs(resolution - 0.02785205863936946) < 1e-5
+    assert np.fabs(angular_resolution - 0.02785205863936946) < 1e-5
+    assert wavelength_resolution
     ref_data = np.loadtxt("data/reference_rq.txt").T
     assert len(ref_data[1]) == len(refl_all)
     assert np.fabs(np.sum(ref_data[1] - refl_all)) < 1e-10

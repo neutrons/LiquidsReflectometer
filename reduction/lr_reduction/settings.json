@@ -56,5 +56,11 @@
             "from":"2014-10-10",
             "value": 1.485
         }
+    ],
+    "wavelength_resolution_dLambda_formula": [
+        {
+            "from":"2025-09-01",
+            "value": "L - A * exp(-k * x), L=0.07564423, A=0.13093263, k=0.34918918"
+        }
     ]
 }

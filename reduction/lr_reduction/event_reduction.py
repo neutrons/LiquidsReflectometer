@@ -381,6 +381,7 @@ class EventReflectivity:
         self.summing_threshold = None
         self.q_summing = False
         self.dq_over_q = 0
+        self.dLambda =
         self.dead_time = dead_time
         self.paralyzable = paralyzable
         self.dead_time_value = dead_time_value
@@ -557,6 +558,7 @@ class EventReflectivity:
             time=time.ctime(),
             dq0=dq0,
             dq_over_q=self.dq_over_q,
+            dLambda=self.dLambda,
             sequence_number=sequence_number,
             sequence_id=sequence_id,
             q_summing=self.q_summing,
@@ -613,8 +615,9 @@ class EventReflectivity:
             self.q_bins = self.q_bins[idx]
 
         # Compute Q resolution
-        self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing)
+        self.dq_over_q = compute_angular_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing)
         self.q_summing = q_summing
+        self.dLambda = compute_wavelength_resolution(self._ws_sc)
 
         return self.q_bins, self.refl, self.d_refl
 
@@ -1188,7 +1191,7 @@ class EventReflectivity:
         return (theta_sample - theta_in) * np.pi / 180.0
 
 
-def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
+def compute_angular_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     """
     Compute the Q resolution from the meta data.
 
@@ -1251,3 +1254,28 @@ def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     slit_distance = s1_sample_distance - sample_si_distance
     dq_over_q = s1h / slit_distance / theta
     return dq_over_q
+
+def compute_wavelength_resolution(ws):
+    """
+    Compute the wavelength resolution from the meta data.
+
+    Parameters
+    ----------
+    ws : mantid.api.Workspace
+        Mantid workspace to extract correction meta-data from.
+
+    Returns
+    -------
+    float
+        The dLambda resolution
+    """
+    settings = read_settings(ws)
+
+    fit_return = api.Fit(InputWorkspace=ws,
+                         Function=f"name=UserFunction, Formula={settings.wavelength_resolution_dLambda_formula}",
+                         Output="fit_result")
+
+    # return the difference between the original and fitted wavelengths
+    dLambda = api.mtd["fit_result_Workspace"].readY(2)
+
+    return dLambda
