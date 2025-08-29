@@ -307,8 +307,8 @@ class ReductionParameters:
         self.pixel_width = getFloatElement(instrument_dom, "pixel_width", default=self.pixel_width)
         self.xi_reference = getFloatElement(instrument_dom, "xi_reference", default=self.xi_reference)
         self.s1_sample_distance = getFloatElement(instrument_dom, "s1_sample_distance", default=self.s1_sample_distance)
-        self.wavelength_resolution_dLambda_formula = getFloatElement(instrument_dom, "wavelength_resolution_dLambda_formula", default=self.wavelength_resolution_dLambda_formula)
-        self.wavelength_resolution_dLambda_initial_parameters = getFloatElement(instrument_dom, "wavelength_resolution_dLambda_initial_parameters", default=self.wavelength_resolution_dLambda_initial_parameters)
+        self.wavelength_resolution_dLambda_formula = getStringElement(instrument_dom, "wavelength_resolution_dLambda_formula", default=self.wavelength_resolution_dLambda_formula)
+        self.wavelength_resolution_dLambda_initial_parameters = getStringElement(instrument_dom, "wavelength_resolution_dLambda_initial_parameters", default=self.wavelength_resolution_dLambda_initial_parameters)
 
         # Emission time
         # Defaults to True, but will be skipped if the necessary meta data is not found
