@@ -1,4 +1,5 @@
 import pytest
+
 from lr_reduction import template
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.reduction_template_reader import ReductionParameters
@@ -55,6 +56,8 @@ class TestReductionParameters:
         assert template_data.pixel_width == 6.0
         assert template_data.xi_reference == 7.0
         assert template_data.s1_sample_distance == 8.0
+        assert template_data.wavelength_resolution_dLambda_formula == "A*x"
+        assert template_data.wavelength_resolution_dLambda_initial_parameters == "A=1"
 
 
 if __name__ == "__main__":

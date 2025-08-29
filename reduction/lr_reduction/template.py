@@ -193,6 +193,8 @@ def process_from_template_ws(
             template_data.pixel_width,
             template_data.xi_reference,
             template_data.s1_sample_distance,
+            template_data.wavelength_resolution_dLambda_formula,
+            template_data.wavelength_resolution_dLambda_initial_parameters,
         )
     else:
         instrument_settings = None

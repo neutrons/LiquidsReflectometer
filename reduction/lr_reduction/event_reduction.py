@@ -153,6 +153,8 @@ def read_settings(ws) -> InstrumentSettings:
         pixel_width=settings_dict["pixel-width"],
         xi_reference=settings_dict["xi-reference"],
         s1_sample_distance=settings_dict["s1-sample-distance"],
+        wavelength_resolution_dLambda_formula=settings_dict["wavelength-resolution-dLambda-formula"],
+        wavelength_resolution_dLambda_initial_parameters=settings_dict["wavelength-resolution-dLambda-initial-parameters"],
     )
     return settings
 
@@ -617,7 +619,14 @@ class EventReflectivity:
         # Compute Q resolution
         self.dq_over_q = compute_angular_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing)
         self.q_summing = q_summing
-        self.d_lambda = compute_wavelength_resolution(self._ws_sc)
+
+
+        #self.d_lambda = compute_wavelength_resolution(self._ws_sc)
+        """
+        ignoring this for now until the workflow for its usage is completed
+        if this line is enabled, the reduction will fail when saving the meta information
+        since this is type Workspace2D, which is not json-serializable
+        """
 
         return self.q_bins, self.refl, self.d_refl
 

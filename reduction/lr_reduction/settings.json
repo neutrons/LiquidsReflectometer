@@ -57,13 +57,13 @@
             "value": 1.485
         }
     ],
-    "wavelength_resolution_dLambda_formula": [
+    "wavelength-resolution-dLambda-formula": [
         {
             "from":"2025-09-01",
             "value": "L - A * exp(-k * x)"
         }
     ],
-  "wavelength_resolution_dLambda_initial_parameters": [
+  "wavelength-resolution-dLambda-initial-parameters": [
         {
             "from":"2025-09-01",
             "value": "L=0.07564423, A=0.13093263, k=0.34918918"
