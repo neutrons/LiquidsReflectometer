@@ -383,8 +383,8 @@ class EventReflectivity:
         self.summing_threshold = None
         self.q_summing = False
         self.dq_over_q = 0
-        self.wavelength = np.array([])
-        self.d_lambda = np.array([])
+        self.wavelength = []
+        self.d_lambda = []
         self.dead_time = dead_time
         self.paralyzable = paralyzable
         self.dead_time_value = dead_time_value
@@ -1284,4 +1284,4 @@ def compute_wavelength_resolution(ws):
     wavelength = fitWorkspace.readY(1)
     d_lambda = fitWorkspace.readY(2)
 
-    return wavelength, d_lambda
+    return wavelength.tolist(), d_lambda.tolist()
