@@ -383,7 +383,8 @@ class EventReflectivity:
         self.summing_threshold = None
         self.q_summing = False
         self.dq_over_q = 0
-        self.d_lambda = None
+        self.wavelength = np.array([])
+        self.d_lambda = np.array([])
         self.dead_time = dead_time
         self.paralyzable = paralyzable
         self.dead_time_value = dead_time_value
@@ -560,7 +561,8 @@ class EventReflectivity:
             time=time.ctime(),
             dq0=dq0,
             dq_over_q=self.dq_over_q,
-            dLambda=self.d_lambda,
+            d_lambda=self.d_lambda,
+            wavelength=self.wavelength,
             sequence_number=sequence_number,
             sequence_id=sequence_id,
             q_summing=self.q_summing,
@@ -619,14 +621,8 @@ class EventReflectivity:
         # Compute Q resolution
         self.dq_over_q = compute_angular_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing)
         self.q_summing = q_summing
+        self.wavelength, self.d_lambda = compute_wavelength_resolution(self._ws_sc)
 
-
-        #self.d_lambda = compute_wavelength_resolution(self._ws_sc)
-        """
-        ignoring this for now until the workflow for its usage is completed
-        if this line is enabled, the reduction will fail when saving the meta information
-        since this is type Workspace2D, which is not json-serializable
-        """
 
         return self.q_bins, self.refl, self.d_refl
 
@@ -1280,9 +1276,12 @@ def compute_wavelength_resolution(ws):
     """
     settings = read_settings(ws)
 
-    api.UserFunction1D(InputWorkspace=ws,
+    fitStatus, chiSq, covarianceTable, paramTable, fitWorkspace = api.UserFunction1D(InputWorkspace=ws,
                        Function=settings.wavelength_resolution_dLambda_formula,
                        InitialParameters=settings.wavelength_resolution_dLambda_initial_parameters,
-                       Output="dLambda")
+                       Output="fit")
 
-    return api.mtd['dLambda_Workspace']
+    wavelength = fitWorkspace.readY(1)
+    d_lambda = fitWorkspace.readY(2)
+
+    return wavelength, d_lambda
