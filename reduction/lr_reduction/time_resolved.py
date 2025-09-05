@@ -16,7 +16,7 @@ from matplotlib import pyplot as plt
 mantid.kernel.config.setLogLevel(3)
 
 from . import template
-from .event_reduction import apply_dead_time_correction, compute_angular_resolution, compute_wavelength_resolution
+from .event_reduction import apply_dead_time_correction, compute_resolution
 
 
 def reduce_30Hz_from_ws(
@@ -94,7 +94,7 @@ def reduce_30Hz_from_ws(
     dq0 = 0
     if meas_ws_30Hz.getInstrument().hasParameter("dq-constant"):
         dq0 = meas_ws_30Hz.getInstrument().getNumberParameter("dq-constant")[0]
-    dq_slope = compute_angular_resolution(meas_ws_30Hz)
+    dq_slope = compute_resolution(meas_ws_30Hz)
     print("Resolution: %g + %g Q" % (dq0, dq_slope))
     dq = dq0 + dq_slope * q[_idx]
     return np.asarray([q[_idx], r_q_final[_idx], dr_q_final[_idx], dq])
@@ -110,8 +110,8 @@ def reduce_30Hz_slices(
     scan_index=1,
     create_plot=True,
     template_reference=None,
-    q_summing=False,
-):  # noqa ARG001
+    q_summing=False, # noqa ARG001
+):
     meas_ws_30Hz = api.LoadEventNexus("REF_L_%s" % meas_run_30Hz)
 
     return reduce_30Hz_slices_ws(
@@ -239,7 +239,7 @@ def reduce_30Hz_slices_ws(
             )
             # Remove first point
             reduced.append(_reduced)
-            _filename = "r{0}_t{1:06d}.txt".format(meas_run_30Hz, int(total_time))
+            _filename = f"r{meas_run_30Hz}_t{int(total_time):06d}.txt"
             np.savetxt(os.path.join(output_dir, _filename), _reduced.T)
         except:
             print("reduce_30Hz_slices_ws: %s" % sys.exc_info()[0])
@@ -348,13 +348,13 @@ def reduce_slices_ws(meas_ws, template_file, time_interval, output_dir, scan_ind
             _reduced = template.process_from_template_ws(tmpws, template_data, theta_value=theta_value, ws_db=ws_db)
 
             dq0 = 0
-            dq_slope = compute_angular_resolution(tmpws)
+            dq_slope = compute_resolution(tmpws)
             dq = dq0 + dq_slope * _reduced[0]
             _reduced = [_reduced[0], _reduced[1], _reduced[2], dq]
             _reduced = np.asarray(_reduced)
 
             reduced.append(_reduced)
-            _filename = "r{0}_t{1:06d}.txt".format(meas_run, int(total_time))
+            _filename = f"r{meas_run}_t{int(total_time):06d}.txt"
             np.savetxt(os.path.join(output_dir, _filename), _reduced.T)
         except:
             print("reduce_slices_ws: %s" % sys.exc_info()[0])

@@ -16,7 +16,7 @@ class InstrumentSettings:
     pixel_width : float - Width of the pixels in mm
     xi_reference : float - Zero-position of slit relative to sample, in mm
     s1_sample_distance : float - Distance from the sample to the s1 aperture in mm
-    wavelength_resolution_dLambda_formula : str - The formula used to calculate the wavelength resolution
+    wavelength_resolution_function : str - The function used to calculate the wavelength resolution
     """
 
     apply_instrument_settings: bool = False
@@ -27,5 +27,4 @@ class InstrumentSettings:
     pixel_width: float = 0.70
     xi_reference: float = 445
     s1_sample_distance: float = 1.485
-    wavelength_resolution_dLambda_formula: str = "L - A * exp(-k * x)" # noqa: N815
-    wavelength_resolution_dLambda_initial_parameters: str = "L=0.07564423, A=0.13093263, k=0.34918918" # noqa: N815
+    wavelength_resolution_function: str = "name=UserFunction, Formula=L - A * exp(-k * x), L=0.07564423, A=0.13093263, k=0.34918918" # noqa: N815

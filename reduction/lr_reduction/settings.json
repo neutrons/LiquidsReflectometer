@@ -57,16 +57,10 @@
             "value": 1.485
         }
     ],
-    "wavelength-resolution-dLambda-formula": [
+    "wavelength-resolution-function": [
         {
             "from":"2025-09-01",
-            "value": "L - A * exp(-k * x)"
-        }
-    ],
-  "wavelength-resolution-dLambda-initial-parameters": [
-        {
-            "from":"2025-09-01",
-            "value": "L=0.07564423, A=0.13093263, k=0.34918918"
+            "value": "name=UserFunction, Formula=L - A * exp(-k * x), L=0.07564423, A=0.13093263, k=0.34918918"
         }
     ]
 }

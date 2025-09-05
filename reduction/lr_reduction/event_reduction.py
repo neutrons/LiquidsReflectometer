@@ -153,8 +153,7 @@ def read_settings(ws) -> InstrumentSettings:
         pixel_width=settings_dict["pixel-width"],
         xi_reference=settings_dict["xi-reference"],
         s1_sample_distance=settings_dict["s1-sample-distance"],
-        wavelength_resolution_dLambda_formula=settings_dict["wavelength-resolution-dLambda-formula"],
-        wavelength_resolution_dLambda_initial_parameters=settings_dict["wavelength-resolution-dLambda-initial-parameters"],
+        wavelength_resolution_formula=settings_dict["wavelength-resolution-formula"],
     )
     return settings
 
@@ -619,7 +618,7 @@ class EventReflectivity:
             self.q_bins = self.q_bins[idx]
 
         # Compute Q resolution
-        self.dq_over_q = compute_angular_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing)
+        self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing)
         self.q_summing = q_summing
         self.wavelength, self.d_lambda = compute_wavelength_resolution(self._ws_sc)
 
@@ -1196,7 +1195,7 @@ class EventReflectivity:
         return (theta_sample - theta_in) * np.pi / 180.0
 
 
-def compute_angular_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
+def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     """
     Compute the Q resolution from the meta data.
 
@@ -1271,17 +1270,18 @@ def compute_wavelength_resolution(ws):
 
     Returns
     -------
-    Workspace2D
-        The wavelength fit
+    tuple of List[Float]
+        (wavelength, d_lambda):
+            wavelength: the fitted wavelength values
+            d_lambda: the difference between wavelength and the fit
     """
     settings = read_settings(ws)
 
-    fitStatus, chiSq, covarianceTable, paramTable, fitWorkspace = api.UserFunction1D(InputWorkspace=ws,
-                       Function=settings.wavelength_resolution_dLambda_formula,
-                       InitialParameters=settings.wavelength_resolution_dLambda_initial_parameters,
-                       Output="fit")
+    out = api.EvaluateFunction(Function=settings.wavelength_resolution_function,
+                         InputWorkspace=ws,
+                         OutputWorkspace='out')
 
-    wavelength = fitWorkspace.readY(1)
-    d_lambda = fitWorkspace.readY(2)
+    wavelength = out.readY(1)
+    d_lambda = out.readY(2)
 
     return wavelength.tolist(), d_lambda.tolist()
