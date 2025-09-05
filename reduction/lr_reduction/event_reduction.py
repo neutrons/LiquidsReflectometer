@@ -579,7 +579,7 @@ class EventReflectivity:
         q_summing : bool
             Turns on constant-Q binning
         tof_weighted : bool
-            If True, binning will be done by weighting each event to the DB distribution
+            If True, binning will be done by weighting each event to the direct beam (DB) distribution
         bck_in_q : bool
             If True, the background will be estimated in Q space using the constant-Q binning approach
         clean : bool
@@ -966,21 +966,21 @@ class EventReflectivity:
                 if wl_dist is not None and wl_bins is not None:
                     if wl_error is None:
                         wl_error = np.zeros(len(wl_dist))
-                        print("No error provided for the normalization weighting")
+                        api.logger.notice("No error provided for normalization weighting")
                     # Computer wavelength weights
                     wl_weights = 1.0 / np.interp(wl_list, wl_bins, wl_dist, np.inf, np.inf)
                     hist_weights = wl_weights * qz / wl_list
 
                     # Relative error in weights from Poisson statistics.
-                    # ***** This needs looking at as wl_dist is already processed and not just the raw counts
+                    # TODO: Verify this error propagation as wl_dist is already processed and not just the raw counts
                     wl_interp_std = np.interp(wl_list, wl_bins, wl_error, left=0, right=0)
                     wl_interp_dist = np.interp(wl_list, wl_bins, wl_dist, left=np.inf, right=np.inf)
                     rel_err_weights = wl_interp_std / wl_interp_dist
 
-                    #Relative error in wl_list also from Poisson statistics
+                    # Relative error in wl_list also from Poisson statistics
                     rel_err_wl_list = np.sqrt(wl_list) / wl_list
 
-                    #Combine relative errors
+                    # Combine relative errors
                     rel_err_hist_weights = np.sqrt(rel_err_weights**2 + rel_err_wl_list**2)
 
                     # Absolute error in histogram weights
@@ -1452,15 +1452,3 @@ def _find_sigma_68(L_, l_, target_prob=0.68):
         return _trapezoidal_cdf_analytic(np.array([x]), L_, l_)[0] - \
                 _trapezoidal_cdf_analytic(np.array([-x]), L_, l_)[0] - target_prob
     return brentq(func, 0, L_)
-
-## Fix the resolution to include si - Done
-## Add new function for correction for the shape correction - Done.
-## Add to new function the q-summing part
-## Add new function for the lambda correction (Jose?)
-## Fix the error propagation in the reflectivity - Needs testing
-## Fix the qz set to 0
-## Fix the pixel angle using the top/bottom
-## Function to create DB
-## Function to process from the DB run number or pre-processed
-## Fix the q-summing saving into the template and being read back in
-## Fix q-bin error and auto trimming points

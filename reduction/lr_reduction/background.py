@@ -195,10 +195,10 @@ def side_background(
     q_bins : numpy.ndarray
         Array of Q bins
     wl_dist : numpy.ndarray
-        Wavelength distribution for the case where we use weighted events for normatization
+        Wavelength distribution for the case where we use weighted events for normalization
     wl_bins : numpy.ndarray
-        Array of wavelength bins for the case where we use weighted events for normatization
-    wl_std : numpy.nparray
+        Array of wavelength bins for the case where we use weighted events for normalization
+    wl_std : numpy.ndarray
         Array of errors for the normalization
     q_summing : bool
         If True, sum the counts in Q bins

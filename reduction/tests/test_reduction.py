@@ -67,14 +67,7 @@ def test_q_summing(nexus_dir):
     # Note that TOF weighted may have a slightly different range, so here we skip
     # the extra point.
     assert len(qz_mid0) == len(qz_mid[1:])
-
-    # plt.plot(qz_mid,refl, 'o', label='q summing and tof weighted')
-    # plt.plot(qz_mid0, refl0, 'x', label='no q summing')
-    # plt.xscale('log')
-    # plt.yscale('log')
-    # plt.legend()
-    # plt.show()
-
+    
     # Q-summing for lowest angle gives odd edge effects at low q. Will need addressing
     # as part of future regridding but not typically used for lowest angle and check
     # agreement excluding these lowest points for now. (Graph shows change.)
