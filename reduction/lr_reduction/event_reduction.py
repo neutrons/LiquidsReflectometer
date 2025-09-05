@@ -382,8 +382,6 @@ class EventReflectivity:
         self.summing_threshold = None
         self.q_summing = False
         self.dq_over_q = 0
-        self.wavelength = []
-        self.d_lambda = []
         self.dead_time = dead_time
         self.paralyzable = paralyzable
         self.dead_time_value = dead_time_value
@@ -560,8 +558,6 @@ class EventReflectivity:
             time=time.ctime(),
             dq0=dq0,
             dq_over_q=self.dq_over_q,
-            d_lambda=self.d_lambda,
-            wavelength=self.wavelength,
             sequence_number=sequence_number,
             sequence_id=sequence_id,
             q_summing=self.q_summing,
@@ -619,9 +615,10 @@ class EventReflectivity:
 
         # Compute Q resolution
         self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing)
+        # Compute wavelength component of the Q-resolution
+        # TODO: integrate this component to self.dq_over_q
+        wavelength, d_lambda = compute_wavelength_resolution(self._ws_sc)
         self.q_summing = q_summing
-        self.wavelength, self.d_lambda = compute_wavelength_resolution(self._ws_sc)
-
 
         return self.q_bins, self.refl, self.d_refl
 
@@ -1270,7 +1267,7 @@ def compute_wavelength_resolution(ws):
 
     Returns
     -------
-    tuple of List[Float]
+    tuple of np.ndarray
         (wavelength, d_lambda):
             wavelength: the fitted wavelength values
             d_lambda: the difference between wavelength and the fit
@@ -1284,4 +1281,4 @@ def compute_wavelength_resolution(ws):
     wavelength = out.readY(1)
     d_lambda = out.readY(2)
 
-    return wavelength.tolist(), d_lambda.tolist()
+    return np.array(wavelength), np.array(d_lambda)
