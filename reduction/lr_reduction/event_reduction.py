@@ -153,6 +153,7 @@ def read_settings(ws) -> InstrumentSettings:
         pixel_width=settings_dict["pixel-width"],
         xi_reference=settings_dict["xi-reference"],
         s1_sample_distance=settings_dict["s1-sample-distance"],
+        wavelength_resolution_function=settings_dict["wavelength-resolution-function"],
     )
     return settings
 
@@ -614,6 +615,9 @@ class EventReflectivity:
 
         # Compute Q resolution
         self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing)
+        # Compute wavelength component of the Q-resolution
+        # TODO: integrate this component to self.dq_over_q
+        wavelength, d_lambda = compute_wavelength_resolution(self._ws_sc)
         self.q_summing = q_summing
 
         return self.q_bins, self.refl, self.d_refl
@@ -1251,3 +1255,30 @@ def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     slit_distance = s1_sample_distance - sample_si_distance
     dq_over_q = s1h / slit_distance / theta
     return dq_over_q
+
+def compute_wavelength_resolution(ws):
+    """
+    Compute the wavelength resolution from the meta data.
+
+    Parameters
+    ----------
+    ws : mantid.api.Workspace
+        Mantid workspace to extract correction meta-data from.
+
+    Returns
+    -------
+    tuple of np.ndarray
+        (wavelength, d_lambda):
+            wavelength: the fitted wavelength values
+            d_lambda: the difference between wavelength and the fit
+    """
+    settings = read_settings(ws)
+
+    out = api.EvaluateFunction(Function=settings.wavelength_resolution_function,
+                         InputWorkspace=ws,
+                         OutputWorkspace='out')
+
+    wavelength = out.readY(1)
+    d_lambda = out.readY(2)
+
+    return np.array(wavelength), np.array(d_lambda)

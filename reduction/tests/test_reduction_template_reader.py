@@ -1,4 +1,5 @@
 import pytest
+
 from lr_reduction import template
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.reduction_template_reader import ReductionParameters

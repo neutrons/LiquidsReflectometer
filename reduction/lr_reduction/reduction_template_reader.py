@@ -187,6 +187,7 @@ class ReductionParameters:
         _xml += "<pixel_width>%s</pixel_width>\n" % str(self.pixel_width)
         _xml += "<xi_reference>%s</xi_reference>\n" % str(self.xi_reference)
         _xml += "<s1_sample_distance>%s</s1_sample_distance>\n" % str(self.s1_sample_distance)
+        _xml += "<wavelength_resolution_function>%s</wavelength_resolution_function>\n" % str(self.wavelength_resolution_function)
 
         # Emission time correction
         _xml += "<use_emission_time>%s</use_emission_time>\n" % str(self.use_emission_time)
@@ -305,6 +306,7 @@ class ReductionParameters:
         self.pixel_width = getFloatElement(instrument_dom, "pixel_width", default=self.pixel_width)
         self.xi_reference = getFloatElement(instrument_dom, "xi_reference", default=self.xi_reference)
         self.s1_sample_distance = getFloatElement(instrument_dom, "s1_sample_distance", default=self.s1_sample_distance)
+        self.wavelength_resolution_function = getStringElement(instrument_dom, "wavelength_resolution_function", default=self.wavelength_resolution_function)
 
         # Emission time
         # Defaults to True, but will be skipped if the necessary meta data is not found
