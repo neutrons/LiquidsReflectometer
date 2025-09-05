@@ -153,7 +153,7 @@ def read_settings(ws) -> InstrumentSettings:
         pixel_width=settings_dict["pixel-width"],
         xi_reference=settings_dict["xi-reference"],
         s1_sample_distance=settings_dict["s1-sample-distance"],
-        wavelength_resolution_formula=settings_dict["wavelength-resolution-formula"],
+        wavelength_resolution_function=settings_dict["wavelength-resolution-function"],
     )
     return settings
 
