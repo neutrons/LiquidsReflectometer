@@ -88,6 +88,8 @@ class ReductionParameters:
         # Calculate emission time delay instead of using an effective distance for all wavelengths
         self.use_emission_time: bool = True
 
+        self.gravity_direction = None
+
     def from_dict(self, data_dict, permissible=True):
         """
         Update object's attributes with a dictionary with entries of the type  attribute_name: attribute_value.
@@ -189,6 +191,8 @@ class ReductionParameters:
         _xml += "<xi_reference>%s</xi_reference>\n" % str(self.xi_reference)
         _xml += "<s1_sample_distance>%s</s1_sample_distance>\n" % str(self.s1_sample_distance)
         _xml += "<wavelength_resolution_function>%s</wavelength_resolution_function>\n" % str(self.wavelength_resolution_function)
+
+        _xml += "<gravity_direction>%s</gravity_direction>\n" % str(self.gravity_direction)
 
         # Emission time correction
         _xml += "<use_emission_time>%s</use_emission_time>\n" % str(self.use_emission_time)
@@ -313,6 +317,8 @@ class ReductionParameters:
         self.xi_reference = getFloatElement(instrument_dom, "xi_reference", default=self.xi_reference)
         self.s1_sample_distance = getFloatElement(instrument_dom, "s1_sample_distance", default=self.s1_sample_distance)
         self.wavelength_resolution_function = getStringElement(instrument_dom, "wavelength_resolution_function", default=self.wavelength_resolution_function)
+
+        self.gravity_direction = getFloatElement(instrument_dom, "gravity_direction", default=self.gravity_direction)
 
         # Emission time
         # Defaults to True, but will be skipped if the necessary meta data is not found
