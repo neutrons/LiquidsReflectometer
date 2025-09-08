@@ -295,7 +295,7 @@ def process_from_template_ws(
         dead_time_threshold=template_data.dead_time_threshold,
         instrument_settings=instrument_settings,
         use_emission_time=template_data.use_emission_time,
-        gravity_direction=template_data.gravity_direction
+        grav_direction=template_data.gravity_direction
     )
     print(f"{'*'*88}\nevent_refl:\n{event_refl}\n{'*'*88}")
 

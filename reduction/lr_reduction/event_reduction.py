@@ -947,6 +947,14 @@ class EventReflectivity:
                 # check on value in template for gravity correction:
                 if self.grav_direction is not None:
                     d_theta = self.gravity_correction(ws, wl_list, grav_dir=self.grav_direction)
+                # Build in ability to use current unweighted workflow which needs to use the same grav corr
+                elif peak_position == 0:
+                    ths_val_RB = abs(self._ws_sc.getRun().getProperty("BL4B:Mot:ths.RBV").value[0])
+                    if ths_val_RB < -0.001:
+                        grav_direction= -1
+                    else:
+                        grav_direction = 1
+                    d_theta = self.gravity_correction(ws, wl_list, grav_dir=grav_direction)
                 else:
                     d_theta = self.gravity_correction(ws, wl_list)
                 event_weights = evt_list.getWeights()
