@@ -91,7 +91,6 @@ def test_full_reduction(nexus_dir):
         if first_run is None:
             first_run = run_number
             resolution = event_reduction.compute_resolution(ws_sc)
-            wavelength, d_lambda = event_reduction.compute_wavelength_resolution(ws_sc)
 
         for i in range(len(qz_mid)):
             qz_all.append(qz_mid[i])
