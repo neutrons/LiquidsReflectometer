@@ -6,6 +6,7 @@ from pathlib import Path
 import mantid
 import mantid.simpleapi as mtd_api
 import numpy as np
+import pytest
 
 # lr_reduction imports
 from lr_reduction import event_reduction, template, workflow
@@ -186,6 +187,17 @@ def test_reduce_functional_bck(nexus_dir, template_dir):
 
     # Cleanup
     cleanup_partial_files(output_dir, range(198409, 198417))
+
+
+def test_compute_wavelength_resolution_n_spectra():
+    """
+    Call compute wavelength resolution method with a workspace
+    of multiple spectra
+    """
+    ws = mtd_api.CreateSampleWorkspace(WorkspaceType="Event")
+
+    with pytest.raises(ValueError):
+        _, _ = event_reduction.compute_wavelength_resolution(ws)
 
 
 def test_reduce_bck_option_mismatch(nexus_dir):

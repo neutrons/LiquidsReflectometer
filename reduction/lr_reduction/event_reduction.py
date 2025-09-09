@@ -1271,7 +1271,15 @@ def compute_wavelength_resolution(ws):
         (wavelength, d_lambda):
             wavelength: the fitted wavelength values
             d_lambda: the difference between wavelength and the fit
+
+    Raises
+    ------
+    ValueError : if ws does not have exactly one spectrum
     """
+
+    if ws.spectrumInfo().size() != 1:
+        raise ValueError("Workspace must have only one spectrum")
+
     settings = read_settings(ws)
 
     out = api.EvaluateFunction(Function=settings.wavelength_resolution_function,
