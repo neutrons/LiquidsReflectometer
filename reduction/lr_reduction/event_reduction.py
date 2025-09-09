@@ -615,9 +615,7 @@ class EventReflectivity:
 
         # Compute Q resolution
         self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing)
-        # Compute wavelength component of the Q-resolution
-        # TODO: integrate this component to self.dq_over_q
-        wavelength, d_lambda = compute_wavelength_resolution(self._ws_sc)
+        # TODO: integrate wavelength component to self.dq_over_q
         self.q_summing = q_summing
 
         return self.q_bins, self.refl, self.d_refl
