@@ -1285,7 +1285,7 @@ class EventReflectivity:
             thi_val = ws.getRun().getProperty("BL4B:Mot:thi.RBV").value[0]
 
             if ws.getInstrument().hasParameter("BL4B:CS:Mode:Coordinates"):
-                if ws.getInstrument().hasParameter("BL4B:CS:Mode:Coordinates").value[0] == "Earth-centered":
+                if ws.getRun().getProperty("BL4B:CS:Mode:Coordinates").value[0] == 0: # Earth-centered=0
                     theta_in = thi_val
                 else:
                     theta_in = thi_val - 4.0
