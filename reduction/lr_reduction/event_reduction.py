@@ -1284,8 +1284,8 @@ class EventReflectivity:
             # Angle calculated from thi and a flag on earth-centered vs beam-centered
             thi_val = ws.getRun().getProperty("BL4B:Mot:thi.RBV").value[0]
 
-            if ws.getInstrument().hasParameter("BL4B:Mot:EarthMode"): ##add real one!
-                if ws.getInstrument().hasParameter("BL4B:Mot:EarthMode").value[0] == "Earth":
+            if ws.getInstrument().hasParameter("BL4B:CS:Mode:Coordinates"):
+                if ws.getInstrument().hasParameter("BL4B:CS:Mode:Coordinates").value[0] == "Earth-centered":
                     theta_in = thi_val
                 else:
                     theta_in = thi_val - 4.0
@@ -1330,8 +1330,10 @@ class EventReflectivity:
             ths_val = abs(ws.getRun().getProperty("BL4B:Mot:ths.RBV").value[0])
             if ths_val < -0.001:
                 grav_direction= -1
+                print('Using gravity direction: negative')
             else:
                 grav_direction = 1
+                print('Using gravity direction: positive')
 
         return grav_direction*(theta_sample - theta_in) * np.pi / 180.0
 
