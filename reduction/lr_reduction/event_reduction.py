@@ -949,9 +949,9 @@ class EventReflectivity:
                     d_theta = self.gravity_correction(ws, wl_list, grav_dir=self.grav_direction)
                 # Build in ability to use current unweighted workflow which needs to use the same grav corr
                 elif peak_position == 0:
-                    ths_val_RB = abs(self._ws_sc.getRun().getProperty("BL4B:Mot:ths.RBV").value[0])
+                    ths_val_RB = self._ws_sc.getRun().getProperty("BL4B:Mot:ths.RBV").value[0]
                     if ths_val_RB < -0.001:
-                        grav_direction= -1
+                        grav_direction = -1
                     else:
                         grav_direction = 1
                     d_theta = self.gravity_correction(ws, wl_list, grav_dir=grav_direction)
@@ -1294,7 +1294,7 @@ class EventReflectivity:
                 and ws.getRun().getProperty("BL4B:CS:ExpPl:OperatingMode").value[0] == "Free Liquid"):
                 theta_in = thi_val
             else:
-                theta_in = thi_val - 4.0 ## what to use as backup?
+                theta_in = thi_val - 4.0
 
         # Calculation from the ILL paper. This works for inclined beams.
         # Calculated theta is the angle on the sample
@@ -1327,13 +1327,11 @@ class EventReflectivity:
             grav_direction = grav_dir
         else:
             # Determine sign of the correction term based on THS setup
-            ths_val = abs(ws.getRun().getProperty("BL4B:Mot:ths.RBV").value[0])
+            ths_val = ws.getRun().getProperty("BL4B:Mot:ths.RBV").value[0]
             if ths_val < -0.001:
-                grav_direction= -1
-                #print('Using gravity direction: negative')
+                grav_direction = -1
             else:
                 grav_direction = 1
-                #print('Using gravity direction: positive')
 
         return grav_direction*(theta_sample - theta_in) * np.pi / 180.0
 
