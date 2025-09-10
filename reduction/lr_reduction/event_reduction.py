@@ -1323,7 +1323,7 @@ class EventReflectivity:
         # Angle is arctan(dy/dx) at sample
         theta_sample = np.arctan(2 * k * (x0 - xs)) * 180 / np.pi
 
-        if grav_dir:
+        if grav_dir  is not None:
             grav_direction = grav_dir
         else:
             # Determine sign of the correction term based on THS setup
