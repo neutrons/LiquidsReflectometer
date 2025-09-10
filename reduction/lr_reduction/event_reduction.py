@@ -360,6 +360,7 @@ class EventReflectivity:
         dead_time_threshold: Optional[float] = 1.5,
         instrument_settings: InstrumentSettings = None,
         use_emission_time=True,
+        grav_direction=None
     ):
         if instrument in [self.INSTRUMENT_4A, self.INSTRUMENT_4B]:
             self.instrument = instrument
@@ -390,6 +391,7 @@ class EventReflectivity:
         self.dead_time_threshold = dead_time_threshold
         self.instrument_settings = instrument_settings
         self.use_emission_time = use_emission_time
+        self.grav_direction = grav_direction
 
         # Turn on functional background estimation
         self.use_functional_bck = functional_background
@@ -890,7 +892,19 @@ class EventReflectivity:
                 wl_list = tofs / self.constant
 
                 # Gravity correction
-                d_theta = self.gravity_correction(ws, wl_list)
+                # check on value in template for gravity correction:
+                if self.grav_direction is not None:
+                    d_theta = self.gravity_correction(ws, wl_list, grav_dir=self.grav_direction)
+                # Build in ability to use current unweighted workflow which needs to use the same grav corr
+                elif peak_position == 0:
+                    ths_val_RB = self._ws_sc.getRun().getProperty("BL4B:Mot:ths.RBV").value[0]
+                    if ths_val_RB < -0.001:
+                        grav_direction = -1
+                    else:
+                        grav_direction = 1
+                    d_theta = self.gravity_correction(ws, wl_list, grav_dir=grav_direction)
+                else:
+                    d_theta = self.gravity_correction(ws, wl_list)
                 event_weights = evt_list.getWeights()
 
                 x_distance = _pixel_width * (j - peak_position)
@@ -900,7 +914,8 @@ class EventReflectivity:
                 ths_value = ws.getRun()["ths"].value[-1]
                 delta_theta_f *= np.sign(ths_value)
 
-                qz = 4.0 * np.pi / wl_list * np.sin(theta + delta_theta_f - d_theta)
+                # TODO: Check in code for any other calls of gravity_correction.
+                qz = 4.0 * np.pi / wl_list * np.sin(theta + delta_theta_f + d_theta)
                 qz = np.fabs(qz)
 
                 if wl_dist is not None and wl_bins is not None:
@@ -1123,7 +1138,7 @@ class EventReflectivity:
             tofs -= t_off + t_mult * tofs / self.constant
         return tofs
 
-    def gravity_correction(self, ws, wl_list):
+    def gravity_correction(self, ws, wl_list, thet_in=None, grav_dir=None):
         """
         Gravity correction for each event
 
@@ -1133,6 +1148,11 @@ class EventReflectivity:
             Mantid workspace to extract correction meta-data from.
         wl_list : numpy.ndarray
             Array of wavelengths for each event.
+        thet_in : float
+            Optional float to specify theta in, otherwise defaults to log values.
+        grav_dir : float
+            Optional float to specify gravity direction, otherwise defaults to ths sign.
+            (i.e. can change with +1, -1 or 0 to turn off)
 
         Returns
         -------
@@ -1157,8 +1177,23 @@ class EventReflectivity:
         sample_si_distance = xi_reference - xi
         slit_distance = s1_sample_distance - sample_si_distance
 
-        # Angle of the incident beam on a horizontal sample
-        theta_in = -4.0
+        if thet_in is not None:
+            theta_in = thet_in
+        else:
+            # Angle calculated from thi and a flag on earth-centered vs beam-centered
+            thi_val = ws.getRun().getProperty("BL4B:Mot:thi.RBV").value[0]
+
+            if ws.getInstrument().hasParameter("BL4B:CS:Mode:Coordinates"):
+                if ws.getRun().getProperty("BL4B:CS:Mode:Coordinates").value[0] == 0: # Earth-centered=0
+                    theta_in = thi_val
+                else:
+                    theta_in = thi_val - 4.0
+
+            elif ("BL4B:CS:ExpPl:OperatingMode" in ws.getRun()
+                and ws.getRun().getProperty("BL4B:CS:ExpPl:OperatingMode").value[0] == "Free Liquid"):
+                theta_in = thi_val
+            else:
+                theta_in = thi_val - 4.0
 
         # Calculation from the ILL paper. This works for inclined beams.
         # Calculated theta is the angle on the sample
@@ -1187,7 +1222,17 @@ class EventReflectivity:
         # Angle is arctan(dy/dx) at sample
         theta_sample = np.arctan(2 * k * (x0 - xs)) * 180 / np.pi
 
-        return (theta_sample - theta_in) * np.pi / 180.0
+        if grav_dir  is not None:
+            grav_direction = grav_dir
+        else:
+            # Determine sign of the correction term based on THS setup
+            ths_val = ws.getRun().getProperty("BL4B:Mot:ths.RBV").value[0]
+            if ths_val < -0.001:
+                grav_direction = -1
+            else:
+                grav_direction = 1
+
+        return grav_direction*(theta_sample - theta_in) * np.pi / 180.0
 
 
 def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
