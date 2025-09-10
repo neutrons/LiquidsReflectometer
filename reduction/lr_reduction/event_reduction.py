@@ -1330,10 +1330,10 @@ class EventReflectivity:
             ths_val = abs(ws.getRun().getProperty("BL4B:Mot:ths.RBV").value[0])
             if ths_val < -0.001:
                 grav_direction= -1
-                print('Using gravity direction: negative')
+                #print('Using gravity direction: negative')
             else:
                 grav_direction = 1
-                print('Using gravity direction: positive')
+                #print('Using gravity direction: positive')
 
         return grav_direction*(theta_sample - theta_in) * np.pi / 180.0
 
