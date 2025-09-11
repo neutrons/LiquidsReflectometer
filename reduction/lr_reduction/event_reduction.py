@@ -683,14 +683,15 @@ class EventReflectivity:
                 d_direct_beam = np.sqrt(d_direct_beam**2 + d_direct_beam_bck**2)
             db_bins = direct_beam > 0
 
-            # Clarify error calculation:
-            refl_normalized = refl.copy() # create a copy of correct dimensions
-            d_refl_normalized = np.zeros(len(d_refl))
-            refl_normalized[db_bins] = refl[db_bins] / direct_beam[db_bins]
-            d_refl_normalized[db_bins] = abs(refl_normalized[db_bins]) * np.sqrt(
-                            (d_refl[db_bins] ** 2 / refl[db_bins] ** 2) +
-                            (d_direct_beam[db_bins] ** 2 / direct_beam[db_bins] ** 2)
-            )
+            # Error propagation for ratio without dividing by refl (robust if some items of refl are zero)
+            refl_normalized = np.zeros_like(refl)  # array ofzeros with same shape as refl
+            d_refl_normalized = np.zeros_like(d_refl)
+            r = refl[db_bins]
+            r_error = d_refl[db_bins]
+            db = direct_beam[db_bins]
+            db_error = d_direct_beam[db_bins]
+            refl_normalized[db_bins] = r / db
+            d_refl_normalized[db_bins] = np.sqrt((r_error**2) / (db**2) + (r**2) * (db_error**2) / (db**4))
 
             # rename to match prior code and avoid issues
             refl[db_bins] = refl_normalized[db_bins]
