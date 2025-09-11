@@ -10,6 +10,7 @@ from typing import Optional
 
 import mantid.simpleapi as api
 import numpy as np
+from scipy.optimize import brentq
 
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.utils import mantid_algorithm_exec
@@ -61,6 +62,7 @@ def get_q_binning(q_min=0.001, q_max=0.15, q_step=-0.02):
     This function calculates the binning for Q values based on the provided minimum, maximum, and step values.
     If the step value is positive, it generates a linear binning. If the step value is negative, it generates
     a logarithmic binning.
+    Corrected with +1 on number of steps.
 
     Parameters
     ----------
@@ -78,11 +80,11 @@ def get_q_binning(q_min=0.001, q_max=0.15, q_step=-0.02):
         A numpy array of Q values based on the specified binning.
     """
     if q_step > 0:
-        n_steps = int((q_max - q_min) / q_step)
+        n_steps = int((q_max - q_min) / q_step) + 1  # the +1 is to include q_max
         return q_min + np.asarray([q_step * i for i in range(n_steps)])
     else:
         _step = 1.0 + np.abs(q_step)
-        n_steps = int(np.log(q_max / q_min) / np.log(_step))
+        n_steps = int(np.log(q_max / q_min) / np.log(_step)) + 1  # the +1 is to include q_max
         return q_min * np.asarray([_step**i for i in range(n_steps)])
 
 
@@ -198,7 +200,8 @@ def process_attenuation(ws, thickness=0):
     mu_model = mu_abs[1]
     tof_model = constant * wl_model
     transmission = 1 / np.exp(-mu_model * thickness)
-    transmission_ws = api.CreateWorkspace(OutputWorkspace="transmission", DataX=tof_model, DataY=transmission, UnitX="TOF", NSpec=1)
+    transmission_ws = api.CreateWorkspace(OutputWorkspace="transmission",
+                                          DataX=tof_model, DataY=transmission, UnitX="TOF", NSpec=1)
 
     ws = api.Multiply(ws, transmission_ws, OutputWorkspace=str(ws))
     return ws
@@ -397,11 +400,13 @@ class EventReflectivity:
         # Process workspaces
         if self.tof_range is not None:
             self._ws_sc = api.CropWorkspace(
-                InputWorkspace=scattering_workspace, XMin=tof_range[0], XMax=tof_range[1], OutputWorkspace="_" + str(scattering_workspace)
+                InputWorkspace=scattering_workspace, XMin=tof_range[0], XMax=tof_range[1],
+                OutputWorkspace="_" + str(scattering_workspace)
             )
             if direct_workspace is not None:
                 self._ws_db = api.CropWorkspace(
-                    InputWorkspace=direct_workspace, XMin=tof_range[0], XMax=tof_range[1], OutputWorkspace="_" + str(direct_workspace)
+                    InputWorkspace=direct_workspace, XMin=tof_range[0], XMax=tof_range[1],
+                    OutputWorkspace="_" + str(direct_workspace)
                 )
             else:
                 self._ws_db = None
@@ -445,6 +450,7 @@ class EventReflectivity:
         self.q_min_meas = 4.0 * np.pi / self.wl_range[1] * np.fabs(np.sin(self.theta))
         self.q_max_meas = 4.0 * np.pi / self.wl_range[0] * np.fabs(np.sin(self.theta))
 
+        # Template defaults specify q_min but not q_max. TODO: Need to check if it needs changing.
         if self.q_min is None:
             self.q_min = self.q_min_meas
         if self.q_max is None:
@@ -665,25 +671,35 @@ class EventReflectivity:
             # we can bin the DB according to the same transform instead of binning and dividing in TOF.
             # This is mathematically equivalent and convenient in terms of abstraction for later
             # use for the constant-Q calculation elsewhere in the code.
-            norm, d_norm = self._reflectivity(
-                self._ws_db, peak_position=0, peak=self.norm_peak, low_res=self.norm_low_res, theta=self.theta, q_summing=False
+            direct_beam, d_direct_beam = self._reflectivity(
+                self._ws_db, peak_position=0, peak=self.norm_peak, low_res=self.norm_low_res,
+                theta=self.theta, q_summing=False
             )
 
             # Direct beam background could be added here. The effect will be negligible.
             if self.norm_bck is not None:
-                norm_bck, d_norm_bck = self.norm_bck_subtraction()
-                norm -= norm_bck
-                d_norm = np.sqrt(d_norm**2 + d_norm_bck**2)
-            db_bins = norm > 0
+                direct_beam_bck, d_direct_beam_bck = self.norm_bck_subtraction()
+                direct_beam -= direct_beam_bck
+                d_direct_beam = np.sqrt(d_direct_beam**2 + d_direct_beam_bck**2)
+            db_bins = direct_beam > 0
 
-            refl[db_bins] = refl[db_bins] / norm[db_bins]
-            d_refl[db_bins] = np.sqrt(
-                d_refl[db_bins] ** 2 / norm[db_bins] ** 2 + refl[db_bins] ** 2 * d_norm[db_bins] ** 2 / norm[db_bins] ** 4
-            )
+            # Error propagation for ratio without dividing by refl (robust if some items of refl are zero)
+            refl_normalized = np.zeros_like(refl)  # array ofzeros with same shape as refl
+            d_refl_normalized = np.zeros_like(d_refl)
+            r = refl[db_bins]
+            r_error = d_refl[db_bins]
+            db = direct_beam[db_bins]
+            db_error = d_direct_beam[db_bins]
+            refl_normalized[db_bins] = r / db
+            d_refl_normalized[db_bins] = np.sqrt((r_error**2) / (db**2) + (r**2) * (db_error**2) / (db**4))
+
+            # rename to match prior code and avoid issues
+            refl[db_bins] = refl_normalized[db_bins]
+            d_refl[db_bins] = d_refl_normalized[db_bins]
 
             # Hold on to normalization to be able to diagnose issues later
-            self.norm = norm[db_bins]
-            self.d_norm = d_norm[db_bins]
+            self.norm = direct_beam[db_bins]
+            self.d_norm = d_direct_beam[db_bins]
 
             # Clean up points where we have no direct beam
             zero_db = [not v for v in db_bins]
@@ -718,12 +734,17 @@ class EventReflectivity:
             The uncertainties in the reflectivity values
         """
         # Event weights for normalization
+        ## this gets the DB events and produces an array of weights and wavelength values
+        ## think this could be replaced by a pre-processed transmission array...i.e. need the wl_dist and wl_bins.
         db_charge = self._ws_db.getRun().getProtonCharge()
         wl_events, wl_weights = self._get_events(self._ws_db, self.norm_peak, self.norm_low_res)
         wl_dist, wl_bins = np.histogram(wl_events, bins=100, weights=wl_weights)
         _bin_width = wl_bins[1:] - wl_bins[:-1]
         wl_dist = wl_dist / db_charge / _bin_width
         wl_middle = [(wl_bins[i + 1] + wl_bins[i]) / 2.0 for i in range(len(wl_bins) - 1)]
+
+        wl_var, _ = np.histogram(wl_events, bins=wl_bins, weights=wl_weights**2)
+        wl_std = np.sqrt(wl_var) / (db_charge * _bin_width)
 
         refl, d_refl = self._reflectivity(
             self._ws_sc,
@@ -734,18 +755,23 @@ class EventReflectivity:
             q_summing=q_summing,
             wl_dist=wl_dist,
             wl_bins=wl_middle,
+            wl_error=wl_std
         )
 
         if self.signal_bck is not None:
-            refl_bck, d_refl_bck = self.bck_subtraction(wl_dist=wl_dist, wl_bins=wl_middle, q_summing=bck_in_q)
+            refl_bck, d_refl_bck = self.bck_subtraction(wl_dist=wl_dist, wl_bins=wl_middle,
+                                                        q_summing=bck_in_q, wl_std=wl_std)
             refl -= refl_bck
             d_refl = np.sqrt(d_refl**2 + d_refl_bck**2)
+
+        # Does there need to be a clean-up of non-zeros like in the unweighted version?
 
         self.refl = refl
         self.d_refl = d_refl
         return self.q_bins, refl, d_refl
 
-    def _roi_integration(self, ws, peak, low_res, q_bins=None, wl_dist=None, wl_bins=None, q_summing=False):
+    def _roi_integration(self, ws, peak, low_res, q_bins=None, wl_dist=None, wl_bins=None,
+                         wl_std=None, q_summing=False):
         """
         Integrate a region of interest and normalize by the number of included pixels.
 
@@ -765,6 +791,7 @@ class EventReflectivity:
             q_summing=q_summing,
             wl_dist=wl_dist,
             wl_bins=wl_bins,
+            wl_error=wl_std
         )
 
         _pixel_area = peak[1] - peak[0] + 1.0
@@ -772,7 +799,8 @@ class EventReflectivity:
         d_refl_bck /= _pixel_area
         return refl_bck, d_refl_bck
 
-    def bck_subtraction(self, normalize_to_single_pixel=False, q_bins=None, wl_dist=None, wl_bins=None, q_summing=False):
+    def bck_subtraction(self, normalize_to_single_pixel=False, q_bins=None,
+                        wl_dist=None, wl_bins=None, wl_std=None, q_summing=False):
         """
         Perform background subtraction on the signal.
         This method provides a higher-level call for background subtraction,
@@ -788,6 +816,8 @@ class EventReflectivity:
             Array of wavelength (wl) values.
         wl_bins
             Array of bins for the wavelength (wl) values.
+        wl_std
+            Array of errors for wavelength normalization.
         q_summing : bool
             If True, sum the q values.
 
@@ -814,7 +844,8 @@ class EventReflectivity:
                 q_bins=q_bins,
                 wl_dist=wl_dist,
                 wl_bins=wl_bins,
-                q_summing=q_summing,
+                wl_std=wl_std,
+                q_summing=q_summing
             )
         else:
             return background.side_background(
@@ -827,7 +858,8 @@ class EventReflectivity:
                 q_bins=q_bins,
                 wl_dist=wl_dist,
                 wl_bins=wl_bins,
-                q_summing=q_summing,
+                wl_std=wl_std,
+                q_summing=q_summing
             )
 
     def norm_bck_subtraction(self):
@@ -860,61 +892,120 @@ class EventReflectivity:
         return z_bins, _spec, _d_spec
 
     def _reflectivity(
-        self, ws, peak_position, peak, low_res, theta, q_bins=None, q_summing=False, wl_dist=None, wl_bins=None, sum_pixels=True
+        self, ws, peak_position, peak, low_res, theta, q_bins=None, q_summing=False,
+        wl_dist=None, wl_bins=None, wl_error=None, sum_pixels=True
     ):
         """
-        Assumes that the input workspace is normalized by proton charge.
+        Assumes that the input workspace is not normalized by proton charge.
+
+        In the current workflow, for specular_unweighted this is applied separately to the reflectivity
+        run and the normalisation run.
+        For specular_weighted, the wl_dist and wl_bins are used to provide the normalisation instead.
+        sum_pixels and q_bins are not specified and used with defaults
+        low_res is the x_range of interest from template
+        peak is data_peak_range from template (i.e. specular ROI)
+
+        It returns reflectivity and error.
         """
         charge = ws.getRun().getProtonCharge()
+        ## in standard workflow, q_bins not specified and calculated using the get_q_binning algorithm,
+        # with ranges and steps taken from the template.
         _q_bins = self.q_bins if q_bins is None else q_bins
 
         shape = len(_q_bins) - 1 if sum_pixels else ((peak[1] - peak[0] + 1), len(_q_bins) - 1)
         refl = np.zeros(shape)
-        d_refl_sq = np.zeros(shape)
+        d_refl = np.zeros(shape)
         counts = np.zeros(shape)
+        keep_weights = np.zeros(shape)
+        # pixel_width only used for q_summing:
         _pixel_width = self.pixel_width if q_summing else 0.0
 
+        ## this first section is very similar to _get_events.
+        # TODO: look at refactoring. Linked to tof vs lam vs q too and desired outputs.
         for i in range(low_res[0], int(low_res[1] + 1)):
             for j in range(peak[0], int(peak[1] + 1)):
+                # set pixel mapping based on orientation of detector.
                 if self.instrument == self.INSTRUMENT_4A:
                     pixel = j * self.n_y + i
                 else:
                     pixel = i * self.n_y + j
+                # collect the events
                 evt_list = ws.getSpectrum(pixel)
                 if evt_list.getNumberEvents() == 0:
                     continue
 
+                # collect tof values and apply emission time correction based on flag from template
                 tofs = evt_list.getTofs()
                 if self.use_emission_time:
-                    tofs = self.emission_time_correction(ws, tofs)
+                    tofs = self.emission_time_correction(ws, tofs=tofs)
+                # convert tof values to wavelength.
                 wl_list = tofs / self.constant
 
                 # Gravity correction
                 d_theta = self.gravity_correction(ws, wl_list)
+                # collect weighted events
                 event_weights = evt_list.getWeights()
 
+                # Calculate per-spectum offset in theta for q-summing.
+                # For q_summing=True, peak_position is fit in template.py using the peak_finding.py functions.
+                # For q_summing=False, _pixel_width=0 and no offset is applied.
                 x_distance = _pixel_width * (j - peak_position)
                 delta_theta_f = np.arctan(x_distance / self.sample_detector_distance) / 2.0
-
                 # Sign will depend on reflect up or down
                 ths_value = ws.getRun()["ths"].value[-1]
                 delta_theta_f *= np.sign(ths_value)
 
+                # convert wavelengths into qz. This could be separated to enable output in lam and q.
                 qz = 4.0 * np.pi / wl_list * np.sin(theta + delta_theta_f - d_theta)
-                qz = np.fabs(qz)
+                # Remove unfeasible negative values:
+                valid_mask = qz > 0
+                qz = qz[valid_mask]
+                wl_list = wl_list[valid_mask]
+                event_weights = event_weights[valid_mask]
 
+                # this workflow is used for specular_weighted:
+                # matches the bins (in wavelength) of the norm run and refl run.
+                # Then converts into q and applies the event weighting.
                 if wl_dist is not None and wl_bins is not None:
+                    if wl_error is None:
+                        wl_error = np.zeros(len(wl_dist))
+                        print("No error provided for the normalization weighting")
+                    # Computer wavelength weights
                     wl_weights = 1.0 / np.interp(wl_list, wl_bins, wl_dist, np.inf, np.inf)
                     hist_weights = wl_weights * qz / wl_list
+
+                    # Relative error in weights from Poisson statistics.
+                    # ***** This needs looking at as wl_dist is already processed and not just the raw counts
+                    wl_interp_std = np.interp(wl_list, wl_bins, wl_error, left=0, right=0)
+                    wl_interp_dist = np.interp(wl_list, wl_bins, wl_dist, left=np.inf, right=np.inf)
+                    rel_err_weights = wl_interp_std / wl_interp_dist
+
+                    #Relative error in wl_list also from Poisson statistics
+                    rel_err_wl_list = np.sqrt(wl_list) / wl_list
+
+                    #Combine relative errors
+                    rel_err_hist_weights = np.sqrt(rel_err_weights**2 + rel_err_wl_list**2)
+
+                    # Absolute error in histogram weights
+                    d_hist_weights = hist_weights * rel_err_hist_weights
+
+                    # Apply event weights
                     hist_weights *= event_weights
+                    d_hist_weights *= event_weights
+
+                    # Histogram the data and errors
                     _counts, _ = np.histogram(qz, bins=_q_bins, weights=hist_weights)
                     _norm, _ = np.histogram(qz, bins=_q_bins)
+                    _for_errors, _ = np.histogram(qz, bins=_q_bins, weights=d_hist_weights**2)
                     if sum_pixels:
                         refl += _counts
                         counts += _norm
+                        keep_weights += _for_errors
                     else:
                         refl[j - peak[0]] += _counts
                         counts[j - peak[0]] += _norm
+                        keep_weights[j - peak[0]] += _for_errors
+                # this workflow is used for specular_unweighted:
                 else:
                     _counts, _ = np.histogram(qz, bins=_q_bins, weights=event_weights)
                     if sum_pixels:
@@ -923,6 +1014,7 @@ class EventReflectivity:
                         refl[j - peak[0]] += _counts
 
         # The following is for information purposes
+        # This also sets the summing_threshold for cutting off low Q points in the specular function.
         if q_summing:
             x0 = _pixel_width * (peak_position - peak[0])
             x1 = _pixel_width * (peak_position - peak[1])
@@ -935,20 +1027,26 @@ class EventReflectivity:
             print("Qz range: ", qz_min, mid_point, qz_max)
             self.summing_threshold = mid_point
 
+        # for the specular weighted workflow, normalises to charge and bin_size
         if wl_dist is not None and wl_bins is not None:
             bin_size = _q_bins[1:] - _q_bins[:-1]
-            non_zero = counts > 0
+            #non_zero = counts > 0
             # Deal with the case where we don't sum all the bins
             if not sum_pixels:
                 bin_size = np.tile(bin_size, [counts.shape[0], 1])
 
-            d_refl_sq[non_zero] = refl[non_zero] / np.sqrt(counts[non_zero]) / charge / bin_size[non_zero]
-            refl[non_zero] = refl[non_zero] / charge / bin_size[non_zero]
+            # Normalize the reflection and error
+            refl_norm = refl / charge / bin_size
+            d_refl = np.sqrt(keep_weights) / charge / bin_size
+
+            ## Rename back to prior to avoid errors:
+            refl = refl_norm
+
         else:
-            d_refl_sq = np.sqrt(np.fabs(refl)) / charge
+            d_refl = np.sqrt(np.fabs(refl)) / charge
             refl /= charge
 
-        return refl, d_refl_sq
+        return refl, d_refl
 
     def _get_events(self, ws, peak, low_res):
         """
@@ -967,14 +1065,15 @@ class EventReflectivity:
                 tofs = evt_list.getTofs()
                 # Correct for emission time as needed
                 if self.use_emission_time:
-                    tofs = self.emission_time_correction(ws, tofs)
+                    tofs = self.emission_time_correction(ws, tofs=tofs)
                 wl_list = tofs / self.constant
                 wl_events = np.concatenate((wl_events, wl_list))
                 weights = evt_list.getWeights()
                 wl_weights = np.concatenate((wl_weights, weights))
         return wl_events, wl_weights
 
-    def off_specular(self, x_axis=None, x_min=-0.015, x_max=0.015, x_npts=50, z_min=None, z_max=None, z_npts=-120, bck_in_q=None):
+    def off_specular(self, x_axis=None, x_min=-0.015, x_max=0.015, x_npts=50, z_min=None, z_max=None,
+                      z_npts=-120, bck_in_q=None):
         """
         Compute off-specular
 
@@ -1097,7 +1196,7 @@ class EventReflectivity:
 
     def emission_time_correction(self, ws, tofs):
         """
-        Coorect TOF for emission time delay in the moderator.
+        Correct TOF for emission time delay in the moderator.
 
         Parameters
         ----------
@@ -1111,6 +1210,7 @@ class EventReflectivity:
         numpy.ndarray
             Array of corrected TOF values
         """
+
         mt_run = ws.getRun()
         use_emission_delay = False
         if "BL4B:Chop:Skf2:ChopperModerator" in mt_run:
@@ -1119,6 +1219,7 @@ class EventReflectivity:
             t_off = mt_run.getProperty("BL4B:Chop:Skf2:ChopperOffset").value[0]
             use_emission_delay = moderator_calc == 1
 
+        # Parameters from nexus logs are for correction in lambda. The /self.constant converts the tofs to lam.
         if use_emission_delay:
             tofs -= t_off + t_mult * tofs / self.constant
         return tofs
@@ -1126,6 +1227,7 @@ class EventReflectivity:
     def gravity_correction(self, ws, wl_list):
         """
         Gravity correction for each event
+        Think this works on an array of wavelengths so could work for non-event list too.
 
         Parameters
         ----------
@@ -1158,6 +1260,7 @@ class EventReflectivity:
         slit_distance = s1_sample_distance - sample_si_distance
 
         # Angle of the incident beam on a horizontal sample
+        # TODO: this will need to be updated with logged value.
         theta_in = -4.0
 
         # Calculation from the ILL paper. This works for inclined beams.
@@ -1193,6 +1296,7 @@ class EventReflectivity:
 def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     """
     Compute the Q resolution from the meta data.
+    Corrected to include both slits.
 
     Parameters
     ----------
@@ -1247,12 +1351,123 @@ def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     if settings.s1_sample_distance is not None:
         s1_sample_distance = settings.s1_sample_distance * 1000
 
+    # Get slit gap openings.
     s1h = abs(ws.getRun().getProperty("S1VHeight").value[0])
+    sih = abs(ws.getRun().getProperty("SiVHeight").value[0])
     xi = abs(ws.getRun().getProperty("BL4B:Mot:xi.RBV").value[0])
     sample_si_distance = xi_reference - xi
     slit_distance = s1_sample_distance - sample_si_distance
-    dq_over_q = s1h / slit_distance / theta
+    dq_over_q = (s1h + sih) * 0.5 / slit_distance / theta
     return dq_over_q
+
+## New function for resolution, ready for testing.
+## Check choices of returned values once ready to implement.
+## Needs update for q-summing.
+def trapezoidal_distribution_params(ws, Theta_deg=None, FootPrint=None, SlitRatio=None):
+    """
+    Calculate trapezoidal parameters L, l from beam/slit geometry and
+    compute equivalent normal sigma for 68% probability interval to
+    enable calculation of angular part of dq_over_q.
+    Option to provide footprint and slitratio rather than reading from file.
+
+    Parameters:
+    -----------
+    ws : mantid.api.Workspace
+        Mantid workspace to extract correction meta-data from.
+    Theta_deg : float
+        Incident beam angle in degrees.
+    FootPrint : float (optional)
+        Beam footprint length on sample [mm].
+    SlitRatio : float (optional)
+        Ratio of slit openings S1/Si.
+
+    Returns:
+    --------
+    L_bottom : float
+        Half-width of trapezoidal support [degrees].
+    l_top : float
+        Half-width of trapezoidal flat-top [degrees].
+    sigma_equiv : float
+        Equivalent normal sigma for central 68% interval [degrees].
+    dth_over_th : float
+        Angular part of dq/q
+    """
+
+    settings = read_settings(ws)
+
+    # Xi reference would be the position of xi if the si slit were to be positioned
+    # at the sample. The distance from the sample to si is then xi_reference - xi.
+    xi_ref = 445
+    if ws.getInstrument().hasParameter("xi-reference"):
+        xi_ref = ws.getInstrument().getNumberParameter("xi-reference")[0]
+
+    # Distance between the s1 and the sample
+    dS1Samp = 1485
+    if settings.s1_sample_distance is not None:
+        dS1Samp = settings.s1_sample_distance * 1000
+
+    xi_pos = abs(ws.getRun().getProperty("BL4B:Mot:xi.RBV").value[0])
+
+    # Derived distances
+    dSiSamp = xi_ref - xi_pos
+    dS1Si = dS1Samp - dSiSamp
+
+    if Theta_deg is None:
+        Theta_deg = abs(ws.getRun().getProperty("ths").value[0])
+
+    # Slit openings - can be taken from a FootPrint and SlitRatio if provided, or the logs
+    if FootPrint is not None and SlitRatio is not None:
+        SiY = FootPrint * np.sin(np.radians(Theta_deg)) / (1 + (dSiSamp/dS1Si)*(1 + SlitRatio))
+        S1Y = SiY * SlitRatio
+    else:
+        S1Y = abs(ws.getRun().getProperty("S1VHeight").value[0])
+        SiY = abs(ws.getRun().getProperty("SiVHeight").value[0])
+
+    # Trapezoidal half-width angles (deg)
+    L_bottom = np.degrees(np.arctan((S1Y + SiY) / (2 * dS1Si)))  # full half-width
+    l_top = np.degrees(np.arctan((S1Y - SiY) / (2 * dS1Si)))  # flat-top half-width
+
+    sigma_equiv = _find_sigma_68(L_bottom, l_top)
+    dth_over_th = sigma_equiv / Theta_deg
+
+    return L_bottom, l_top, sigma_equiv, dth_over_th
+
+# Analytic trapezoidal CDF for use in trapezoial_distribution_params
+def _trapezoidal_cdf_analytic(x, L_, l_):
+    h = 1 / (L_ + l_)
+    cdf = np.zeros_like(x)
+    left_tail = x < -L_
+    left_slope = (x >= -L_) & (x < -l_)
+    flat_top = (x >= -l_) & (x < l_)
+    right_slope = (x >= l_) & (x <= L_)
+    right_tail = x > L_
+
+    cdf[left_tail] = 0
+    cdf[left_slope] = (h / (L_ - l_)) * 0.5 * (x[left_slope] + L_)**2
+    F_neg_l = (h / (L_ - l_)) * 0.5 * (L_ - l_)**2
+    cdf[flat_top] = F_neg_l + h * (x[flat_top] + l_)
+    cdf[right_slope] = 1 - (h / (L_ - l_)) * 0.5 * (L_ - x[right_slope])**2
+    cdf[right_tail] = 1
+    return cdf
+
+# Find equivalent normal sigma for 68% central interval for use in trapezoidal_distribution_params
+def _find_sigma_68(L_, l_, target_prob=0.68):
+    def func(x):
+        return _trapezoidal_cdf_analytic(np.array([x]), L_, l_)[0] - \
+                _trapezoidal_cdf_analytic(np.array([-x]), L_, l_)[0] - target_prob
+    return brentq(func, 0, L_)
+
+## Fix the resolution to include si - Done
+## Add new function for correction for the shape correction - Done.
+## Add to new function the q-summing part
+## Add new function for the lambda correction (Jose?)
+## Fix the error propagation in the reflectivity - Needs testing
+## Fix the qz set to 0
+## Fix the pixel angle using the top/bottom
+## Function to create DB
+## Function to process from the DB run number or pre-processed
+## Fix the q-summing saving into the template and being read back in
+## Fix q-bin error and auto trimming points
 
 def compute_wavelength_resolution(ws):
     """

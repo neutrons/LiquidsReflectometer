@@ -16,7 +16,7 @@ def find_ranges_without_overlap(r1, r2):
         Range of pixels to consider
     r2 : list
         Range of pixels to exclude
-    
+
     Returns
     -------
     list
@@ -45,7 +45,8 @@ def find_ranges_without_overlap(r1, r2):
 
 
 def functional_background(
-    ws, event_reflectivity, peak, bck, low_res, normalize_to_single_pixel=False, q_bins=None, wl_dist=None, wl_bins=None, q_summing=False
+    ws, event_reflectivity, peak, bck, low_res, normalize_to_single_pixel=False, q_bins=None, wl_dist=None,
+    wl_bins=None, wl_std=None, q_summing=False
 ):
     """
     Estimate background using a linear function over a background range that may include the specular peak.
@@ -71,6 +72,8 @@ def functional_background(
         Wavelength distribution for the case where we use weighted events for normatization
     wl_bins : numpy.ndarray
         Array of wavelength bins for the case where we use weighted events for normatization
+    wl_std: numpy.ndarray
+        Array of errors for wl_dist array
     q_summing : bool
         If True, sum the counts in Q bins
 
@@ -108,6 +111,7 @@ def functional_background(
                 wl_dist=wl_dist,
                 wl_bins=wl_bins,
                 sum_pixels=False,
+                wl_error=wl_std
             )
             bck_counts.append(_b)
             d_bck_counts.append(_d_b)
@@ -151,7 +155,8 @@ def functional_background(
 
         refl_bck[i] = (slope * (peak[1] + peak[0] + 1) + 2 * intercept) * _pixel_area / 2
         d_refl_bck[i] = (
-            np.sqrt(d_slope**2 * (peak[1] + peak[0] + 1) ** 2 + 4 * d_intercept**2 + 4 * (peak[1] + peak[0] + 1) * fit.covar[0][1])
+            np.sqrt(d_slope**2 * (peak[1] + peak[0] + 1) ** 2 + 4 * d_intercept**2 +
+                    4 * (peak[1] + peak[0] + 1) * fit.covar[0][1])
             * _pixel_area
             / 2
         )
@@ -166,8 +171,8 @@ def functional_background(
 
 
 def side_background(
-    ws, event_reflectivity, peak, bck, low_res, normalize_to_single_pixel=False, q_bins=None, 
-    wl_dist=None, wl_bins=None, q_summing=False
+    ws, event_reflectivity, peak, bck, low_res, normalize_to_single_pixel=False, q_bins=None,
+    wl_dist=None, wl_bins=None, wl_std=None, q_summing=False
 ):
     """
     Original background substration done using two pixels defining the
@@ -193,9 +198,11 @@ def side_background(
         Wavelength distribution for the case where we use weighted events for normatization
     wl_bins : numpy.ndarray
         Array of wavelength bins for the case where we use weighted events for normatization
+    wl_std : numpy.nparray
+        Array of errors for the normalization
     q_summing : bool
         If True, sum the counts in Q bins
-    
+
     Returns
     -------
     numpy.ndarray
@@ -212,7 +219,8 @@ def side_background(
         _left = [bck[0], right_side]
         print("Left side background: [%s, %s]" % (_left[0], _left[1]))
         refl_bck, d_refl_bck = event_reflectivity._roi_integration(
-            ws, peak=_left, low_res=low_res, q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins, q_summing=q_summing
+            ws, peak=_left, low_res=low_res, q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins,
+            q_summing=q_summing, wl_std=wl_std
         )
     # Background on the right of the peak only. We allow the user to overlap the peak
     # on the left, but only use the part right of the peak.
@@ -221,17 +229,20 @@ def side_background(
         _right = [left_side, bck[1]]
         print("Right side background: [%s, %s]" % (_right[0], _right[1]))
         refl_bck, d_refl_bck = event_reflectivity._roi_integration(
-            ws, peak=_right, low_res=low_res, q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins, q_summing=q_summing
+            ws, peak=_right, low_res=low_res, q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins,
+            q_summing=q_summing, wl_std=wl_std
         )
     # Background on both sides
     elif bck[0] < peak[0] - 1 and bck[1] > peak[1] + 1:
         _left = [bck[0], peak[0] - 1]
         refl_bck, d_refl_bck = event_reflectivity._roi_integration(
-            ws, peak=_left, low_res=low_res, q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins, q_summing=q_summing
+            ws, peak=_left, low_res=low_res, q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins,
+            q_summing=q_summing, wl_std=wl_std
         )
         _right = [peak[1] + 1, bck[1]]
         _refl_bck, _d_refl_bck = event_reflectivity._roi_integration(
-            ws, peak=_right, low_res=low_res, q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins, q_summing=q_summing
+            ws, peak=_right, low_res=low_res, q_bins=q_bins, wl_dist=wl_dist, wl_bins=wl_bins,
+            q_summing=q_summing, wl_std=wl_std
         )
         print("Background on both sides: [%s %s] [%s %s]" % (_left[0], _left[1], _right[0], _right[1]))
 
