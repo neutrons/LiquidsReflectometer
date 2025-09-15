@@ -12,6 +12,7 @@ import mantid.simpleapi as api
 import numpy as np
 from scipy.optimize import brentq
 
+from lr_reduction.gravity_correction import gravity_correction
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.utils import mantid_algorithm_exec
 
@@ -326,6 +327,8 @@ class EventReflectivity:
         If ``UseDeadTimeThreshold`` is True, this is the upper limit for dead-time correction ratios
     use_emmission_time : bool
         If True, the emission time delay will be computed
+    gravity_direction : GravityDirection
+        Direction of gravity correction to apply
     """
 
     QX_VS_QZ = 0
@@ -363,7 +366,7 @@ class EventReflectivity:
         dead_time_threshold: Optional[float] = 1.5,
         instrument_settings: InstrumentSettings = None,
         use_emission_time=True,
-        grav_direction=None
+        gravity_direction=None  # undetermined
     ):
         if instrument in [self.INSTRUMENT_4A, self.INSTRUMENT_4B]:
             self.instrument = instrument
@@ -394,7 +397,7 @@ class EventReflectivity:
         self.dead_time_threshold = dead_time_threshold
         self.instrument_settings = instrument_settings
         self.use_emission_time = use_emission_time
-        self.grav_direction = grav_direction
+        self.grav_direction = gravity_direction
 
         # Turn on functional background estimation
         self.use_functional_bck = functional_background
@@ -943,20 +946,9 @@ class EventReflectivity:
                 # convert tof values to wavelength.
                 wl_list = tofs / self.constant
 
-                # Gravity correction
-                # check on value in template for gravity correction:
-                if self.grav_direction is not None:
-                    d_theta = self.gravity_correction(ws, wl_list, grav_dir=self.grav_direction)
-                # Build in ability to use current unweighted workflow which needs to use the same grav corr
-                elif peak_position == 0:
-                    ths_val_RB = self._ws_sc.getRun().getProperty("BL4B:Mot:ths.RBV").value[0]
-                    if ths_val_RB < -0.001:
-                        grav_direction = -1
-                    else:
-                        grav_direction = 1
-                    d_theta = self.gravity_correction(ws, wl_list, grav_dir=grav_direction)
-                else:
-                    d_theta = self.gravity_correction(ws, wl_list)
+                # Gravity correction (check on value in template for gravity correction):
+                d_theta = gravity_correction(ws, wl_list, gravity_direction=self.grav_direction)
+
                 event_weights = evt_list.getWeights()
 
                 # Calculate per-spectum offset in theta for q-summing.
@@ -1237,104 +1229,6 @@ class EventReflectivity:
         if use_emission_delay:
             tofs -= t_off + t_mult * tofs / self.constant
         return tofs
-
-    def gravity_correction(self, ws, wl_list, thet_in=None, grav_dir=None):
-        """
-        Gravity correction for each event
-        Think this works on an array of wavelengths so could work for non-event list too.
-
-        Parameters
-        ----------
-        ws : mantid.api.Workspace
-            Mantid workspace to extract correction meta-data from.
-        wl_list : numpy.ndarray
-            Array of wavelengths for each event.
-        thet_in : float
-            Optional float to specify theta in, otherwise defaults to log values.
-        grav_dir : float
-            Optional float to specify gravity direction, otherwise defaults to ths sign.
-            (i.e. can change with +1, -1 or 0 to turn off)
-
-        Returns
-        -------
-        numpy.ndarray
-            Array of gravity-corrected theta values for each event, in radians.
-        """
-        # Xi reference would be the position of xi if the si slit were to be positioned
-        # at the sample. The distance from the sample to si is then xi_reference - xi.
-        xi_reference = 445
-        if ws.getInstrument().hasParameter("xi-reference"):
-            xi_reference = ws.getInstrument().getNumberParameter("xi-reference")[0]
-
-        # Distance between the s1 and the sample
-        s1_sample_distance = 1485
-        if ws.getInstrument().hasParameter("s1-sample-distance"):
-            s1_sample_distance = ws.getInstrument().getNumberParameter("s1-sample-distance")[0] * 1000
-
-        xi = 310
-        if ws.getInstrument().hasParameter("BL4B:Mot:xi.RBV"):
-            xi = abs(ws.getRun().getProperty("BL4B:Mot:xi.RBV").value[0])
-
-        sample_si_distance = xi_reference - xi
-        slit_distance = s1_sample_distance - sample_si_distance
-
-        if thet_in is not None:
-            theta_in = thet_in
-        else:
-            # Angle calculated from thi and a flag on earth-centered vs beam-centered
-            thi_val = ws.getRun().getProperty("BL4B:Mot:thi.RBV").value[0]
-
-            if ws.getInstrument().hasParameter("BL4B:CS:Mode:Coordinates"):
-                if ws.getRun().getProperty("BL4B:CS:Mode:Coordinates").value[0] == 0: # Earth-centered=0
-                    theta_in = thi_val
-                else:
-                    theta_in = thi_val - 4.0
-
-            elif ("BL4B:CS:ExpPl:OperatingMode" in ws.getRun()
-                and ws.getRun().getProperty("BL4B:CS:ExpPl:OperatingMode").value[0] == "Free Liquid"):
-                theta_in = thi_val
-            else:
-                theta_in = thi_val - 4.0
-
-        # Calculation from the ILL paper. This works for inclined beams.
-        # Calculated theta is the angle on the sample
-
-        g = 9.8067  # m/s^2
-        h = 6.6260715e-34  # Js=kg m^2/s
-        mn = 1.67492749804e-27  # kg
-
-        v = h / (mn * wl_list * 1e-10)
-        k = g / (2 * v**2)
-
-        # Define the sample position as x=0, y=0. increasing x is towards moderator
-        xs = 0
-
-        # positions of slits
-        x1 = sample_si_distance / 1000
-        x2 = (sample_si_distance + slit_distance) / 1000
-
-        # height of slits determined by incident theta, y=0 is the sample height
-        y1 = x1 * np.tan(theta_in * np.pi / 180)
-        y2 = x2 * np.tan(theta_in * np.pi / 180)
-
-        # This is the location of the top of the parabola
-        x0 = (y1 - y2 + k * (x1**2 - x2**2)) / (2 * k * (x1 - x2))
-
-        # Angle is arctan(dy/dx) at sample
-        theta_sample = np.arctan(2 * k * (x0 - xs)) * 180 / np.pi
-
-        if grav_dir  is not None:
-            grav_direction = grav_dir
-        else:
-            # Determine sign of the correction term based on THS setup
-            ths_val = ws.getRun().getProperty("BL4B:Mot:ths.RBV").value[0]
-            if ths_val < -0.001:
-                grav_direction = -1
-            else:
-                grav_direction = 1
-
-        return grav_direction*(theta_sample - theta_in) * np.pi / 180.0
-
 
 def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     """
