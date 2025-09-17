@@ -100,8 +100,8 @@ def test_theta_sample():
     CreateSingleValuedWorkspace(OutputWorkspace=workspace)
 
     # Test with default instrument values
-    angles = _theta_sample(workspace, wavelengths=np.array([3.0, 6.0, 9.0]), theta_in=2.0)
-    assert_almost_equal(angles, [2.00026, 2.00104, 2.00235], decimal=4)
+    angles = _theta_sample(workspace, wavelengths=np.array([3.0, 6.0, 9.0]), theta_in=-4.0)
+    assert_almost_equal(angles, [-3.99973, -3.99895, -3.99765], decimal=4)
 
 def test_gravity_correction():
     workspace = mtd.unique_hidden_name()
