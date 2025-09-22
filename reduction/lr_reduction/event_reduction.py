@@ -952,7 +952,8 @@ class EventReflectivity:
                 else:
                     if peak_position == 0:  # is direct beam
                         # for direct beam, find the direction using the `ths` value of the associated reflectivity run
-                        d_theta = gravity_correction(ws, wl_list, gravity_direction=GravityDirection(self._ws_sc))
+                        d_theta = gravity_correction(
+                            ws, wl_list, gravity_direction=GravityDirection.find_direction(self._ws_sc))
                     else:  # is reflectivity run
                         d_theta = gravity_correction(ws, wl_list, gravity_direction=None)
 
