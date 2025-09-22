@@ -34,7 +34,9 @@ def _log_value(run, log_name: str, default=None):
     if log_name in run:
         p = run.getProperty(log_name)
         if hasattr(p, "size"):  # a log series (int series, float series, string series)
-            return p.value[0]
+            # logs can have some pre-run data in them at the start
+            # and the last value is typically more reliable as a reference for the run
+            return p.value[-1]
         else:
             return p.value
     elif default is not None:
