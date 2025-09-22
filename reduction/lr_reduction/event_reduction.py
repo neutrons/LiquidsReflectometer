@@ -12,7 +12,7 @@ import mantid.simpleapi as api
 import numpy as np
 from scipy.optimize import brentq
 
-from lr_reduction.gravity_correction import GravityDirection
+from lr_reduction.gravity_correction import GravityDirection, gravity_correction
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.utils import mantid_algorithm_exec
 
@@ -948,13 +948,13 @@ class EventReflectivity:
 
                 # Gravity correction (check on value in template for gravity correction):
                 if self.grav_direction is not None:
-                    d_theta = self.gravity_correction(ws, wl_list, grav_dir=self.grav_direction)
+                    d_theta = gravity_correction(ws, wl_list, grav_dir=self.grav_direction)
                 else:
                     if peak_position == 0:  # is direct beam
                         # for direct beam, find the direction using the `ths` value of the associated reflectivity run
-                        d_theta = self.gravity_correction(ws, wl_list, grav_dir=GravityDirection(self._ws_sc))
+                        d_theta = gravity_correction(ws, wl_list, grav_dir=GravityDirection(self._ws_sc))
                     else:  # is reflectivity run
-                        d_theta = self.gravity_correction(ws, wl_list, grav_dir=None)
+                        d_theta = gravity_correction(ws, wl_list, grav_dir=None)
 
                 event_weights = evt_list.getWeights()
 
