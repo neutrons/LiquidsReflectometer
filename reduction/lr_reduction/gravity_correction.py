@@ -65,7 +65,9 @@ class GravityDirection(IntEnum):
             ws = workspace_handle(workspace)
             run = ws.getRun()
             assert ws.getInstrument().getName() == "REF_L", "Gravity direction can only be determined for REF_L"
-            # TODO: code comment explaining what is BL4B:Mot:ths.RBV and why -0.0001
+            # Determine whether reflect up or down based on the sign of sample angle (ths) as don't have other flag for this.
+            # For theta-theta geometry ths=0.0 and is reflect up so include 0.0 as if positive value of ths. 
+            # This is a workaround without an alternative flag.
             ths_val_RB = _log_value(run, "BL4B:Mot:ths.RBV")
             if ths_val_RB < -0.001:
                 return cls.DOWN
@@ -98,7 +100,7 @@ def _theta_in(workspace: MantidWorkspace) -> float:
         if _log_value(run, "BL4B:CS:Mode:Coordinates") == 0: # Earth-centered=0
             theta_in = thi
         else:
-            theta_in = thi - 4.0  # TODO: code comment explaining why -4.0
+            theta_in = thi - 4.0  # Beamline optics gives -4 deg incline. In future will have PV.
     elif _log_value(run, "BL4B:CS:ExpPl:OperatingMode", default="") == "Free Liquid":
         theta_in = thi
     else:
@@ -153,12 +155,12 @@ def _theta_sample(workspace: MantidWorkspace, wavelengths: np.ndarray, theta_in:
 
     # Xi reference would be the position of xi if the si slit were to be positioned
     # at the sample. The distance from the sample to si is then xi_reference - xi.
-    # TODO: code comment explaining default value of 445
+    # Default reference value based on instrument setup. xi would read 445 at the sample point.
     xi_reference = instrument_parameter("xi-reference", default=445)  # in mm
     # Distance between slit s1 and the sample
     s1_sample_distance = instrument_parameter("s1-sample-distance", default=1.485) * 1000  # in mm
-    # TODO: code comment explaining the meaning of xi and its default value (units?)
-    xi = _log_value(run, "BL4B:Mot:xi.RBV", default=310)
+    # Slit i position given by xi motor. Reference value is xi motor readback at the sample position.
+    xi = _log_value(run, "BL4B:Mot:xi.RBV", default=310) # in mm
     sample_si_distance = xi_reference - xi
     slit_distance = s1_sample_distance - sample_si_distance
 
@@ -174,6 +176,7 @@ def _theta_sample(workspace: MantidWorkspace, wavelengths: np.ndarray, theta_in:
 
     # Define the sample position as x=0, y=0. increasing x is towards moderator
     xs = 0
+    ys = 0
 
     # positions of slits, in meters
     x1 = sample_si_distance / 1000
@@ -185,6 +188,10 @@ def _theta_sample(workspace: MantidWorkspace, wavelengths: np.ndarray, theta_in:
 
     # This is the location of the top of the parabola
     x0 = (y1 - y2 + k * (x1**2 - x2**2)) / (2 * k * (x1 - x2))
+    y0 = y2 + k * (x2 - x0)**2
+
+    # Shift in x for where neutron hits the sample plane
+    xs = x0 - np.sqrt(y0 / k)
 
     # Angle is arctan(dy/dx) at sample
     return np.arctan(2 * k * (x0 - xs)) * 180 / np.pi
