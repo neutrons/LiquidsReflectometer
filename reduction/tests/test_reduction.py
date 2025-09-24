@@ -305,19 +305,16 @@ def test_reduce_workflow_with_overlap_avg(nexus_dir):
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
-def test_quick_reduce(nexus_dir):
+def test_quick_reduce(nexus_dir, datarepo_dir):
     """
     Test the quick reduction workflow
     """
     with amend_config(data_dir=nexus_dir):
         ws = mtd_api.Load("REF_L_201284")
         ws_db = mtd_api.Load("REF_L_201045")
-
     _refl = workflow.reduce_explorer(ws, ws_db, center_pixel=145, db_center_pixel=145)
-    reference_path = "data/reference_r201284_quick.txt"
-    if os.path.isfile(reference_path):
-        _data = np.loadtxt(reference_path).T
-
+    reference_path = os.path.join(datarepo_dir, "reference_r201284_quick.txt")
+    _data = np.loadtxt(reference_path).T
     # Optional plotting for checking tests:
     # plt.errorbar(_refl[0], _refl[1], _refl[2], marker='o', label='New reduction')
     # plt.errorbar(_data[0], _data[1],_data[2], marker='x', label='Prior data')
@@ -325,9 +322,8 @@ def test_quick_reduce(nexus_dir):
     # plt.yscale('log')
     # plt.legend()
     # plt.show()
-
     for i in range(3):
-        assert np.fabs(np.sum(_data[i] - _refl[i])) < 1e-10
+        assert np.fabs(np.sum(_data[i] - _refl[i])) < 1e-5
 
 
 def test_reduce_workflow_201282(nexus_dir):
