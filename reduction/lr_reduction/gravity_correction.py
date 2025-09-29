@@ -66,7 +66,7 @@ class GravityDirection(IntEnum):
             run = ws.getRun()
             assert ws.getInstrument().getName() == "REF_L", "Gravity direction can only be determined for REF_L"
             # Determine whether reflect up or down based on the sign of sample angle (ths) as don't have other flag for this.
-            # For theta-theta geometry ths=0.0 and is reflect up so include 0.0 as if positive value of ths. 
+            # For theta-theta geometry ths=0.0 and is reflect up so include 0.0 as if positive value of ths.
             # This is a workaround without an alternative flag.
             ths_val_RB = _log_value(run, "BL4B:Mot:ths.RBV")
             if ths_val_RB < -0.001:
@@ -105,7 +105,7 @@ def _theta_in(workspace: MantidWorkspace) -> float:
         theta_in = thi
     else:
         theta_in = thi - 4.0
-    return theta_in
+    return abs(theta_in)
 
 
 def _theta_sample(workspace: MantidWorkspace, wavelengths: np.ndarray, theta_in: float) -> np.ndarray:
@@ -176,7 +176,6 @@ def _theta_sample(workspace: MantidWorkspace, wavelengths: np.ndarray, theta_in:
 
     # Define the sample position as x=0, y=0. increasing x is towards moderator
     xs = 0
-    ys = 0
 
     # positions of slits, in meters
     x1 = sample_si_distance / 1000
