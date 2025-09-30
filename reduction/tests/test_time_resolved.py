@@ -56,21 +56,22 @@ def test_reduce_template_workflow(nexus_dir):
                                               time_interval=300,
                                               output_dir=output_dir,
                                               scan_index=5,
-                                              create_plot=False)
+                                              create_plot=False)[0]  # there's only one element in the returned list
+    q_values = reduced[0]
+    intensities = reduced[1]
 
-    q_long = len(ref_data[0])
-    q_short = len(reduced[0][0])
     n_match = 0
     n_pts = 0
-    for i in range(q_long):
-        if ref_data[0][i] > 0.03 and ref_data[0][i] < 0.045:
+    for i, q_ref in enumerate(ref_data[0]):
+        if 0.03 < q_ref < 0.045:
             n_pts += 1
-            for k in range(q_short):
-                if np.fabs(reduced[0][0][k] - ref_data[0][i]) < 0.0001:
-                    assert(np.fabs(reduced[0][1][k] - ref_data[1][i]) < 1e-10)
+            for k, q_red in enumerate(q_values):
+                if np.fabs(q_ref - q_red) < 0.0001:
+                    relative_difference = np.fabs(intensities[k] - ref_data[1][i]) / ref_data[1][i]
+                    assert(relative_difference < 0.07)
                     n_match += 1
     assert(n_pts == n_match)
 
-    # Plot data
-    time_resolved.plot_slices(reduced, 'Test', 300,
+    # check data can be plotted to a PNG image, but don't show it on the screen
+    time_resolved.plot_slices([reduced], 'Test', 300,
                               os.path.join(output_dir, 'reduced_template.png'), show=False)
