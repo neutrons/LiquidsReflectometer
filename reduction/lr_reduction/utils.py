@@ -32,7 +32,6 @@ def workspace_handle(workspace: MantidWorkspace) -> Workspace:
 
     Returns
     -------
-    ~mantid.api.Workspace
         The workspace object
     """
     if isinstance(workspace, str):
