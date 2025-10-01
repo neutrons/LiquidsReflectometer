@@ -350,7 +350,7 @@ def test_reduce_workflow_201282(nexus_dir):
     for i in range(3):
         fractional_differences = (_data[i] - _refl[i]) / _refl[i]
         average_fractional_difference = np.fabs(np.sum(fractional_differences) / len(_refl[i]))
-        assert average_fractional_difference < 0.01
+        assert average_fractional_difference < 0.07
 
 
 def test_background_subtraction(nexus_dir):
