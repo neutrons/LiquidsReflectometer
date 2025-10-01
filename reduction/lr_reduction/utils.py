@@ -3,7 +3,6 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Union
 
-from mantid.api import Workspace
 from mantid.kernel import ConfigService
 from mantid.simpleapi import mtd
 
@@ -21,7 +20,7 @@ def mantid_algorithm_exec(algorithm_class, **kwargs):
         return algorithm_instance.getProperty('OutputWorkspace').value
 
 
-def workspace_handle(workspace: MantidWorkspace) -> Workspace:
+def workspace_handle(workspace: MantidWorkspace) -> MantidWorkspace:
     r"""
     Utility function to get a workspace handle from either a workspace name or a workspace object.
 
@@ -32,7 +31,7 @@ def workspace_handle(workspace: MantidWorkspace) -> Workspace:
 
     Returns
     -------
-        The workspace object
+        The Workspace instance
     """
     if isinstance(workspace, str):
         return mtd[workspace]
