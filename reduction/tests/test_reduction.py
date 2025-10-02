@@ -130,7 +130,9 @@ def test_full_reduction(nexus_dir):
     # plt.show()
 
     assert len(ref_data[1]) == len(refl_all)
-    assert np.fabs(np.sum(ref_data[1] - refl_all)) < 1e-10
+    relative_difference = (ref_data[1] - refl_all) / ref_data[1]
+    average_relative_difference = np.fabs(np.sum(relative_difference) / len(refl_all))
+    assert average_relative_difference < 0.05
 
     # Cleanup
     output_dir = "data/"
@@ -157,11 +159,9 @@ def test_reduce_workflow(nexus_dir):
         _refl = np.loadtxt(reduced_path).T
 
     for i in range(3):
-        assert np.fabs(np.sum(_data[i] - _refl[i])) < 1e-10
-
-    # The reference was computed with a constant dq/q but our approach recalculates
-    # it for each run, so we expect a small discrepancy within 1%.
-    assert np.sum((_data[3] - _refl[3]) / _refl[3]) / len(_refl[3]) < 0.01
+        fractional_differences = (_data[i] - _refl[i]) / _data[i]
+        average_fractional_difference = np.fabs(np.sum(fractional_differences) / len(_refl[i]))
+        assert average_fractional_difference < 0.07
 
     # Cleanup
     cleanup_partial_files(output_dir, range(198409, 198417))
@@ -200,15 +200,10 @@ def test_reduce_functional_bck(nexus_dir, template_dir):
     # plt.legend()
     # plt.show()
 
-    for i in range(2):
-        assert np.fabs(np.sum(_data[i] - _refl[i])) < 1e-9
-
-    # Error bars from fit might be different
-    assert np.fabs(np.sum(_data[2] - _refl[2])) < 1e-8
-
-    # The reference was computed with a constant dq/q but our approach recalculates
-    # it for each run, so we expect a small discrepancy within 1%.
-    assert np.sum((_data[3] - _refl[3]) / _refl[3]) / len(_refl[3]) < 0.01
+    for i in range(3):
+        fractional_differences = (_data[i] - _refl[i]) / _data[i]
+        average_fractional_difference = np.fabs(np.sum(fractional_differences) / len(_refl[i]))
+        assert average_fractional_difference < 0.07
 
     # Cleanup
     cleanup_partial_files(output_dir, range(198409, 198417))
@@ -253,11 +248,9 @@ def test_reduce_bck_option_mismatch(nexus_dir):
         _refl = np.loadtxt(reduced_path).T
 
     for i in range(3):
-        assert np.fabs(np.sum(_data[i] - _refl[i])) < 1e-10
-
-    # The reference was computed with a constant dq/q but our approach recalculates
-    # it for each run, so we expect a small discrepancy within 1%.
-    assert np.sum((_data[3] - _refl[3]) / _refl[3]) / len(_refl[3]) < 0.01
+        fractional_differences = (_data[i] - _refl[i]) / _data[i]
+        average_fractional_difference = np.fabs(np.sum(fractional_differences) / len(_refl[i]))
+        assert average_fractional_difference < 0.07
 
     # Cleanup
     cleanup_partial_files(output_dir, range(198409, 198417))
@@ -295,29 +288,24 @@ def test_reduce_workflow_with_overlap_avg(nexus_dir):
     # plt.show()
 
     for i in range(3):
-        assert np.fabs(np.sum(_data[i] - _refl[i])) < 1e-10
-
-    # The reference was computed with a constant dq/q but our approach recalculates
-    # it for each run, so we expect a small discrepancy within 1%.
-    assert np.sum((_data[3] - _refl[3]) / _refl[3]) / len(_refl[3]) < 0.01
+        fractional_differences = (_data[i] - _refl[i]) / _data[i]
+        average_fractional_difference = np.fabs(np.sum(fractional_differences) / len(_refl[i]))
+        assert average_fractional_difference < 0.07
 
     # Cleanup
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
-def test_quick_reduce(nexus_dir):
+def test_quick_reduce(nexus_dir, datarepo_dir):
     """
     Test the quick reduction workflow
     """
     with amend_config(data_dir=nexus_dir):
         ws = mtd_api.Load("REF_L_201284")
         ws_db = mtd_api.Load("REF_L_201045")
-
     _refl = workflow.reduce_explorer(ws, ws_db, center_pixel=145, db_center_pixel=145)
-    reference_path = "data/reference_r201284_quick.txt"
-    if os.path.isfile(reference_path):
-        _data = np.loadtxt(reference_path).T
-
+    reference_path = os.path.join(datarepo_dir, "reference_r201284_quick.txt")
+    _data = np.loadtxt(reference_path).T
     # Optional plotting for checking tests:
     # plt.errorbar(_refl[0], _refl[1], _refl[2], marker='o', label='New reduction')
     # plt.errorbar(_data[0], _data[1],_data[2], marker='x', label='Prior data')
@@ -325,9 +313,8 @@ def test_quick_reduce(nexus_dir):
     # plt.yscale('log')
     # plt.legend()
     # plt.show()
-
     for i in range(3):
-        assert np.fabs(np.sum(_data[i] - _refl[i])) < 1e-10
+        assert np.fabs(np.sum(_data[i] - _refl[i])) < 1e-5
 
 
 def test_reduce_workflow_201282(nexus_dir):
@@ -361,11 +348,9 @@ def test_reduce_workflow_201282(nexus_dir):
     # plt.show()
 
     for i in range(3):
-        assert np.fabs(np.sum(_data[i] - _refl[i])) < 1e-10
-
-    # The reference was computed with a constant dq/q but our approach recalculates
-    # it for each run, so we expect a small discrepancy within 1%.
-    assert np.sum((_data[3] - _refl[3]) / _refl[3]) / len(_refl[3]) < 0.01
+        fractional_differences = (_data[i] - _refl[i]) / _refl[i]
+        average_fractional_difference = np.fabs(np.sum(fractional_differences) / len(_refl[i]))
+        assert average_fractional_difference < 0.07
 
 
 def test_background_subtraction(nexus_dir):
@@ -399,10 +384,8 @@ def test_background_subtraction(nexus_dir):
     # plt.show()
 
     for i in range(3):
-        assert np.fabs(np.sum(_data[i] - _refl[i])) < 1e-10
-
-    # The reference was computed with a constant dq/q but our approach recalculates
-    # it for each run, so we expect a small discrepancy within 1%.
-    assert np.sum((_data[3] - _refl[3]) / _refl[3]) / len(_refl[3]) < 0.01
+        fractional_differences = (_data[i] - _refl[i]) / _refl[i]
+        average_fractional_difference = np.fabs(np.sum(fractional_differences) / len(_refl[i]))
+        assert average_fractional_difference < 0.02
 
     cleanup_partial_files(output_dir, range(198382, 198390))

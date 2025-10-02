@@ -8,6 +8,7 @@ import xml.dom.minidom
 from typing import Optional
 
 from lr_reduction import __version__ as VERSION
+from lr_reduction.gravity_correction import GravityDirection
 from lr_reduction.instrument_settings import InstrumentSettings
 
 # Get the mantid version being used, if available
@@ -87,6 +88,10 @@ class ReductionParameters:
 
         # Calculate emission time delay instead of using an effective distance for all wavelengths
         self.use_emission_time: bool = True
+
+        # Gravity correction
+        self.gravity_direction = None
+
 
     def from_dict(self, data_dict, permissible=True):
         """
@@ -189,6 +194,10 @@ class ReductionParameters:
         _xml += "<xi_reference>%s</xi_reference>\n" % str(self.xi_reference)
         _xml += "<s1_sample_distance>%s</s1_sample_distance>\n" % str(self.s1_sample_distance)
         _xml += "<wavelength_resolution_function>%s</wavelength_resolution_function>\n" % str(self.wavelength_resolution_function)
+
+        # Gravity correction
+        if self.gravity_direction is not None:
+            _xml += "<gravity_direction>%s</gravity_direction>\n" % str(self.gravity_direction)  # -1, 0, 1
 
         # Emission time correction
         _xml += "<use_emission_time>%s</use_emission_time>\n" % str(self.use_emission_time)
@@ -314,6 +323,10 @@ class ReductionParameters:
         self.s1_sample_distance = getFloatElement(instrument_dom, "s1_sample_distance", default=self.s1_sample_distance)
         self.wavelength_resolution_function = getStringElement(instrument_dom, "wavelength_resolution_function", default=self.wavelength_resolution_function)
 
+        self.gravity_direction = GravityDirection.from_value(
+            getIntElement(instrument_dom, "gravity_direction", default=self.gravity_direction)
+        )
+
         # Emission time
         # Defaults to True, but will be skipped if the necessary meta data is not found
         self.use_emission_time = getBoolElement(instrument_dom, "use_emission_time", default=True)
@@ -355,7 +368,23 @@ def getIntList(dom, tag, default=[]):
 
 
 def getFloatElement(dom, tag, default=None):
-    """Parse a float element from the dom object"""
+    """
+    Parse a float element from the DOM object.
+
+    Parameters
+    ----------
+    dom : xml.dom.minidom.Document
+        The DOM object to parse the element from.
+    tag : str
+        The name of the tag to search for in the DOM.
+    default : float, optional
+        The default value to return if the tag is not found or its content is None.
+
+    Returns
+    -------
+    float
+        The float value of the tag's content if it exists, otherwise the default value.
+    """
     value = getContent(dom, tag)
     return float(value) if value is not None else default
 

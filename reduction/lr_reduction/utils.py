@@ -1,11 +1,12 @@
-# standard imports
 from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
 from typing import Union
 
-# third-party libraries
 from mantid.kernel import ConfigService
+from mantid.simpleapi import mtd
+
+from lr_reduction.typing import MantidWorkspace
 
 
 def mantid_algorithm_exec(algorithm_class, **kwargs):
@@ -17,6 +18,25 @@ def mantid_algorithm_exec(algorithm_class, **kwargs):
     algorithm_instance.PyExec()
     if 'OutputWorkspace' in kwargs:
         return algorithm_instance.getProperty('OutputWorkspace').value
+
+
+def workspace_handle(workspace: MantidWorkspace) -> MantidWorkspace:
+    r"""
+    Utility function to get a workspace handle from either a workspace name or a workspace object.
+
+    Parameters
+    ----------
+    workspace
+        Name of the workspace or the workspace object
+
+    Returns
+    -------
+        The Workspace instance
+    """
+    if isinstance(workspace, str):
+        return mtd[workspace]
+    else:
+        return workspace
 
 
 @contextmanager
