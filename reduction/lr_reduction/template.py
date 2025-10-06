@@ -126,7 +126,7 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
         return 1, 0, 0, 0
     return a, b, a_error, b_error
 
-
+## NOTES: Add flag to follow the new workflow (at least initially)
 def process_from_template(
     run_number, template_path, q_summing=False, normalize=True, tof_weighted=False, bck_in_q=False,
     clean=False, info=False
@@ -145,7 +145,7 @@ def process_from_template(
         clean=clean, info=info, normalize=normalize
     )
 
-
+## NOTES: Add flag to follow the new workflow (at least initially)
 def process_from_template_ws(
     ws_sc,
     template_data,
@@ -167,8 +167,13 @@ def process_from_template_ws(
     if isinstance(template_data, str):
         template_data = read_template(template_data, sequence_number)
 
+    ## NOTES: Improve error propagation through dead_time. Might be a later fix.
     if template_data.dead_time:
         ws_sc = event_reduction.apply_dead_time_correction(ws_sc, template_data)
+
+    ## NOTES: Add logic to only load and apply the dead_time correction if not a pre-processed DB.
+    ##        Suggestion on a flag based on the name e.g. "DB_xxxxx" for pre-processed.
+    ##        Suggest if is pre-processed to load the pre-processed into a workspace too.
 
     # Load normalization run
     normalize = normalize and template_data.apply_normalization
@@ -178,6 +183,7 @@ def process_from_template_ws(
         if attenuator_thickness > 0:
             ws_db = event_reduction.process_attenuation(ws_db, thickness=attenuator_thickness)
 
+    ## NOTES: As covered above. Error propagation and only apply for non pre-processed.
     # Apply dead time correction
     if normalize and template_data.dead_time:
         ws_db = event_reduction.apply_dead_time_correction(ws_db, template_data)
@@ -208,6 +214,7 @@ def process_from_template_ws(
     _wl = ws_sc.getRun()["LambdaRequest"].value[0]
 
     # Determine scattering angle. If a value was given, don't add the offset
+    ## NOTES: a new PV has been added to help with the angle selection and can be copied from prior logic.
     if theta_value is not None:
         theta = theta_value * np.pi / 180.0
     else:
@@ -253,12 +260,14 @@ def process_from_template_ws(
     else:
         low_res = None
 
+    ## NOTES: If DB pre-processed these settings can be ignored.
     norm_peak = template_data.norm_peak_range
     if template_data.norm_x_range_flag:
         norm_low_res = template_data.norm_x_range
     else:
         norm_low_res = None
 
+    ## NOTES: If DB pre-processed these settings can be ignored.
     # We are not subtracting background for the direct beam
     if template_data.subtract_norm_background:
         norm_bck = template_data.norm_background_roi
@@ -269,6 +278,8 @@ def process_from_template_ws(
     q_min = template_data.q_min
     q_step = -template_data.q_step
 
+    ## NOTES: Feed the flag for the new workflow in here.
+    ##        Decide whether to have separate flag for pre-processed DB or just do on the filename format.
     # Perform the reduction
     event_refl = event_reduction.EventReflectivity(
         ws_sc,
@@ -299,12 +310,14 @@ def process_from_template_ws(
     )
     print(f"{'*'*88}\nevent_refl:\n{event_refl}\n{'*'*88}")
 
+    ## NOTES: Feed the flag for the new workflow in here.
     # R(Q)
     qz, refl, d_refl = event_refl.specular(
         q_summing=q_summing, tof_weighted=tof_weighted, bck_in_q=bck_in_q, clean=clean, normalize=normalize
     )
     qz_mid = (qz[:-1] + qz[1:]) / 2.0
 
+    ## NOTES: This would be skipped to the else statement for the pre-processed DB case.
     # When using composite direct beam, we don't need a scaling
     # factor file if the multiplier is in the logs
     scaling_factor_PV = "BL4B:CS:Autoreduce:ScaleMultiplier"
@@ -360,6 +373,7 @@ def process_from_template_ws(
             for i in range(len(_norm)):
                 fd.write("%g %g %g %g\n" % (qz_mid[i], wl[i], _norm[i], _d_norm[i]))
 
+    ## NOTES: Might want to include a new log here. TBC.
     # We can optionally return details about the reduction process
     if info:
         meta_data = event_refl.to_dict()

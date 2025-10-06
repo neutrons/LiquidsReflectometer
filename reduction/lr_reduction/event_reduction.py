@@ -270,7 +270,7 @@ def apply_dead_time_correction(ws, template_data):
         api.AddSampleLog(Workspace=ws, LogName="dead_time_applied", LogText="1", LogType="Number")
     return ws
 
-
+## NOTES: Will add any flag here for the new workflow into the init.
 class EventReflectivity:
     """
     Data reduction for the Liquids Reflectometer.
@@ -510,6 +510,7 @@ class EventReflectivity:
         else:
             self.source_detector_distance = settings.source_detector_distance
 
+    ## NOTES: Need to look at output here and might add new details. TBC.
     def __repr__(self):
         """
         Generate a string representation of the reduction settings.
@@ -549,6 +550,7 @@ class EventReflectivity:
         sequence_id = int(self._ws_sc.getRun().getProperty("sequence_id").value[0])
         run_title = self._ws_sc.getTitle()
 
+        ## NOTES: Need appropriate logic here for pre-processed DBs. Think this is just for logging.
         if self._ws_db:
             norm_run = self._ws_db.getRunNumber()
         else:
@@ -602,11 +604,14 @@ class EventReflectivity:
         d_refl
             The uncertainties in the reflectivity values
         """
+        ## NOTES: Initial suggestion to use a new version workflow from here to keep old intact.
+        ##            e.g. if new_workflow: self.specular_new(....)
         if tof_weighted:
             self.specular_weighted(q_summing=q_summing, bck_in_q=bck_in_q)
         else:
             self.specular_unweighted(q_summing=q_summing, normalize=normalize)
 
+        ## NOTES: Cleaning up steps probably remain but will need to be checked.
         # Remove leading zeros
         r = np.trim_zeros(self.refl, "f")
         trim = len(self.refl) - len(r)
@@ -624,12 +629,86 @@ class EventReflectivity:
             self.d_refl = self.d_refl[idx[:-1]]
             self.q_bins = self.q_bins[idx]
 
+        ## NOTES: New workflow will include the full resolution calculation.
+        ##        Likely be a new compute_resolution function.
         # Compute Q resolution
         self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing)
         # TODO: integrate wavelength component to self.dq_over_q
         self.q_summing = q_summing
 
         return self.q_bins, self.refl, self.d_refl
+
+    ## NOTES: Sketch out of new functio. This would likely be broken into several pieces:
+    def specular_new(self): #, q_summing=False):
+        ## Assume similar assignment of workspaces and parameters to other workflows.
+        ## Assume RB has been loaded and dead_time corrected already.
+        ## Assume DB has been loaded and dead time corrected OR loaded of pre-processed.
+
+        ## ------- ##
+
+        # Normalise RB by charge
+        # Could be something like this. Should check how the normalisation is done
+        # on other instruments. Is this per-pulse or overall?
+        rb_charge = self._ws_sc.getRun().getProtonCharge()
+        self._ws_sc = self._ws_sc / rb_charge
+
+        # Normalise DB by charge if not preprocessed - note as above
+        db_charge = self._ws_db.getRun().getProtonCharge()
+        self._ws_db = self._ws_db / db_charge
+
+        ## ------- ##
+
+        # Option to histogram or apply a fine time bin here if it helps with processing
+        # Could be a api.Rebin(self._ws_sc, Params=10) type thing.
+
+        ## ------- ##
+
+        # Apply Emission Time Correction. This is how used at the moment
+        # Not sure if the tof list can be read directly from the ws instead to stay in ws.
+        # It current loops over all pixels.
+        # Output would then be applied to the ws and propagate the error.
+
+        # collect the events
+        ws = self._ws_sc
+        pixel = 350 ## THIS IS NOT CORRECT, just showing the idea. Old logic loops over all.
+        evt_list = ws.getSpectrum(pixel)
+        # collect tof values and apply emission time correction based on flag from template
+        tofs = evt_list.getTofs()
+        if self.use_emission_time:
+            tofs = self.emission_time_correction(ws, tofs=tofs)
+
+        # Also apply to DB if not pre-processed.
+
+        ## ------- ##
+
+        # Apply Background subtraction.
+
+        ## ------- ##
+
+        # Calculate gravity correction
+
+        ## ------- ##
+
+        # Convert pixel to angle
+
+        ## ------- ##
+
+        # Convert TOF to wavelength
+
+        ## ------- ##
+
+        # Normalise RB by DB
+
+        ## ------- ##
+
+        # Convert to Q
+
+        ## ------- ##
+
+
+        return
+
+
 
     def specular_unweighted(self, q_summing=False, normalize=True):
         """
