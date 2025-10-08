@@ -89,7 +89,12 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
 
         # apply the dead time threshold if passed
         if use_dead_time_threshold:
+            logger.notice(f"DeadTimeThreshold applied for run {ws_event_data.getRunNumber()}. " \
+                          f"{np.sum(corr > dead_time_threshold)} of {len(corr)} " \
+                          f"TOF bins above threshold {dead_time_threshold}")
             corr[corr > dead_time_threshold] = 0
+        else:
+            logger.notice("DeadTimeThreshold not used")
 
         if np.min(corr) < 0:
             error = ( "Corrupted dead time correction:\n"
