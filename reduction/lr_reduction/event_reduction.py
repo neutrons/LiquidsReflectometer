@@ -970,7 +970,7 @@ class EventReflectivity:
 
                 # TODO: Check in code for any other calls of gravity_correction.
                 # convert wavelengths into qz. This could be separated to enable output in lam and q.
-                qz = 4.0 * np.pi / wl_list * np.sin(theta + delta_theta_f - d_theta)
+                qz = 4.0 * np.pi / wl_list * np.sin(theta + delta_theta_f + d_theta)
                 # Remove unfeasible negative values:
                 valid_mask = qz > 0
                 qz = qz[valid_mask]

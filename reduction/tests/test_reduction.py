@@ -122,6 +122,7 @@ def test_full_reduction(nexus_dir):
     ref_data = np.loadtxt("data/reference_rq.txt").T
 
     # Optional plotting for checking tests:
+    # import matplotlib.pyplot as plt
     # plt.plot(qz_all,refl_all, 'o', label='New reduction')
     # plt.plot(ref_data[0], ref_data[1], 'x', label='Prior data')
     # plt.xscale('log')
@@ -280,6 +281,7 @@ def test_reduce_workflow_with_overlap_avg(nexus_dir):
         _refl = np.loadtxt(reduced_path).T
 
     # Optional plotting for checking tests:
+    # import matplotlib.pyplot as plt
     # plt.errorbar(_refl[0], _refl[1], _refl[2], marker='o', label='New reduction')
     # plt.errorbar(_data[0], _data[1],_data[2], marker='x', label='Prior data')
     # plt.xscale('log')
