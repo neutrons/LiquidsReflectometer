@@ -44,7 +44,6 @@
    <norm_to_back_pixels>148</norm_to_back_pixels>
    <norm_lambda_requested>15.0</norm_lambda_requested>
    <norm_dataset>201043</norm_dataset>
-   <auto_q_binning>False</auto_q_binning>
    <overlap_lowest_error>True</overlap_lowest_error>
    <angle_offset>0.0</angle_offset>
    <angle_offset_error>0.0</angle_offset_error>
@@ -95,7 +94,6 @@
    <norm_to_back_pixels>150</norm_to_back_pixels>
    <norm_lambda_requested>12.386</norm_lambda_requested>
    <norm_dataset>201044</norm_dataset>
-   <auto_q_binning>False</auto_q_binning>
    <overlap_lowest_error>True</overlap_lowest_error>
    <angle_offset>0.0</angle_offset>
    <angle_offset_error>0.0</angle_offset_error>
@@ -146,7 +144,6 @@
    <norm_to_back_pixels>150</norm_to_back_pixels>
    <norm_lambda_requested>9.74</norm_lambda_requested>
    <norm_dataset>201045</norm_dataset>
-   <auto_q_binning>False</auto_q_binning>
    <overlap_lowest_error>True</overlap_lowest_error>
    <angle_offset>0.0</angle_offset>
    <angle_offset_error>0.0</angle_offset_error>
@@ -197,7 +194,6 @@
    <norm_to_back_pixels>150</norm_to_back_pixels>
    <norm_lambda_requested>7.043</norm_lambda_requested>
    <norm_dataset>201048</norm_dataset>
-   <auto_q_binning>False</auto_q_binning>
    <overlap_lowest_error>True</overlap_lowest_error>
    <angle_offset>0.0</angle_offset>
    <angle_offset_error>0.0</angle_offset_error>
@@ -248,7 +244,6 @@
    <norm_to_back_pixels>150</norm_to_back_pixels>
    <norm_lambda_requested>4.25</norm_lambda_requested>
    <norm_dataset>201051</norm_dataset>
-   <auto_q_binning>False</auto_q_binning>
    <overlap_lowest_error>True</overlap_lowest_error>
    <angle_offset>0.0</angle_offset>
    <angle_offset_error>0.0</angle_offset_error>
@@ -299,7 +294,6 @@
    <norm_to_back_pixels>150</norm_to_back_pixels>
    <norm_lambda_requested>4.25</norm_lambda_requested>
    <norm_dataset>201051</norm_dataset>
-   <auto_q_binning>False</auto_q_binning>
    <overlap_lowest_error>True</overlap_lowest_error>
    <angle_offset>0.0</angle_offset>
    <angle_offset_error>0.0</angle_offset_error>
@@ -350,7 +344,6 @@
    <norm_to_back_pixels>150</norm_to_back_pixels>
    <norm_lambda_requested>4.25</norm_lambda_requested>
    <norm_dataset>201051</norm_dataset>
-   <auto_q_binning>False</auto_q_binning>
    <overlap_lowest_error>True</overlap_lowest_error>
    <angle_offset>0.0</angle_offset>
    <angle_offset_error>0.0</angle_offset_error>
