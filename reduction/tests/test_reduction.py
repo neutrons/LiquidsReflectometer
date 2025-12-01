@@ -88,7 +88,7 @@ def test_q_summing(nexus_dir):
 
 def test_q_summing_as_option(nexus_dir):
     """
-    Test Q summing process
+    Test Q summing with and without supplying q_summing option
     """
     template_path = "data/template.xml"
     template.read_template(template_path, 7)
