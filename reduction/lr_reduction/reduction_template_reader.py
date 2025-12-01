@@ -56,7 +56,7 @@ class ReductionParameters:
         # Q range
         self.q_min = 0.001
         self.q_step = 0.001
-        self.auto_q_binning = False
+        self.const_q = False
 
         # Scattering angle
         self.tthd_value = 0
@@ -160,7 +160,7 @@ class ReductionParameters:
         _xml += "<post_cut>%s</post_cut>\n" % str(self.post_cut)
         _xml += "<q_min>%s</q_min>\n" % str(self.q_min)
         _xml += "<q_step>%s</q_step>\n" % str(self.q_step)
-        _xml += "<auto_q_binning>%s</auto_q_binning>\n" % str(self.auto_q_binning)
+        _xml += "<const_q>%s</const_q>\n" % str(self.const_q)
 
         # Angle offset
         _xml += "<angle_offset>%s</angle_offset>\n" % str(self.angle_offset)
@@ -283,7 +283,7 @@ class ReductionParameters:
         self.post_cut = getIntElement(instrument_dom, "post_cut", default=self.post_cut)
         self.q_min = getFloatElement(instrument_dom, "q_min", default=self.q_min)
         self.q_step = getFloatElement(instrument_dom, "q_step", default=self.q_step)
-        self.auto_q_binning = getBoolElement(instrument_dom, "auto_q_binning", default=False)
+        self.const_q = getBoolElement(instrument_dom, "const_q", default=False)
 
         # Angle offset
         self.angle_offset = getFloatElement(instrument_dom, "angle_offset", default=self.angle_offset)

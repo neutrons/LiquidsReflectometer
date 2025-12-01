@@ -45,7 +45,6 @@
    <norm_to_back2_pixels>0</norm_to_back2_pixels>
    <norm_lambda_requested>15.0</norm_lambda_requested>
    <norm_dataset>188230</norm_dataset>
-   <auto_q_binning>False</auto_q_binning>
    <angle_offset> 0 </angle_offset>
    <angle_offset_error> 0 </angle_offset_error>
    <q_step>0.02</q_step>
@@ -111,7 +110,6 @@
    <norm_to_back2_pixels>0</norm_to_back2_pixels>
    <norm_lambda_requested>12.386</norm_lambda_requested>
    <norm_dataset>188231</norm_dataset>
-   <auto_q_binning>False</auto_q_binning>
    <angle_offset> 0 </angle_offset>
    <angle_offset_error> 0 </angle_offset_error>
    <q_step>0.02</q_step>
@@ -177,7 +175,6 @@
    <norm_to_back2_pixels>0</norm_to_back2_pixels>
    <norm_lambda_requested>9.74</norm_lambda_requested>
    <norm_dataset>188232</norm_dataset>
-   <auto_q_binning>False</auto_q_binning>
    <angle_offset> 0 </angle_offset>
    <angle_offset_error> 0 </angle_offset_error>
    <q_step>0.02</q_step>
@@ -243,7 +240,6 @@
    <norm_to_back2_pixels>0</norm_to_back2_pixels>
    <norm_lambda_requested>7.043</norm_lambda_requested>
    <norm_dataset>188233</norm_dataset>
-   <auto_q_binning>False</auto_q_binning>
    <angle_offset> 0 </angle_offset>
    <angle_offset_error> 0 </angle_offset_error>
    <q_step>0.02</q_step>
@@ -309,7 +305,6 @@
    <norm_to_back2_pixels>0</norm_to_back2_pixels>
    <norm_lambda_requested>4.25</norm_lambda_requested>
    <norm_dataset>188234</norm_dataset>
-   <auto_q_binning>False</auto_q_binning>
    <angle_offset> 0 </angle_offset>
    <angle_offset_error> 0 </angle_offset_error>
    <q_step>0.02</q_step>
@@ -375,7 +370,6 @@
    <norm_to_back2_pixels>0</norm_to_back2_pixels>
    <norm_lambda_requested>4.25</norm_lambda_requested>
    <norm_dataset>188234</norm_dataset>
-   <auto_q_binning>False</auto_q_binning>
    <angle_offset> 0 </angle_offset>
    <angle_offset_error> 0 </angle_offset_error>
    <q_step>0.02</q_step>
@@ -441,7 +435,6 @@
    <norm_to_back2_pixels>0</norm_to_back2_pixels>
    <norm_lambda_requested>4.25</norm_lambda_requested>
    <norm_dataset>188234</norm_dataset>
-   <auto_q_binning>False</auto_q_binning>
    <angle_offset> 0 </angle_offset>
    <angle_offset_error> 0 </angle_offset_error>
    <q_step>0.02</q_step>

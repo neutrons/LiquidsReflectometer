@@ -149,7 +149,7 @@ def process_from_template(
 def process_from_template_ws(
     ws_sc,
     template_data,
-    q_summing=False,
+    q_summing=None,
     tof_weighted=False,
     bck_in_q=False,
     clean=False,
@@ -248,6 +248,10 @@ def process_from_template_ws(
                                                                     x_max=x_max, center=peak_center, sigma=3.0)
         print("Peak center: %g" % peak_center)
 
+    if q_summing is None:
+        q_summing = template_data.const_q
+
+
     if template_data.data_x_range_flag:
         low_res = template_data.data_x_range
     else:
@@ -303,6 +307,9 @@ def process_from_template_ws(
     qz, refl, d_refl = event_refl.specular(
         q_summing=q_summing, tof_weighted=tof_weighted, bck_in_q=bck_in_q, clean=clean, normalize=normalize
     )
+    print(f"qz: {qz}")
+    print(f"refl: {refl}")
+    print(f"d_refl: {d_refl}")
     qz_mid = (qz[:-1] + qz[1:]) / 2.0
 
     # When using composite direct beam, we don't need a scaling
