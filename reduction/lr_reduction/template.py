@@ -307,9 +307,6 @@ def process_from_template_ws(
     qz, refl, d_refl = event_refl.specular(
         q_summing=q_summing, tof_weighted=tof_weighted, bck_in_q=bck_in_q, clean=clean, normalize=normalize
     )
-    print(f"qz: {qz}")
-    print(f"refl: {refl}")
-    print(f"d_refl: {d_refl}")
     qz_mid = (qz[:-1] + qz[1:]) / 2.0
 
     # When using composite direct beam, we don't need a scaling
