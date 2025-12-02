@@ -237,6 +237,10 @@ def process_from_template_ws(
 
     peak_center = (peak[0] + peak[1]) / 2.0
 
+    # Use template const_q if q_summing not explicitly provided
+    if q_summing is None:
+        q_summing = template_data.const_q
+
     # Fit the reflected beam position, which may not be in the middle and is
     # used in the q-summing calculation
     if q_summing:
@@ -247,9 +251,6 @@ def process_from_template_ws(
         peak_center, sc_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min,
                                                                     x_max=x_max, center=peak_center, sigma=3.0)
         print("Peak center: %g" % peak_center)
-
-    if q_summing is None:
-        q_summing = template_data.const_q
 
 
     if template_data.data_x_range_flag:
