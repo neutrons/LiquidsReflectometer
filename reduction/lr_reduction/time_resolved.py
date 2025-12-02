@@ -26,7 +26,7 @@ def reduce_30Hz_from_ws(
     template_data,
     scan_index=1,  # noqa ARG001
     template_reference=None,
-    q_summing=False,
+    q_summing=None,
 ):
     """
     Perform 30Hz reduction
@@ -110,7 +110,7 @@ def reduce_30Hz_slices(
     scan_index=1,
     create_plot=True,
     template_reference=None,
-    q_summing=False, # noqa ARG001
+    q_summing=None, # noqa ARG001
 ):
     meas_ws_30Hz = api.LoadEventNexus("REF_L_%s" % meas_run_30Hz)
 
@@ -124,7 +124,7 @@ def reduce_30Hz_slices(
         scan_index=scan_index,
         create_plot=create_plot,
         template_reference=template_reference,
-        q_summing=False,
+        q_summing=None,
     )
 
 
@@ -146,7 +146,7 @@ def reduce_30Hz_slices_ws(
     scan_index=1,
     create_plot=True,
     template_reference=None,
-    q_summing=False,
+    q_summing=None,
 ):
     """
     Perform 30Hz reduction

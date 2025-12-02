@@ -86,35 +86,32 @@ def test_q_summing(nexus_dir):
     output_dir = "data/"
     cleanup_partial_files(output_dir, range(198409, 198417))
 
-def test_q_summing_as_option(nexus_dir):
+@pytest.mark.parametrize("template_path, q_summing, expected_q_summing, tof_weighted", [
+    ("data/template.xml", None, False, False),
+    ("data/template_with_const_q_true.xml", None, True, False),
+    ("data/template.xml", True, True, True),
+    ("data/template.xml", False, False, True),
+])
+def test_q_summing_as_option(nexus_dir, template_path, q_summing, expected_q_summing, tof_weighted):
     """
     Test Q summing with and without supplying q_summing option
     """
-    template_path = "data/template.xml"
     template.read_template(template_path, 7)
     with amend_config(data_dir=nexus_dir):
         ws_sc = mtd_api.Load("REF_L_%s" % 198415)
-    qz_mid0, refl0, _, meta_data = template.process_from_template_ws(ws_sc, template_path, info=True)
-    with patch.object(event_reduction.EventReflectivity, 'specular') as mock_specular:
-        mock_specular.return_value = (np.array([1, 2, 3]), np.array([0.1, 0.2]), np.array([0.01, 0.02]))
-        qz_mid, refl, d_refl = template.process_from_template_ws(ws_sc, template_path)
-        mock_specular.assert_called_once()
-        # Check the keyword arguments passed to specular
-        call_kwargs = mock_specular.call_args[1]
-        assert call_kwargs['q_summing'] == False
 
     with patch.object(event_reduction.EventReflectivity, 'specular') as mock_specular:
         mock_specular.return_value = (np.array([1, 2, 3]), np.array([0.1, 0.2]), np.array([0.01, 0.02]))
-        # Now try with Q summing, which should have similar results
-        qz_mid, refl, _, meta_data = template.process_from_template_ws(ws_sc, template_path, tof_weighted=True,
-                                                                   info=True, q_summing=True)
+
+        qz_mid, refl, _, meta_data = template.process_from_template_ws(
+            ws_sc, template_path, tof_weighted=tof_weighted,
+            info=True, q_summing=q_summing
+        )
+
         mock_specular.assert_called_once()
         call_kwargs = mock_specular.call_args[1]
-        assert call_kwargs['q_summing'] == True
+        assert call_kwargs['q_summing'] == expected_q_summing
 
-
-
-    # Cleanup
     output_dir = "data/"
     cleanup_partial_files(output_dir, range(198409, 198417))
 
