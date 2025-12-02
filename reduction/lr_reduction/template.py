@@ -128,11 +128,12 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
 
 
 def process_from_template(
-    run_number, template_path, q_summing=False, normalize=True, tof_weighted=False, bck_in_q=False,
+    run_number, template_path, q_summing=None, normalize=True, tof_weighted=False, bck_in_q=False,
     clean=False, info=False
     ):
     """
     The clean option removes leading zeros and the drop when doing q-summing
+    @param q_summing: If None, the template setting will be used; if True/False, override the template
     """
     # For backward compatibility, consider the case of a list of run numbers to be added
     if "," in str(run_number):
@@ -158,6 +159,9 @@ def process_from_template_ws(
     theta_value=None,
     ws_db=None,
 ):
+    """
+    @param q_summing: If None, the template setting will be used; if True/False, override the template
+    """
     # Get the sequence number
     sequence_number = 1
     if ws_sc.getRun().hasProperty("sequence_number"):

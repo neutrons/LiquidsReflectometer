@@ -12,7 +12,7 @@ from . import event_reduction, output, reduction_template_reader, template
 
 
 def reduce(
-    ws, template_file, output_dir, average_overlap=False, theta_offset: float | None = 0, q_summing=False, bck_in_q=False, is_live=False
+    ws, template_file, output_dir, average_overlap=False, theta_offset: float | None = 0, q_summing=None, bck_in_q=False, is_live=False
 ):
     """
     Function called by reduce_REFL.py, which lives in /SNS/REF_L/shared/autoreduce
@@ -26,7 +26,7 @@ def reduce(
     average_overlap : bool
         If True, the overlapping points will be averaged
     q_summing : bool
-        If True, constant-Q binning will be used
+        If None, the template setting will be used; if True/False, override the template
     bck_in_q : bool
         If True, and constant-Q binning is used, the background will be estimated
         along constant-Q lines rather than along TOF/pixel boundaries.
@@ -368,7 +368,7 @@ def reduce_explorer(ws, ws_db, theta_pv=None, center_pixel=145, db_center_pixel=
     )
 
     # R(Q)
-    qz, refl, d_refl = event_refl.specular(q_summing=False, tof_weighted=False, bck_in_q=False, clean=False, normalize=True)
+    qz, refl, d_refl = event_refl.specular(q_summing=None, tof_weighted=False, bck_in_q=False, clean=False, normalize=True)
     qz_mid = (qz[:-1] + qz[1:]) / 2.0
 
     return qz_mid, refl, d_refl
