@@ -128,11 +128,12 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
 
 
 def process_from_template(
-    run_number, template_path, q_summing=False, normalize=True, tof_weighted=False, bck_in_q=False,
+    run_number, template_path, q_summing=None, normalize=True, tof_weighted=False, bck_in_q=False,
     clean=False, info=False
     ):
     """
     The clean option removes leading zeros and the drop when doing q-summing
+    @param q_summing: If None, the template setting will be used; if True/False, override the template
     """
     # For backward compatibility, consider the case of a list of run numbers to be added
     if "," in str(run_number):
@@ -149,7 +150,7 @@ def process_from_template(
 def process_from_template_ws(
     ws_sc,
     template_data,
-    q_summing=False,
+    q_summing=None,
     tof_weighted=False,
     bck_in_q=False,
     clean=False,
@@ -158,6 +159,9 @@ def process_from_template_ws(
     theta_value=None,
     ws_db=None,
 ):
+    """
+    @param q_summing: If None, the template setting will be used; if True/False, override the template
+    """
     # Get the sequence number
     sequence_number = 1
     if ws_sc.getRun().hasProperty("sequence_number"):
@@ -237,6 +241,10 @@ def process_from_template_ws(
 
     peak_center = (peak[0] + peak[1]) / 2.0
 
+    # Use template const_q if q_summing not explicitly provided
+    if q_summing is None:
+        q_summing = template_data.const_q
+
     # Fit the reflected beam position, which may not be in the middle and is
     # used in the q-summing calculation
     if q_summing:
@@ -247,6 +255,7 @@ def process_from_template_ws(
         peak_center, sc_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min,
                                                                     x_max=x_max, center=peak_center, sigma=3.0)
         print("Peak center: %g" % peak_center)
+
 
     if template_data.data_x_range_flag:
         low_res = template_data.data_x_range

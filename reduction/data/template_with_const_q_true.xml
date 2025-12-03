@@ -48,7 +48,7 @@
    <angle_offset_error>0.0</angle_offset_error>
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
-   <const_q>False</const_q>
+   <const_q>True</const_q>
    <scaling_factor_flag>True</scaling_factor_flag>
    <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
@@ -95,7 +95,7 @@
    <angle_offset_error>0.0</angle_offset_error>
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
-   <const_q>False</const_q>
+   <const_q>True</const_q>
    <scaling_factor_flag>True</scaling_factor_flag>
    <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
@@ -142,7 +142,7 @@
    <angle_offset_error>0.0</angle_offset_error>
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
-   <const_q>False</const_q>
+   <const_q>True</const_q>
    <scaling_factor_flag>True</scaling_factor_flag>
    <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
@@ -189,7 +189,7 @@
    <angle_offset_error>0.0</angle_offset_error>
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
-   <const_q>False</const_q>
+   <const_q>True</const_q>
    <scaling_factor_flag>True</scaling_factor_flag>
    <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
@@ -236,7 +236,7 @@
    <angle_offset_error>0.0</angle_offset_error>
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
-   <const_q>False</const_q>
+   <const_q>True</const_q>
    <scaling_factor_flag>True</scaling_factor_flag>
    <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
@@ -283,7 +283,7 @@
    <angle_offset_error>0.0</angle_offset_error>
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
-   <const_q>False</const_q>
+   <const_q>True</const_q>
    <scaling_factor_flag>True</scaling_factor_flag>
    <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
@@ -330,7 +330,7 @@
    <angle_offset_error>0.0</angle_offset_error>
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
-   <const_q>False</const_q>
+   <const_q>True</const_q>
    <scaling_factor_flag>True</scaling_factor_flag>
    <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
@@ -377,7 +377,7 @@
    <angle_offset_error>0.0</angle_offset_error>
    <q_step>0.02</q_step>
    <q_min>0.005</q_min>
-   <const_q>False</const_q>
+   <const_q>True</const_q>
    <scaling_factor_flag>True</scaling_factor_flag>
    <scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>
    <incident_medium_list>Si</incident_medium_list>
