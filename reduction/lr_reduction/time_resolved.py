@@ -110,7 +110,7 @@ def reduce_30Hz_slices(
     scan_index=1,
     create_plot=True,
     template_reference=None,
-    q_summing=None, # noqa ARG001
+    q_summing=None,
 ):
     meas_ws_30Hz = api.LoadEventNexus("REF_L_%s" % meas_run_30Hz)
 
@@ -124,7 +124,7 @@ def reduce_30Hz_slices(
         scan_index=scan_index,
         create_plot=create_plot,
         template_reference=template_reference,
-        q_summing=None,
+        q_summing=q_summing,
     )
 
 
