@@ -30,19 +30,19 @@ requires = ["hatchling>=1.27.0", "toml", "versioningit"]
 source = "versioningit"
 
 [tool.hatch.build.hooks.versioningit-onbuild]
-source-file = "reduction/lr_reduction/_version.py"
+source-file = "src/lr_reduction/_version.py"
 build-file = "lr_reduction/_version.py"
 
 [tool.hatch.build]
 artifacts = [
-  "reduction/lr_reduction/_version.py",
-  "reduction/lr_reduction/**/*.yml",
-  "reduction/lr_reduction/**/*.yaml",
-  "reduction/lr_reduction/**/*.ini"
+  "src/lr_reduction/_version.py",
+  "src/lr_reduction/**/*.yml",
+  "src/lr_reduction/**/*.yaml",
+  "src/lr_reduction/**/*.ini"
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["reduction/lr_reduction"]
+packages = ["src/lr_reduction"]
 
 #################
 #  VERSIONINGIT
@@ -60,7 +60,7 @@ dirty = "{version}"
 distance-dirty = "{next_version}.dev{distance}"
 
 [tool.versioningit.write]
-file = "reduction/lr_reduction/_version.py"
+file = "src/lr_reduction/_version.py"
 
 ####################################################################
 #  CREATING CONDA ENVIRONMENT AND BUILDING CONDA PACKAGE WITH PIXI
@@ -153,7 +153,7 @@ conda-builder = { cmd = "pixi build", description = "Command that creates the co
 conda-build = { depends-on = ["sync-version", "conda-builder", "reset-version"], description = "Build the conda package" }
 conda-clean = { cmd = "rm -f *.conda", description = "Clean the local .conda build artifacts" }
 # Testing
-test-reduction = { cmd = "cd reduction/ && python -m pytest -vv --cov=. --cov-report=xml --cov-report=term tests"}
+test-reduction = { cmd = "cd tests/ && python -m pytest -vv --cov=. --cov-report=xml --cov-report=term"}
 # Misc
 clean-all = { description = "Clean all build artifacts", depends-on = ["docs-clean", "conda-clean"] }
 sync-version = { cmd = 'version=$(python -m versioningit); toml set tool.pixi.package.version "$version" --toml-path pyproject.toml', description = "Sync pyproject.toml version with Git version" }
@@ -174,7 +174,7 @@ skip_empty = true
 [tool.pytest.ini_options]
 pythonpath = [
   ".",
-  "reduction",
+  "src",
   "scripts",
   "tests/data/liquidsreflectometer-data/nexus/",
 ]
@@ -214,6 +214,7 @@ ignore = [
   "N803", # argument should be lowercase
   "N806", # variable should be lowercase
   "N812", # version should be lowercase
+  "N815", # mixed case variable in class scope
   "N999", # invalid module name
 ]
 

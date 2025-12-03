@@ -20,4 +20,4 @@ def nexus_dir() -> str:
 @pytest.fixture(scope="session")
 def template_dir() -> str:
     r"""Absolute path to reduction/data/ directory"""
-    return str(Path(__file__).parent.parent / "data")
+    return str(Path(__file__).parent / "data")

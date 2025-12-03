@@ -4,6 +4,7 @@ https://www.sphinx-doc.org/en/master/usage/configuration.html
 """
 import os
 import sys
+
 import versioningit
 
 sys.path.insert(0, os.path.abspath("../reduction"))
@@ -17,6 +18,7 @@ author = "ORNL"
 version = versioningit.get_version("../")
 # The full version (major.minor.patch) without pre-/post-release metadata
 from packaging.version import Version
+
 release = Version(version).base_version
 
 # -- General configuration ---------------------------------------------------

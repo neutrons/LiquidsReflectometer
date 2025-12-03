@@ -30,17 +30,17 @@ $$
 By default, we use a paralyzing dead time correction with $\Delta_{TOF}=100$ $\mu s$. These parameters can be changed.
 
 The BL4B detector is a wire chamber with a detector readout that includes digitization of the
-position of each event. For a number of reasons, like event pileup, it is possible for the 
+position of each event. For a number of reasons, like event pileup, it is possible for the
 electronics to be unable to assign a coordinate to a particular trigger event. These events are
 labelled as error events and stored along with the good events. While only good events are used
 to compute reflectivity, error events are included in the $R$ value defined above. For clarity, we chose to define $R$ in terms of number of triggers as opposed to events.
 
 Once the dead time correction as a function for time-of-flight is computed, each event
-in the run being processed is assigned a weight according to the correction. 
+in the run being processed is assigned a weight according to the correction.
 
 $w_i = C(t_i)$
 
-where $t_i$ is the time-of-flight of event $i$. The value of $C$ is interpolated from the 
+where $t_i$ is the time-of-flight of event $i$. The value of $C$ is interpolated from the
 computed dead time correction distribution.
 
 [1] V. Bécares, J. Blázquez, Detector Dead Time Determination and OptimalCounting Rate for a Detector Near a Spallation Source ora Subcritical Multiplying System, Science and Technology of Nuclear Installations, 2012, 240693, https://doi.org/10.1155/2012/240693
@@ -62,7 +62,7 @@ data file and can be changed in the data acquisition system.
 
 ### Gravity correction
 The reflected angle of each neutron is corrected for the effect of gravity according to
-reference Campbell et al [2]. This correction is done individually for each neutron event according to its wavelength. 
+reference Campbell et al [2]. This correction is done individually for each neutron event according to its wavelength.
 
 [2] R.A. Campbell et al, Eur. Phys. J. Plus (2011) 126: 107. https://doi.org/10.1140/epjp/i2011-11107-8
 
@@ -92,12 +92,12 @@ weight assigned to each event:
 
 $S(q_z) = \frac{1}{Q} \sum_{i \in q_z \pm \Delta{q_z}/2}  w_i$
 
-where the sum is over all event falling in the $q_z$ bin or width $\Delta q_z$, and $w_i$ is the 
+where the sum is over all event falling in the $q_z$ bin or width $\Delta q_z$, and $w_i$ is the
 weight if the $i^{th}$ event. At this point we have an unnormalized $S(q_z)$, which remains to be
 corrected for the neutron flux. The value of $Q$ is the integrated proton charge for the
 
 ### Constant-Q binning
-When using a divergent beam, or when measuring a warped sample, it may be beneficial to take 
+When using a divergent beam, or when measuring a warped sample, it may be beneficial to take
 into accound where a neutron landed on the detector in order to recalculate its angle, and its
 $q$ value.
 
@@ -119,7 +119,7 @@ previous equation to account for when we reflect up or down.
 
 ## Normalization options
 The scattering signal computed above needs to be normalized by the incoming flux in order
-to produce $R(q_z)$. For the simplest case, we follow the same procedure as above for the 
+to produce $R(q_z)$. For the simplest case, we follow the same procedure as above for the
 relevant direct beam run, and simply compute the $S_1(q_z)$ using the standard procedure above,
 using the same $q_z$ binning,
 and replacing $\theta$ by the value at which the reflected beam was measured. We are then effectively computing what the measured signal would be if all neutron from the beam would reflect with a probability of 1. We refer this distribution at $S_1(q_z)$.
@@ -131,14 +131,14 @@ $$
 $$
 
 This approach is equivalent to predetermining the TOF binning that would be needed to produce
-the $q_z$ binning we actually want, summing counts in TOF for both scattered and direct beam, 
+the $q_z$ binning we actually want, summing counts in TOF for both scattered and direct beam,
 taking the ratio of the two, and finally converting TOF to $q_z$. The only difference is that we
 don't bother with the TOF bins and assign events directly into the $q_z$ we know they will contribute to the denominator of for normalization.
 
 ### Normalization using weighted events
 An alternative approach to the normalization described above is also implemented to BL4B.
 It leverages the weighted event approach. Using this approach, we can simply histogram the direct
-beam event in a wavelenth distribution. In such a histogram, each bin in wavelength will have 
+beam event in a wavelenth distribution. In such a histogram, each bin in wavelength will have
 a flux
 
 $$\phi(\lambda) = N_{\lambda} / Q / \Delta_{\lambda}$$
@@ -146,7 +146,7 @@ $$\phi(\lambda) = N_{\lambda} / Q / \Delta_{\lambda}$$
 where $N_{\lambda}$ is the number of neutrons in the bin of center $\lambda$, $Q$ is the
 integrated proton charge, and $\Delta(\lambda)$ is the wavelength bin width for the distribution.
 
-Coming back to the calculation of the reflected signal above, we now can add a new weight for 
+Coming back to the calculation of the reflected signal above, we now can add a new weight for
 each event according to the flux for its particular wavelength:
 
 $$

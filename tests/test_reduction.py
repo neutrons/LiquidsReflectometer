@@ -48,11 +48,11 @@ def test_attenuation(nexus_dir):
     event_reduction.process_attenuation(ws_sc, 0.005)
 
 
-def test_q_summing(nexus_dir):
+def test_q_summing(template_dir, nexus_dir):
     """
     Test Q summing process
     """
-    template_path = "data/template.xml"
+    template_path = os.path.join(template_dir, "template.xml")
     template.read_template(template_path, 7)
     with amend_config(data_dir=nexus_dir):
         ws_sc = mtd_api.Load("REF_L_%s" % 198415)
@@ -86,16 +86,17 @@ def test_q_summing(nexus_dir):
     output_dir = "data/"
     cleanup_partial_files(output_dir, range(198409, 198417))
 
-@pytest.mark.parametrize("template_path, q_summing, expected_q_summing, tof_weighted", [
-    ("data/template.xml", None, False, False),
-    ("data/template_with_const_q_true.xml", None, True, False),
-    ("data/template.xml", True, True, True),
-    ("data/template.xml", False, False, True),
+@pytest.mark.parametrize("template_file, q_summing, expected_q_summing, tof_weighted", [
+    ("template.xml", None, False, False),
+    ("template_with_const_q_true.xml", None, True, False),
+    ("template.xml", True, True, True),
+    ("template.xml", False, False, True),
 ])
-def test_q_summing_as_option(nexus_dir, template_path, q_summing, expected_q_summing, tof_weighted):
+def test_q_summing_as_option(template_dir, nexus_dir, template_file, q_summing, expected_q_summing, tof_weighted):
     """
     Test Q summing with and without supplying q_summing option
     """
+    template_path = os.path.join(template_dir, template_file)
     template.read_template(template_path, 7)
     with amend_config(data_dir=nexus_dir):
         ws_sc = mtd_api.Load("REF_L_%s" % 198415)
@@ -116,11 +117,11 @@ def test_q_summing_as_option(nexus_dir, template_path, q_summing, expected_q_sum
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
-def test_full_reduction(nexus_dir):
+def test_full_reduction(template_dir, nexus_dir):
     """
     Test the full reduction chain
     """
-    template_path = "data/template.xml"
+    template_path = os.path.join(template_dir, "template.xml")
     qz_all = []
     refl_all = []
     d_refl_all = []
@@ -170,19 +171,17 @@ def test_full_reduction(nexus_dir):
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
-def test_reduce_workflow(nexus_dir):
-    template_path = "data/template.xml"
-    output_dir = "data/"
+def test_reduce_workflow(template_dir, nexus_dir, tmp_path):
+    template_path = os.path.join(template_dir, "template.xml")
+    output_dir = tmp_path
     reduced_path = os.path.join(output_dir, "REFL_198409_combined_data_auto.txt")
-    if os.path.isfile(reduced_path):
-        os.remove(reduced_path)
 
     for i in range(198409, 198417):
         with amend_config(data_dir=nexus_dir):
             ws = mtd_api.Load("REF_L_%s" % i)
         workflow.reduce(ws, template_path, output_dir=output_dir, average_overlap=False)
 
-    reference_path = "data/reference_rq.txt"
+    reference_path = os.path.join(template_dir, "reference_rq.txt")
     if os.path.isfile(reference_path):
         _data = np.loadtxt(reference_path).T
 
@@ -194,17 +193,12 @@ def test_reduce_workflow(nexus_dir):
         average_fractional_difference = np.fabs(np.sum(fractional_differences) / len(_refl[i]))
         assert average_fractional_difference < 0.07
 
-    # Cleanup
-    cleanup_partial_files(output_dir, range(198409, 198417))
 
-
-def test_reduce_functional_bck(nexus_dir, template_dir):
+def test_reduce_functional_bck(nexus_dir, template_dir, tmp_path):
     os.chdir(Path(template_dir).parent)
-    template_path = "data/template_fbck.xml"
-    output_dir = "data/"
+    template_path = os.path.join(template_dir, "template_fbck.xml")
+    output_dir = tmp_path
     reduced_path = os.path.join(output_dir, "REFL_198409_combined_data_auto.txt")
-    if os.path.isfile(reduced_path):
-        os.remove(reduced_path)
 
     for i in range(198409, 198417):
         with amend_config(data_dir=nexus_dir):
@@ -216,7 +210,7 @@ def test_reduce_functional_bck(nexus_dir, template_dir):
 
         workflow.reduce(ws, template_data, output_dir=output_dir, average_overlap=False)
 
-    reference_path = "data/reference_fbck.txt"
+    reference_path = os.path.join(template_dir, "reference_fbck.txt")
     if os.path.isfile(reference_path):
         _data = np.loadtxt(reference_path).T
 
@@ -236,9 +230,6 @@ def test_reduce_functional_bck(nexus_dir, template_dir):
         average_fractional_difference = np.fabs(np.sum(fractional_differences) / len(_refl[i]))
         assert average_fractional_difference < 0.07
 
-    # Cleanup
-    cleanup_partial_files(output_dir, range(198409, 198417))
-
 
 def test_compute_wavelength_resolution_n_spectra():
     """
@@ -251,16 +242,14 @@ def test_compute_wavelength_resolution_n_spectra():
         _, _ = event_reduction.compute_wavelength_resolution(ws)
 
 
-def test_reduce_bck_option_mismatch(nexus_dir):
+def test_reduce_bck_option_mismatch(template_dir, nexus_dir, tmp_path):
     """
     Ask for functional background but pass by a background range with
     only a single region. This will revert to simple averaging over the range.
     """
-    template_path = "data/template.xml"
-    output_dir = "data/"
+    template_path = os.path.join(template_dir, "template.xml")
+    output_dir = tmp_path
     reduced_path = os.path.join(output_dir, "REFL_198409_combined_data_auto.txt")
-    if os.path.isfile(reduced_path):
-        os.remove(reduced_path)
 
     for i in range(198409, 198417):
         with amend_config(data_dir=nexus_dir):
@@ -271,7 +260,7 @@ def test_reduce_bck_option_mismatch(nexus_dir):
         template_data.two_backgrounds = True
         workflow.reduce(ws, template_data, output_dir=output_dir, average_overlap=False)
 
-    reference_path = "data/reference_rq.txt"
+    reference_path = os.path.join(template_dir, "reference_rq.txt")
     if os.path.isfile(reference_path):
         _data = np.loadtxt(reference_path).T
 
@@ -283,27 +272,22 @@ def test_reduce_bck_option_mismatch(nexus_dir):
         average_fractional_difference = np.fabs(np.sum(fractional_differences) / len(_refl[i]))
         assert average_fractional_difference < 0.07
 
-    # Cleanup
-    cleanup_partial_files(output_dir, range(198409, 198417))
 
-
-def test_reduce_workflow_with_overlap_avg(nexus_dir):
+def test_reduce_workflow_with_overlap_avg(template_dir, nexus_dir, tmp_path):
     """
     Test the complete working, but this time we average the point in the
     overlap regions.
     """
-    template_path = "data/template.xml"
-    output_dir = "data/"
+    template_path = os.path.join(template_dir, "template.xml")
+    output_dir = tmp_path
     reduced_path = os.path.join(output_dir, "REFL_198409_combined_data_auto.txt")
-    if os.path.isfile(reduced_path):
-        os.remove(reduced_path)
 
     for i in range(198409, 198417):
         with amend_config(data_dir=nexus_dir):
             ws = mtd_api.Load("REF_L_%s" % i)
         workflow.reduce(ws, template_path, output_dir=output_dir, average_overlap=True)
 
-    reference_path = "data/reference_rq_avg.txt"
+    reference_path = os.path.join(template_dir, "reference_rq_avg.txt")
     if os.path.isfile(reference_path):
         _data = np.loadtxt(reference_path).T
 
@@ -323,9 +307,6 @@ def test_reduce_workflow_with_overlap_avg(nexus_dir):
         fractional_differences = (_data[i] - _refl[i]) / _data[i]
         average_fractional_difference = np.fabs(np.sum(fractional_differences) / len(_refl[i]))
         assert average_fractional_difference < 0.07
-
-    # Cleanup
-    cleanup_partial_files(output_dir, range(198409, 198417))
 
 
 def test_quick_reduce(nexus_dir, datarepo_dir):
@@ -349,11 +330,11 @@ def test_quick_reduce(nexus_dir, datarepo_dir):
         assert np.fabs(np.sum(_data[i] - _refl[i])) < 1e-5
 
 
-def test_reduce_workflow_201282(nexus_dir):
+def test_reduce_workflow_201282(template_dir, nexus_dir):
     """
     Test to reproduce autoreduction output
     """
-    template_path = "data/template_201282.xml"
+    template_path = os.path.join(template_dir, "template_201282.xml")
     output_dir = "data/"
     reduced_path = os.path.join(output_dir, "REFL_201282_combined_data_auto.txt")
     if os.path.isfile(reduced_path):
@@ -364,7 +345,7 @@ def test_reduce_workflow_201282(nexus_dir):
             ws = mtd_api.Load("REF_L_%s" % i)
         workflow.reduce(ws, template_path, output_dir=output_dir, average_overlap=False)
 
-    reference_path = "data/reference_rq_201282.txt"
+    reference_path = os.path.join(template_dir, "reference_rq_201282.txt")
     if os.path.isfile(reference_path):
         _data = np.loadtxt(reference_path).T
 
@@ -385,11 +366,11 @@ def test_reduce_workflow_201282(nexus_dir):
         assert average_fractional_difference < 0.07
 
 
-def test_background_subtraction(nexus_dir):
+def test_background_subtraction(template_dir, nexus_dir):
     """
     Test with background subtraction off for the data and on for the normalization
     """
-    template_path = "data/template_short_nobck.xml"
+    template_path = os.path.join(template_dir, "template_short_nobck.xml")
     output_dir = "data/"
     reduced_path = os.path.join(output_dir, "REFL_198382_combined_data_auto.txt")
     if os.path.isfile(reduced_path):
@@ -400,7 +381,7 @@ def test_background_subtraction(nexus_dir):
             ws = mtd_api.Load("REF_L_%s" % i)
         workflow.reduce(ws, template_path, output_dir=output_dir, average_overlap=False)
 
-    reference_path = "data/reference_short_nobck.txt"
+    reference_path = os.path.join(template_dir, "reference_short_nobck.txt")
     if os.path.isfile(reference_path):
         _data = np.loadtxt(reference_path).T
 
