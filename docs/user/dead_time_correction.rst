@@ -121,4 +121,3 @@ Example using ``SingleReadoutDeadTimeCorrection``
     corr = corr_ws.readY(0)
     for c in corr:
         assert c <= 1.1
-        

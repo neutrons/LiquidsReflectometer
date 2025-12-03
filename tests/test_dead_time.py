@@ -1,3 +1,5 @@
+import os
+
 import mantid.simpleapi as mtd_api
 
 from lr_reduction import template
@@ -76,11 +78,11 @@ def test_deadtime_threshold(nexus_dir):
     for c in corr:
         assert c <= 1.0003
 
-def test_full_reduction(nexus_dir):
+def test_full_reduction(nexus_dir, template_dir):
     """
     Test dead time from the reduction workflow
     """
-    template_path = "data/template.xml"
+    template_path = os.path.join(template_dir, "template.xml")
     with amend_config(data_dir=nexus_dir):
         ws = mtd_api.Load("REF_L_198409")
 
