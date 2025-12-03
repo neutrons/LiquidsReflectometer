@@ -1,7 +1,7 @@
 # standard imports
 import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 # third-party imports
 import mantid
