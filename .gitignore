@@ -1,25 +1,25 @@
 # Project files
-reduction/lr_reduction/_version.py
+src/lr_reduction/_version.py
 
 # Files written by tests
-reduction/data/REFL_198382_combined_data_auto.txt
-reduction/data/REFL_198409_combined_data_auto.txt
-reduction/data/REFL_201282_1_201282_partial.txt
-reduction/data/REFL_201282_2_201283_partial.txt
-reduction/data/REFL_201282_3_201284_partial.txt
-reduction/data/REFL_201282_4_201285_partial.txt
-reduction/data/REFL_201282_5_201286_partial.txt
-reduction/data/REFL_201282_6_201287_partial.txt
-reduction/data/REFL_201282_7_201288_partial.txt
-reduction/data/REFL_201282_combined_data_auto.txt
-reduction/data/REF_L_198388_auto_template.xml
-reduction/data/REF_L_198409_auto_template.xml
-reduction/data/REF_L_201282_auto_template.xml
-reduction/data/options.json
-reduction/data/r198413-time-resolved.json
-reduction/data/r198413_t000000.txt
-reduction/data/reduced.png
-reduction/data/reduced_template.png
+tests/data/REFL_198382_combined_data_auto.txt
+tests/data/REFL_198409_combined_data_auto.txt
+tests/data/REFL_201282_1_201282_partial.txt
+tests/data/REFL_201282_2_201283_partial.txt
+tests/data/REFL_201282_3_201284_partial.txt
+tests/data/REFL_201282_4_201285_partial.txt
+tests/data/REFL_201282_5_201286_partial.txt
+tests/data/REFL_201282_6_201287_partial.txt
+tests/data/REFL_201282_7_201288_partial.txt
+tests/data/REFL_201282_combined_data_auto.txt
+tests/data/REF_L_198388_auto_template.xml
+tests/data/REF_L_198409_auto_template.xml
+tests/data/REF_L_201282_auto_template.xml
+tests/data/options.json
+tests/data/r198413-time-resolved.json
+tests/data/r198413_t000000.txt
+tests/data/reduced.png
+tests/data/reduced_template.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
