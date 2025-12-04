@@ -37,6 +37,7 @@ jobs:
       - name: Download test data
         run: |
           git submodule update --init
+          git lfs pull
           echo "data repo size: $(du -sh tests/data/liquidsreflectometer-data)"
 
       - name: Test with coverage
