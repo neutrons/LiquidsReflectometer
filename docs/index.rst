@@ -30,6 +30,7 @@ API
 .. toctree::
    :titlesonly:
 
+   api/lr_autoreduce
    api/lr_reduction
 
 Developer Guide

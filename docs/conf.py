@@ -59,13 +59,13 @@ master_doc = "index"
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
     "sphinx": ("https://www.sphinx-doc.org/en/master/", None),
+    "mantid": ("https://docs.mantidproject.org/nightly/", None),
 }
 intersphinx_disabled_domains = ["std"]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build"]
 pygments_style = "sphinx"
-
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

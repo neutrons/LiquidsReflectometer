@@ -42,7 +42,7 @@ artifacts = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/lr_reduction"]
+packages = ["src/lr_reduction", "src/lr_autoreduce"]
 
 #################
 #  VERSIONINGIT
@@ -70,6 +70,7 @@ preview = ["pixi-build"]
 channels = [
   "conda-forge",
   "mantid",
+  "neutrons",
   "https://prefix.dev/pixi-build-backends"
 ]
 platforms = ["linux-64"]  # add additional platforms as needed
@@ -83,6 +84,7 @@ python = ">=3.11"
 lmfit = "*"
 mantid = ">=6.14.0,<6.15"
 matplotlib = "==3.9.4"
+plot-publisher = ">=1.0,<2.0"
 pyqt = ">=5,<6"
 qtpy = ">=2.4.3"
 
@@ -97,6 +99,7 @@ python = ">=3.11"
 lmfit = ">=1.3.0,<1.4.0"
 mantid = ">=6.14.0,<6.15"
 matplotlib = "==3.9.4"
+plot-publisher = ">=1.0,<2.0"
 pyqt = ">=5,<6"
 qtpy = ">=2.4.3"
 

@@ -31,6 +31,14 @@ lr_reduction.instrument_settings
     :undoc-members:
     :show-inheritance:
 
+lr_reduction.mantid_utils
+-------------------------
+
+.. automodule:: lr_reduction.mantid_utils
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 lr_reduction.output
 -------------------
 
@@ -67,6 +75,14 @@ lr_reduction.time_resolved
 --------------------------
 
 .. automodule:: lr_reduction.time_resolved
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+lr_reduction.typing
+-------------------
+
+.. automodule:: lr_reduction.typing
    :members:
    :undoc-members:
    :show-inheritance:
