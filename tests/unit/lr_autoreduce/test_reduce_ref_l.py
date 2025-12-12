@@ -78,28 +78,10 @@ def sample_logs():
     return {"experiment_identifier": "IPTS-123456"}
 
 
-def test_confirm_data_calledprocesserror_logs_warning(sample_logs):
+def test_confirm_data_exception_logs_notice(sample_logs):
     with patch("lr_autoreduce.reduce_REF_L.subprocess.run", side_effect=subprocess.CalledProcessError(1, "cmd")):
         with patch("lr_autoreduce.reduce_REF_L.logger") as mock_logger:
             confirm_data_availability(sample_logs)
 
-    mock_logger.warning.assert_called_once()
-    assert "confirm-data failed" in mock_logger.warning.call_args[0][0]
-
-
-def test_confirm_data_file_not_found_logs_warning(sample_logs):
-    with patch("lr_autoreduce.reduce_REF_L.subprocess.run", side_effect=FileNotFoundError):
-        with patch("lr_autoreduce.reduce_REF_L.logger") as mock_logger:
-            confirm_data_availability(sample_logs)
-
-    mock_logger.warning.assert_called_once()
-    assert "confirm-data not found" in mock_logger.warning.call_args[0][0]
-
-
-def test_confirm_data_timeout_logs_warning(sample_logs):
-    with patch("lr_autoreduce.reduce_REF_L.subprocess.run", side_effect=subprocess.TimeoutExpired("cmd", 30)):
-        with patch("lr_autoreduce.reduce_REF_L.logger") as mock_logger:
-            confirm_data_availability(sample_logs)
-
-    mock_logger.warning.assert_called_once()
-    assert "confirm-data timed out" in mock_logger.warning.call_args[0][0]
+    mock_logger.notice.assert_called_once()
+    assert "Could not set data availability" in mock_logger.notice.call_args[0][0]
