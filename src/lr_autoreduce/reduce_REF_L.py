@@ -58,7 +58,7 @@ def parse_command_arguments():
     parser.add_argument('output_dir', type=str, help='Output directory path.')
     # Existing behavior: optional 3rd positional arg
     parser.add_argument("old_version_flag", nargs="?", default=None)
-    # Existing behavior: optional positional 4–8 parameters
+    # Existing behavior: optional positional 4-8 parameters
     parser.add_argument("template_file", nargs="?", default=None, type=str, help='Path to the template XML file.')
     parser.add_argument("avg_overlap", nargs="?", default="false")
     parser.add_argument("const_q", nargs="?", default="false")
@@ -70,7 +70,7 @@ def parse_command_arguments():
     return parser.parse_args()
 
 
-def autoreduce(events_file: str, output_dir: str, template_file: str = None, avg_overlap: bool = False, const_q: bool = False, theta_offset: float = 0.0, publish = True) -> None:
+def autoreduce(events_file: str, output_dir: str, template_file: str = None, avg_overlap: bool = False, const_q: bool = False, theta_offset: float = 0.0, publish: bool = True) -> None:
     """
     Autoreduce a single events file and upload the HTML report to the livedata server
 
@@ -146,7 +146,7 @@ def upload_report(output_dir: str, sample_logs: SampleLogs, ws: MantidWorkspace,
 
     multiplot = []
     run_position = int(run_number) - sequence_id
-    logger.notice('run position: ', run_position)
+    logger.notice(f'run position: {run_position}')
     if run_position < 10:
         _run = int(run_number)
         for i in range(0, run_position + 1):
@@ -178,17 +178,14 @@ def confirm_data_availability(sample_logs: SampleLogs) -> None:
 
     Raises subprocess exceptions on failure so the caller can handle/log them.
     """
-    ipts = sample_logs["experiment_identifier"]
-    ipts_number = ipts.split("-")[1]
-    cmd = ["/SNS/software/nses/bin/confirm-data", "-s", "Yes", "BL-4B", ipts_number, "1", "Auto"]
     try:
+        ipts = sample_logs["experiment_identifier"]
+        ipts_number = ipts.split("-")[1]
+        cmd = ["/SNS/software/nses/bin/confirm-data", "-s", "Yes", "BL-4B", ipts_number, "1",
+               "Auto"]
         subprocess.run(cmd, check=True, timeout=30)
-    except subprocess.CalledProcessError as e:
-        logger.warning(f"confirm-data failed: {e.returncode}")
-    except FileNotFoundError:
-        logger.warning("confirm-data not found on PATH")
-    except subprocess.TimeoutExpired:
-        logger.warning("confirm-data timed out")
+    except Exception:  # noqa: BLE001  # deliberately broad
+        logger.notice("Could not set data availability")
 
 
 def str_to_bool(s):
