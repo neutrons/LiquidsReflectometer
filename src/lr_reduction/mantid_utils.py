@@ -8,10 +8,14 @@ class SampleLogs:
     returns the first value of the property if it is a vector, or the value if it is a scalar.
     Mantid's default run object `workspace.getRun()[property_name]` returns the property object, not its value.
     Usually, we're interested in the property's value, not the object itself.
-    With this wrapper, we would write:
+
+    With this wrapper, we would write::
+
         sample_logs = SampleLogs(workspace)
         value = sample_logs[property_name]  # value if scalar, first value if vector
-    instead of:
+
+    instead of::
+
         sample_logs = workspace.getRun()
         value = sample_logs.getProperty(property_name).value  # if scalar
         value = sample_logs.getProperty(property_name).firstValue()  # if vector

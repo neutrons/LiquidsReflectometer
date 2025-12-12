@@ -1,22 +1,35 @@
 """
-
 Autoreduction script for the Liquids Reflectometer (BL-4B, REF_L) instrument
 
-Parameters:
-    events_file: Path to the Nexus events file.
-    output_dir: Output directory path.
-    old_version_flag: (Optional) Not used, kept for compatibility with existing scripts.
-    template_file: (Optional) Template XML file.
-    avg_overlap: (Optional) If 'true', use average overlap method.
-    const_q: (Optional) If 'true', use constant Q summing.
-    fit_first_peak: (Optional) Not used, kept for compatibility with existing scripts.
-    theta_offset: (Optional) Theta offset value.
-    --no_publish: (Optional) If provided, do not upload HTML report to monitor.sns.gov.
+CLI Arguments
+-------------
+    ``events_file``
+        Path to the Nexus events file.
+    ``output_dir``
+        Path to the output directory.
+    ``old_version_flag``
+        (Optional) Not used, kept for compatibility with existing scripts.
+    ``template_file``
+        (Optional) Path to the template XML file.
+    ``avg_overlap``
+        (Optional) If 'true', use average overlap method.
+    ``const_q``
+        (Optional) If 'true', use constant Q summing.
+    ``fit_first_peak``
+        (Optional) Not used, kept for compatibility with existing scripts.
+    ``theta_offset``
+        (Optional) Theta offset value.
+    ``--no_publish``
+        (Optional) If provided, do not upload HTML report to monitor.sns.gov.
 
-Usage:
-    python reduce_REF_L.py <events_file> <output_dir> [old_version_flag]
-        [template_file] [avg_overlap] [const_q] [fit_first_peak] [theta_offset]
-        [--no_publish]
+Usage
+-----
+
+.. code-block:: console
+
+    python reduce_REF_L.py <events_file> <output_dir> [old_version_flag] \
+[template_file] [avg_overlap] [const_q] [fit_first_peak] [theta_offset] \
+[--no_publish]
 
 """
 
