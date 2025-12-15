@@ -44,7 +44,7 @@ from mantid.simpleapi import LoadEventNexus
 from plot_publisher import plot1d
 
 from lr_reduction import workflow
-from lr_reduction.mantid_utils import SampleLogs
+from lr_reduction.mantid_utils import SampleLogValues
 from lr_reduction.template import get_default_template_file
 from lr_reduction.typing import MantidWorkspace
 
@@ -109,7 +109,7 @@ def autoreduce(events_file: str, output_dir: str, template_file: str = None, avg
 
     # Load workspace and sample logs
     ws = LoadEventNexus(Filename=events_file)
-    sample_logs = SampleLogs(ws)
+    sample_logs = SampleLogValues(ws)
 
     # Determine which template to use
     if template_file is None:
@@ -128,7 +128,7 @@ def autoreduce(events_file: str, output_dir: str, template_file: str = None, avg
     confirm_data_availability(sample_logs)
 
 
-def upload_report(output_dir: str, sample_logs: SampleLogs, ws: MantidWorkspace, publish: bool = True) -> None:
+def upload_report(output_dir: str, sample_logs: SampleLogValues, ws: MantidWorkspace, publish: bool = True) -> None:
     """
     Creates and uploads HTML report to the livedata server.
 
@@ -137,7 +137,7 @@ def upload_report(output_dir: str, sample_logs: SampleLogs, ws: MantidWorkspace,
     output_dir
         Output directory path.
     sample_logs
-        SampleLogs object.
+        SampleLogValues object.
     ws
         Workspace object.
     publish
@@ -186,7 +186,7 @@ def upload_report(output_dir: str, sample_logs: SampleLogs, ws: MantidWorkspace,
                y_title="Reflectivity", y_log=True, show_dx=False, publish=publish)
 
 
-def confirm_data_availability(sample_logs: SampleLogs) -> None:
+def confirm_data_availability(sample_logs: SampleLogValues) -> None:
     """Notify the external data confirmation utility that data are available.
 
     Raises subprocess exceptions on failure so the caller can handle/log them.

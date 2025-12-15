@@ -1,10 +1,10 @@
 import pytest
 from mantid.simpleapi import AddSampleLog, CreateWorkspace, DeleteWorkspace, mtd
 
-from lr_reduction.mantid_utils import SampleLogs
+from lr_reduction.mantid_utils import SampleLogValues
 
 
-class TestSampleLogs:
+class TestSampleLogValues:
     @classmethod
     def setup_class(cls):
         """
@@ -26,10 +26,10 @@ class TestSampleLogs:
         DeleteWorkspace(cls.workspace)
 
     def test_initialization(self):
-        assert SampleLogs(self.workspace)
+        assert SampleLogValues(self.workspace)
 
     def test_contains_property(self):
-        sample_logs = SampleLogs(self.workspace)
+        sample_logs = SampleLogValues(self.workspace)
         for property_name in ["property_int", "property_float", "property_str", "property_series"]:
             assert property_name in sample_logs
         assert sample_logs["property_int"] == 42
@@ -38,18 +38,18 @@ class TestSampleLogs:
         assert sample_logs["property_series"] == 42
 
     def test_does_not_contain_property(self):
-        sample_logs = SampleLogs(self.workspace)
+        sample_logs = SampleLogValues(self.workspace)
         assert "property_unknown" not in sample_logs
 
     def test_property(self):
-        sample_logs = SampleLogs(self.workspace)
+        sample_logs = SampleLogValues(self.workspace)
         assert sample_logs.property("property_int").value == 42
         assert sample_logs.property("property_float").value == 3.14
         assert sample_logs.property("property_str").value == "hello"
         assert sample_logs.property("property_series").firstValue() == 42
 
     def test_mean(self):
-        sample_logs = SampleLogs(self.workspace)
+        sample_logs = SampleLogValues(self.workspace)
         assert sample_logs.mean("property_series") == 42
 
 

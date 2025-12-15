@@ -2,16 +2,16 @@ from lr_reduction.typing import MantidWorkspace
 from lr_reduction.utils import workspace_handle
 
 
-class SampleLogs:
+class SampleLogValues:
     """
-    Wrapper around Mantid's run object so that `SampleLogs(workspace)[property_name]`
+    Wrapper around Mantid's run object so that `SampleLogValues(workspace)[property_name]`
     returns the first value of the property if it is a vector, or the value if it is a scalar.
     Mantid's default run object `workspace.getRun()[property_name]` returns the property object, not its value.
     Usually, we're interested in the property's value, not the object itself.
 
     With this wrapper, we would write::
 
-        sample_logs = SampleLogs(workspace)
+        sample_logs = SampleLogValues(workspace)
         value = sample_logs[property_name]  # value if scalar, first value if vector
 
     instead of::

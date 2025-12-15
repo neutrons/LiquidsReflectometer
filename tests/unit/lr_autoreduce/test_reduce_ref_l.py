@@ -74,7 +74,7 @@ def test_str_to_bool():
 
 @pytest.fixture
 def sample_logs():
-    # Minimal stand-in for SampleLogs
+    # Minimal stand-in for SampleLogValues
     return {"experiment_identifier": "IPTS-123456"}
 
 
