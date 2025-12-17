@@ -19,7 +19,7 @@ class ReducedData:
 
 
 @dataclass
-class OverlapAxis:
+class OverlapInfo:
     """Class for overlap axis information."""
 
     min_x: float
@@ -117,11 +117,11 @@ class OverlapScalingFactor:
         _fit_range = np.arange(min_x, max_x + step, step)
         return _fit_range
 
-    def calculate_axis_overlap(self, left_axis: np.ndarray, right_axis: np.ndarray) -> OverlapAxis:
+    def calculate_axis_overlap(self, left_axis: np.ndarray, right_axis: np.ndarray) -> OverlapInfo:
         """
         Calculate the overlap region of the two axis
         """
-        overlap = OverlapAxis(
+        overlap = OverlapInfo(
             min_x=-1,
             max_x=-1,
             index_min_in_left=0,
