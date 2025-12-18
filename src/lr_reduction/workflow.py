@@ -8,7 +8,8 @@ import os
 import mantid.simpleapi as mtd_api
 import numpy as np
 
-from . import event_reduction, output, reduction_template_reader, template
+from lr_reduction import event_reduction, output, reduction_template_reader, template
+from lr_reduction.web_report import assemble_report, generate_report_sections
 
 
 def reduce(
@@ -20,6 +21,7 @@ def reduce(
     q_summing=None,
     bck_in_q=False,
     is_live=False,
+    return_report=False,
 ):
     """
     Function called by reduce_REFL.py, which lives in /SNS/REF_L/shared/autoreduce
@@ -30,21 +32,25 @@ def reduce(
 
     Parameters
     ----------
+    ws : MantidWorkspace
+        The workspace to process
+    template_file : str
+        Path to the template file containing the reduction parameters
+    output_dir : str
+        Directory where the output files will be saved
     average_overlap : bool
         If True, the overlapping points will be averaged
+    theta_offset : float
+        Theta offset to apply. If None, the template value will be used.
     q_summing : bool
         If None, the template setting will be used; if True/False, override the template
     bck_in_q : bool
         If True, and constant-Q binning is used, the background will be estimated
         along constant-Q lines rather than along TOF/pixel boundaries.
-    theta_offset : float
-        Theta offset to apply. If None, the template value will be used.
     is_live : bool
         If True, the data is live and will be saved in a separate file to avoid conflict with auto-reduction
-    output_dir : str
-        Directory where the output files will be saved
-    template_file : str
-        Path to the template file containing the reduction parameters
+    return_report : bool
+        If True, return the generated report HTML string
 
     Returns
     -------
@@ -87,7 +93,10 @@ def reduce(
     coll.save_ascii(reduced_file, meta_as_json=True)
 
     # Assemble partial results into a single R(q)
-    seq_list, run_list = assemble_results(meta_data["sequence_id"], output_dir, average_overlap, is_live=is_live)
+    seq_list, run_list, refl_plot = assemble_results(meta_data["sequence_id"], output_dir, average_overlap, is_live=is_live)
+
+    report_sections = generate_report_sections(ws, template_data, meta_data)
+    report = assemble_report(refl_plot, report_sections)
 
     # Save template. This will not happen if the template_file input was
     # template data, which the template processing allows.
@@ -95,6 +104,9 @@ def reduce(
         write_template(seq_list, run_list, template_file, output_dir)
     else:
         print("Template data was passed instead of a file path: template data not saved")
+
+    if return_report:
+        return run_list[0], report
 
     # Return the sequence identifier
     return run_list[0]
@@ -121,6 +133,8 @@ def assemble_results(first_run, output_dir, average_overlap=False, is_live=False
         The sequence identifiers
     run_list : list
         The run numbers
+    plot_combined : str
+        The combined reflectivity plot
     """
     # Keep track of sequence IDs and run numbers so we can make a new template
     seq_list = []
@@ -148,7 +162,9 @@ def assemble_results(first_run, output_dir, average_overlap=False, is_live=False
         output_file_name = "REFL_%s_live_estimate.txt" % first_run
     coll.save_ascii(os.path.join(output_dir, output_file_name))
 
-    return seq_list, run_list
+    plot_combined = coll.plot()
+
+    return seq_list, run_list, plot_combined
 
 
 def write_template(seq_list, run_list, template_file, output_dir):

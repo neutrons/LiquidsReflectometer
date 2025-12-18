@@ -5,6 +5,7 @@ Write R(q) output
 import json
 
 import numpy as np
+from plot_publisher import plot1d
 
 from . import __version__ as VERSION
 
@@ -196,6 +197,26 @@ class RunCollection:
         """
         _q, _r, _dr, _dq, _meta = read_file(file_path)
         self.add(_q, _r, _dr, _meta, dq=_dq)
+
+    def plot(self):
+        """
+        Plot the collection of runs
+
+        Returns
+        -------
+        str
+            HTML div containing the combined reflectivity curve plot
+        """
+        refl_curves = []
+
+        for item in self.collection:
+            for i in range(len(item["q"])):
+                refl_curves.append([item["q"][i], item["r"][i], item["dr"][i], item["dq"][i]])
+
+        # run_number is only used when publish=True
+        return plot1d(run_number="dummy_run", data_list=refl_curves, instrument='REF_L',
+                      x_title=u"Q (1/A)", x_log=True,
+                      y_title="Reflectivity", y_log=True, show_dx=False, publish=False)
 
 
 def read_file(file_path):

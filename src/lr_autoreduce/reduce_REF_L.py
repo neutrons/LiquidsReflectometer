@@ -35,18 +35,17 @@ Usage
 
 import argparse
 import os
+import re
 import subprocess
 from pathlib import Path
 
-import numpy as np
 from mantid import logger
 from mantid.simpleapi import LoadEventNexus
-from plot_publisher import plot1d
 
 from lr_reduction import workflow
 from lr_reduction.mantid_utils import SampleLogValues
 from lr_reduction.template import get_default_template_file
-from lr_reduction.typing import MantidWorkspace
+from lr_reduction.web_report import save_report, upload_report
 
 # Name of the conda environment to use - required by autoreduction
 CONDA_ENV = "lr_reduction"
@@ -125,95 +124,21 @@ def autoreduce(
     logger.notice(f"Using template: {template_file}")
 
     # Run the reduction
-    workflow.reduce(
-        ws,
-        template_file,
-        output_dir,
-        average_overlap=avg_overlap,
-        theta_offset=theta_offset,
-        q_summing=const_q,
-        bck_in_q=False,
-    )
+    _, report = workflow.reduce(ws, template_file, output_dir,
+                    average_overlap=avg_overlap, theta_offset=theta_offset,
+                    q_summing=const_q, bck_in_q=False, return_report=True)
 
-    # Plot and publish results
-    upload_report(output_dir, sample_logs, ws, publish)
+    # Save to disk and (optionally) upload the HTML report
+    match = re.search(r'REF_L_(\d+)', events_file)
+    if not match:
+        raise ValueError(f"Could not extract run number from events file: {events_file}")
+    run_number = match.group(1)
+    save_report(report, os.path.join(output_dir, f'REF_L_{run_number}.html'))
+    if publish:
+        upload_report(report, run_number=run_number)
 
     # Confirm data availability
     confirm_data_availability(sample_logs)
-
-
-def upload_report(output_dir: str, sample_logs: SampleLogValues, ws: MantidWorkspace, publish: bool = True) -> None:
-    """
-    Creates and uploads HTML report to the livedata server.
-
-    Parameters
-    ----------
-    output_dir
-        Output directory path.
-    sample_logs
-        SampleLogValues object.
-    ws
-        Workspace object.
-    publish
-        If True, upload the report to the livedata server.
-    """
-    sequence_id = int(sample_logs["sequence_id"])
-    sequence_number = int(sample_logs["sequence_number"])
-
-    default_file_name = "REFL_%s_combined_data_auto.txt" % sequence_id
-    default_file_path = os.path.join(output_dir, default_file_name)
-    if not os.path.isfile(default_file_path):
-        raise ValueError("Combined data output file not found")
-
-    logger.notice("Loading %s" % os.path.join(output_dir, default_file_name))
-    x, y, dy, dx = np.loadtxt(os.path.join(output_dir, default_file_name)).T
-
-    run_number = int(ws.getRunNumber())
-    offset = sequence_id - run_number + sequence_number - 1
-
-    multiplot = []
-    run_position = int(run_number) - sequence_id
-    logger.notice(f"run position: {run_position}")
-    if run_position < 10:
-        _run = int(run_number)
-        for i in range(0, run_position + 1):
-            _id = i + offset
-            _run = sequence_id + i
-            reduced_file_name = "REFL_%s_%s_%s_partial.txt" % (sequence_id, _id + 1, _run)
-            reduced_file_path = os.path.join(output_dir, reduced_file_name)
-            if not os.path.isfile(reduced_file_path):
-                logger.notice(f"File {reduced_file_name} not found, skipping run in sequence")
-                continue
-            try:
-                xi, yi, dyi, dxi = np.loadtxt(reduced_file_path).T
-            except Exception as e:  # noqa: BLE001
-                logger.error(f"Failed to load {reduced_file_name}: {e}")
-                continue
-            multiplot.append([xi, yi, dyi, dxi])
-
-        plot1d(
-            _run,
-            multiplot,
-            instrument="REF_L",
-            x_title="Q (1/A)",
-            x_log=True,
-            y_title="Reflectivity",
-            y_log=True,
-            show_dx=False,
-            publish=publish,
-        )
-    else:
-        plot1d(
-            run_number,
-            [[x, y, dy, dx]],
-            instrument="REF_L",
-            x_title="Q (1/A)",
-            x_log=True,
-            y_title="Reflectivity",
-            y_log=True,
-            show_dx=False,
-            publish=publish,
-        )
 
 
 def confirm_data_availability(sample_logs: SampleLogValues) -> None:
