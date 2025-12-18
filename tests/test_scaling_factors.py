@@ -1,170 +1,90 @@
-import os
-
-import mantid.simpleapi as mtd_api
 import numpy as np
+import pytest
+from pytest import approx
 
-mtd_api.config["default.facility"] = "SNS"
-mtd_api.config["default.instrument"] = "REF_L"
+from lr_reduction.scaling_factors import (
+    OverlapScalingFactor,
+    ReducedData,
+    scaling_factor_critical_edge,
+)
 
-from lr_reduction.scaling_factors import workflow as sf_workflow
-from lr_reduction.utils import amend_config
-
-
-def check_results(data_file, reference):
-    """
-        Check scaling factor file output against reference
-    """
-    # Read data and skip header
-    with open(data_file, 'r') as fd:
-        _cfg_data = fd.readlines()
-        cfg_data = []
-        for l in _cfg_data:
-            if not l.startswith('#'):
-                cfg_data.append(l)
-
-    with open(reference, 'r') as fd:
-        _cfg_ref = fd.readlines()
-        cfg_ref = []
-        for l in _cfg_ref:
-            if not l.startswith('#'):
-                cfg_ref.append(l)
-
-    for i in range(len(cfg_ref)):
-        # Newly generated data
-        toks = cfg_data[i].split(' ')
-        for t in toks:
-            kv = t.split('=')
-
-        # Reference data
-        toks = cfg_ref[i].split(' ')
-        for t in toks:
-            kv_ref = t.split('=')
-
-        for j in range(len(kv_ref)):
-            v_calc = float(kv[1])
-            v_ref = float(kv_ref[1])
-            delta = np.fabs((v_ref - v_calc)/v_ref)
-            assert delta < 0.02
+### Fixtures ###
 
 
-def test_compute_sf(nexus_dir):
-    """
-        Test the computation of scaling factors
-    """
-    with amend_config(data_dir=nexus_dir):
-        ws = mtd_api.Load("REF_L_197912")
+@pytest.fixture
+def fake_data():
+    q = np.linspace(0.01, 0.2, 100)
+    r = np.linspace(2, 2, 100)
+    err = 0.05 * np.ones_like(r)  # Constant error
 
-    output_dir = '/tmp'
-
-    # We are passing the first run of the set. For the autoreduction,
-    # we would be missing runs from the complete set so we will want to
-    # wait for the whole set to be acquired.
-    output = sf_workflow.process_scaling_factors(ws, output_dir,
-                                                 use_deadtime=False,
-                                                 wait=True, postfix='_test')
-    assert output is False
-
-    output_cfg = os.path.join(output_dir, "sf_197912_Si_test.cfg")
-    if os.path.isfile(output_cfg):
-        os.remove(output_cfg)
-
-    output = sf_workflow.process_scaling_factors(ws, output_dir,
-                                                 use_deadtime=False,
-                                                 wait=False, postfix='_test')
-    assert output is True
-
-    check_results(output_cfg, 'data/sf_197912_Si_auto.cfg')
+    return ReducedData(q=q, r=r, err=err)
 
 
-def test_compute_sf_with_deadtime(nexus_dir):
-    """
-        Test the computation of scaling factors
-    """
-    with amend_config(data_dir=nexus_dir):
-        ws = mtd_api.Load("REF_L_197912")
+@pytest.fixture
+def shifted_fake_data():
+    q = np.linspace(0.015, 0.215, 100)  # Slightly shifted q range
+    r = np.linspace(0.5, 0.5, 100)  # Different constant reflectivity
+    err = 0.05 * np.ones_like(r)  # Constant error
 
-    output_dir = '/tmp'
-
-    output_cfg = os.path.join(output_dir, "sf_197912_Si_test_dt.cfg")
-    if os.path.isfile(output_cfg):
-        os.remove(output_cfg)
-
-    output = sf_workflow.process_scaling_factors(ws, output_dir,
-                                                 use_deadtime=True,
-                                                 wait=False, postfix='_test_dt')
-    assert output is True
-
-    check_results(output_cfg, 'data/sf_197912_Si_dt_par_42_200.cfg')
+    return ReducedData(q=q, r=r, err=err)
 
 
-def test_compute_sf_with_deadtime_tof_300(nexus_dir):
-    """
-        Test the computation of scaling factors
-    """
-    with amend_config(data_dir=nexus_dir):
-        ws = mtd_api.Load("REF_L_197912")
+@pytest.fixture
+def fake_data_no_overlap():
+    q = np.linspace(0.3, 0.5, 100)  # No overlap with fake_data
+    r = np.linspace(1, 1, 100)
+    err = 0.05 * np.ones_like(r)  # Constant error
 
-    output_dir = '/tmp'
-
-    output_cfg = os.path.join(output_dir, "sf_197912_Si_test_dt.cfg")
-    if os.path.isfile(output_cfg):
-        os.remove(output_cfg)
-
-    output = sf_workflow.process_scaling_factors(ws, output_dir,
-                                                 use_deadtime=True,
-                                                 deadtime=4.6,
-                                                 deadtime_tof_step=300,
-                                                 paralyzable=False,
-                                                 wait=False, postfix='_test_dt')
-    assert output is True
-
-    check_results(output_cfg, 'data/sf_197912_Si_dt_par_46_300.cfg')
+    return ReducedData(q=q, r=r, err=err)
 
 
-def test_compute_sf_with_deadtime_tof_200(nexus_dir):
-    """
-        Test the computation of scaling factors
-    """
-    with amend_config(data_dir=nexus_dir):
-        ws = mtd_api.Load("REF_L_197912")
-
-    output_dir = '/tmp'
-
-    output_cfg = os.path.join(output_dir, "sf_197912_Si_test_dt.cfg")
-    if os.path.isfile(output_cfg):
-        os.remove(output_cfg)
-
-    output = sf_workflow.process_scaling_factors(ws, output_dir,
-                                                 use_deadtime=True,
-                                                 deadtime=4.6,
-                                                 deadtime_tof_step=200,
-                                                 paralyzable=False,
-                                                 wait=False, postfix='_test_dt')
-    assert output is True
-
-    check_results(output_cfg, 'data/sf_197912_Si_dt_par_46_200.cfg')
+@pytest.fixture
+def overlap_scaling_factor(fake_data, shifted_fake_data):
+    return OverlapScalingFactor(left_data=fake_data, right_data=shifted_fake_data, sf_auto=0.5)
 
 
-def test_compute_sf_with_deadtime_tof_200_sort(nexus_dir):
-    """
-        Test the computation of scaling factors
-    """
-    with amend_config(data_dir=nexus_dir):
-        ws = mtd_api.Load("REF_L_197912")
+### Test functions ###
 
-    output_dir = '/tmp'
 
-    output_cfg = os.path.join(output_dir, "sf_197912_Si_test_dt.cfg")
-    if os.path.isfile(output_cfg):
-        os.remove(output_cfg)
+def test_scaling_factor_critical_edge(fake_data, shifted_fake_data):
+    # Define critical edge range
+    q_min = 0.05
+    q_max = 0.1
 
-    output = sf_workflow.process_scaling_factors(ws, output_dir,
-                                                 order_by_runs=False,
-                                                 use_deadtime=True,
-                                                 deadtime=4.6,
-                                                 deadtime_tof_step=200,
-                                                 paralyzable=False,
-                                                 wait=False, postfix='_test_dt')
-    assert output is True
+    # Calculate scaling factor for fake_data
+    sf_linear = scaling_factor_critical_edge(q_min, q_max, [fake_data])
+    assert isinstance(sf_linear, float)
+    assert sf_linear == approx(0.5, abs=1e-9)
 
-    check_results(output_cfg, 'data/sf_197912_Si_dt_par_46_200.cfg')
+    # Calculate scaling factor for shifted_fake_data
+    sf_shifted = scaling_factor_critical_edge(q_min, q_max, [shifted_fake_data])
+    assert isinstance(sf_shifted, float)
+    assert sf_shifted == approx(2.0, abs=1e-9)
+
+    # Check that the scaling factors are different due to different data
+    assert sf_linear != sf_shifted
+
+
+### Test OverlapScalingFactor class ###
+
+
+def test_overlap_scaling_factor(fake_data, shifted_fake_data):
+    # Create OverlapScalingFactor instance
+    overlap_sf = OverlapScalingFactor(left_data=fake_data, right_data=shifted_fake_data)
+
+    # Get scaling factor
+    sf = overlap_sf.get_scaling_factor()
+
+    assert isinstance(sf, float)
+    assert sf == approx(0.25, abs=1e-9)  # Since fake_data r=2 and shifted_fake_data r=0.5
+
+
+def test_overlap_scaling_factor_no_overlap(fake_data, fake_data_no_overlap):
+    # Create OverlapScalingFactor instance with no overlap
+    overlap_sf = OverlapScalingFactor(left_data=fake_data, right_data=fake_data_no_overlap)
+
+    # Get scaling factor
+    sf = overlap_sf.get_scaling_factor()
+
+    assert isinstance(sf, float)
+    assert sf == approx(1.0, abs=1e-9)  # Should return 1.0 when no overlap
