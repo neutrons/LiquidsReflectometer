@@ -397,8 +397,7 @@ def process_from_template_ws(
             fd.write("# Slit 1 (h x w): %g x %g\n" % (s1h, s1w))
             fd.write("# Slit 2 (h x w): %g x %g\n" % (s2h, s2w))
             fd.write("# Q, wavelength, counts/mC, error\n")
-            for i in range(len(_norm)):
-                fd.write("%g %g %g %g\n" % (qz_mid[i], wl[i], _norm[i], _d_norm[i]))
+            fd.writelines("%g %g %g %g\n" % (qz_mid[i], wl[i], _norm[i], _d_norm[i]) for i in range(len(_norm)))
 
     # We can optionally return details about the reduction process
     if info:

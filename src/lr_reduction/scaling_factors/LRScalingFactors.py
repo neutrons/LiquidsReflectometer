@@ -442,8 +442,7 @@ class LRScalingFactors(PythonAlgorithm):
         fd.write("#    deadtime_value: %s\n" % deadtime)
         fd.write("#    deadtime_tof_step: %s\n#\n" % deadtime_step)
 
-        for k, v in scaling_file_meta.items():
-            fd.write("%s\n" % v)
+        fd.writelines("%s\n" % v for k, v in scaling_file_meta.items())
         for item in scaling_file_content:
             fd.write("IncidentMedium=%s " % item["IncidentMedium"])
             fd.write("LambdaRequested=%s " % item["LambdaRequested"])
