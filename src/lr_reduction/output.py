@@ -173,7 +173,8 @@ class RunCollection:
 
             # Write R(q)
             fd.write("# %-21s %-21s %-21s %-21s\n" % ("Q [1/Angstrom]", "R", "dR", "dQ [FWHM]"))
-            fd.writelines("%20.16f  %20.16f  %20.16f  %20.16f\n" % (self.qz_all[i], self.refl_all[i], self.d_refl_all[i], self.d_qz_all[i]) for i in range(len(self.qz_all)))
+            for i in range(len(self.qz_all)):
+                fd.write("%20.16f  %20.16f  %20.16f  %20.16f\n" % (self.qz_all[i], self.refl_all[i], self.d_refl_all[i], self.d_qz_all[i]))
 
     def add_from_file(self, file_path):
         """
@@ -199,7 +200,7 @@ def read_file(file_path):
     """
     _meta = dict()
     with open(file_path, "r") as fd:
-        for l in fd:
+        for l in fd.readlines():
             if l.startswith("# Meta:"):
                 _meta = json.loads(l[len("# Meta:") : -1])
     try:

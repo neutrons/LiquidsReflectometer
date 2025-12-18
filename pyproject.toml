@@ -200,10 +200,10 @@ markers = [
 #########
 [tool.ruff]
 line-length = 120
-exclude = ["notebooks/**", "**/*.ipynb", "scripts/**", "tests/data/**"]
+exclude = ["notebooks/**", "**/*.ipynb"]
 
 [tool.ruff.lint]
-select = ["A", "ARG","ASYNC","BLE", "E", "F", "FURB", "I", "N", "UP032", "W"]
+select = ["A", "ARG","ASYNC","BLE", "E", "F", "I", "N", "UP032", "W"]
 ignore = [
   "E402", # module level import not at top of file
   "E501", # line too long
