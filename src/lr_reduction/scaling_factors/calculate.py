@@ -3,7 +3,7 @@ from typing import Literal
 
 import numpy as np
 from mantid import mtd
-from mantid.simpleapi import CreateWorkspace, Fit, ReplaceSpecialValues
+from mantid.simpleapi import CreateWorkspace, Fit, ReplaceSpecialValues, logger
 
 
 @dataclass
@@ -44,9 +44,10 @@ def scaling_factor_critical_edge(q_min: float, q_max: float, data: list[ReducedD
 
         new_errors = reduced_data.err[indices]
         errors = np.concatenate((errors, new_errors))
-    if len(values) > 1:
+    if len(values) > 1 and np.all(np.isfinite(errors)) and not np.any(errors == 0):
         sf = 1 / np.average(values, weights=1 / errors**2).item()
     else:
+        logger.warning("Insufficient or invalid error data; setting scaling factor to 1.0.")
         sf = 1.0
 
     return sf
@@ -203,15 +204,14 @@ class OverlapScalingFactor:
         """Calculate the scaling factor to apply for the overlap region between two fits."""
         left_mean = self.calculate_mean_over_range(fit_range_to_use, a_left, b_left)
         right_mean = self.calculate_mean_over_range(fit_range_to_use, a_right, b_right)
-        sf = right_mean / left_mean
+        if np.isclose(left_mean, 0.0):
+            logger.warning("Left mean value is zero; setting scaling factor to 1.0 to avoid division by zero.")
+            sf = 1.0
+        else:
+            sf = right_mean / left_mean
         return sf
 
     def calculate_mean_over_range(self, range_to_use: np.ndarray, a: float, b: float) -> float:
         """Calculate the average value of the function over the given range."""
-        sz_range = range_to_use.size
-        _sum = 0
-        for i in range(sz_range):
-            _value = a * range_to_use[i] + b
-            _sum += _value
-        _mean = float(_sum) / float(sz_range)
-        return _mean
+        mean_value = float(np.mean(a * range_to_use + b))
+        return mean_value
