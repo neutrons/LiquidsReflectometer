@@ -9,6 +9,7 @@ import os
 import re
 import time
 
+# TODO: Wildcard imports are bad practice (Glass)
 from mantid.api import *
 from mantid.kernel import *
 from mantid.simpleapi import *
@@ -65,12 +66,17 @@ class LRScalingFactors(PythonAlgorithm):
         self.declareProperty(IntArrayProperty("DirectBeamRuns", []), "Run number of the signal run to use")
         self.declareProperty(IntArrayProperty("Attenuators", []), "Number of attenuators for each run")
         self.declareProperty(
-            FloatArrayProperty("TOFRange", [10000.0, 35000.0], FloatArrayLengthValidator(2), direction=Direction.Input), "TOF range to use"
+            FloatArrayProperty("TOFRange", [10000.0, 35000.0], FloatArrayLengthValidator(2), direction=Direction.Input),
+            "TOF range to use",
         )
         self.declareProperty(IntArrayProperty("SignalPeakPixelRange", [150, 160]), "Pixel range defining the data peak")
-        self.declareProperty(IntArrayProperty("SignalBackgroundPixelRange", [147, 163]), "Pixel range defining the background")
         self.declareProperty(
-            IntArrayProperty("LowResolutionPixelRange", [Property.EMPTY_INT, Property.EMPTY_INT], direction=Direction.Input),
+            IntArrayProperty("SignalBackgroundPixelRange", [147, 163]), "Pixel range defining the background"
+        )
+        self.declareProperty(
+            IntArrayProperty(
+                "LowResolutionPixelRange", [Property.EMPTY_INT, Property.EMPTY_INT], direction=Direction.Input
+            ),
             "Pixel range defining the region to use in the low-resolution direction",
         )
         self.declareProperty("IncidentMedium", "Medium", doc="Name of the incident medium")
@@ -79,10 +85,11 @@ class LRScalingFactors(PythonAlgorithm):
         self.declareProperty("TOFSteps", 500.0, doc="TOF step size")
         self.declareProperty("SlitTolerance", 0.07, doc="Tolerance for matching slit positions")
         self.declareProperty("UseDeadTimeCorrection", True, doc="If True, counts will be corrected for dead time")
-        self.declareProperty("ParalyzableDeadTime", True,
-                             doc="If true, paralyzable correction will be applied, non-paralyzing otherwise")
+        self.declareProperty(
+            "ParalyzableDeadTime", True, doc="If true, paralyzable correction will be applied, non-paralyzing otherwise"
+        )
         self.declareProperty("DeadTime", 4.2, doc="Dead time value")
-        self.declareProperty("DeadTimeTOFStep", 200., doc="TOF step to bin into for dead time")
+        self.declareProperty("DeadTimeTOFStep", 200.0, doc="TOF step to bin into for dead time")
         self.declareProperty(FileProperty("ScalingFactorFile", "", action=FileAction.Save, extensions=["cfg"]))
 
     # pylint: disable=too-many-locals,too-many-branches
@@ -167,7 +174,13 @@ class LRScalingFactors(PythonAlgorithm):
             if n_attenuator == 0:
                 if 0 in self.references:
                     raise RuntimeError("More than one run with zero attenuator was supplied.")
-                self.references[0] = {"index": i, "run": run, "ref_ws": workspace_name, "ratio_ws": None, "diagnostics": str(run)}
+                self.references[0] = {
+                    "index": i,
+                    "run": run,
+                    "ref_ws": workspace_name,
+                    "ratio_ws": None,
+                    "diagnostics": str(run),
+                }
                 previous_ws = workspace_name
                 continue
 
@@ -180,7 +193,10 @@ class LRScalingFactors(PythonAlgorithm):
                     RHSWorkspace=self.references[n_attenuator - 1]["ref_ws"],
                     OutputWorkspace="ScalingRatio_%s" % n_attenuator,
                 )
-                self.references[n_attenuator]["diagnostics"] = "%s / %s" % (str(data_runs[i - 1]), self.references[n_attenuator - 1]["run"])
+                self.references[n_attenuator]["diagnostics"] = "%s / %s" % (
+                    str(data_runs[i - 1]),
+                    self.references[n_attenuator - 1]["run"],
+                )
                 # Multiply the result by the ratio for that run, and store
                 if self.references[n_attenuator - 1]["ratio_ws"] is not None:
                     Multiply(
@@ -188,7 +204,9 @@ class LRScalingFactors(PythonAlgorithm):
                         RHSWorkspace="ScalingRatio_%s" % n_attenuator,
                         OutputWorkspace="ScalingRatio_%s" % n_attenuator,
                     )
-                    self.references[n_attenuator]["diagnostics"] += " * %s" % self.references[n_attenuator - 1]["diagnostics"]
+                    self.references[n_attenuator]["diagnostics"] += (
+                        " * %s" % self.references[n_attenuator - 1]["diagnostics"]
+                    )
                 self.references[n_attenuator]["ratio_ws"] = "ScalingRatio_%s" % n_attenuator
 
             # If this is not a reference run, compute F
@@ -319,7 +337,12 @@ class LRScalingFactors(PythonAlgorithm):
         Multiply(LHSWorkspace=self.references[n_attenuator]["ratio_ws"], RHSWorkspace=f_ws, OutputWorkspace=f_ws)
         # Store the final result for this setting
         ReplaceSpecialValues(
-            InputWorkspace=f_ws, OutputWorkspace=f_ws, NaNValue=0.0, NaNError=1000.0, InfinityValue=0.0, InfinityError=1000.0
+            InputWorkspace=f_ws,
+            OutputWorkspace=f_ws,
+            NaNValue=0.0,
+            NaNError=1000.0,
+            InfinityValue=0.0,
+            InfinityError=1000.0,
         )
 
         # Remove prompt pulse bin, replace the y value by the
@@ -364,7 +387,8 @@ class LRScalingFactors(PythonAlgorithm):
                 "error_a": error_a,
                 "b": b,
                 "error_b": error_b,
-                "diagnostics": "%s / %s * %s" % (run, self.references[n_attenuator]["run"], self.references[n_attenuator]["diagnostics"]),
+                "diagnostics": "%s / %s * %s"
+                % (run, self.references[n_attenuator]["run"], self.references[n_attenuator]["diagnostics"]),
             }
         )
 
@@ -471,25 +495,30 @@ class LRScalingFactors(PythonAlgorithm):
 
     def compute_dead_time_correction(self, ws, tof_min, tof_max, tof_step):
         """
-            Compute dead time correction to be applied to the reflectivity curve.
+        Compute dead time correction to be applied to the reflectivity curve.
         """
         paralyzable = self.getProperty("ParalyzableDeadTime").value
         deadtime = self.getProperty("DeadTime").value
         deadtime_step = self.getProperty("DeadTimeTOFStep").value
         error_ws = LoadErrorEventsNexus(ws.getRun().getProperty("run_number").value)
 
-        corr_ws = mantid_algorithm_exec(dead_time_correction.SingleReadoutDeadTimeCorrection,
-                                        InputWorkspace=ws,
-                                        InputErrorEventsWorkspace=error_ws,
-                                        Paralyzable=paralyzable,
-                                        DeadTime=deadtime,
-                                        TOFStep=deadtime_step,
-                                        TOFRange=[tof_min, tof_max],
-                                        OutputWorkspace="corr")
+        corr_ws = mantid_algorithm_exec(
+            dead_time_correction.SingleReadoutDeadTimeCorrection,
+            InputWorkspace=ws,
+            InputErrorEventsWorkspace=error_ws,
+            Paralyzable=paralyzable,
+            DeadTime=deadtime,
+            TOFStep=deadtime_step,
+            TOFRange=[tof_min, tof_max],
+            OutputWorkspace="corr",
+        )
 
         # Rebin to the workspace we need
-        corr_ws = Rebin(InputWorkspace=corr_ws, Params=[tof_min, tof_step, tof_max],
-            PreserveEvents=False, OutputWorkspace=str(corr_ws)
+        corr_ws = Rebin(
+            InputWorkspace=corr_ws,
+            Params=[tof_min, tof_step, tof_max],
+            PreserveEvents=False,
+            OutputWorkspace=str(corr_ws),
         )
 
         return corr_ws
@@ -508,10 +537,7 @@ class LRScalingFactors(PythonAlgorithm):
         tof_step = self.getProperty("TOFSteps").value
         correct_for_deadtime = self.getProperty("UseDeadTimeCorrection").value
         if correct_for_deadtime:
-            dead_time_correction = self.compute_dead_time_correction(workspace,
-                                                                     tof_range[0],
-                                                                     tof_range[1],
-                                                                     tof_step)
+            dead_time_correction = self.compute_dead_time_correction(workspace, tof_range[0], tof_range[1], tof_step)
 
         # Check low-res axis
         if low_res_range[0] == Property.EMPTY_INT:
@@ -521,7 +547,10 @@ class LRScalingFactors(PythonAlgorithm):
 
         # Rebin TOF axis
         workspace = Rebin(
-            InputWorkspace=workspace, Params=[tof_range[0], tof_step, tof_range[1]], PreserveEvents=False, OutputWorkspace=str(workspace)
+            InputWorkspace=workspace,
+            Params=[tof_range[0], tof_step, tof_range[1]],
+            PreserveEvents=False,
+            OutputWorkspace=str(workspace),
         )
 
         # Subtract background
@@ -551,11 +580,7 @@ class LRScalingFactors(PythonAlgorithm):
         workspace = SumSpectra(InputWorkspace=workspace, OutputWorkspace=str(workspace))
 
         if correct_for_deadtime:
-            Multiply(
-                LHSWorkspace=workspace,
-                RHSWorkspace=dead_time_correction,
-                OutputWorkspace=str(workspace)
-            )
+            Multiply(LHSWorkspace=workspace, RHSWorkspace=dead_time_correction, OutputWorkspace=str(workspace))
 
         return str(workspace)
 

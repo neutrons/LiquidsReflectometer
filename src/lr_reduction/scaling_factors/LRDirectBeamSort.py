@@ -10,6 +10,7 @@ import functools
 from math import ceil
 from typing import List, Tuple
 
+# TODO: Wildcard imports are bad practice (Glass)
 import numpy as np
 from mantid.api import *
 from mantid.kernel import *
@@ -38,9 +39,9 @@ class CompareTwoNXSDataForSFcalculator(object):
 
     def __init__(self, nxsdataToCompareWith, nxsdataToPosition):
         """
-            Compare two runs to decide in which order they should be processed
-            :param workspace nxsdataToCompareWith: new run to compare with
-            :param workspace nxsdataToPosition: second run to compare with
+        Compare two runs to decide in which order they should be processed
+        :param workspace nxsdataToCompareWith: new run to compare with
+        :param workspace nxsdataToPosition: second run to compare with
         """
         self.nexusToCompareWithRun = nxsdataToCompareWith.getRun()
         self.nexusToPositionRun = nxsdataToPosition.getRun()
@@ -128,19 +129,34 @@ class LRDirectBeamSort(PythonAlgorithm):
             IntArrayProperty("RunList", [], direction=Direction.Input),
             "List of run numbers (integers) to be sorted - takes precedence over WorkspaceList",
         )
-        self.declareProperty(StringArrayProperty("WorkspaceList", [], direction=Direction.Input), "List of workspace names to be sorted")
         self.declareProperty(
-            "UseLowResCut", False, direction=Direction.Input, doc="If True, an x-direction cut will be determined and used"
+            StringArrayProperty("WorkspaceList", [], direction=Direction.Input), "List of workspace names to be sorted"
         )
-        self.declareProperty("ComputeScalingFactors", True, direction=Direction.Input, doc="If True, the scaling factors will be computed")
+        self.declareProperty(
+            "UseLowResCut",
+            False,
+            direction=Direction.Input,
+            doc="If True, an x-direction cut will be determined and used",
+        )
+        self.declareProperty(
+            "ComputeScalingFactors",
+            True,
+            direction=Direction.Input,
+            doc="If True, the scaling factors will be computed",
+        )
         self.declareProperty("TOFSteps", 200.0, doc="TOF bin width")
         self.declareProperty("WavelengthOffset", 0.0, doc="Wavelength offset used for TOF range determination")
         self.declareProperty("IncidentMedium", "Air", doc="Name of the incident medium")
-        self.declareProperty("OrderDirectBeamsByRunNumber", False, "Force the sequence of direct beam files to be ordered by run number")
         self.declareProperty(
-            FileProperty("ScalingFactorFile", "", action=FileAction.OptionalSave, extensions=["cfg"]), "Scaling factor file to be created"
+            "OrderDirectBeamsByRunNumber", False, "Force the sequence of direct beam files to be ordered by run number"
         )
-        self.declareProperty(IntArrayProperty("OrderedRunList", [], direction=Direction.Output), "Ordered list of run numbers")
+        self.declareProperty(
+            FileProperty("ScalingFactorFile", "", action=FileAction.OptionalSave, extensions=["cfg"]),
+            "Scaling factor file to be created",
+        )
+        self.declareProperty(
+            IntArrayProperty("OrderedRunList", [], direction=Direction.Output), "Ordered list of run numbers"
+        )
         self.declareProperty(
             StringArrayProperty("OrderedNameList", [], direction=Direction.Output),
             "Ordered list of workspace names corresponding to the run list",
@@ -149,7 +165,7 @@ class LRDirectBeamSort(PythonAlgorithm):
         self.declareProperty("UseDeadTimeCorrection", False, doc="If True, correct for dead time")
         self.declareProperty("ParalyzableDeadTime", True, doc="Use paralyzable dead time correction")
         self.declareProperty("DeadTime", 4.2, doc="Dead time value")
-        self.declareProperty("DeadTimeTOFStep", 200., doc="TOF step to bin into for dead time")
+        self.declareProperty("DeadTimeTOFStep", 200.0, doc="TOF step to bin into for dead time")
 
     def PyExec(self):
         compute = self.getProperty("ComputeScalingFactors").value
@@ -157,7 +173,9 @@ class LRDirectBeamSort(PythonAlgorithm):
         run_list = self.getProperty("RunList").value
         if len(run_list) > 0:
             for run in run_list:
-                workspace = LoadEventNexus(Filename="REF_L_%s" % run, OutputWorkspace="__data_file_%s" % run, MetaDataOnly=not compute)
+                workspace = LoadEventNexus(
+                    Filename="REF_L_%s" % run, OutputWorkspace="__data_file_%s" % run, MetaDataOnly=not compute
+                )
                 lr_data.append(workspace)
         else:
             ws_list = self.getProperty("WorkspaceList").value
@@ -225,7 +243,6 @@ class LRDirectBeamSort(PythonAlgorithm):
             bck_ranges = []
 
             for run in g:
-
                 peak, low_res = self._find_peak(run)  # , use_low_res_cut)
 
                 att = run.getRun().getProperty("vAtt").value[0] - 1
@@ -301,20 +318,22 @@ class LRDirectBeamSort(PythonAlgorithm):
             deadtime = self.getProperty("DeadTime").value
             deadtime_step = self.getProperty("DeadTimeTOFStep").value
 
-            mantid_algorithm_exec(LRScalingFactors.LRScalingFactors,
-                                  DirectBeamRuns=direct_beam_runs,
-                                  TOFRange=tof_range,
-                                  TOFSteps=tof_steps,
-                                  SignalPeakPixelRange=peak_ranges,
-                                  SignalBackgroundPixelRange=bck_ranges,
-                                  LowResolutionPixelRange=x_ranges,
-                                  IncidentMedium=incident_medium,
-                                  SlitTolerance=slit_tolerance,
-                                  ScalingFactorFile=scaling_file,
-                                  UseDeadTimeCorrection=use_deadtime,
-                                  ParalyzableDeadTime=paralyzable,
-                                  DeadTime=deadtime,
-                                  DeadTimeTOFStep=deadtime_step)
+            mantid_algorithm_exec(
+                LRScalingFactors.LRScalingFactors,
+                DirectBeamRuns=direct_beam_runs,
+                TOFRange=tof_range,
+                TOFSteps=tof_steps,
+                SignalPeakPixelRange=peak_ranges,
+                SignalBackgroundPixelRange=bck_ranges,
+                LowResolutionPixelRange=x_ranges,
+                IncidentMedium=incident_medium,
+                SlitTolerance=slit_tolerance,
+                ScalingFactorFile=scaling_file,
+                UseDeadTimeCorrection=use_deadtime,
+                ParalyzableDeadTime=paralyzable,
+                DeadTime=deadtime,
+                DeadTimeTOFStep=deadtime_step,
+            )
 
         # log output summary
         logger.notice(summary)
@@ -366,7 +385,7 @@ class LRDirectBeamSort(PythonAlgorithm):
             InputWorkspace=ws_name,
             OutputWorkspace=peak_ws_name,
             PeakCenters=f"{max_index}",
-            FitWindowBoundaryList=f"{crop},{signal.shape[0]-crop}",
+            FitWindowBoundaryList=f"{crop},{signal.shape[0] - crop}",
             HighBackground=False,
             ConstrainPeakPositions=False,
             FittedPeaksWorkspace=model_ws_name,
