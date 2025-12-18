@@ -9,17 +9,17 @@ from lr_reduction import template
 from lr_reduction.event_reduction import EventReflectivity
 from lr_reduction.mantid_utils import SampleLogValues
 from lr_reduction.web_report import (
-    ReportGenerator,
-    generate_event_count_info,
-    generate_plots,
-    generate_web_report,
-    html_wrapper,
+    assemble_report,
+    generate_report_plots,
+    generate_report_section_reduction_parameters,
+    generate_report_section_run_meta_data,
+    generate_report_sections,
 )
 
 
 @pytest.fixture(scope="module")
 def workspace_sc(nexus_dir):
-    """Fixture to create a Report object for testing."""
+    """Fixture to create and return a Mantid workspace (LoadEventNexus) for testing."""
     with amend_config(data_dir=nexus_dir):
         ws = LoadEventNexus("REF_L_201288")
     return ws
@@ -27,7 +27,7 @@ def workspace_sc(nexus_dir):
 
 @pytest.fixture(scope="module")
 def workspace_db(nexus_dir):
-    """Fixture to create a Report object for testing."""
+    """Fixture to load a Mantid workspace for direct beam data."""
     with amend_config(data_dir=nexus_dir):
         ws_db = LoadEventNexus("REF_L_201051")
     return ws_db
@@ -44,7 +44,7 @@ def template_data(workspace_sc, template_dir):
 
 @pytest.fixture(scope="module")
 def meta_data(workspace_sc, workspace_db, template_data):
-    """Fixture to create a Report object for testing."""
+    """Fixture to create metadata dictionary for testing."""
     peak = template_data.data_peak_range
     peak_center = (peak[0] + peak[1]) / 2.0
     sample_logs = SampleLogValues(workspace_sc)
@@ -68,33 +68,31 @@ def meta_data(workspace_sc, workspace_db, template_data):
     return meta_data
 
 
-def test_generate_web_report(workspace_sc, template_data, meta_data):
-    report = generate_web_report(workspace_sc, template_data, meta_data)
-    with open("/home/u5z/output.html", "w") as file:
-        file.write(report)
-    # assert len(report) == 2
+def test_generate_report_section_reduction_parameters(workspace_sc, template_data, meta_data):
+    report = generate_report_section_reduction_parameters(workspace_sc, template_data, meta_data)
+    assert len(report) == 820
 
 
-def test_generate_plots(workspace_sc, template_data):
-    html_plots = generate_plots(workspace_sc, template_data)
-    plot_html = "<table style='width:100%'>\n"
-    plot_html += "<tr>\n"
-    for plot in html_plots:
-        if plot is not None:
-            plot_html += "<td>%s</td>\n" % plot
-    plot_html += "</tr>\n"
-    plot_html += "</table>\n"
-    with open("/home/u5z/plots_output.html", "w") as file:
-        file.write(html_wrapper(plot_html))
+def test_generate_report_plots(workspace_sc, template_data):
+    html_plots = generate_report_plots(workspace_sc, template_data)
+    assert len(html_plots) == 5
+    assert None not in html_plots
 
 
-def test_generate_event_count_info(workspace_sc):
-    info_html = generate_event_count_info(workspace_sc)
-    with open("/home/u5z/info_output.html", "w") as file:
-        file.write(html_wrapper(info_html))
+def test_generate_report_section_run_meta_data(workspace_sc):
+    html_meta_data = generate_report_section_run_meta_data(workspace_sc)
+    assert len(html_meta_data) == 132
 
 
-def test_generate_report(workspace_sc, template_data, meta_data):
-    generator = ReportGenerator(workspace_sc, template_data, meta_data)
-    report = generator.generate()
-    assert report
+def test_generate_report_sections(workspace_sc, template_data, meta_data):
+    report_sections = generate_report_sections(workspace_sc, template_data, meta_data)
+    assert report_sections.run_meta_data is not None
+    assert report_sections.reduction_parameters is not None
+    assert report_sections.plots is not None
+
+
+def test_assemble_report(workspace_sc, template_data, meta_data):
+    report_sections = generate_report_sections(workspace_sc, template_data, meta_data)
+    report = assemble_report(None, report_sections)
+    assert "<html>" in report
+    assert "</html>" in report

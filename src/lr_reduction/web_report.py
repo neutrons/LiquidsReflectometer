@@ -3,9 +3,8 @@ Report class used to populate the web monitor
 """
 
 import math
-import sys
 import time
-from typing import List, Optional, Tuple, Union
+from typing import NamedTuple, Optional, Union
 
 import numpy as np
 import plotly.graph_objs as go
@@ -21,8 +20,26 @@ from lr_reduction.reduction_template_reader import ReductionParameters
 from lr_reduction.typing import MantidWorkspace
 
 
+class ReportSections(NamedTuple):
+    """
+    HTML fragments generated from a reduction run.
+
+    Attributes
+    ----------
+    run_meta_data
+        HTML <div> with run-level metadata.
+    plots
+        List of HTML <div>:s containing plots of the data run.
+    reduction_parameters
+        HTML <div> describing the reduction parameters used.
+    """
+    run_meta_data: str
+    plots: list[str]
+    reduction_parameters: str
+
+
 def html_wrapper(report: Union[str, None]) -> str:
-    """Wraps a report (set of <dvi> elements) in a complete HTML document
+    """Wraps a report (set of <div> elements) in a complete HTML document
 
     Adds the javascript engine (PlotLy.js) address, HTML head, and body tags.
 
@@ -66,48 +83,31 @@ def html_wrapper(report: Union[str, None]) -> str:
     return prefix + report + suffix  # allow for report being `None`
 
 
-def _concatenate_reports(reports: List[str]) -> str:
-    if isinstance(reports, (list, tuple)):
-        composite = "\n".join([str(report) for report in reports])
-    else:
-        composite = str(reports)
-    return composite
-
-
-def save_report(html_report: Union[str, List[str]], report_file: str):
+def save_report(html_report: str, report_file: str):
     """Save report to a local file
-
-    If `html_report` contains more than one report, then merge them.
 
     Parameters
     ----------
-    html_report : str, List[str]
-        One or more compendium of <div> and <table> elements. Has all the information from reducing a run,
-        possibly including reports from more than one peak when the run contains many peaks. This could happen
-        if the experiment contained more than one sample, each reflecting at a different angle.
+    html_report : str
+        HTML report containing <div> and <table> elements with information and plots from data
+        reduction of one run.
     report_file : str
         File path where the report will be saved as an HTML file.
     """
-    report_composite = _concatenate_reports(html_report)
     with open(report_file, "w", encoding="utf-8") as f:
-        f.write(html_wrapper(report_composite))
+        f.write(html_wrapper(html_report))
 
 
-def upload_report(html_report: Union[str, List[str]], run_number: Union[str, int]) -> Optional[requests.Response]:
-    r"""Upload report to the livedata server
-
-    If `html_report` contains more than one report, then merge them.
+def upload_report(html_report: str, run_number: Union[str, int]) -> Optional[requests.Response]:
+    r"""Upload report to the live data server
 
     Parameters
     ----------
-    html_report: str, List[str]
-        one or more compendium of <div> and <table> elements. Has all the information from reducing a run,
-        possibly including reports from more than one peak when the run contains many peaks. This could happen
-        if the experiment contained more than one sample, each reflecting at a different angle.
+    html_report: str
+        HTML report containing <div> and <table> elements with information and plots from data
+        reduction of one run.
     run_number: str, int
-        Run number (e.g. '123435'). Required if `publish` is True
-    report_file: Optional[str]
-        Save the report to a file. If `None` or `False`, the report will not be saved to a file.
+        Run number (e.g. '123435').
 
     Returns
     -------
@@ -115,119 +115,122 @@ def upload_report(html_report: Union[str, List[str]], run_number: Union[str, int
         `Response` object returned by the livedata server, or `None` if the function is unable to do find the
         library to generate the `request.post()`
     """
-    report_composite = _concatenate_reports(html_report)
-    return publish_plot("REF_M", run_number, files={"file": report_composite})
+    return publish_plot("REF_L", run_number, files={"file": html_report})
 
 
-def process_collection(summary_content=None, report_list=None) -> Tuple[str, str]:
-    r"""Process a collection of HTML reports into on final HTML report
+def assemble_report(reflectivity_plot_div: str=None, report_sections: ReportSections=None) -> str:
+    """Assemble report HTML snippets into on final HTML report
 
     Parameters
     ----------
-        summary_content: str
-            HTML content to be displayed at the top of the report
-        report_list: List[lr_reduction.web_report.Report]
-            List of HTML contents to be appended at the bottom of the page
-        run_number: str
-            run number to associate this report with
+    reflectivity_plot_div: str
+    report_sections: ReportSections
 
     Returns
     -------
-    Tuple[str, str]
-        plot_html str: HTML
-        script str: python script
+    str
+        HTML report
     """
-    if report_list is None:
-        report_list = []
-    logger.notice("Processing... %s" % len(report_list))
+    logger.notice("Assembling web report")
     plot_html = "<div></div>"
-    script = ""
 
-    if summary_content is not None:
-        plot_html += "<div>%s</div>\n" % summary_content
+    if reflectivity_plot_div is not None:
+        plot_html += "<div>%s</div>\n" % reflectivity_plot_div
 
-    if report_list:
-        plot_html += report_list[0].report
-    for report in report_list:
-        script += report.script
-        plot_html += "<div>%s</div>\n" % report.cross_section_info
+    if report_sections is not None:
+        plot_html += "<div>%s</div>\n" % report_sections.run_meta_data
+        plot_html += "<div>%s</div>\n" % report_sections.reduction_parameters
         plot_html += "<table style='width:100%'>\n"
         plot_html += "<tr>\n"
-        for plot in report.plots:
+        for plot in report_sections.plots:
             if plot is not None:
                 plot_html += "<td>%s</td>\n" % plot
         plot_html += "</tr>\n"
         plot_html += "</table>\n"
         plot_html += "<hr>\n"
 
-    return plot_html, script
+    return plot_html
 
 
-class ReportGenerator:
+def generate_report_sections(
+    workspace: MantidWorkspace,
+    template_file: ReductionParameters,
+    meta_data: dict,
+    logfile=None,
+) -> ReportSections:
     """
-    Take the output of the reduction and generate diagnostics plots, and a block of meta data.
+    Generate diagnostics plots and report metadata from a reduction workspace.
+
+    Parameters
+    ----------
+    workspace
+        Mantid workspace
+    template_file
+        Template file path or pre-parsed template data
+    meta_data
+        Metadata to embed in the report
+    logfile
+        Optional file-like object for logging
+
+    Returns
+    -------
+    ReportSections
+        Container holding HTML fragments for the reduction report
+        (parameters, plots, and run metadata).
     """
 
-    def __init__(self, workspace, template_file, meta_data, logfile=None):
-        """
-        Parameters
-        ----------
-        workspace
-        template_file
-        logfile
-        """
-        logger.notice("  - Data type: ")
-        self.workspace = workspace
-        self.sample_logs = SampleLogValues(workspace)
-        self.data_type = DataType.from_workspace(workspace)
-
-        # Get the sequence number
-        try:
-            sequence_number = self.sample_logs["sequence_number"]
-        except:  # noqa E722
-            sequence_number = 1
-        # Read template if it was passed as a file path
-        # It can be passed as a dict directly
-        if isinstance(template_file, str):
-            template_data = template.read_template(template_file, sequence_number)
-        else:
-            template_data = template_file
-        self.template_data = template_data
-        self.meta_data = meta_data
-
-        self.logfile = logfile
-        try:
-            self.number_events = workspace.getNumberEvents()
-        except:  # noqa E722
-            self.number_events = 0
-        self.plots = []
-        self.report = ""
-        self.event_count_info = ""
-
-    def generate(self):
-        if self.data_type != DataType.UNKNOWN:
-            self.log(f"  - generating report [{self.number_events}]")
-            self.report: str = generate_web_report(self.workspace, self.template_data, self.meta_data)
-            self.event_count_info = generate_event_count_info(self.workspace)
-            try:
-                self.plots = generate_plots(self.workspace, self.template_data)
-            except:  # noqa E722
-                self.log("Could not generate plots: %s" % sys.exc_info()[0])
-                logger.error("Could not generate plots: %s" % sys.exc_info()[0])
-        else:
-            logger.error("Invalid data type for report: %s" % self.data_type.name)
-
-        self.log("  - report: %s %s" % (len(self.report), len(self.plots)))
-
-    def log(self, msg):
-        """Log a message"""
-        if self.logfile is not None:
-            self.logfile.write(msg + "\n")
+    def log(msg):
+        if logfile is not None:
+            logfile.write(msg + "\n")
         logger.notice(msg)
 
+    logger.notice("  - Data type:")
 
-def generate_event_count_info(workspace: MantidWorkspace) -> str:
-    """Generate an HTML table containing run information (event count and proton charge)
+    sample_logs = SampleLogValues(workspace)
+    data_type = DataType.from_workspace(workspace)
+
+    try:
+        sequence_number = sample_logs["sequence_number"]
+    except Exception:  # noqa: BLE001
+        sequence_number = 1
+
+    # Read template if needed
+    if isinstance(template_file, str):
+        template_data = template.read_template(template_file, sequence_number)
+    else:
+        template_data = template_file
+
+    try:
+        number_events = workspace.getNumberEvents()
+    except Exception:  # noqa: BLE001
+        number_events = 0
+
+    plots = []
+    report = ""
+    run_meta_data = ""
+
+    if data_type != DataType.UNKNOWN:
+        log(f"  - generating report [{number_events}]")
+
+        report = generate_report_section_reduction_parameters(workspace, template_data, meta_data)
+        run_meta_data = generate_report_section_run_meta_data(workspace)
+
+        try:
+            plots = generate_report_plots(workspace, template_data)
+        except Exception as e:  # noqa: BLE001
+            log(f"Could not generate plots: {e}")
+            logger.error("Could not generate plots", exc_info=True)
+
+    else:
+        logger.error("Invalid data type for report: %s", data_type.name)
+
+    log(f"  - report: {len(report)} {len(plots)}")
+
+    return ReportSections(run_meta_data, plots, report)
+
+
+def generate_report_section_run_meta_data(workspace: MantidWorkspace) -> str:
+    """Generate an HTML table containing run information
 
     Parameters
     ----------
@@ -252,8 +255,8 @@ def generate_event_count_info(workspace: MantidWorkspace) -> str:
     return meta
 
 
-def generate_web_report(workspace, template_data, meta_data) -> str:
-    r"""Generate HTML report from a reduced workspace and template data
+def generate_report_section_reduction_parameters(workspace, template_data, meta_data) -> str:
+    """Generate HTML report from a reduced workspace and template data
 
     Returns
     -------
@@ -319,7 +322,7 @@ def generate_web_report(workspace, template_data, meta_data) -> str:
     return meta
 
 
-def generate_plots(workspace: MantidWorkspace, template_data: ReductionParameters):
+def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionParameters):
     """
     Generate diagnostics plots
     """
@@ -347,7 +350,7 @@ def generate_plots(workspace: MantidWorkspace, template_data: ReductionParameter
             y_range=scatt_peak,
             y_bck_range=template_data.background_roi,
         )
-    except:  # noqa E722
+    except Exception:  # noqa E722
         # self.log("  - Could not generate XY plot")
         xy_plot = _plotText("Could not generate XY plot")
 
@@ -382,7 +385,7 @@ def generate_plots(workspace: MantidWorkspace, template_data: ReductionParameter
             y_label="TOF (ms)",
             swap_axes=False,
         )
-    except:  # noqa E722
+    except Exception:  # noqa E722
         # self.log("  - Could not generate X-TOF plot")
         y_tof_plot = _plotText("Could not generate X-TOF plot")
 
@@ -410,7 +413,7 @@ def generate_plots(workspace: MantidWorkspace, template_data: ReductionParameter
             x_label="Y pixel",
             y_label="Counts",
         )
-    except:  # noqa E722
+    except Exception:  # noqa E722
         # self.log("  - Could not generate Y count distribution")
         peak_pixels = _plotText(
             "Could not generate Y count distribution"
@@ -438,7 +441,7 @@ def generate_plots(workspace: MantidWorkspace, template_data: ReductionParameter
             x_label="X pixel",
             y_label="Counts",
         )
-    except:  # noqa E722
+    except Exception:  # noqa E722
         # self.log("  - Could not generate X count distribution")
         low_res_profile = _plotText("Could not generate X count distribution")
 
@@ -456,7 +459,7 @@ def generate_plots(workspace: MantidWorkspace, template_data: ReductionParameter
             x_label="TOF (ms)",
             y_label="Counts",
         )
-    except:  # noqa E722
+    except Exception:  # noqa E722
         # self.log("  - Could not generate TOF distribution")
         tof_dist = _plotText(
             "Could not generate TOF distribution"
@@ -466,28 +469,49 @@ def generate_plots(workspace: MantidWorkspace, template_data: ReductionParameter
 
 
 def _plot2d(
-    x,
-    y,
-    z,
-    x_range=None,
-    y_range=None,
-    x_label="X pixel",
-    y_label="Y pixel",
-    title="",
-    x_bck_range=None,
-    y_bck_range=None,
-    swap_axes=False,
+    x: np.ndarray,
+    y: np.ndarray,
+    z: np.ndarray | list,
+    x_range: list=None,
+    y_range: list=None,
+    x_label: str="X pixel",
+    y_label: str="Y pixel",
+    title: str="",
+    x_bck_range: list=None,
+    y_bck_range: list=None,
+    swap_axes: bool=False,
 ):
     """
-    Generate a 2D plot
-    :param array x: x-axis values
-    :param array y: y-axis values
-    :param array z: z-axis counts
-    :param str x_label: x-axis label
-    :param str y_label: y-axis label
-    :param str title: plot title
-    :param array x_bck_range: array of length 2 to specify a background region in x
-    :param array y_bck_range: array of length 2 to specify a background region in y
+    Generate a simple 2D plot as an HTML snippet containing a Plotly graph embedded within a web page
+
+    Parameters
+    ----------
+    x
+        x-axis values
+    y
+        y-axis values
+    z
+        z-axis counts
+    x_range
+        x-axis range for the plot
+    y_range
+        y-axis range for the plot
+    x_label
+        label for the x-axis
+    y_label
+        label for the y-axis
+    title
+        the title of the plot
+    x_bck_range
+        x-axis background range for the plot
+    y_bck_range
+        y-axis background range for the plot
+    swap_axes
+        whether to swap the x and y axes
+
+    Returns
+    -------
+    str
     """
     colorscale = [
         [0, "rgb(0,0,131)"],
@@ -515,23 +539,28 @@ def _plot2d(
     # Round the remaining values to a certain number of decimal places, for instance 0.003455245 to 0.0034.
     # This will later save disk space when writing the figure to file
     def leading_decimal_places(x: float):
-        """Calculate the number of leading decimal places for a number between 0 and 1."""
+        """Calculate the number of leading decimal places for a number between 0 and 1.
+
+        Returns 0 if x is outside the range (0, 1).
+        """
         if x <= 0 or x >= 1:
-            raise ValueError("x must be between 0 and 1")
+            return 0  # Safe default for out-of-range values
         return abs(math.floor(math.log10(x)))
 
     z_sparse = np.round(z_sparse, 1 + leading_decimal_places(threshold))
+
+    plotly_objects = []
 
     heatmap = go.Heatmap(
         x=x_sparse,
         y=y_sparse,
         z=z_sparse,
         autocolorscale=False,
-        type="heatmap",
         showscale=False,
         hoverinfo="x+y+z",
         colorscale=colorscale,
     )
+    plotly_objects.append(heatmap)
 
     x_range_color = "rgba(152, 0, 0, .8)"
     y_range_color = "rgba(0, 128, 0, 1)"
@@ -540,7 +569,6 @@ def _plot2d(
         y_range_color = "rgba(152, 0, 0, .8)"
 
     # Set the color scale limits
-    data = [heatmap]
     if x_range is not None:
         x_left = go.Scatter(
             name="",
@@ -558,8 +586,8 @@ def _plot2d(
                 color=x_range_color,
             ),
         )
-        data.append(x_left)
-        data.append(x_right)
+        plotly_objects.append(x_left)
+        plotly_objects.append(x_right)
 
     if x_bck_range is not None:
         x_left = go.Scatter(
@@ -578,8 +606,8 @@ def _plot2d(
                 color="rgba(152, 152, 152, .8)",
             ),
         )
-        data.append(x_left)
-        data.append(x_right)
+        plotly_objects.append(x_left)
+        plotly_objects.append(x_right)
 
     if y_range is not None:
         y_left = go.Scatter(
@@ -598,8 +626,8 @@ def _plot2d(
                 color=y_range_color,
             ),
         )
-        data.append(y_left)
-        data.append(y_right)
+        plotly_objects.append(y_left)
+        plotly_objects.append(y_right)
 
     if y_bck_range is not None:
         y_left = go.Scatter(
@@ -618,8 +646,8 @@ def _plot2d(
                 color="rgba(152, 152, 152, .8)",
             ),
         )
-        data.append(y_left)
-        data.append(y_right)
+        plotly_objects.append(y_left)
+        plotly_objects.append(y_right)
 
     x_layout = dict(
         title=x_label,
@@ -653,14 +681,14 @@ def _plot2d(
         xaxis=x_layout,
         yaxis=y_layout,
     )
-    fig = go.Figure(data=data, layout=layout)
+    fig = go.Figure(data=plotly_objects, layout=layout)
     return pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
 
 
 def _plot1d(
     x, y, x_range=None, y_range=None, x_label="", y_label="Counts", title="", bck_range=None, x_log=False, y_log=True
 ) -> str:
-    r"""Generate a simple 1D plot as an HTML snippet containing a Plotly graph embedded within a web page
+    """Generate a simple 1D plot as an HTML snippet containing a Plotly graph embedded within a web page
 
     Parameters
     ----------
@@ -685,9 +713,11 @@ def _plot1d(
     str
     """
     data = [go.Scatter(name="", x=x, y=y)]
+    range_min_default = 0.001
 
     if x_range is not None:
-        min_y = min([v for v in y if v > 0])
+        y_pos = [v for v in y if v > 0]
+        min_y = min(y_pos) if y_pos else range_min_default
         x_left = go.Scatter(
             name="",
             x=[x_range[0], x_range[0]],
@@ -708,7 +738,8 @@ def _plot1d(
         data.append(x_right)
 
     if y_range is not None:
-        min_x = min([v for v in x if v > 0])
+        x_pos = [v for v in x if v > 0]
+        min_x = min(x_pos) if x_pos else range_min_default
         y_left = go.Scatter(
             name="",
             y=[y_range[0], y_range[0]],
@@ -729,7 +760,8 @@ def _plot1d(
         data.append(y_right)
 
     if bck_range is not None:
-        min_y = min([v for v in y if v > 0])
+        y_pos = [v for v in y if v > 0]
+        min_y = min(y_pos) if y_pos else range_min_default
         x_left = go.Scatter(
             name="",
             x=[bck_range[0], bck_range[0]],
@@ -792,107 +824,20 @@ def _plot1d(
     return pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
 
 
-def plot1d(
-    run_number,  # noqa ARG001
-    data_list,
-    data_names=None,
-    x_title="",
-    y_title="",
-    x_log=False,
-    y_log=False,
-    instrument="",  # noqa ARG001
-    show_dx=True,
-    title="",
-    publish=False,  # noqa ARG001
-):
-    r"""
-    Produce a 1D plot in the style of the autoreduction output.
-    The function signature is meant to match the autoreduction publisher.
-    @param data_list: list of traces [ [x1, y1], [x2, y2], ...]
-    @param data_names: name for each trace, for the legend
-
-    Arguments run_number, instrument, and publish are unused because this function is not meant to upload
-    anything to the livedata server.
-    """
-    # Create traces
-    if not isinstance(data_list, list):
-        raise RuntimeError("plot1d: data_list parameter is expected to be a list")
-
-    # Catch the case where the list is in the format [x y]
-    data = []
-    show_legend = False
-    if len(data_list) == 2 and not isinstance(data_list[0], list):
-        label = ""
-        if isinstance(data_names, list) and len(data_names) == 1:
-            label = data_names[0]
-            show_legend = True
-        data = [go.Scatter(name=label, x=data_list[0], y=data_list[1])]
-    else:
-        for i in range(len(data_list)):
-            label = ""
-            if isinstance(data_names, list) and len(data_names) == len(data_list):
-                label = data_names[i]
-                show_legend = True
-            err_x = {}
-            err_y = {}
-            if len(data_list[i]) >= 3:
-                err_y = dict(type="data", array=data_list[i][2], visible=True)
-            if len(data_list[i]) >= 4:
-                err_x = dict(type="data", array=data_list[i][3], visible=True)
-                if show_dx is False:
-                    err_x["thickness"] = 0
-            data.append(go.Scatter(name=label, x=data_list[i][0], y=data_list[i][1], error_x=err_x, error_y=err_y))
-
-    x_layout = dict(
-        title=x_title,
-        zeroline=False,
-        exponentformat="power",
-        showexponent="all",
-        showgrid=True,
-        showline=True,
-        mirror="all",
-        ticks="inside",
-    )
-    if x_log:
-        x_layout["type"] = "log"
-    y_layout = dict(
-        title=y_title,
-        zeroline=False,
-        exponentformat="power",
-        showexponent="all",
-        showgrid=True,
-        showline=True,
-        mirror="all",
-        ticks="inside",
-    )
-    if y_log:
-        y_layout["type"] = "log"
-
-    layout = go.Layout(
-        showlegend=show_legend,
-        autosize=True,
-        width=600,
-        height=400,
-        margin=dict(t=40, b=40, l=80, r=40),
-        hovermode="closest",
-        bargap=0,
-        xaxis=x_layout,
-        yaxis=y_layout,
-        title=title,
-    )
-
-    fig = go.Figure(data=data, layout=layout)
-    plot_div = pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
-    return plot_div
-
-
 def _plotText(text, title=""):
-    r"""
+    """
     Displays an informative message as a plot
 
-    :param: text: str, the text to be displayed
-    :param: title: str, the title of the plot
-    :return: py.plot, the plot
+    Parameters
+    ----------
+    text : str
+        Text to display
+    title : str
+        Title of the text area
+
+    Returns
+    -------
+    str
     """
 
     layout = go.Layout(
