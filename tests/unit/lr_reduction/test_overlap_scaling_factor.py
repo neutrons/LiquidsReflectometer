@@ -88,9 +88,19 @@ def test_find_nearest(overlap_scaling_factor):
     assert index == 2  # Nearest to 0.33 is 0.3 at index 2
 
 
-def test_scale_to_apply_for_best_overlap(overlap_scaling_factor):
-    pass
+def test_scale_factor_for_overlap_region(overlap_scaling_factor):
+    fit_range = np.array([0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
+    a_left = 0.0
+    b_left = 2.0
+    a_right = 0.0
+    b_right = 0.5
+    sf = overlap_scaling_factor.scale_factor_for_overlap_region(fit_range, a_left, b_left, a_right, b_right)
+    assert sf == approx(0.25, abs=1e-9)  # Since left mean is 2.0 and right mean is 0.5
 
 
 def test_calculate_mean_over_range(overlap_scaling_factor):
-    pass
+    fit_range = np.array([0.05, 0.06, 0.07, 0.08, 0.09, 0.1])
+    a = 0.0
+    b = 2.0
+    mean_value = overlap_scaling_factor.calculate_mean_over_range(fit_range, a, b)
+    assert mean_value == approx(2.0, abs=1e-9)  # Since data is constant at 2.0

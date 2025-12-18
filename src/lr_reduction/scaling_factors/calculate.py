@@ -39,12 +39,11 @@ def scaling_factor_critical_edge(q_min: float, q_max: float, data: list[ReducedD
         high_bound = reduced_data.q <= q_max
         indices = np.argwhere(low_bound & high_bound).T[0]
 
-        _values_i = reduced_data.r[indices]
-        values = np.concatenate((values, _values_i))
+        new_values = reduced_data.r[indices]
+        values = np.concatenate((values, new_values))
 
-        _errors_i = reduced_data.err[indices]
-        errors = np.concatenate((errors, _errors_i))
-
+        new_errors = reduced_data.err[indices]
+        errors = np.concatenate((errors, new_errors))
     if len(values) > 1:
         sf = 1 / np.average(values, weights=1 / errors**2).item()
     else:
@@ -98,29 +97,26 @@ class OverlapScalingFactor:
             nbr_points = 10
             fit_range_to_use = self.get_fitting_overlap_range(overlap.min_x, overlap.max_x, nbr_points)
 
-            sf = self.scale_to_apply_for_best_overlap(fit_range_to_use, a_left, b_left, a_right, b_right)
+            sf = self.scale_factor_for_overlap_region(fit_range_to_use, a_left, b_left, a_right, b_right)
 
         return sf
 
     def apply_sf(self, data: ReducedData) -> ReducedData:
-        """
-        Apply the auto scaling factor to the data
-        """
+        """Apply the auto scaling factor to a data set."""
         r = data.r * self.sf_auto
         err = data.err * self.sf_auto
         data.temp_r = r
         data.temp_err = err
         return data
 
-    def get_fitting_overlap_range(self, min_x, max_x, nbr_points):
+    def get_fitting_overlap_range(self, min_x: float, max_x: float, nbr_points: int) -> np.ndarray:
+        """Get the range of values for fitting within the overlap region."""
         step = (float(max_x) - float(min_x)) / float(nbr_points)
-        _fit_range = np.arange(min_x, max_x + step, step)
-        return _fit_range
+        fit_range = np.arange(min_x, max_x + step, step)
+        return fit_range
 
     def calculate_axis_overlap(self, left_axis: np.ndarray, right_axis: np.ndarray) -> OverlapInfo:
-        """
-        Calculate the overlap region of the two axis
-        """
+        """Calculate the overlap region between two 1D axes."""
         overlap = OverlapInfo(
             min_x=-1,
             max_x=-1,
@@ -143,8 +139,33 @@ class OverlapScalingFactor:
     def fit_data(
         self, data: ReducedData, threshold_index: int, data_type: Literal["left", "right"] = "right"
     ) -> list[float]:
-        """
-        will fit the data with linear fitting y=ax + b
+        """Perform a linear least-squares fit of the reflectivity data using `y = a * x + b`.
+
+        The region of data to be fitted is selected based on `threshold_index` and `data_type`:
+        * If `data_type == "right"` (default), the fit is performed on the data from
+            the beginning of the arrays up to and including `threshold_index`.
+        * If `data_type == "left"`, the fit is performed on the data from
+            `threshold_index` to the end of the arrays, using the temporary arrays
+            `temp_r` and `temp_err` stored in `data`.
+
+        Parameters
+        ----------
+        data : ReducedData
+            The reduced data to be fitted.
+        threshold_index : int
+            Index in the `q` axis that defines the boundary of the region to fit.
+            For `data_type="right"`, data up to and including this index are used.
+            For `data_type="left"`, data from this index to the end are used.
+        data_type : {"left", "right"}, optional
+            Selects which side of `threshold_index` is fitted. `"right"` fits the
+            low-Q side (start to `threshold_index`); `"left"` fits the high-Q side
+            (`threshold_index` to end) using `temp_r` and `temp_err`.
+
+        Returns
+        -------
+        list[float]
+            A two-element list `[a, b]` containing the fitted linear parameters for
+            the model `y = a * x + b`, where `a` is the slope and `b` is the intercept.
         """
         if data_type == "left":
             assert data.temp_r is not None and data.temp_err is not None, "Temporary data arrays should not be None."
@@ -172,25 +193,21 @@ class OverlapScalingFactor:
         return [a, b]
 
     def find_nearest(self, array: np.ndarray, value: float) -> int:
+        """Find the index of the array element nearest to the given value."""
         idx = (np.abs(array - value)).argmin().item()
         return idx
 
-    def scale_to_apply_for_best_overlap(
+    def scale_factor_for_overlap_region(
         self, fit_range_to_use: np.ndarray, a_left: float, b_left: float, a_right: float, b_right: float
     ) -> float:
-        """
-        This function will use the same overlap region and will determine the scaling to apply to
-        the second fit to get the best match
-        """
+        """Calculate the scaling factor to apply for the overlap region between two fits."""
         left_mean = self.calculate_mean_over_range(fit_range_to_use, a_left, b_left)
         right_mean = self.calculate_mean_over_range(fit_range_to_use, a_right, b_right)
-        _sf = right_mean / left_mean
-        return _sf
+        sf = right_mean / left_mean
+        return sf
 
     def calculate_mean_over_range(self, range_to_use: np.ndarray, a: float, b: float) -> float:
-        """
-        Calculate the average value of the function over the given range
-        """
+        """Calculate the average value of the function over the given range."""
         sz_range = range_to_use.size
         _sum = 0
         for i in range(sz_range):
