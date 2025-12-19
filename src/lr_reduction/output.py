@@ -208,12 +208,15 @@ class RunCollection:
             HTML div containing the combined reflectivity curve plot
         """
         refl_curves = []
+        run_names = []
 
         for item in self.collection:
             refl_curves.append([item["q"], item["r"], item["dr"], item["dq"]])
+            run_names.append(f"Run: {item['info']['run_number']}")
 
-        # run_number is only used when publish=True
-        return plot1d(run_number="dummy_run", data_list=refl_curves, instrument='REF_L',
+        # run_number parameter is only used when publish=True
+        return plot1d(run_number="dummy_run", data_list=refl_curves, data_names=run_names,
+                      instrument='REF_L',
                       x_title=u"Q (1/A)", x_log=True,
                       y_title="Reflectivity", y_log=True, show_dx=False, publish=False)
 
