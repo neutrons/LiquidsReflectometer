@@ -210,8 +210,7 @@ class RunCollection:
         refl_curves = []
 
         for item in self.collection:
-            for i in range(len(item["q"])):
-                refl_curves.append([item["q"][i], item["r"][i], item["dr"][i], item["dq"][i]])
+            refl_curves.append([item["q"], item["r"], item["dr"], item["dq"]])
 
         # run_number is only used when publish=True
         return plot1d(run_number="dummy_run", data_list=refl_curves, instrument='REF_L',
