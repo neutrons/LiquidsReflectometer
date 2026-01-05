@@ -9,6 +9,7 @@ import os
 import re
 import time
 
+# TODO: Wildcard imports are bad practice (Glass)
 from mantid.api import *
 from mantid.kernel import *
 from mantid.simpleapi import *
