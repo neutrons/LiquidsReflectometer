@@ -1,7 +1,6 @@
-# import mantid algorithms, numpy and matplotlib
 import sys
 sys.path.append('../autoreduce')
-from mantid.simpleapi import *
+from mantid.simpleapi import Load, Integration
 import numpy as np
 from scipy import ndimage
 from peak_finding import find_peaks, peak_prominences, peak_widths

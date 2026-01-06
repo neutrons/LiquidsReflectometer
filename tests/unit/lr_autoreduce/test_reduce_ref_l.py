@@ -32,12 +32,12 @@ def test_parse_args_all_positionals():
         "prog",
         "events.nxs.h5",
         "output",
-        "1",                 # old_version_flag
-        "template.xml",      # template_file
-        "true",              # avg_overlap
-        "true",              # const_q
-        "true",              # fit_first_peak
-        "5.0",               # theta_offset
+        "1",  # old_version_flag
+        "template.xml",  # template_file
+        "true",  # avg_overlap
+        "true",  # const_q
+        "true",  # fit_first_peak
+        "5.0",  # theta_offset
     ]
     with patch.object(sys, "argv", argv):
         args = parse_command_arguments()

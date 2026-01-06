@@ -16,8 +16,8 @@ def mantid_algorithm_exec(algorithm_class, **kwargs):
     for name, value in kwargs.items():
         algorithm_instance.setProperty(name, value)
     algorithm_instance.PyExec()
-    if 'OutputWorkspace' in kwargs:
-        return algorithm_instance.getProperty('OutputWorkspace').value
+    if "OutputWorkspace" in kwargs:
+        return algorithm_instance.getProperty("OutputWorkspace").value
 
 
 def workspace_handle(workspace: MantidWorkspace) -> MantidWorkspace:

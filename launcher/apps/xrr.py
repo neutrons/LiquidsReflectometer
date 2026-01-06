@@ -10,31 +10,30 @@ OUTPUT_DIR_DIRECTIVE = "Click to choose an output directory"
 
 
 class XRR(QWidget):
-
     def __init__(self):
         QWidget.__init__(self)
-        self.setWindowTitle('Rigaku XRR reduction')
+        self.setWindowTitle("Rigaku XRR reduction")
         layout = QGridLayout()
         self.setLayout(layout)
 
         self.settings = QtCore.QSettings()
 
         # Data file
-        self.choose_data = QPushButton('Data file')
+        self.choose_data = QPushButton("Data file")
         layout.addWidget(self.choose_data, 1, 1)
 
         self.data_path = QLabel(self)
         layout.addWidget(self.data_path, 1, 2)
 
         # Output directory
-        self.choose_output_dir = QPushButton('Output directory')
+        self.choose_output_dir = QPushButton("Output directory")
         layout.addWidget(self.choose_output_dir, 2, 1)
 
         self.output_dir_label = QLabel(self)
         layout.addWidget(self.output_dir_label, 2, 2)
 
         # Process button
-        self.perform_reduction = QPushButton('Process')
+        self.perform_reduction = QPushButton("Process")
         layout.addWidget(self.perform_reduction, 3, 1)
 
         # connections
@@ -46,16 +45,16 @@ class XRR(QWidget):
         self.read_settings()
 
     def data_selection(self):
-        _data_file, _ = QFileDialog.getOpenFileName(self, 'Open file',
-                                                    self.data_path.text(),
-                                                    'Rigaku data file (*.ras)')
+        _data_file, _ = QFileDialog.getOpenFileName(
+            self, "Open file", self.data_path.text(), "Rigaku data file (*.ras)"
+        )
         if os.path.isfile(_data_file):
             self.data_path.setText(_data_file)
 
     def output_dir_selection(self):
-        _dir = QFileDialog.getExistingDirectory(None, 'Select a folder:',
-                                                self.output_dir_label.text(),
-                                                QFileDialog.ShowDirsOnly)
+        _dir = QFileDialog.getExistingDirectory(
+            None, "Select a folder:", self.output_dir_label.text(), QFileDialog.ShowDirsOnly
+        )
         if os.path.isdir(_dir):
             self.output_dir_label.setText(_dir)
 
@@ -71,8 +70,8 @@ class XRR(QWidget):
         self.output_dir_label.setText(_out_dir)
 
     def save_settings(self):
-        self.settings.setValue('xrr_data_file', self.data_path.text())
-        self.settings.setValue('output_dir', self.output_dir_label.text())
+        self.settings.setValue("xrr_data_file", self.data_path.text())
+        self.settings.setValue("output_dir", self.output_dir_label.text())
 
     def check_inputs(self):
         error = None
@@ -104,5 +103,4 @@ class XRR(QWidget):
 
         print("Reduce!")
 
-        subprocess.run(['python3', 'scripts/xrr_reduction.py',
-                        self.data_path.text(), self.output_dir_label.text()])
+        subprocess.run(["python3", "scripts/xrr_reduction.py", self.data_path.text(), self.output_dir_label.text()])

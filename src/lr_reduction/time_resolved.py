@@ -6,11 +6,9 @@ import json
 import os
 import sys
 
-import mantid
+import mantid.kernel
 import mantid.simpleapi as api
 import numpy as np
-from mantid.api import *
-from mantid.kernel import *
 from matplotlib import pyplot as plt
 
 mantid.kernel.config.setLogLevel(3)
@@ -65,9 +63,15 @@ def reduce_30Hz_from_ws(
     print("Ref 30Hz:  %g %g    [%g]" % (r_meas[0].min(), r_meas[0].max(), _binning_ref))
     print("Meas 30Hz: %g %g    [%g]" % (r_ref[0].min(), r_ref[0].max(), _binning_meas))
 
-    _q_idx_60 = np.asarray(np.where((data_60Hz[0] > _min_q * (1 - _tolerance)) & (data_60Hz[0] < _max_q * (1 + _tolerance))))[0]
-    _q_idx_meas30 = np.asarray(np.where((r_meas[0] > _min_q * (1 - _tolerance)) & (r_meas[0] < _max_q * (1 + _tolerance))))[0]
-    _q_idx_ref30 = np.asarray(np.where((r_ref[0] > _min_q * (1 - _tolerance)) & (r_ref[0] < _max_q * (1 + _tolerance))))[0]
+    _q_idx_60 = np.asarray(
+        np.where((data_60Hz[0] > _min_q * (1 - _tolerance)) & (data_60Hz[0] < _max_q * (1 + _tolerance)))
+    )[0]
+    _q_idx_meas30 = np.asarray(
+        np.where((r_meas[0] > _min_q * (1 - _tolerance)) & (r_meas[0] < _max_q * (1 + _tolerance)))
+    )[0]
+    _q_idx_ref30 = np.asarray(
+        np.where((r_ref[0] > _min_q * (1 - _tolerance)) & (r_ref[0] < _max_q * (1 + _tolerance)))
+    )[0]
 
     if not data_60Hz[0][_q_idx_60].shape[0] == r_ref[0][_q_idx_ref30].shape[0]:
         print("\n\n60Hz reference may have been reduced with different binning!")
@@ -79,7 +83,8 @@ def reduce_30Hz_from_ws(
     dr_q_final = np.sqrt(
         (r_meas[2][_q_idx_meas30] / r_ref[1][_q_idx_ref30] * data_60Hz[1][_q_idx_60]) ** 2
         + (r_meas[1][_q_idx_meas30] / r_ref[1][_q_idx_ref30] * data_60Hz[2][_q_idx_60]) ** 2
-        + (r_meas[1][_q_idx_meas30] / r_ref[1][_q_idx_ref30] ** 2 * data_60Hz[1][_q_idx_60] * r_ref[2][_q_idx_ref30]) ** 2
+        + (r_meas[1][_q_idx_meas30] / r_ref[1][_q_idx_ref30] ** 2 * data_60Hz[1][_q_idx_60] * r_ref[2][_q_idx_ref30])
+        ** 2
     )
 
     print("Q range: %s - %s" % (r_meas[0][0], r_meas[0][_q_idx_meas30][-1]))
@@ -128,11 +133,19 @@ def reduce_30Hz_slices(
     )
 
 
-def reduce_slices(meas_run, template_file, time_interval, output_dir, scan_index=1, theta_offset=None, create_plot=True):
-    meas_ws = api.LoadEventNexus("REF_L_%s" % meas_run)
+def reduce_slices(
+    meas_run, template_file, time_interval, output_dir, scan_index=1, theta_offset=None, create_plot=True
+):
+    meas_ws = api.LoadEventNexus(f"REF_L_{meas_run}")
 
     return reduce_slices_ws(
-        meas_ws, template_file, time_interval, output_dir, scan_index=scan_index, theta_offset=theta_offset, create_plot=create_plot
+        meas_ws,
+        template_file,
+        time_interval,
+        output_dir,
+        scan_index=scan_index,
+        theta_offset=theta_offset,
+        create_plot=create_plot,
     )
 
 
@@ -261,7 +274,9 @@ def reduce_30Hz_slices_ws(
     return reduced
 
 
-def reduce_slices_ws(meas_ws, template_file, time_interval, output_dir, scan_index=1, theta_offset=0, theta_value=None, create_plot=True):
+def reduce_slices_ws(
+    meas_ws, template_file, time_interval, output_dir, scan_index=1, theta_offset=0, theta_value=None, create_plot=True
+):
     """
     Perform time-resolved reduction
     :param meas_ws: workspace of the data we want to reduce
@@ -379,7 +394,14 @@ def plot_slices(reduced, title, time_interval, file_path, offset=10, show=True):
     for _data in reduced:
         qz, refl, d_refl, _ = _data
 
-        plt.errorbar(qz, refl * _running_offset, yerr=d_refl * _running_offset, markersize=4, marker="o", label="T=%g s" % total_time)
+        plt.errorbar(
+            qz,
+            refl * _running_offset,
+            yerr=d_refl * _running_offset,
+            markersize=4,
+            marker="o",
+            label="T=%g s" % total_time,
+        )
 
         total_time += time_interval
         _running_offset *= offset

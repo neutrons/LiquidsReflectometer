@@ -17,10 +17,9 @@ OUTPUT_DIR_DIRECTIVE = "Click to choose an output directory"
 
 
 class ReductionInterface(QTabWidget):
-
     def __init__(self):
         QWidget.__init__(self)
-        self.setWindowTitle('Reflectometry Launcher')
+        self.setWindowTitle("Reflectometry Launcher")
         layout = QGridLayout()
         self.setLayout(layout)
 
@@ -69,12 +68,13 @@ class ReductionInterface(QTabWidget):
         self.setTabText(tab_id, "SLD calculator")
 
         # Refracted beam analysis
-        #tab_id += 1
-        #self.refracted_tab = Refracted()
-        #self.addTab(self.refracted_tab, "Refraction analysis")
-        #self.setTabText(tab_id, "Refraction analysis")
+        # tab_id += 1
+        # self.refracted_tab = Refracted()
+        # self.addTab(self.refracted_tab, "Refraction analysis")
+        # self.setTabText(tab_id, "Refraction analysis")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app = QApplication([])
     window = ReductionInterface()
     window.show()

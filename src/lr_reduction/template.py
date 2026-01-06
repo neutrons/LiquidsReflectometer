@@ -159,9 +159,15 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
 
 
 def process_from_template(
-    run_number, template_path, q_summing=None, normalize=True, tof_weighted=False, bck_in_q=False,
-    clean=False, info=False
-    ):
+    run_number,
+    template_path,
+    q_summing=None,
+    normalize=True,
+    tof_weighted=False,
+    bck_in_q=False,
+    clean=False,
+    info=False,
+):
     """
     The clean option removes leading zeros and the drop when doing q-summing
     @param q_summing: If None, the template setting will be used; if True/False, override the template
@@ -173,8 +179,14 @@ def process_from_template(
     # Load data
     ws_sc = api.Load("REF_L_%s" % run_number, OutputWorkspace="REF_L_%s" % run_number)
     return process_from_template_ws(
-        ws_sc, template_path, q_summing=q_summing, tof_weighted=tof_weighted, bck_in_q=bck_in_q,
-        clean=clean, info=info, normalize=normalize
+        ws_sc,
+        template_path,
+        q_summing=q_summing,
+        tof_weighted=tof_weighted,
+        bck_in_q=bck_in_q,
+        clean=clean,
+        info=info,
+        normalize=normalize,
     )
 
 
@@ -258,8 +270,10 @@ def process_from_template_ws(
         theta += template_data.angle_offset * np.pi / 180.0
 
     theta_degrees = theta * 180 / np.pi
-    print("wl=%g; ths=%g; thi=%g; offset=%g; theta used=%g" % (_wl, ths_value, thi_value,
-                                                               template_data.angle_offset, theta_degrees))
+    print(
+        "wl=%g; ths=%g; thi=%g; offset=%g; theta used=%g"
+        % (_wl, ths_value, thi_value, template_data.angle_offset, theta_degrees)
+    )
 
     # Get the reduction parameters from the template
     peak = template_data.data_peak_range
@@ -283,10 +297,10 @@ def process_from_template_ws(
         x_max = template_data.data_peak_range[1]
         _, _x, _y = peak_finding.process_data(ws_sc, summed=True, tof_step=200)
         peak_center = np.argmax(_y[x_min:x_max]) + x_min
-        peak_center, sc_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min,
-                                                                    x_max=x_max, center=peak_center, sigma=3.0)
+        peak_center, sc_width, _ = peak_finding.fit_signal_flat_bck(
+            _x, _y, x_min=x_min, x_max=x_max, center=peak_center, sigma=3.0
+        )
         print("Peak center: %g" % peak_center)
-
 
     if template_data.data_x_range_flag:
         low_res = template_data.data_x_range
@@ -335,9 +349,9 @@ def process_from_template_ws(
         dead_time_threshold=template_data.dead_time_threshold,
         instrument_settings=instrument_settings,
         use_emission_time=template_data.use_emission_time,
-        gravity_direction=template_data.gravity_direction
+        gravity_direction=template_data.gravity_direction,
     )
-    print(f"{'*'*88}\nevent_refl:\n{event_refl}\n{'*'*88}")
+    print(f"{'*' * 88}\nevent_refl:\n{event_refl}\n{'*' * 88}")
 
     # R(Q)
     qz, refl, d_refl = event_refl.specular(
@@ -397,8 +411,7 @@ def process_from_template_ws(
             fd.write("# Slit 1 (h x w): %g x %g\n" % (s1h, s1w))
             fd.write("# Slit 2 (h x w): %g x %g\n" % (s2h, s2w))
             fd.write("# Q, wavelength, counts/mC, error\n")
-            for i in range(len(_norm)):
-                fd.write("%g %g %g %g\n" % (qz_mid[i], wl[i], _norm[i], _d_norm[i]))
+            fd.writelines("%g %g %g %g\n" % (qz_mid[i], wl[i], _norm[i], _d_norm[i]) for i in range(len(_norm)))
 
     # We can optionally return details about the reduction process
     if info:

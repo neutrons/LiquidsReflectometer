@@ -1,7 +1,7 @@
 # Rebin and smooth the reflectivity curve to prepare it for ML
 import sys
 import os
-from mantid.simpleapi import *
+from mantid.simpleapi import CropWorkspace, ConvertToHistogram, ConvertToPointData, Load, RebinToWorkspace, SaveAscii, SmoothData
 
 def smooth_and_rebin(file_path, reference, output_file):
     """

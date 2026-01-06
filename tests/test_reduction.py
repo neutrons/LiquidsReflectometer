@@ -61,8 +61,9 @@ def test_q_summing(template_dir, nexus_dir):
     assert np.fabs(meta_data["dq_over_q"] - 0.02261) < 1e-3
 
     # Now try with Q summing, which should have similar results
-    qz_mid, refl, _, meta_data = template.process_from_template_ws(ws_sc, template_path, tof_weighted=True,
-                                                                   info=True, q_summing=True)
+    qz_mid, refl, _, meta_data = template.process_from_template_ws(
+        ws_sc, template_path, tof_weighted=True, info=True, q_summing=True
+    )
 
     assert np.fabs(meta_data["dq_over_q"] - 0.009354) < 1e-5
 
@@ -86,12 +87,16 @@ def test_q_summing(template_dir, nexus_dir):
     output_dir = "data/"
     cleanup_partial_files(output_dir, range(198409, 198417))
 
-@pytest.mark.parametrize("template_file, q_summing, expected_q_summing, tof_weighted", [
-    ("template.xml", None, False, False),
-    ("template_with_const_q_true.xml", None, True, False),
-    ("template.xml", True, True, True),
-    ("template.xml", False, False, True),
-])
+
+@pytest.mark.parametrize(
+    "template_file, q_summing, expected_q_summing, tof_weighted",
+    [
+        ("template.xml", None, False, False),
+        ("template_with_const_q_true.xml", None, True, False),
+        ("template.xml", True, True, True),
+        ("template.xml", False, False, True),
+    ],
+)
 def test_q_summing_as_option(template_dir, nexus_dir, template_file, q_summing, expected_q_summing, tof_weighted):
     """
     Test Q summing with and without supplying q_summing option
@@ -101,17 +106,16 @@ def test_q_summing_as_option(template_dir, nexus_dir, template_file, q_summing, 
     with amend_config(data_dir=nexus_dir):
         ws_sc = mtd_api.Load("REF_L_%s" % 198415)
 
-    with patch.object(event_reduction.EventReflectivity, 'specular') as mock_specular:
+    with patch.object(event_reduction.EventReflectivity, "specular") as mock_specular:
         mock_specular.return_value = (np.array([1, 2, 3]), np.array([0.1, 0.2]), np.array([0.01, 0.02]))
 
         qz_mid, refl, _, meta_data = template.process_from_template_ws(
-            ws_sc, template_path, tof_weighted=tof_weighted,
-            info=True, q_summing=q_summing
+            ws_sc, template_path, tof_weighted=tof_weighted, info=True, q_summing=q_summing
         )
 
         mock_specular.assert_called_once()
         call_kwargs = mock_specular.call_args[1]
-        assert call_kwargs['q_summing'] == expected_q_summing
+        assert call_kwargs["q_summing"] == expected_q_summing
 
     output_dir = "data/"
     cleanup_partial_files(output_dir, range(198409, 198417))

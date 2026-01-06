@@ -12,7 +12,14 @@ from . import event_reduction, output, reduction_template_reader, template
 
 
 def reduce(
-    ws, template_file, output_dir, average_overlap=False, theta_offset: float | None = 0, q_summing=None, bck_in_q=False, is_live=False
+    ws,
+    template_file,
+    output_dir,
+    average_overlap=False,
+    theta_offset: float | None = 0,
+    q_summing=None,
+    bck_in_q=False,
+    is_live=False,
 ):
     """
     Function called by reduce_REFL.py, which lives in /SNS/REF_L/shared/autoreduce
@@ -73,7 +80,9 @@ def reduce(
         reduced_file = os.path.join(output_dir, "REFL_live_partial.txt")
     else:
         reduced_file = os.path.join(
-            output_dir, "REFL_%s_%s_%s_partial.txt" % (meta_data["sequence_id"], meta_data["sequence_number"], meta_data["run_number"])
+            output_dir,
+            "REFL_%s_%s_%s_partial.txt"
+            % (meta_data["sequence_id"], meta_data["sequence_number"], meta_data["run_number"]),
         )
     coll.save_ascii(reduced_file, meta_as_json=True)
 
@@ -230,7 +239,9 @@ def offset_from_first_run(ws, template_file: str, output_dir: str):
         x_max = template_data.norm_peak_range[1]
         _, _x, _y = peak_finding.process_data(ws_db, summed=True, tof_step=200)
         peak_center = np.argmax(_y)
-        db_center, db_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min, x_max=x_max, center=peak_center, sigma=1.0)
+        db_center, db_width, _ = peak_finding.fit_signal_flat_bck(
+            _x, _y, x_min=x_min, x_max=x_max, center=peak_center, sigma=1.0
+        )
         print(
             "    DB center: %g\t Width: %g from [%g %g]"
             % (db_center, db_width, template_data.norm_peak_range[0], template_data.norm_peak_range[1])
@@ -241,7 +252,9 @@ def offset_from_first_run(ws, template_file: str, output_dir: str):
         x_max = template_data.data_peak_range[1]
         _, _x, _y = peak_finding.process_data(ws, summed=True, tof_step=200)
         peak_center = np.argmax(_y[x_min:x_max]) + x_min
-        sc_center, sc_width, _ = peak_finding.fit_signal_flat_bck(_x, _y, x_min=x_min, x_max=x_max, center=peak_center, sigma=3.0)
+        sc_center, sc_width, _ = peak_finding.fit_signal_flat_bck(
+            _x, _y, x_min=x_min, x_max=x_max, center=peak_center, sigma=3.0
+        )
         pixel_offset = sc_center - peak_center
         print("    SC center: %g\t Width: %g" % (sc_center, sc_width))
 
@@ -340,8 +353,14 @@ def reduce_explorer(ws, ws_db, theta_pv=None, center_pixel=145, db_center_pixel=
 
     # Perform the reduction
     width_mult = 2.5
-    peak = [np.rint(sc_center - width_mult * sc_width).astype(int), np.rint(sc_center + width_mult * sc_width).astype(int)]
-    norm_peak = [np.rint(db_center - width_mult * db_width).astype(int), np.rint(db_center + width_mult * db_width).astype(int)]
+    peak = [
+        np.rint(sc_center - width_mult * sc_width).astype(int),
+        np.rint(sc_center + width_mult * sc_width).astype(int),
+    ]
+    norm_peak = [
+        np.rint(db_center - width_mult * db_width).astype(int),
+        np.rint(db_center + width_mult * db_width).astype(int),
+    ]
     peak_bck = [peak[0] - 3, peak[1] + 3]
     norm_bck = [norm_peak[0] - 3, norm_peak[1] + 3]
 
@@ -368,7 +387,9 @@ def reduce_explorer(ws, ws_db, theta_pv=None, center_pixel=145, db_center_pixel=
     )
 
     # R(Q)
-    qz, refl, d_refl = event_refl.specular(q_summing=None, tof_weighted=False, bck_in_q=False, clean=False, normalize=True)
+    qz, refl, d_refl = event_refl.specular(
+        q_summing=None, tof_weighted=False, bck_in_q=False, clean=False, normalize=True
+    )
     qz_mid = (qz[:-1] + qz[1:]) / 2.0
 
     return qz_mid, refl, d_refl
