@@ -8,10 +8,9 @@ from qtpy.QtWidgets import QGridLayout, QLabel, QMessageBox, QPushButton, QWidge
 
 
 class SLD(QWidget):
-
     def __init__(self):
         QWidget.__init__(self)
-        self.setWindowTitle('Rigaku XRR reduction')
+        self.setWindowTitle("Rigaku XRR reduction")
         layout = QGridLayout()
         self.setLayout(layout)
 
@@ -45,7 +44,7 @@ class SLD(QWidget):
         self.output.setReadOnly(True)
 
         # Process button
-        self.calculate = QPushButton('Calculate')
+        self.calculate = QPushButton("Calculate")
         layout.addWidget(self.calculate, 5, 1)
 
         # connections
@@ -55,14 +54,14 @@ class SLD(QWidget):
         self.read_settings()
 
     def read_settings(self):
-        _composition = self.settings.value("sld_composition", 'Si')
+        _composition = self.settings.value("sld_composition", "Si")
         self.composition_ledit.setText(_composition)
-        _wl = self.settings.value("sld_wavelength", '1.54')
+        _wl = self.settings.value("sld_wavelength", "1.54")
         self.wl_ledit.setText(_wl)
 
     def save_settings(self):
-        self.settings.setValue('sld_composition', self.composition_ledit.text())
-        self.settings.setValue('sld_wavelength', self.wl_ledit.text())
+        self.settings.setValue("sld_composition", self.composition_ledit.text())
+        self.settings.setValue("sld_wavelength", self.wl_ledit.text())
 
     def show_dialog(self, text):
         msgBox = QMessageBox()
@@ -85,8 +84,8 @@ class SLD(QWidget):
             sld, im_sld, incoh = nsf.neutron_sld(compound=composition, wavelength=wavelength, density=density)
             x_sld, x_im_sld = xsf.xray_sld(compound=composition, wavelength=wavelength, density=density)
 
-            output_text =      "%-15s %6.6f\n" % ("Neutron SLD:", sld)
-            output_text +=     "%-15s %6.6f\n" % ("   Imag SLD:", im_sld)
+            output_text = "%-15s %6.6f\n" % ("Neutron SLD:", sld)
+            output_text += "%-15s %6.6f\n" % ("   Imag SLD:", im_sld)
             output_text += "%-15s %6.6f\n\n" % ("   Incoh SLD:", incoh)
 
             output_text += "%-15s %6.6f\n" % ("X-ray SLD:", x_sld)

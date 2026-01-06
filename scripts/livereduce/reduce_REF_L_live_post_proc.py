@@ -1,11 +1,11 @@
 import sys
 import os
 import json
+import time
 
 import mantid.simpleapi as mtd_api
 import matplotlib.pyplot as plt
 import numpy as np
-import time
 
 sys.path.append("/SNS/REF_L/shared/reduction")
 from lr_reduction import workflow, peak_finding

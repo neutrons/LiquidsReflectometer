@@ -161,7 +161,7 @@ def read_settings(ws) -> InstrumentSettings:
     return settings
 
 
-def process_attenuation(ws, thickness=0):
+def process_attenuation(ws, thickness: float = 0):
     """
     Correct for absorption by assigning weight to each neutron event
 
@@ -201,8 +201,9 @@ def process_attenuation(ws, thickness=0):
     mu_model = mu_abs[1]
     tof_model = constant * wl_model
     transmission = 1 / np.exp(-mu_model * thickness)
-    transmission_ws = api.CreateWorkspace(OutputWorkspace="transmission",
-                                          DataX=tof_model, DataY=transmission, UnitX="TOF", NSpec=1)
+    transmission_ws = api.CreateWorkspace(
+        OutputWorkspace="transmission", DataX=tof_model, DataY=transmission, UnitX="TOF", NSpec=1
+    )
 
     ws = api.Multiply(ws, transmission_ws, OutputWorkspace=str(ws))
     return ws
@@ -366,7 +367,7 @@ class EventReflectivity:
         dead_time_threshold: Optional[float] = 1.5,
         instrument_settings: InstrumentSettings = None,
         use_emission_time=True,
-        gravity_direction=None  # undetermined
+        gravity_direction=None,  # undetermined
     ):
         if instrument in [self.INSTRUMENT_4A, self.INSTRUMENT_4B]:
             self.instrument = instrument
@@ -405,13 +406,17 @@ class EventReflectivity:
         # Process workspaces
         if self.tof_range is not None:
             self._ws_sc = api.CropWorkspace(
-                InputWorkspace=scattering_workspace, XMin=tof_range[0], XMax=tof_range[1],
-                OutputWorkspace="_" + str(scattering_workspace)
+                InputWorkspace=scattering_workspace,
+                XMin=tof_range[0],
+                XMax=tof_range[1],
+                OutputWorkspace="_" + str(scattering_workspace),
             )
             if direct_workspace is not None:
                 self._ws_db = api.CropWorkspace(
-                    InputWorkspace=direct_workspace, XMin=tof_range[0], XMax=tof_range[1],
-                    OutputWorkspace="_" + str(direct_workspace)
+                    InputWorkspace=direct_workspace,
+                    XMin=tof_range[0],
+                    XMax=tof_range[1],
+                    OutputWorkspace="_" + str(direct_workspace),
                 )
             else:
                 self._ws_db = None
@@ -756,8 +761,12 @@ class EventReflectivity:
             # This is mathematically equivalent and convenient in terms of abstraction for later
             # use for the constant-Q calculation elsewhere in the code.
             direct_beam, d_direct_beam = self._reflectivity(
-                self._ws_db, peak_position=0, peak=self.norm_peak, low_res=self.norm_low_res,
-                theta=self.theta, q_summing=False
+                self._ws_db,
+                peak_position=0,
+                peak=self.norm_peak,
+                low_res=self.norm_low_res,
+                theta=self.theta,
+                q_summing=False,
             )
 
             # Direct beam background could be added here. The effect will be negligible.
@@ -839,12 +848,13 @@ class EventReflectivity:
             q_summing=q_summing,
             wl_dist=wl_dist,
             wl_bins=wl_middle,
-            wl_error=wl_std
+            wl_error=wl_std,
         )
 
         if self.signal_bck is not None:
-            refl_bck, d_refl_bck = self.bck_subtraction(wl_dist=wl_dist, wl_bins=wl_middle,
-                                                        q_summing=bck_in_q, wl_std=wl_std)
+            refl_bck, d_refl_bck = self.bck_subtraction(
+                wl_dist=wl_dist, wl_bins=wl_middle, q_summing=bck_in_q, wl_std=wl_std
+            )
             refl -= refl_bck
             d_refl = np.sqrt(d_refl**2 + d_refl_bck**2)
 
@@ -854,8 +864,9 @@ class EventReflectivity:
         self.d_refl = d_refl
         return self.q_bins, refl, d_refl
 
-    def _roi_integration(self, ws, peak, low_res, q_bins=None, wl_dist=None, wl_bins=None,
-                         wl_std=None, q_summing=False):
+    def _roi_integration(
+        self, ws, peak, low_res, q_bins=None, wl_dist=None, wl_bins=None, wl_std=None, q_summing=False
+    ):
         """
         Integrate a region of interest and normalize by the number of included pixels.
 
@@ -875,7 +886,7 @@ class EventReflectivity:
             q_summing=q_summing,
             wl_dist=wl_dist,
             wl_bins=wl_bins,
-            wl_error=wl_std
+            wl_error=wl_std,
         )
 
         _pixel_area = peak[1] - peak[0] + 1.0
@@ -883,8 +894,9 @@ class EventReflectivity:
         d_refl_bck /= _pixel_area
         return refl_bck, d_refl_bck
 
-    def bck_subtraction(self, normalize_to_single_pixel=False, q_bins=None,
-                        wl_dist=None, wl_bins=None, wl_std=None, q_summing=False):
+    def bck_subtraction(
+        self, normalize_to_single_pixel=False, q_bins=None, wl_dist=None, wl_bins=None, wl_std=None, q_summing=False
+    ):
         """
         Perform background subtraction on the signal.
         This method provides a higher-level call for background subtraction,
@@ -929,7 +941,7 @@ class EventReflectivity:
                 wl_dist=wl_dist,
                 wl_bins=wl_bins,
                 wl_std=wl_std,
-                q_summing=q_summing
+                q_summing=q_summing,
             )
         else:
             return background.side_background(
@@ -943,7 +955,7 @@ class EventReflectivity:
                 wl_dist=wl_dist,
                 wl_bins=wl_bins,
                 wl_std=wl_std,
-                q_summing=q_summing
+                q_summing=q_summing,
             )
 
     def norm_bck_subtraction(self):
@@ -976,8 +988,18 @@ class EventReflectivity:
         return z_bins, _spec, _d_spec
 
     def _reflectivity(
-        self, ws, peak_position, peak, low_res, theta, q_bins=None, q_summing=False,
-        wl_dist=None, wl_bins=None, wl_error=None, sum_pixels=True
+        self,
+        ws,
+        peak_position,
+        peak,
+        low_res,
+        theta,
+        q_bins=None,
+        q_summing=False,
+        wl_dist=None,
+        wl_bins=None,
+        wl_error=None,
+        sum_pixels=True,
     ):
         """
         Assumes that the input workspace is not normalized by proton charge.
@@ -1032,7 +1054,8 @@ class EventReflectivity:
                     if peak_position == 0:  # is direct beam
                         # for direct beam, find the direction using the `ths` value of the associated reflectivity run
                         d_theta = gravity_correction(
-                            ws, wl_list, gravity_direction=GravityDirection.find_direction(self._ws_sc))
+                            ws, wl_list, gravity_direction=GravityDirection.find_direction(self._ws_sc)
+                        )
                     else:  # is reflectivity run
                         d_theta = gravity_correction(ws, wl_list, gravity_direction=None)
 
@@ -1073,10 +1096,10 @@ class EventReflectivity:
                     wl_interp_dist = np.interp(wl_list, wl_bins, wl_dist, left=np.inf, right=np.inf)
                     rel_err_weights = wl_interp_std / wl_interp_dist
 
-                    #Relative error in wl_list also from Poisson statistics
+                    # Relative error in wl_list also from Poisson statistics
                     rel_err_wl_list = np.sqrt(wl_list) / wl_list
 
-                    #Combine relative errors
+                    # Combine relative errors
                     rel_err_hist_weights = np.sqrt(rel_err_weights**2 + rel_err_wl_list**2)
 
                     # Absolute error in histogram weights
@@ -1123,7 +1146,7 @@ class EventReflectivity:
         # for the specular weighted workflow, normalises to charge and bin_size
         if wl_dist is not None and wl_bins is not None:
             bin_size = _q_bins[1:] - _q_bins[:-1]
-            #non_zero = counts > 0
+            # non_zero = counts > 0
             # Deal with the case where we don't sum all the bins
             if not sum_pixels:
                 bin_size = np.tile(bin_size, [counts.shape[0], 1])
@@ -1165,8 +1188,9 @@ class EventReflectivity:
                 wl_weights = np.concatenate((wl_weights, weights))
         return wl_events, wl_weights
 
-    def off_specular(self, x_axis=None, x_min=-0.015, x_max=0.015, x_npts=50, z_min=None, z_max=None,
-                      z_npts=-120, bck_in_q=None):
+    def off_specular(
+        self, x_axis=None, x_min=-0.015, x_max=0.015, x_npts=50, z_min=None, z_max=None, z_npts=-120, bck_in_q=None
+    ):
         """
         Compute off-specular
 
@@ -1255,7 +1279,6 @@ class EventReflectivity:
             ths_value = ws.getRun()["ths"].value[-1]
             delta_theta_f *= np.sign(ths_value)
 
-
             theta_f = theta + delta_theta_f
 
             qz = k * (np.sin(theta_f) + np.sin(theta))
@@ -1316,6 +1339,7 @@ class EventReflectivity:
         if use_emission_delay:
             tofs -= t_off + t_mult * tofs / self.constant
         return tofs
+
 
 def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     """
@@ -1384,6 +1408,7 @@ def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     dq_over_q = (s1h + sih) * 0.5 / slit_distance / theta
     return dq_over_q
 
+
 ## New function for resolution, ready for testing.
 ## Check choices of returned values once ready to implement.
 ## Needs update for q-summing.
@@ -1441,7 +1466,7 @@ def trapezoidal_distribution_params(ws, Theta_deg=None, FootPrint=None, SlitRati
 
     # Slit openings - can be taken from a FootPrint and SlitRatio if provided, or the logs
     if FootPrint is not None and SlitRatio is not None:
-        SiY = FootPrint * np.sin(np.radians(Theta_deg)) / (1 + (dSiSamp/dS1Si)*(1 + SlitRatio))
+        SiY = FootPrint * np.sin(np.radians(Theta_deg)) / (1 + (dSiSamp / dS1Si) * (1 + SlitRatio))
         S1Y = SiY * SlitRatio
     else:
         S1Y = abs(ws.getRun().getProperty("S1VHeight").value[0])
@@ -1456,6 +1481,7 @@ def trapezoidal_distribution_params(ws, Theta_deg=None, FootPrint=None, SlitRati
 
     return L_bottom, l_top, sigma_equiv, dth_over_th
 
+
 # Analytic trapezoidal CDF for use in trapezoial_distribution_params
 def _trapezoidal_cdf_analytic(x, L_, l_):
     h = 1 / (L_ + l_)
@@ -1467,19 +1493,25 @@ def _trapezoidal_cdf_analytic(x, L_, l_):
     right_tail = x > L_
 
     cdf[left_tail] = 0
-    cdf[left_slope] = (h / (L_ - l_)) * 0.5 * (x[left_slope] + L_)**2
-    F_neg_l = (h / (L_ - l_)) * 0.5 * (L_ - l_)**2
+    cdf[left_slope] = (h / (L_ - l_)) * 0.5 * (x[left_slope] + L_) ** 2
+    F_neg_l = (h / (L_ - l_)) * 0.5 * (L_ - l_) ** 2
     cdf[flat_top] = F_neg_l + h * (x[flat_top] + l_)
-    cdf[right_slope] = 1 - (h / (L_ - l_)) * 0.5 * (L_ - x[right_slope])**2
+    cdf[right_slope] = 1 - (h / (L_ - l_)) * 0.5 * (L_ - x[right_slope]) ** 2
     cdf[right_tail] = 1
     return cdf
+
 
 # Find equivalent normal sigma for 68% central interval for use in trapezoidal_distribution_params
 def _find_sigma_68(L_, l_, target_prob=0.68):
     def func(x):
-        return _trapezoidal_cdf_analytic(np.array([x]), L_, l_)[0] - \
-                _trapezoidal_cdf_analytic(np.array([-x]), L_, l_)[0] - target_prob
+        return (
+            _trapezoidal_cdf_analytic(np.array([x]), L_, l_)[0]
+            - _trapezoidal_cdf_analytic(np.array([-x]), L_, l_)[0]
+            - target_prob
+        )
+
     return brentq(func, 0, L_)
+
 
 ## Fix the resolution to include si - Done
 ## Add new function for correction for the shape correction - Done.
@@ -1492,6 +1524,7 @@ def _find_sigma_68(L_, l_, target_prob=0.68):
 ## Function to process from the DB run number or pre-processed
 ## Fix the q-summing saving into the template and being read back in
 ## Fix q-bin error and auto trimming points
+
 
 def compute_wavelength_resolution(ws):
     """
@@ -1519,9 +1552,9 @@ def compute_wavelength_resolution(ws):
 
     settings = read_settings(ws)
 
-    out = api.EvaluateFunction(Function=settings.wavelength_resolution_function,
-                         InputWorkspace=ws,
-                         OutputWorkspace='out')
+    out = api.EvaluateFunction(
+        Function=settings.wavelength_resolution_function, InputWorkspace=ws, OutputWorkspace="out"
+    )
 
     wavelength = out.readX(1)
     d_lambda = out.readY(1)

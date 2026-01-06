@@ -5,14 +5,12 @@ Dead time correction algorithm for single-readout detectors.
 # TODO: Wildcard imports need to be removed (Glass)
 import numpy as np
 import scipy
-from mantid.api import *
-from mantid.api import AlgorithmFactory, PythonAlgorithm
-from mantid.kernel import *
-from mantid.simpleapi import *
+from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, MatrixWorkspaceProperty, PropertyMode, PythonAlgorithm
+from mantid.kernel import Direction, FloatArrayLengthValidator, FloatArrayProperty, FloatBoundedValidator
+from mantid.simpleapi import Rebin, SumSpectra, logger
 
 
 class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
-
     def category(self):
         return "Reflectometry\\SNS"
 
@@ -26,22 +24,34 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         return "Single read-out dead time correction calculation"
 
     def PyInit(self):
-        self.declareProperty(IEventWorkspaceProperty("InputWorkspace", "", Direction.Input),
-                             "Input workspace use to compute dead time correction")
-        self.declareProperty(IEventWorkspaceProperty("InputErrorEventsWorkspace", "", Direction.Input, PropertyMode.Optional),
-                             "Input workspace with error events use to compute dead time correction")
+        self.declareProperty(
+            IEventWorkspaceProperty("InputWorkspace", "", Direction.Input),
+            "Input workspace use to compute dead time correction",
+        )
+        self.declareProperty(
+            IEventWorkspaceProperty("InputErrorEventsWorkspace", "", Direction.Input, PropertyMode.Optional),
+            "Input workspace with error events use to compute dead time correction",
+        )
         self.declareProperty("DeadTime", 4.2, doc="Dead time in microseconds")
-        self.declareProperty("UseDeadTimeThreshold", False,
-                             doc="If True, use a correction of 0 for TOF bins requiring corrections greater than ``DeadTimeThreshold``")
-        self.declareProperty("DeadTimeThreshold", 1.5, validator=FloatBoundedValidator(lower=1.0),
-                             doc="If ``UseDeadTimeThreshold`` is True, this is the upper limit for dead-time correction ratios" )
-        self.declareProperty("TOFStep", 100.0,
-                             doc="TOF bins to compute deadtime correction for, in microseconds")
-        self.declareProperty("Paralyzable", False,
-                             doc="If true, paralyzable correction will be applied, non-paralyzing otherwise")
-        self.declareProperty(FloatArrayProperty("TOFRange", [0., 0.],
-                                                FloatArrayLengthValidator(2), direction=Direction.Input),
-                             "TOF range to use")
+        self.declareProperty(
+            "UseDeadTimeThreshold",
+            False,
+            doc="If True, use a correction of 0 for TOF bins requiring corrections greater than ``DeadTimeThreshold``",
+        )
+        self.declareProperty(
+            "DeadTimeThreshold",
+            1.5,
+            validator=FloatBoundedValidator(lower=1.0),
+            doc="If ``UseDeadTimeThreshold`` is True, this is the upper limit for dead-time correction ratios",
+        )
+        self.declareProperty("TOFStep", 100.0, doc="TOF bins to compute deadtime correction for, in microseconds")
+        self.declareProperty(
+            "Paralyzable", False, doc="If true, paralyzable correction will be applied, non-paralyzing otherwise"
+        )
+        self.declareProperty(
+            FloatArrayProperty("TOFRange", [0.0, 0.0], FloatArrayLengthValidator(2), direction=Direction.Input),
+            "TOF range to use",
+        )
         self.declareProperty(MatrixWorkspaceProperty("OutputWorkspace", "", Direction.Output), "Output workspace")
 
     def PyExec(self):
@@ -61,19 +71,23 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
             tof_min = ws_event_data.getTofMin()
             tof_max = ws_event_data.getTofMax()
         logger.notice("TOF range: %f %f" % (tof_min, tof_max))
-        _ws_sc = Rebin(InputWorkspace=ws_event_data, Params="%s,%s,%s" % (tof_min, tof_step, tof_max), PreserveEvents=False)
+        _ws_sc = Rebin(
+            InputWorkspace=ws_event_data, Params="%s,%s,%s" % (tof_min, tof_step, tof_max), PreserveEvents=False
+        )
 
         # Get the total number of counts on the detector for each TOF bin per pulse
         counts_ws = SumSpectra(_ws_sc, OutputWorkspace=output_workspace)
 
         # If we have error events, add them since those are also detector triggers
         if ws_error_events is not None:
-            _errors = Rebin(InputWorkspace=ws_error_events, Params="%s,%s,%s" % (tof_min, tof_step, tof_max), PreserveEvents=False)
+            _errors = Rebin(
+                InputWorkspace=ws_error_events, Params="%s,%s,%s" % (tof_min, tof_step, tof_max), PreserveEvents=False
+            )
             counts_ws += _errors
 
         # When operating at a given frequency, the proton charge of the blocked
         # pulsed is zero in the data file, so we don't have to adjust the number of pulses.
-        t_series = np.asarray(_ws_sc.getRun()['proton_charge'].value)
+        t_series = np.asarray(_ws_sc.getRun()["proton_charge"].value)
         n_pulses = np.count_nonzero(t_series)
 
         rate = counts_ws.readY(0) / n_pulses
@@ -84,22 +98,23 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
             corr = true_rate / (rate / tof_step)
             # If we have no events, set the correction to 1 otherwise we will get a nan
             # from the equation above.
-            corr[rate==0] = 1
+            corr[rate == 0] = 1
         else:
-            corr = 1/(1-rate * dead_time / tof_step)
+            corr = 1 / (1 - rate * dead_time / tof_step)
 
         # apply the dead time threshold if passed
         if use_dead_time_threshold:
-            logger.notice(f"DeadTimeThreshold applied for run {ws_event_data.getRunNumber()}. " \
-                          f"{np.sum(corr > dead_time_threshold)} of {len(corr)} " \
-                          f"TOF bins above threshold {dead_time_threshold}")
+            logger.notice(
+                f"DeadTimeThreshold applied for run {ws_event_data.getRunNumber()}. "
+                f"{np.sum(corr > dead_time_threshold)} of {len(corr)} "
+                f"TOF bins above threshold {dead_time_threshold}"
+            )
             corr[corr > dead_time_threshold] = 0
         else:
             logger.notice("DeadTimeThreshold not used")
 
         if np.min(corr) < 0:
-            error = ( "Corrupted dead time correction:\n"
-                      +"  Reflected: %s\n" % corr )
+            error = "Corrupted dead time correction:\n" + "  Reflected: %s\n" % corr
             logger.error(error)
 
         counts_ws.setY(0, corr)
@@ -107,7 +122,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         # We don't compute an error on the dead time correction, so set it to zero
         counts_ws.setE(0, 0 * corr)
         counts_ws.setDistribution(True)
-        self.setProperty('OutputWorkspace', counts_ws)
+        self.setProperty("OutputWorkspace", counts_ws)
 
 
 AlgorithmFactory.subscribe(SingleReadoutDeadTimeCorrection)

@@ -51,7 +51,6 @@ def test_log_value():
     CreateSingleValuedWorkspace(OutputWorkspace=workspace)
     run = workspace_handle(workspace).getRun()
 
-
     with pytest.raises(RuntimeError):
         _log_value(run, "NonExistent Log")
     assert _log_value(run, "NonExistent Log", default=100) == 100

@@ -16,7 +16,7 @@ try:
     import mantid
 
     MANTID_VERSION = mantid.__version__
-except:  #noqa: E722
+except:  # noqa: E722
     MANTID_VERSION = "None"
 
 
@@ -91,7 +91,6 @@ class ReductionParameters:
 
         # Gravity correction
         self.gravity_direction = None
-
 
     def from_dict(self, data_dict, permissible=True):
         """
@@ -173,8 +172,9 @@ class ReductionParameters:
 
         # Incident medium
         _xml += "<incident_medium_list>%s</incident_medium_list>\n" % str(self.incident_medium_list[0])
-        _xml += "<incident_medium_index_selected>%s</incident_medium_index_selected>\n"% str(
-            self.incident_medium_index_selected)
+        _xml += "<incident_medium_index_selected>%s</incident_medium_index_selected>\n" % str(
+            self.incident_medium_index_selected
+        )
 
         # Dead time correction
         _xml += "<dead_time_correction>%s</dead_time_correction>\n" % str(self.dead_time)
@@ -193,7 +193,9 @@ class ReductionParameters:
         _xml += "<pixel_width>%s</pixel_width>\n" % str(self.pixel_width)
         _xml += "<xi_reference>%s</xi_reference>\n" % str(self.xi_reference)
         _xml += "<s1_sample_distance>%s</s1_sample_distance>\n" % str(self.s1_sample_distance)
-        _xml += "<wavelength_resolution_function>%s</wavelength_resolution_function>\n" % str(self.wavelength_resolution_function)
+        _xml += "<wavelength_resolution_function>%s</wavelength_resolution_function>\n" % str(
+            self.wavelength_resolution_function
+        )
 
         # Gravity correction
         if self.gravity_direction is not None:
@@ -214,8 +216,10 @@ class ReductionParameters:
         instrument_dom : xml.dom.Document
         """
         # Peak from/to pixels
-        self.data_peak_range = [getIntElement(instrument_dom, "from_peak_pixels"),
-                                getIntElement(instrument_dom, "to_peak_pixels")]
+        self.data_peak_range = [
+            getIntElement(instrument_dom, "from_peak_pixels"),
+            getIntElement(instrument_dom, "to_peak_pixels"),
+        ]
 
         # data metadata
         _tthd_value = getStringElement(instrument_dom, "tthd_value")
@@ -253,8 +257,10 @@ class ReductionParameters:
 
         # TOF range
         self.select_tof_range = getBoolElement(instrument_dom, "tof_range_flag", default=self.select_tof_range)
-        self.tof_range = [getFloatElement(instrument_dom, "from_tof_range"),
-                          getFloatElement(instrument_dom, "to_tof_range")]
+        self.tof_range = [
+            getFloatElement(instrument_dom, "from_tof_range"),
+            getFloatElement(instrument_dom, "to_tof_range"),
+        ]
 
         self.data_files = getIntList(instrument_dom, "data_sets")
 
@@ -268,8 +274,9 @@ class ReductionParameters:
         ]
 
         # Background subtraction option
-        self.subtract_norm_background = getBoolElement(instrument_dom,
-                                                "norm_background_flag", default=self.subtract_norm_background)
+        self.subtract_norm_background = getBoolElement(
+            instrument_dom, "norm_background_flag", default=self.subtract_norm_background
+        )
 
         self.norm_background_roi = [
             getIntElement(instrument_dom, "norm_from_back_pixels"),
@@ -307,21 +314,29 @@ class ReductionParameters:
         self.paralyzable = getBoolElement(instrument_dom, "dead_time_paralyzable", default=self.paralyzable)
         self.dead_time_value = getFloatElement(instrument_dom, "dead_time_value", default=self.dead_time_value)
         self.dead_time_tof_step = getFloatElement(instrument_dom, "dead_time_tof_step", default=self.dead_time_tof_step)
-        self.use_dead_time_threshold = getBoolElement(instrument_dom, "use_dead_time_threshold", default=self.use_dead_time_threshold)
-        self.dead_time_threshold = getFloatElement(instrument_dom, "dead_time_threshold", default=self.dead_time_threshold)
+        self.use_dead_time_threshold = getBoolElement(
+            instrument_dom, "use_dead_time_threshold", default=self.use_dead_time_threshold
+        )
+        self.dead_time_threshold = getFloatElement(
+            instrument_dom, "dead_time_threshold", default=self.dead_time_threshold
+        )
 
         # Instrument settings
         self.apply_instrument_settings = getBoolElement(instrument_dom, "apply_instrument_settings", default=False)
-        self.source_detector_distance = getFloatElement(instrument_dom, "source_detector_distance",
-                                                        default=self.source_detector_distance)
-        self.sample_detector_distance = getFloatElement(instrument_dom, "sample_detector_distance",
-                                                        default=self.sample_detector_distance)
+        self.source_detector_distance = getFloatElement(
+            instrument_dom, "source_detector_distance", default=self.source_detector_distance
+        )
+        self.sample_detector_distance = getFloatElement(
+            instrument_dom, "sample_detector_distance", default=self.sample_detector_distance
+        )
         self.num_x_pixels = getIntElement(instrument_dom, "num_x_pixels", default=self.num_x_pixels)
         self.num_y_pixels = getIntElement(instrument_dom, "num_y_pixels", default=self.num_y_pixels)
         self.pixel_width = getFloatElement(instrument_dom, "pixel_width", default=self.pixel_width)
         self.xi_reference = getFloatElement(instrument_dom, "xi_reference", default=self.xi_reference)
         self.s1_sample_distance = getFloatElement(instrument_dom, "s1_sample_distance", default=self.s1_sample_distance)
-        self.wavelength_resolution_function = getStringElement(instrument_dom, "wavelength_resolution_function", default=self.wavelength_resolution_function)
+        self.wavelength_resolution_function = getStringElement(
+            instrument_dom, "wavelength_resolution_function", default=self.wavelength_resolution_function
+        )
 
         self.gravity_direction = GravityDirection.from_value(
             getIntElement(instrument_dom, "gravity_direction", default=self.gravity_direction)

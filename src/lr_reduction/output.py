@@ -109,7 +109,6 @@ class RunCollection:
             self.d_qz_all = np.asarray(d_qz_all)
 
     def save_ascii(self, file_path, meta_as_json=False):
-
         """
         Save R(Q) in ASCII format.
         This function merges the data before saving. It writes metadata and R(Q) data
@@ -173,8 +172,11 @@ class RunCollection:
 
             # Write R(q)
             fd.write("# %-21s %-21s %-21s %-21s\n" % ("Q [1/Angstrom]", "R", "dR", "dQ [FWHM]"))
-            for i in range(len(self.qz_all)):
-                fd.write("%20.16f  %20.16f  %20.16f  %20.16f\n" % (self.qz_all[i], self.refl_all[i], self.d_refl_all[i], self.d_qz_all[i]))
+            fd.writelines(
+                "%20.16f  %20.16f  %20.16f  %20.16f\n"
+                % (self.qz_all[i], self.refl_all[i], self.d_refl_all[i], self.d_qz_all[i])
+                for i in range(len(self.qz_all))
+            )
 
     def add_from_file(self, file_path):
         """
@@ -200,7 +202,7 @@ def read_file(file_path):
     """
     _meta = dict()
     with open(file_path, "r") as fd:
-        for l in fd.readlines():
+        for l in fd:
             if l.startswith("# Meta:"):
                 _meta = json.loads(l[len("# Meta:") : -1])
     try:

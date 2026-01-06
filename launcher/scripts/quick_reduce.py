@@ -71,5 +71,9 @@ if __name__ == "__main__":
     # Parse arguments
     args = parser.parse_args()
     process(
-        args.run_number, args.db_run_number, np.rint(args.pixel).astype(int), np.rint(args.db_pixel).astype(int), output_dir=args.output_dir
+        args.run_number,
+        args.db_run_number,
+        np.rint(args.pixel).astype(int),
+        np.rint(args.db_pixel).astype(int),
+        output_dir=args.output_dir,
     )
