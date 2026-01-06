@@ -35,7 +35,9 @@ def make_mock_ws():
         ws.getRun.return_value = mock_run
 
         return ws
+
     return _make_mock_ws
+
 
 def test_trapezoidal_cdf_analytic_basic():
     x = np.array([-1, 0, 1])
@@ -46,24 +48,21 @@ def test_trapezoidal_cdf_analytic_basic():
     assert cdf[0] == 0
     assert cdf[-1] == 1
 
+
 def test_find_sigma_68_basic():
     L_, l_ = 1.0, 0.5
     sigma = event_reduction._find_sigma_68(L_, l_)
     assert 0 < sigma < L_
     assert sigma == pytest.approx(0.5101, rel=1e-3)
 
+
 def test_trapezoid_gaussian_function(make_mock_ws):
     """
     Test the trapezoidal distribution params function in event_reduction using mock instrument parameters.
     """
-    mock_run_properties = {
-        "ths" : 0.369,
-        "S1VHeight": 0.29,
-        "SiVHeight": 0.145,
-        "BL4B:Mot:xi.RBV": 300
-        }
+    mock_run_properties = {"ths": 0.369, "S1VHeight": 0.29, "SiVHeight": 0.145, "BL4B:Mot:xi.RBV": 300}
 
-    ws = make_mock_ws(properties = mock_run_properties)
+    ws = make_mock_ws(properties=mock_run_properties)
 
     L_bottom, l_top, sigma_equiv, dth_over_th = event_reduction.trapezoidal_distribution_params(ws)
     print(L_bottom, l_top, sigma_equiv, dth_over_th)

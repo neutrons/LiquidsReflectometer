@@ -10,11 +10,10 @@ import functools
 from math import ceil
 from typing import List, Tuple
 
-# TODO: Wildcard imports are bad practice (Glass)
 import numpy as np
-from mantid.api import *
-from mantid.kernel import *
-from mantid.simpleapi import *
+from mantid.api import AlgorithmFactory, FileAction, FileProperty, PythonAlgorithm
+from mantid.kernel import Direction, IntArrayProperty, StringArrayProperty
+from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, FitPeaks, LoadEventNexus, logger, mtd
 
 THI_TOLERANCE = 0.002
 

@@ -49,7 +49,7 @@ from lr_reduction.template import get_default_template_file
 from lr_reduction.typing import MantidWorkspace
 
 # Name of the conda environment to use - required by autoreduction
-CONDA_ENV = 'lr_reduction'
+CONDA_ENV = "lr_reduction"
 
 
 def parse_command_arguments():
@@ -65,25 +65,33 @@ def parse_command_arguments():
     -------
     The command line arguments are used during batch reduction in ``nr_launcher``.
     """
-    parser = argparse.ArgumentParser(description='Autoreduction script for REF_L')
+    parser = argparse.ArgumentParser(description="Autoreduction script for REF_L")
     # Mandatory positional arguments
-    parser.add_argument('events_file', type=str, help='Path to the Nexus events file.')
-    parser.add_argument('output_dir', type=str, help='Output directory path.')
+    parser.add_argument("events_file", type=str, help="Path to the Nexus events file.")
+    parser.add_argument("output_dir", type=str, help="Output directory path.")
     # Existing behavior: optional 3rd positional arg
     parser.add_argument("old_version_flag", nargs="?", default=None)
     # Existing behavior: optional positional 4-8 parameters
-    parser.add_argument("template_file", nargs="?", default=None, type=str, help='Path to the template XML file.')
+    parser.add_argument("template_file", nargs="?", default=None, type=str, help="Path to the template XML file.")
     parser.add_argument("avg_overlap", nargs="?", default="false")
     parser.add_argument("const_q", nargs="?", default="false")
     parser.add_argument("fit_first_peak", nargs="?", default="false")
     parser.add_argument("theta_offset", nargs="?", default="0")
     # Optional arguments
-    parser.add_argument('--no_publish', action='store_true', help='Do not upload HTML report to the livedata server.')
+    parser.add_argument("--no_publish", action="store_true", help="Do not upload HTML report to the livedata server.")
 
     return parser.parse_args()
 
 
-def autoreduce(events_file: str, output_dir: str, template_file: str = None, avg_overlap: bool = False, const_q: bool = False, theta_offset: float = 0.0, publish: bool = True) -> None:
+def autoreduce(
+    events_file: str,
+    output_dir: str,
+    template_file: str | None = None,
+    avg_overlap: bool = False,
+    const_q: bool = False,
+    theta_offset: float = 0.0,
+    publish: bool = True,
+) -> None:
     """
     Autoreduce a single events file and upload the HTML report to the livedata server
 
@@ -113,13 +121,19 @@ def autoreduce(events_file: str, output_dir: str, template_file: str = None, avg
 
     # Determine which template to use
     if template_file is None:
-        template_file =  get_default_template_file(output_dir, sample_logs["tthd"])
+        template_file = get_default_template_file(output_dir, sample_logs["tthd"])
     logger.notice(f"Using template: {template_file}")
 
     # Run the reduction
-    workflow.reduce(ws, template_file, output_dir,
-                    average_overlap=avg_overlap, theta_offset=theta_offset,
-                    q_summing=const_q, bck_in_q=False)
+    workflow.reduce(
+        ws,
+        template_file,
+        output_dir,
+        average_overlap=avg_overlap,
+        theta_offset=theta_offset,
+        q_summing=const_q,
+        bck_in_q=False,
+    )
 
     # Plot and publish results
     upload_report(output_dir, sample_logs, ws, publish)
@@ -146,7 +160,7 @@ def upload_report(output_dir: str, sample_logs: SampleLogValues, ws: MantidWorks
     sequence_id = int(sample_logs["sequence_id"])
     sequence_number = int(sample_logs["sequence_number"])
 
-    default_file_name = 'REFL_%s_combined_data_auto.txt' % sequence_id
+    default_file_name = "REFL_%s_combined_data_auto.txt" % sequence_id
     default_file_path = os.path.join(output_dir, default_file_name)
     if not os.path.isfile(default_file_path):
         raise ValueError("Combined data output file not found")
@@ -159,13 +173,13 @@ def upload_report(output_dir: str, sample_logs: SampleLogValues, ws: MantidWorks
 
     multiplot = []
     run_position = int(run_number) - sequence_id
-    logger.notice(f'run position: {run_position}')
+    logger.notice(f"run position: {run_position}")
     if run_position < 10:
         _run = int(run_number)
         for i in range(0, run_position + 1):
             _id = i + offset
             _run = sequence_id + i
-            reduced_file_name = 'REFL_%s_%s_%s_partial.txt' % (sequence_id, _id + 1, _run)
+            reduced_file_name = "REFL_%s_%s_%s_partial.txt" % (sequence_id, _id + 1, _run)
             reduced_file_path = os.path.join(output_dir, reduced_file_name)
             if not os.path.isfile(reduced_file_path):
                 logger.notice(f"File {reduced_file_name} not found, skipping run in sequence")
@@ -177,13 +191,29 @@ def upload_report(output_dir: str, sample_logs: SampleLogValues, ws: MantidWorks
                 continue
             multiplot.append([xi, yi, dyi, dxi])
 
-        plot1d(_run, multiplot, instrument='REF_L',
-               x_title=u"Q (1/A)", x_log=True,
-               y_title="Reflectivity", y_log=True, show_dx=False, publish=publish)
+        plot1d(
+            _run,
+            multiplot,
+            instrument="REF_L",
+            x_title="Q (1/A)",
+            x_log=True,
+            y_title="Reflectivity",
+            y_log=True,
+            show_dx=False,
+            publish=publish,
+        )
     else:
-        plot1d(run_number, [[x, y, dy, dx]], instrument='REF_L',
-               x_title=u"Q (1/A)", x_log=True,
-               y_title="Reflectivity", y_log=True, show_dx=False, publish=publish)
+        plot1d(
+            run_number,
+            [[x, y, dy, dx]],
+            instrument="REF_L",
+            x_title="Q (1/A)",
+            x_log=True,
+            y_title="Reflectivity",
+            y_log=True,
+            show_dx=False,
+            publish=publish,
+        )
 
 
 def confirm_data_availability(sample_logs: SampleLogValues) -> None:
@@ -194,8 +224,7 @@ def confirm_data_availability(sample_logs: SampleLogValues) -> None:
     try:
         ipts = sample_logs["experiment_identifier"]
         ipts_number = ipts.split("-")[1]
-        cmd = ["/SNS/software/nses/bin/confirm-data", "-s", "Yes", "BL-4B", ipts_number, "1",
-               "Auto"]
+        cmd = ["/SNS/software/nses/bin/confirm-data", "-s", "Yes", "BL-4B", ipts_number, "1", "Auto"]
         subprocess.run(cmd, check=True, timeout=30)
     except Exception:  # noqa: BLE001  # deliberately broad
         logger.notice("Could not set data availability")
@@ -220,4 +249,6 @@ if __name__ == "__main__":
     if args.no_publish:
         publish_arg = False
 
-    autoreduce(events_file_arg, output_dir_arg, template_file_arg, avg_overlap_arg, const_q_arg, theta_offset_arg, publish_arg)
+    autoreduce(
+        events_file_arg, output_dir_arg, template_file_arg, avg_overlap_arg, const_q_arg, theta_offset_arg, publish_arg
+    )

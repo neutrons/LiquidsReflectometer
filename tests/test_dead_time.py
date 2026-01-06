@@ -50,6 +50,7 @@ def test_deadtime_paralyzable(nexus_dir):
         assert c > 0
         assert c < 1.001
 
+
 def test_deadtime_threshold(nexus_dir):
     """
     Test using the threshold. Here the threshold is set to 0,
@@ -77,6 +78,7 @@ def test_deadtime_threshold(nexus_dir):
 
     for c in corr:
         assert c <= 1.0003
+
 
 def test_full_reduction(nexus_dir, template_dir):
     """

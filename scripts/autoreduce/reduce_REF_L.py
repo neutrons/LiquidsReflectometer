@@ -8,7 +8,6 @@
 """
 import sys
 import os
-import time
 import numpy as np
 import warnings
 warnings.simplefilter('ignore')
@@ -19,7 +18,7 @@ sys.path.append("/SNS/REF_L/shared/reduction")
 CONDA_ENV = 'mantid'
 
 import mantid
-from mantid.simpleapi import *
+from mantid.simpleapi import LoadEventNexus, SetInstrumentParameter, LRAutoReduction, logger
 from mantid.kernel import ConfigService
 ConfigService.Instance().setString("default.instrument", "REF_L")
 ConfigService.Instance().setString("default.facility", "SNS")

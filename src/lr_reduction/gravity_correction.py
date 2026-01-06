@@ -46,11 +46,9 @@ def _log_value(run, log_name: str, default=None):
 
 
 class GravityDirection(IntEnum):
-
     DOWN = -1
     OFF = 0
     UP = 1
-
 
     @classmethod
     def from_value(cls, value):
@@ -58,7 +56,7 @@ class GravityDirection(IntEnum):
         return None if value is None else cls(value)
 
     @classmethod
-    def find_direction(cls, workspace: MantidWorkspace) -> 'GravityDirection':
+    def find_direction(cls, workspace: MantidWorkspace) -> "GravityDirection":
         """(docstring here)"""
 
         try:
@@ -97,7 +95,7 @@ def _theta_in(workspace: MantidWorkspace) -> float:
     # Angle calculated from thi and a flag on earth-centered vs beam-centered
     thi = _log_value(run, "BL4B:Mot:thi.RBV")
     if "BL4B:CS:Mode:Coordinates" in run:
-        if _log_value(run, "BL4B:CS:Mode:Coordinates") == 0: # Earth-centered=0
+        if _log_value(run, "BL4B:CS:Mode:Coordinates") == 0:  # Earth-centered=0
             theta_in = thi
         else:
             theta_in = thi - 4.0  # Beamline optics gives -4 deg incline. In future will have PV.
@@ -160,7 +158,7 @@ def _theta_sample(workspace: MantidWorkspace, wavelengths: np.ndarray, theta_in:
     # Distance between slit s1 and the sample
     s1_sample_distance = instrument_parameter("s1-sample-distance", default=1.485) * 1000  # in mm
     # Slit i position given by xi motor. Reference value is xi motor readback at the sample position.
-    xi = _log_value(run, "BL4B:Mot:xi.RBV", default=310) # in mm
+    xi = _log_value(run, "BL4B:Mot:xi.RBV", default=310)  # in mm
     sample_si_distance = xi_reference - xi
     slit_distance = s1_sample_distance - sample_si_distance
 
@@ -187,7 +185,7 @@ def _theta_sample(workspace: MantidWorkspace, wavelengths: np.ndarray, theta_in:
 
     # This is the location of the top of the parabola
     x0 = (y1 - y2 + k * (x1**2 - x2**2)) / (2 * k * (x1 - x2))
-    y0 = y2 + k * (x2 - x0)**2
+    y0 = y2 + k * (x2 - x0) ** 2
 
     # Shift in x for where neutron hits the sample plane
     xs = x0 - np.sqrt(y0 / k)
@@ -196,10 +194,12 @@ def _theta_sample(workspace: MantidWorkspace, wavelengths: np.ndarray, theta_in:
     return np.arctan(2 * k * (x0 - xs)) * 180 / np.pi
 
 
-def gravity_correction(workspace: MantidWorkspace,
-                       wavelengths: np.ndarray,
-                       theta_in: float = None,
-                       gravity_direction: GravityDirection = None) -> np.ndarray:
+def gravity_correction(
+    workspace: MantidWorkspace,
+    wavelengths: np.ndarray,
+    theta_in: float = None,
+    gravity_direction: GravityDirection = None,
+) -> np.ndarray:
     """
     Gravity correction for each event
 
@@ -224,4 +224,4 @@ def gravity_correction(workspace: MantidWorkspace,
     theta_sample = _theta_sample(workspace, wavelengths, theta_in)
     if gravity_direction is None:
         gravity_direction = GravityDirection.find_direction(workspace)
-    return int(gravity_direction)  * (theta_sample - theta_in) * np.pi / 180.0
+    return int(gravity_direction) * (theta_sample - theta_in) * np.pi / 180.0

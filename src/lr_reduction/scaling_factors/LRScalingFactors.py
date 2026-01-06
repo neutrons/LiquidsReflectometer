@@ -9,10 +9,25 @@ import os
 import re
 import time
 
-# TODO: Wildcard imports are bad practice (Glass)
-from mantid.api import *
-from mantid.kernel import *
-from mantid.simpleapi import *
+from mantid.api import FileAction, FileProperty, PythonAlgorithm
+from mantid.kernel import Direction, FloatArrayLengthValidator, FloatArrayProperty, IntArrayProperty, Property
+from mantid.simpleapi import (
+    AlgorithmFactory,
+    CreateWorkspace,
+    CropWorkspace,
+    Divide,
+    Fit,
+    LoadErrorEventsNexus,
+    LoadEventNexus,
+    LRSubtractAverageBackground,
+    Multiply,
+    NormaliseByCurrent,
+    Rebin,
+    ReplaceSpecialValues,
+    SumSpectra,
+    logger,
+    mtd,
+)
 
 import lr_reduction
 from lr_reduction import dead_time_correction

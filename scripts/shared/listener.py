@@ -12,9 +12,9 @@ if ("MANTIDPATH" in os.environ):
 sys.path.insert(0,"/opt/mantid63/bin")
 sys.path.insert(1,"/opt/mantid63/lib")
 
-import mantid
+import mantid.kernel
 mantid.kernel.config.setLogLevel(3)
-from mantid.simpleapi import *
+from mantid.simpleapi import mtd, StartLiveData, DeleteWorkspace, CloneWorkspace, SumSpectra, Rebin, AlgorithmManager
 import numpy as np
 
 

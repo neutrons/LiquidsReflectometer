@@ -10,10 +10,9 @@ OUTPUT_DIR_DIRECTIVE = os.path.expanduser("~")
 
 
 class QuickReduce(QWidget):
-
     def __init__(self):
         QWidget.__init__(self)
-        self.setWindowTitle('Quick reduce')
+        self.setWindowTitle("Quick reduce")
         layout = QGridLayout()
         layout.setColumnStretch(1, 0)
         layout.setColumnStretch(2, 1)
@@ -52,23 +51,21 @@ class QuickReduce(QWidget):
         layout.addWidget(self.db_peak_pixel_label, 4, 2)
 
         # Output directory
-        self.choose_output_dir = QPushButton('Output directory')
+        self.choose_output_dir = QPushButton("Output directory")
         layout.addWidget(self.choose_output_dir, 5, 1)
 
         self.output_dir_label = QLabel(self)
         layout.addWidget(self.output_dir_label, 5, 2)
 
-        spacer = QSpacerItem(20, 20, QtWidgets.QSizePolicy.Minimum,
-                             QtWidgets.QSizePolicy.Minimum)
+        spacer = QSpacerItem(20, 20, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
         layout.addItem(spacer, 6, 1)
 
         # Process button
-        self.perform_reduction = QPushButton('Process')
+        self.perform_reduction = QPushButton("Process")
         self.perform_reduction.setStyleSheet("background-color : green")
         layout.addWidget(self.perform_reduction, 7, 1)
 
-        spacer = QSpacerItem(10, 10, QtWidgets.QSizePolicy.Minimum,
-                             QtWidgets.QSizePolicy.Expanding)
+        spacer = QSpacerItem(10, 10, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         layout.addItem(spacer, 8, 1)
 
         # connections
@@ -79,17 +76,17 @@ class QuickReduce(QWidget):
         self.read_settings()
 
     def output_dir_selection(self):
-        _dir = QFileDialog.getExistingDirectory(None, 'Select a folder:',
-                                                self.output_dir_label.text(),
-                                                QFileDialog.ShowDirsOnly)
+        _dir = QFileDialog.getExistingDirectory(
+            None, "Select a folder:", self.output_dir_label.text(), QFileDialog.ShowDirsOnly
+        )
         if os.path.isdir(_dir):
             self.output_dir_label.setText(_dir)
 
     def read_settings(self):
-        _run_number = self.settings.value("quick_run_number", '')
+        _run_number = self.settings.value("quick_run_number", "")
         self.run_number_ledit.setText(_run_number)
 
-        _db_run_number = self.settings.value("quick_db_run_number", '')
+        _db_run_number = self.settings.value("quick_db_run_number", "")
         self.db_run_number_ledit.setText(_db_run_number)
 
         _pixel = self.settings.value("quick_pixel", 145)
@@ -104,12 +101,12 @@ class QuickReduce(QWidget):
         self.output_dir_label.setText(_out_dir)
 
     def save_settings(self):
-        self.settings.setValue('quick_run_number', self.run_number_ledit.text())
-        self.settings.setValue('quick_db_run_number', self.db_run_number_ledit.text())
-        self.settings.setValue('quick_pixel', self.peak_pixel_ledit.text())
-        self.settings.setValue('quick_db_pixel', self.db_peak_pixel_ledit.text())
+        self.settings.setValue("quick_run_number", self.run_number_ledit.text())
+        self.settings.setValue("quick_db_run_number", self.db_run_number_ledit.text())
+        self.settings.setValue("quick_pixel", self.peak_pixel_ledit.text())
+        self.settings.setValue("quick_db_pixel", self.db_peak_pixel_ledit.text())
 
-        self.settings.setValue('quick_output_dir', self.output_dir_label.text())
+        self.settings.setValue("quick_output_dir", self.output_dir_label.text())
 
     def check_inputs(self):
         error = None
@@ -144,6 +141,15 @@ class QuickReduce(QWidget):
 
         print("Processing!")
 
-        subprocess.run(['nsd-conda-wrap.sh', 'mantid', 'scripts/quick_reduce.py',
-                        self.run_number_ledit.text(), self.db_run_number_ledit.text(),
-                        self.peak_pixel_ledit.text(), self.db_peak_pixel_ledit.text(), self.output_dir_label.text()])
+        subprocess.run(
+            [
+                "nsd-conda-wrap.sh",
+                "mantid",
+                "scripts/quick_reduce.py",
+                self.run_number_ledit.text(),
+                self.db_run_number_ledit.text(),
+                self.peak_pixel_ledit.text(),
+                self.db_peak_pixel_ledit.text(),
+                self.output_dir_label.text(),
+            ]
+        )
