@@ -2,13 +2,12 @@
 Process Rigaku .ras file and produce R(Q)
 """
 
-import os
-import numpy as np
 import argparse
-
-from matplotlib import pyplot as plt
-
+import os
 import warnings
+
+import numpy as np
+from matplotlib import pyplot as plt
 
 warnings.filterwarnings("ignore", module="numpy")
 warnings.filterwarnings("ignore")

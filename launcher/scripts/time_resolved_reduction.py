@@ -1,11 +1,8 @@
-import sys
 import argparse
+import sys
 
 sys.path.append("/SNS/REF_L/shared/reduction")
-
-
 from lr_reduction import time_resolved
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(add_help=True)

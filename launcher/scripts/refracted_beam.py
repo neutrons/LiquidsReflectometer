@@ -1,21 +1,19 @@
 import argparse
 import os
-import sys
 
 import mantid
 import mantid.simpleapi as api
-import matplotlib.lines as mlines
 import numpy as np
 from matplotlib import pyplot as plt
 
 mantid.kernel.config.setLogLevel(3)
 
 import lmfit
-from lmfit.models import GaussianModel, Model
+from lmfit.models import GaussianModel
 
 SLD = dict(Si=2.07e-6, Quartz=4.18e-6)
 
-
+# FIX: I don't think we're using `set_ylim` correctly (Glass)
 class Refracted(object):
     def __init__(self, ws, material="Si", tof_bin=200, offset=0.01, pixel_size=0.00072):
         """
