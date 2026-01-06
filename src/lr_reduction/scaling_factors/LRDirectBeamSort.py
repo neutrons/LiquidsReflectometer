@@ -10,6 +10,7 @@ import functools
 from math import ceil
 from typing import List, Tuple
 
+# TODO: Wildcard imports are bad practice (Glass)
 import numpy as np
 from mantid.api import AlgorithmFactory, FileAction, FileProperty, PythonAlgorithm
 from mantid.kernel import Direction, IntArrayProperty, StringArrayProperty

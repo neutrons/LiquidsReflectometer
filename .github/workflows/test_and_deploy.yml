@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0 # Fetch all history for accurate versioning
           fetch-tags: true # Fetch tags to ensure versioning works correctly
@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 100
           fetch-tags: true
@@ -78,7 +78,7 @@ jobs:
         run: pixi run conda-build
 
       - name: upload conda package as artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: artifact-conda-package
           path: ${{ env.PKG_NAME }}-*.conda
@@ -91,7 +91,7 @@ jobs:
         shell: bash -el {0}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -106,7 +106,7 @@ jobs:
             python=3.11
 
       - name: Download conda package artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: artifact-conda-package
           path: /tmp/local-channel/linux-64
@@ -136,7 +136,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 100
           fetch-tags: true
@@ -148,7 +148,7 @@ jobs:
           pixi-version: v0.48.2
 
       - name: Download conda package artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: artifact-conda-package
 
