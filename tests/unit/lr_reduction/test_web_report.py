@@ -29,7 +29,7 @@ def workspace_sc(nexus_dir):
 def workspace_db(nexus_dir):
     """Fixture to load a Mantid workspace for direct beam data."""
     with amend_config(data_dir=nexus_dir):
-        ws_db = LoadEventNexus("REF_L_201051")
+        ws_db = LoadEventNexus("REF_L_198399")
     return ws_db
 
 
@@ -91,8 +91,15 @@ def test_generate_report_sections(workspace_sc, template_data, meta_data):
     assert report_sections.plots is not None
 
 
+def test_generate_report_section_direct_beam(workspace_db, template_data):
+    report_sections = generate_report_sections(workspace_db, template_data)
+    assert report_sections.run_meta_data is not None
+    assert report_sections.reduction_parameters is not None
+    assert report_sections.plots is not None
+
+
 def test_assemble_report(workspace_sc, template_data, meta_data):
     report_sections = generate_report_sections(workspace_sc, template_data, meta_data)
     report = assemble_report(None, report_sections)
-    assert "<html>" in report
-    assert "</html>" in report
+    assert "<div>" in report
+    assert "</div>" in report

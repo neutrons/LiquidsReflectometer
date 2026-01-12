@@ -43,9 +43,10 @@ from mantid import logger
 from mantid.simpleapi import LoadEventNexus
 
 from lr_reduction import workflow
+from lr_reduction.data_info import DataType
 from lr_reduction.mantid_utils import SampleLogValues
 from lr_reduction.template import get_default_template_file
-from lr_reduction.web_report import save_report, upload_report
+from lr_reduction.web_report import assemble_report, generate_report_sections, save_report, upload_report
 
 # Name of the conda environment to use - required by autoreduction
 CONDA_ENV = "lr_reduction"
@@ -117,16 +118,25 @@ def autoreduce(
     # Load workspace and sample logs
     ws = LoadEventNexus(Filename=events_file)
     sample_logs = SampleLogValues(ws)
+    data_type = DataType.from_workspace(ws)
 
     # Determine which template to use
     if template_file is None:
         template_file = get_default_template_file(output_dir, sample_logs["tthd"])
     logger.notice(f"Using template: {template_file}")
 
-    # Run the reduction
-    _, report = workflow.reduce(ws, template_file, output_dir,
-                    average_overlap=avg_overlap, theta_offset=theta_offset,
-                    q_summing=const_q, bck_in_q=False, return_report=True)
+    if data_type == DataType.REFLECTED_BEAM:
+        # Run the reduction
+        _, report = workflow.reduce(ws, template_file, output_dir,
+                        average_overlap=avg_overlap, theta_offset=theta_offset,
+                        q_summing=const_q, bck_in_q=False, return_report=True)
+    elif data_type == DataType.DIRECT_BEAM:
+        # Generate simple report
+        report_sections = generate_report_sections(ws, template_file)
+        report = assemble_report(None, report_sections)
+    else:
+        logger.notice(f"Data type {data_type} not supported for autoreduction.")
+        return
 
     # Save to disk and (optionally) upload the HTML report
     match = re.search(r'REF_L_(\d+)', events_file)

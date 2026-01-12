@@ -5,23 +5,24 @@ Autoreduction process for the Liquids Reflectometer
 import json
 import os
 
-import mantid.simpleapi as mtd_api
 import numpy as np
+from mantid.simpleapi import LoadEventNexus, logger
 
 from lr_reduction import event_reduction, output, reduction_template_reader, template
+from lr_reduction.typing import MantidWorkspace
 from lr_reduction.web_report import assemble_report, generate_report_sections
 
 
 def reduce(
-    ws,
-    template_file,
-    output_dir,
-    average_overlap=False,
+    ws: MantidWorkspace,
+    template_file: str | dict,
+    output_dir: str,
+    average_overlap: bool = False,
     theta_offset: float | None = 0,
-    q_summing=None,
-    bck_in_q=False,
-    is_live=False,
-    return_report=False,
+    q_summing: bool = None,
+    bck_in_q: bool = False,
+    is_live: bool = False,
+    return_report: bool = False,
 ):
     """
     Function called by reduce_REFL.py, which lives in /SNS/REF_L/shared/autoreduce
@@ -62,7 +63,7 @@ def reduce(
     if ws.getRun().hasProperty("sequence_number"):
         sequence_number = ws.getRun().getProperty("sequence_number").value[0]
     # Read template if it was passed as a file path
-    # It can be passsed as a dict directly
+    # It can be passed as a dict directly
     if isinstance(template_file, str):
         template_data = template.read_template(template_file, sequence_number)
     else:
@@ -103,7 +104,7 @@ def reduce(
     if isinstance(template_file, str):
         write_template(seq_list, run_list, template_file, output_dir)
     else:
-        print("Template data was passed instead of a file path: template data not saved")
+        logger.notice("Template data was passed instead of a file path: template data not saved")
 
     if return_report:
         return run_list[0], report
@@ -193,7 +194,7 @@ def write_template(seq_list, run_list, template_file, output_dir):
                 data_sets[seq_list[i] - 1].data_files = [run_list[i]]
                 new_data_sets.append(data_sets[seq_list[i] - 1])
             else:
-                print("Too few entries [%s] in template for sequence number %s" % (len(data_sets), seq_list[i]))
+                logger.warning(f"Too few entries [{len(data_sets)}] in template for sequence number {seq_list[i]} when saving new template")
 
     # Save the template that was used
     xml_str = reduction_template_reader.to_xml(new_data_sets)
@@ -240,7 +241,7 @@ def offset_from_first_run(ws, template_file: str, output_dir: str):
 
     # Load normalization run
     print("    DB: %s" % template_data.norm_file)
-    ws_db = mtd_api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
+    ws_db = LoadEventNexus("REF_L_%s" % template_data.norm_file)
 
     # Look for parameters that might have been determined earlier for this measurement
     options_file = os.path.join(output_dir, "REFL_%s_options.json" % sequence_id)

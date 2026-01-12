@@ -94,6 +94,7 @@ def save_report(html_report: str, report_file: str):
     report_file : str
         File path where the report will be saved as an HTML file.
     """
+    logger.notice(f"Saving report to: {report_file}")
     with open(report_file, "w", encoding="utf-8") as f:
         f.write(html_wrapper(html_report))
 
@@ -115,6 +116,7 @@ def upload_report(html_report: str, run_number: Union[str, int]) -> Optional[req
         `Response` object returned by the livedata server, or `None` if the function is unable to do find the
         library to generate the `request.post()`
     """
+    logger.notice(f"Uploading report for run {run_number} to livedata server")
     return publish_plot("REF_L", run_number, files={"file": html_report})
 
 
@@ -141,11 +143,16 @@ def assemble_report(reflectivity_plot_div: str=None, report_sections: ReportSect
         plot_html += "<div>%s</div>\n" % report_sections.run_meta_data
         plot_html += "<div>%s</div>\n" % report_sections.reduction_parameters
         plot_html += "<table style='width:100%'>\n"
-        plot_html += "<tr>\n"
-        for plot in report_sections.plots:
-            if plot is not None:
-                plot_html += "<td>%s</td>\n" % plot
-        plot_html += "</tr>\n"
+        plots = [p for p in report_sections.plots if p is not None]
+        # arrange plots in table with two plots per row
+        for i in range(0, len(plots), 2):
+            plot_html += "<tr>\n"
+            plot_html += "<td>%s</td>\n" % plots[i]
+            if i + 1 < len(plots):
+                plot_html += "<td>%s</td>\n" % plots[i + 1]
+            else:
+                plot_html += "<td></td>\n"  # optional filler cell
+            plot_html += "</tr>\n"
         plot_html += "</table>\n"
         plot_html += "<hr>\n"
 
@@ -155,7 +162,7 @@ def assemble_report(reflectivity_plot_div: str=None, report_sections: ReportSect
 def generate_report_sections(
     workspace: MantidWorkspace,
     template_file: ReductionParameters,
-    meta_data: dict,
+    meta_data: dict = None,
     logfile=None,
 ) -> ReportSections:
     """
@@ -184,10 +191,9 @@ def generate_report_sections(
             logfile.write(msg + "\n")
         logger.notice(msg)
 
-    logger.notice("  - Data type:")
-
     sample_logs = SampleLogValues(workspace)
     data_type = DataType.from_workspace(workspace)
+    log(f"  - Data type: {data_type.name}")
 
     try:
         sequence_number = sample_logs["sequence_number"]
@@ -209,20 +215,23 @@ def generate_report_sections(
     report = ""
     run_meta_data = ""
 
-    if data_type != DataType.UNKNOWN:
-        log(f"  - generating report [{number_events}]")
+    log(f"  - generating report [{number_events}]")
 
+    if data_type == DataType.REFLECTED_BEAM:
         report = generate_report_section_reduction_parameters(workspace, template_data, meta_data)
-        run_meta_data = generate_report_section_run_meta_data(workspace)
-
-        try:
-            plots = generate_report_plots(workspace, template_data)
-        except Exception as e:  # noqa: BLE001
-            log(f"Could not generate plots: {e}")
-            logger.error("Could not generate plots", exc_info=True)
-
+    elif data_type == DataType.DIRECT_BEAM:
+        report = generate_report_section_direct_beam_parameters(workspace, template_data)
     else:
         logger.error("Invalid data type for report: %s", data_type.name)
+        return ReportSections("", [], "")
+
+    run_meta_data = generate_report_section_run_meta_data(workspace)
+
+    try:
+        plots = generate_report_plots(workspace, template_data)
+    except Exception as e:  # noqa: BLE001
+        log(f"Could not generate plots: {e}")
+        logger.error("Could not generate plots", exc_info=True)
 
     log(f"  - report: {len(report)} {len(plots)}")
 
@@ -245,7 +254,8 @@ def generate_report_section_run_meta_data(workspace: MantidWorkspace) -> str:
     -----
     This is useful for live reduction. For a finished run, WebMon fetches this from ONCat.
     """
-    # self.log("  - generating cross-section report")
+    logger.notice("  - generating run meta data")
+
     meta = "<p>\n<table style='width:80%'>"
     meta += "<tr><td># events:</td><td>%s</td></tr>" % workspace.getNumberEvents()
 
@@ -263,7 +273,7 @@ def generate_report_section_reduction_parameters(workspace, template_data, meta_
     str
         Reduction configuration in the form of an HTML table
     """
-    # self.log("  - generating report")
+    logger.notice("  - generating reduction parameters")
 
     sample_logs = SampleLogValues(workspace)
     direct_beam = template_data.norm_file
@@ -319,6 +329,45 @@ def generate_report_section_reduction_parameters(workspace, template_data, meta_
         meta_data["q_max"],
     )
     meta += "</table>\n"
+    return meta
+
+
+def generate_report_section_direct_beam_parameters(workspace, template_data) -> str:
+    """Generate HTML report from a reduced workspace and template data
+
+    Returns
+    -------
+    str
+        Reduction configuration in the form of an HTML table
+    """
+    logger.notice("  - generating direct beam parameters")
+
+    sample_logs = SampleLogValues(workspace)
+
+    meta = "<table style='width:80%'>"
+    meta += "<tr><td>Run:</td><td><b>%s</b></td></tr>" % (
+        int(sample_logs["run_number"]),
+    )
+    meta += "<tr><td>Peak range:</td><td>%s - %s</td></tr>" % (
+        template_data.norm_peak_range[0],
+        template_data.norm_peak_range[1],
+    )
+    meta += "<tr><td>Background:</td><td>%s - %s</td></tr>" % (
+        template_data.norm_background_roi[0],
+        template_data.norm_background_roi[1],
+    )
+    meta += "<tr><td>Low-res range:</td><td>%s - %s</td></tr>" % (
+        template_data.norm_x_range[0],
+        template_data.norm_x_range[1],
+    )
+    meta += "<tr><td>Sequence:</td><td>%s: %s/%s</td></tr>" % (
+        sample_logs["sequence_id"],
+        sample_logs["sequence_number"],
+        sample_logs["sequence_total"],
+    )
+    meta += "<tr><td>Report time:</td><td>%s</td></tr>" % time.ctime()
+    meta += "</table>\n"
+
     return meta
 
 
