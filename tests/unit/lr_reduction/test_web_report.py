@@ -70,7 +70,7 @@ def meta_data(workspace_sc, workspace_db, template_data):
 
 def test_generate_report_section_reduction_parameters(workspace_sc, template_data, meta_data):
     report = generate_report_section_reduction_parameters(workspace_sc, template_data, meta_data)
-    assert len(report) == 820
+    assert len(report) == 787
 
 
 def test_generate_report_plots(workspace_sc, template_data):

@@ -277,7 +277,7 @@ def generate_report_section_reduction_parameters(workspace, template_data, meta_
 
     sample_logs = SampleLogValues(workspace)
     direct_beam = template_data.norm_file
-    two_backgrounds = template_data.two_backgrounds
+    two_backgrounds = meta_data["use_functional_bck"]
 
     meta = "<table style='width:80%'>"
     meta += "<tr><td>Run:</td><td><b>%s</b> </td></td><td><b>Direct beam: %s</b></td></tr>" % (
@@ -285,9 +285,10 @@ def generate_report_section_reduction_parameters(workspace, template_data, meta_
         direct_beam,
     )
     meta += "<tr><td>Q-binning:</td><td>%s</td><td>-</td></tr>" % meta_data["q_summing"]
-    meta += "<tr><td>Specular peak:</td><td>%g</td><td>-</td></tr>" % (
-        meta_data["specular_pixel"],
-    )
+    if meta_data["q_summing"]:
+        meta += "<tr><td>Specular peak:</td><td>%g</td><td>-</td></tr>" % (
+            meta_data["specular_pixel"],
+        )
     meta += "<tr><td>Peak range:</td><td>%s - %s</td></td><td>%s - %s</td></tr>" % (
         template_data.data_peak_range[0],
         template_data.data_peak_range[1],
@@ -301,11 +302,12 @@ def generate_report_section_reduction_parameters(workspace, template_data, meta_
         template_data.norm_background_roi[0],
         template_data.norm_background_roi[1],
     )
-    meta += "<tr><td>Background2:</td><td>%s - %s</td><td>-</td></tr>" % (
-        template_data.background_roi[2],
-        template_data.background_roi[3],
-    )
-    meta += "<tr><td>Low-res range:</td><td>%s - %s</td><td>%s - %s</td></tr>" % (
+    if two_backgrounds:
+        meta += "<tr><td>Background2:</td><td>%s - %s</td><td>-</td></tr>" % (
+            template_data.background_roi[2],
+            template_data.background_roi[3],
+        )
+    meta += "<tr><td>X range:</td><td>%s - %s</td><td>%s - %s</td></tr>" % (
         template_data.data_x_range[0],
         template_data.data_x_range[1],
         template_data.norm_x_range[0],
@@ -320,13 +322,16 @@ def generate_report_section_reduction_parameters(workspace, template_data, meta_
     meta += "</table>\n"
 
     meta += "<table style='width:100%'>"
-    meta += "<tr><th>Theta (actual)</th><th>Wavelength</th><th>Q</th></tr>"  # noqa E501
-    meta += "<tr><td>%6.4g</td><td>%6.4g - %6.4g</td><td>%6.4g - %6.4g</td></tr>\n" % (
-        meta_data["theta"],
+    meta += "<tr><th>Wavelength</th><th>Q</th><th>Thi</th><th>Ths</th><th>Offset</th><th>Theta used</th></tr>"  # noqa E501
+    meta += "<tr><td>%6.4g - %6.4g</td><td>%6.4g - %6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td></tr>\n" % (
         meta_data["wl_min"],
         meta_data["wl_max"],
         meta_data["q_min"],
         meta_data["q_max"],
+        sample_logs["thi"],
+        sample_logs["ths"],
+        template_data.angle_offset,
+        meta_data["theta"] * 180.0 / np.pi,
     )
     meta += "</table>\n"
     return meta
@@ -345,7 +350,7 @@ def generate_report_section_direct_beam_parameters(workspace, template_data) -> 
     sample_logs = SampleLogValues(workspace)
 
     meta = "<table style='width:80%'>"
-    meta += "<tr><td>Run:</td><td><b>%s</b></td></tr>" % (
+    meta += "<tr><td>Run:</td><td><b>%s</b> (direct beam)</td></tr>" % (
         int(sample_logs["run_number"]),
     )
     meta += "<tr><td>Peak range:</td><td>%s - %s</td></tr>" % (
@@ -356,7 +361,7 @@ def generate_report_section_direct_beam_parameters(workspace, template_data) -> 
         template_data.norm_background_roi[0],
         template_data.norm_background_roi[1],
     )
-    meta += "<tr><td>Low-res range:</td><td>%s - %s</td></tr>" % (
+    meta += "<tr><td>X range:</td><td>%s - %s</td></tr>" % (
         template_data.norm_x_range[0],
         template_data.norm_x_range[1],
     )
@@ -389,7 +394,7 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
     xy_plot = None
     try:
         integrated = Integration(workspace)
-        signal = np.log10(integrated.extractY())
+        signal = integrated.extractY()
         z = np.reshape(signal, (n_x, n_y))
         xy_plot = _plot2d(
             z=z.T,
@@ -417,9 +422,10 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
             NXPixel=n_x,
             NYPixel=n_y,
             ConvertToQ=False,
+            IntegrateY=False,
             OutputWorkspace="direct_summed",
         )
-        signal = np.transpose(np.log10(direct_summed.extractY()))
+        signal = np.transpose(direct_summed.extractY())
         tof_axis = direct_summed.extractX()[0] / 1000.0
         tof_axis = (tof_axis[:-1] + tof_axis[1:]) / 2.0  # average TOF values
 
@@ -432,7 +438,7 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
             y_range=None,
             x_label="Y pixel",
             y_label="TOF (ms)",
-            swap_axes=False,
+            swap_axes=True,
         )
     except Exception:  # noqa E722
         # self.log("  - Could not generate X-TOF plot")
@@ -486,6 +492,7 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
         low_res_profile = _plot1d(
             signal_x,
             signal_y,
+            y_log=False,
             x_range=scatt_low_res,
             x_label="X pixel",
             y_label="Counts",
