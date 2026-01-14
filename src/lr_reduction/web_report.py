@@ -2,10 +2,8 @@
 Report class used to populate the web monitor
 """
 
-import json
 import math
 import time
-import uuid
 from typing import NamedTuple, Optional, Union
 
 import numpy as np
@@ -381,12 +379,15 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
         scatt_peak = None
         scatt_low_res = None
         scatt_bck = None
-        tof_range = None
+        tof_range_ms = None
+        tof_zoom_range = None
     else:
         scatt_peak = template_data.data_peak_range
         scatt_low_res = template_data.data_x_range
         scatt_bck = template_data.background_roi
-        tof_range = template_data.tof_range
+        tof_range_ms = [t / 1000.0 for t in template_data.tof_range]
+        # convert to ms and add margins
+        tof_zoom_range = [template_data.tof_range[0]/1000.0 - 5.0, template_data.tof_range[1]/1000.0 + 5.0]
 
     # X-Y plot
     xy_plot = None
@@ -435,12 +436,12 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
             x=list(range(signal.shape[1])),
             x_range=scatt_peak,
             x_bck_range=scatt_bck,
-            y_range=tof_range,
+            y_range=tof_range_ms,
             x_label="Y pixel",
             y_label="TOF (ms)",
             swap_axes=True,
             x_zoom_range=YTOF_PLOT_ZOOM_X_RANGE,
-            y_zoom_range=tof_range,
+            y_zoom_range=tof_zoom_range,
         )
     except Exception:  # noqa E722
         logger.warning("  - Could not generate X-TOF plot")
@@ -513,7 +514,7 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
             signal_x,
             signal_y,
             y_log=False,
-            x_range=tof_range,
+            x_range=tof_range_ms,
             x_label="TOF (ms)",
             y_label="Counts",
         )
@@ -588,6 +589,7 @@ def _plot2d(
         x_range, y_range = y_range, x_range
         x_bck_range, y_bck_range = y_bck_range, x_bck_range
         x_label, y_label = y_label, x_label
+        x_zoom_range, y_zoom_range = y_zoom_range, x_zoom_range
 
     # Eliminate items in array Z that are not finite and below a certain threshold
     x_grid, y_grid = np.meshgrid(x, y)
@@ -718,6 +720,7 @@ def _plot2d(
         showline=True,
         mirror="all",
         ticks="inside",
+        range=x_zoom_range,
     )
     y_layout = dict(
         title=y_label,
@@ -728,6 +731,7 @@ def _plot2d(
         showline=True,
         mirror="all",
         ticks="inside",
+        range=y_zoom_range,
     )
     layout = go.Layout(
         title=title,
@@ -743,35 +747,9 @@ def _plot2d(
     )
     fig = go.Figure(data=plotly_objects, layout=layout)
 
-    div_id = f"plot_{uuid.uuid4().hex}"
-    div_html = pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False, div_id=div_id)
+    div_html = pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
 
-    zoom_script = ""
-    if x_zoom_range is not None and y_zoom_range is not None:
-        # JSON-encode ranges so they are JS-safe
-        x_zoom_json = json.dumps(x_zoom_range)
-        y_zoom_json = json.dumps(y_zoom_range)
-        zoom_script = f"""
-<script>
-(function() {{
-    var plot = document.getElementById("{div_id}");
-    if (!plot || plot.dataset.initialZoomApplied) return;
-
-    function zoomOnce() {{
-        Plotly.relayout(plot, {{
-            "xaxis.range": {x_zoom_json},
-            "yaxis.range": {y_zoom_json}
-        }});
-        plot.dataset.initialZoomApplied = "true";
-        plot.removeEventListener("plotly_afterplot", zoomOnce);
-    }}
-
-    plot.addEventListener("plotly_afterplot", zoomOnce);
-}})();
-</script>
-"""
-
-    return div_html + zoom_script
+    return div_html
 
 
 def _plot1d(
