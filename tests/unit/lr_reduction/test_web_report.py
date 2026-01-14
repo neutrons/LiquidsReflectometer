@@ -6,6 +6,7 @@ from mantid.kernel import amend_config
 from mantid.simpleapi import LoadEventNexus
 
 from lr_reduction import template
+from lr_reduction.data_info import DataType
 from lr_reduction.event_reduction import EventReflectivity
 from lr_reduction.mantid_utils import SampleLogValues
 from lr_reduction.web_report import (
@@ -73,8 +74,14 @@ def test_generate_report_section_reduction_parameters(workspace_sc, template_dat
     assert len(report) == 787
 
 
-def test_generate_report_plots(workspace_sc, template_data):
-    html_plots = generate_report_plots(workspace_sc, template_data)
+def test_generate_report_plots_reflected_beam(workspace_sc, template_data):
+    html_plots = generate_report_plots(workspace_sc, template_data, DataType.REFLECTED_BEAM)
+    assert len(html_plots) == 5
+    assert None not in html_plots
+
+
+def test_generate_report_plots_direct_beam(workspace_db, template_data):
+    html_plots = generate_report_plots(workspace_db, template_data, DataType.DIRECT_BEAM)
     assert len(html_plots) == 5
     assert None not in html_plots
 

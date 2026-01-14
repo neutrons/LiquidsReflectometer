@@ -2,8 +2,10 @@
 Report class used to populate the web monitor
 """
 
+import json
 import math
 import time
+import uuid
 from typing import NamedTuple, Optional, Union
 
 import numpy as np
@@ -18,6 +20,10 @@ from lr_reduction.data_info import DataType
 from lr_reduction.mantid_utils import SampleLogValues
 from lr_reduction.reduction_template_reader import ReductionParameters
 from lr_reduction.typing import MantidWorkspace
+
+XY_PLOT_ZOOM_X_RANGE = [25, 225]
+XY_PLOT_ZOOM_Y_RANGE = [100, 200]
+YTOF_PLOT_ZOOM_X_RANGE = [100, 200]
 
 
 class ReportSections(NamedTuple):
@@ -220,7 +226,7 @@ def generate_report_sections(
     if data_type == DataType.REFLECTED_BEAM:
         report = generate_report_section_reduction_parameters(workspace, template_data, meta_data)
     elif data_type == DataType.DIRECT_BEAM:
-        report = generate_report_section_direct_beam_parameters(workspace, template_data)
+        report = generate_report_section_direct_beam_parameters(workspace)
     else:
         logger.error("Invalid data type for report: %s", data_type.name)
         return ReportSections("", [], "")
@@ -228,7 +234,7 @@ def generate_report_sections(
     run_meta_data = generate_report_section_run_meta_data(workspace)
 
     try:
-        plots = generate_report_plots(workspace, template_data)
+        plots = generate_report_plots(workspace, template_data, data_type)
     except Exception as e:  # noqa: BLE001
         log(f"Could not generate plots: {e}")
         logger.error("Could not generate plots", exc_info=True)
@@ -337,7 +343,7 @@ def generate_report_section_reduction_parameters(workspace, template_data, meta_
     return meta
 
 
-def generate_report_section_direct_beam_parameters(workspace, template_data) -> str:
+def generate_report_section_direct_beam_parameters(workspace) -> str:
     """Generate HTML report from a reduced workspace and template data
 
     Returns
@@ -353,18 +359,6 @@ def generate_report_section_direct_beam_parameters(workspace, template_data) -> 
     meta += "<tr><td>Run:</td><td><b>%s</b> (direct beam)</td></tr>" % (
         int(sample_logs["run_number"]),
     )
-    meta += "<tr><td>Peak range:</td><td>%s - %s</td></tr>" % (
-        template_data.norm_peak_range[0],
-        template_data.norm_peak_range[1],
-    )
-    meta += "<tr><td>Background:</td><td>%s - %s</td></tr>" % (
-        template_data.norm_background_roi[0],
-        template_data.norm_background_roi[1],
-    )
-    meta += "<tr><td>X range:</td><td>%s - %s</td></tr>" % (
-        template_data.norm_x_range[0],
-        template_data.norm_x_range[1],
-    )
     meta += "<tr><td>Sequence:</td><td>%s: %s/%s</td></tr>" % (
         sample_logs["sequence_id"],
         sample_logs["sequence_number"],
@@ -376,19 +370,23 @@ def generate_report_section_direct_beam_parameters(workspace, template_data) -> 
     return meta
 
 
-def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionParameters):
+def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionParameters, data_type: DataType) -> list[str]:
     """
     Generate diagnostics plots
     """
-    # self.log("  - generating plots [%s]" % self.number_events)
-    # if self.number_events < 10:
-    #     logger.notice("No events for workspace %s" % str(workspace))
-    #     return []
     n_x = int(workspace.getInstrument().getNumberParameter("number-of-x-pixels")[0])
     n_y = int(workspace.getInstrument().getNumberParameter("number-of-y-pixels")[0])
 
-    scatt_peak = template_data.data_peak_range
-    scatt_low_res = template_data.data_x_range
+    if data_type == DataType.DIRECT_BEAM:
+        scatt_peak = None
+        scatt_low_res = None
+        scatt_bck = None
+        tof_range = None
+    else:
+        scatt_peak = template_data.data_peak_range
+        scatt_low_res = template_data.data_x_range
+        scatt_bck = template_data.background_roi
+        tof_range = template_data.tof_range
 
     # X-Y plot
     xy_plot = None
@@ -402,13 +400,15 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
             y=list(range(n_y)),
             x_range=scatt_low_res,
             y_range=scatt_peak,
-            y_bck_range=template_data.background_roi,
+            y_bck_range=scatt_bck,
+            x_zoom_range=XY_PLOT_ZOOM_X_RANGE,
+            y_zoom_range=XY_PLOT_ZOOM_Y_RANGE,
         )
     except Exception:  # noqa E722
-        # self.log("  - Could not generate XY plot")
+        logger.warning("  - Could not generate XY plot")
         xy_plot = _plotText("Could not generate XY plot")
 
-    # self.log("  - generating X-TOF plot")
+    logger.notice("  - generating X-TOF plot")
     # Y-TOF plot
     y_tof_plot = None
     try:
@@ -434,17 +434,19 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
             y=tof_axis,
             x=list(range(signal.shape[1])),
             x_range=scatt_peak,
-            x_bck_range=template_data.background_roi,
-            y_range=None,
+            x_bck_range=scatt_bck,
+            y_range=tof_range,
             x_label="Y pixel",
             y_label="TOF (ms)",
             swap_axes=True,
+            x_zoom_range=YTOF_PLOT_ZOOM_X_RANGE,
+            y_zoom_range=tof_range,
         )
     except Exception:  # noqa E722
-        # self.log("  - Could not generate X-TOF plot")
+        logger.warning("  - Could not generate X-TOF plot")
         y_tof_plot = _plotText("Could not generate X-TOF plot")
 
-    # self.log("  - generating Y count distribution")
+    logger.notice("  - generating Y count distribution")
     # Count per Y pixel
     peak_pixels = None
     try:
@@ -464,17 +466,17 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
             signal_x,
             signal_y,
             x_range=scatt_peak,
-            bck_range=template_data.background_roi,  # TODO: handle two backgrounds
+            bck_range=scatt_bck,  # TODO: handle two backgrounds
             x_label="Y pixel",
             y_label="Counts",
         )
     except Exception:  # noqa E722
-        # self.log("  - Could not generate Y count distribution")
+        logger.warning("  - Could not generate Y count distribution")
         peak_pixels = _plotText(
             "Could not generate Y count distribution"
         )
 
-    # self.log("  - generating X count distribution")
+    logger.notice("  - generating X count distribution")
     # Count per X pixel
     low_res_profile = None
     try:
@@ -498,7 +500,7 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
             y_label="Counts",
         )
     except Exception:  # noqa E722
-        # self.log("  - Could not generate X count distribution")
+        logger.warning("  - Could not generate X count distribution")
         low_res_profile = _plotText("Could not generate X count distribution")
 
     # TOF distribution
@@ -511,12 +513,12 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
             signal_x,
             signal_y,
             y_log=False,
-            x_range=None,
+            x_range=tof_range,
             x_label="TOF (ms)",
             y_label="Counts",
         )
     except Exception:  # noqa E722
-        # self.log("  - Could not generate TOF distribution")
+        logger.warning("  - Could not generate TOF distribution")
         tof_dist = _plotText(
             "Could not generate TOF distribution"
         )
@@ -536,6 +538,8 @@ def _plot2d(
     x_bck_range: list=None,
     y_bck_range: list=None,
     swap_axes: bool=False,
+    x_zoom_range: list=None,
+    y_zoom_range: list=None,
 ):
     """
     Generate a simple 2D plot as an HTML snippet containing a Plotly graph embedded within a web page
@@ -738,7 +742,36 @@ def _plot2d(
         yaxis=y_layout,
     )
     fig = go.Figure(data=plotly_objects, layout=layout)
-    return pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
+
+    div_id = f"plot_{uuid.uuid4().hex}"
+    div_html = pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False, div_id=div_id)
+
+    zoom_script = ""
+    if x_zoom_range is not None and y_zoom_range is not None:
+        # JSON-encode ranges so they are JS-safe
+        x_zoom_json = json.dumps(x_zoom_range)
+        y_zoom_json = json.dumps(y_zoom_range)
+        zoom_script = f"""
+<script>
+(function() {{
+    var plot = document.getElementById("{div_id}");
+    if (!plot || plot.dataset.initialZoomApplied) return;
+
+    function zoomOnce() {{
+        Plotly.relayout(plot, {{
+            "xaxis.range": {x_zoom_json},
+            "yaxis.range": {y_zoom_json}
+        }});
+        plot.dataset.initialZoomApplied = "true";
+        plot.removeEventListener("plotly_afterplot", zoomOnce);
+    }}
+
+    plot.addEventListener("plotly_afterplot", zoomOnce);
+}})();
+</script>
+"""
+
+    return div_html + zoom_script
 
 
 def _plot1d(
