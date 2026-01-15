@@ -8,8 +8,8 @@ def test_from_workspace_direct_beam_earth_centered_coordinates(mock_sample_logs_
     """Test direct beam detection with earth-centered coordinates"""
     mock_logs = {
         "BL4B:CS:Mode:Coordinates": 0,
-        "thi": 0.005,
-        "tthd": 0.005,
+        "thi": 0.800,
+        "tthd": 0.805,
     }
     mock_sample_logs_class.return_value = mock_logs
 
@@ -23,8 +23,8 @@ def test_from_workspace_direct_beam_free_liquid_mode(mock_sample_logs_class):
     mock_logs = {
         "BL4B:CS:Mode:Coordinates": 1,
         "BL4B:CS:ExpPl:OperatingMode": "Free Liquid",
-        "thi": 0.0,
-        "tthd": 0.0,
+        "thi": 0.210,
+        "tthd": 0.212,
     }
     mock_sample_logs_class.return_value = mock_logs
 
@@ -67,8 +67,8 @@ def test_from_workspace_direct_beam_beam_centered(mock_sample_logs_class):
     mock_logs = {
         "BL4B:CS:Mode:Coordinates": 1,
         "BL4B:CS:ExpPl:OperatingMode": "Other",
-        "ths": 0.0,
-        "tthd": 0.0,
+        "ths": 0.0006,
+        "tthd": 0.0008,
     }
     mock_sample_logs_class.return_value = mock_logs
 

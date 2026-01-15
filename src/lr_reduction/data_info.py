@@ -36,13 +36,13 @@ class DataType(IntEnum):
         sample_logs = SampleLogValues(input_workspace)
         value = cls.REFLECTED_BEAM
         try:
-            # Determine if direct beam based on geometry
+            # Determine whether this is a direct beam based on the geometry
             if (("BL4B:CS:Mode:Coordinates" in sample_logs and sample_logs["BL4B:CS:Mode:Coordinates"] == 0) or  # This is a new log for earth-centered
                     sample_logs["BL4B:CS:ExpPl:OperatingMode"] == "Free Liquid"):  # This is backward compatibility from before the new log value
                 # Earth-centered coordinate system
                 thi = sample_logs["thi"]
                 tthd = sample_logs["tthd"]
-                if np.isclose(thi, tthd) and np.fabs(thi) < 0.01:
+                if np.isclose(thi, tthd, atol=0.01):
                     value = cls.DIRECT_BEAM
             else:
                 # Beam-centered coordinate system
