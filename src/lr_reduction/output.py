@@ -103,6 +103,13 @@ class RunCollection:
                     total += self.refl_all[i]
                     err2 += self.d_refl_all[i] ** 2
                     npts += 1.0
+
+            # Store the last point
+            qz_all.append(qz)
+            refl_all.append(total / npts)
+            d_refl_all.append(np.sqrt(err2) / npts)
+            d_qz_all.append(dq)
+
             self.qz_all = np.asarray(qz_all)
             self.refl_all = np.asarray(refl_all)
             self.d_refl_all = np.asarray(d_refl_all)
