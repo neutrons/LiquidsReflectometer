@@ -631,8 +631,10 @@ class EventReflectivity:
             self.d_refl = self.d_refl[idx[:-1]]
             self.q_bins = self.q_bins[idx]
 
+        ## NEED TO MOVE THIS TO PREVIOUS LEVEL OF FUNCTION AND IS NOW A LIST SO NEEDS HANDLING AS ABOVE...
         # Compute Q resolution
-        self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing)
+        #self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing)
+        self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing, wl_list=lambda_list)
         # TODO: integrate wavelength component to self.dq_over_q
         self.q_summing = q_summing
 
@@ -662,7 +664,7 @@ class EventReflectivity:
             The uncertainties in the reflectivity values
         """
         # Scattering data
-        refl, d_refl = self._reflectivity(
+        refl, d_refl, _ = self._reflectivity(
             self._ws_sc,
             peak_position=self.specular_pixel,
             peak=self.signal_peak,
@@ -683,7 +685,7 @@ class EventReflectivity:
             # we can bin the DB according to the same transform instead of binning and dividing in TOF.
             # This is mathematically equivalent and convenient in terms of abstraction for later
             # use for the constant-Q calculation elsewhere in the code.
-            direct_beam, d_direct_beam = self._reflectivity(
+            direct_beam, d_direct_beam, _ = self._reflectivity(
                 self._ws_db,
                 peak_position=0,
                 peak=self.norm_peak,
@@ -762,7 +764,7 @@ class EventReflectivity:
         wl_var, _ = np.histogram(wl_events, bins=wl_bins, weights=wl_weights**2)
         wl_std = np.sqrt(wl_var) / (db_charge * _bin_width)
 
-        refl, d_refl = self._reflectivity(
+        refl, d_refl, _ = self._reflectivity(
             self._ws_sc,
             peak_position=self.specular_pixel,
             peak=self.signal_peak,
@@ -799,7 +801,7 @@ class EventReflectivity:
         their position on the detector and place in the proper Q bin.
         """
         q_bins = self.q_bins if q_bins is None else q_bins
-        refl_bck, d_refl_bck = self._reflectivity(
+        refl_bck, d_refl_bck, _ = self._reflectivity(
             ws,
             peak_position=0,
             q_bins=q_bins,
@@ -946,6 +948,7 @@ class EventReflectivity:
         d_refl = np.zeros(shape)
         counts = np.zeros(shape)
         keep_weights = np.zeros(shape)
+        keep_lam = np.zeros(shape)
         # pixel_width only used for q_summing:
         _pixel_width = self.pixel_width if q_summing else 0.0
 
@@ -1040,10 +1043,12 @@ class EventReflectivity:
                         refl += _counts
                         counts += _norm
                         keep_weights += _for_errors
+                        keep_lam += wl_list # check this...
                     else:
                         refl[j - peak[0]] += _counts
                         counts[j - peak[0]] += _norm
                         keep_weights[j - peak[0]] += _for_errors
+                        keep_lam[j - peak[0]] += wl_list # check this...
                 # this workflow is used for specular_unweighted:
                 else:
                     _counts, _ = np.histogram(qz, bins=_q_bins, weights=event_weights)
@@ -1085,7 +1090,7 @@ class EventReflectivity:
             d_refl = np.sqrt(np.fabs(refl)) / charge
             refl /= charge
 
-        return refl, d_refl
+        return refl, d_refl, keep_lam
 
     def _get_events(self, ws, peak, low_res):
         """
@@ -1264,15 +1269,17 @@ class EventReflectivity:
         return tofs
 
 
-def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
+def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     """
-    Compute the Q resolution from the meta data.
+    Compute the theta component of the q resolution.
     Corrected to include both slits.
 
     Parameters
     ----------
     ws : mantid.api.Workspace
         Mantid workspace to extract correction meta-data from.
+    default_dq : float
+        Default dth/th value to use if resolution cannot be computed from logs.
     theta : float
         Scattering angle in radians
     q_summing : bool
@@ -1281,7 +1288,7 @@ def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     Returns
     -------
     float
-        The dQ/Q resolution (FWHM)
+        The dtheta/theta resolution
     """
     settings = read_settings(ws)
 
@@ -1294,14 +1301,17 @@ def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
         sdd = 1830
         if settings.sample_detector_distance:
             sdd = settings.sample_detector_distance * 1000
-        pixel_size = 0.7
+        pixel_size = 0.7 # mm, default pixel size for BL4B
         if settings.pixel_width:
             pixel_size = settings.pixel_width
 
-        # All angles here in radians, assuming small angles
-        dq_over_q = np.arcsin(pixel_size / sdd) / theta
-        print("Q summing: %g" % dq_over_q)
-        return dq_over_q
+        det_res = 1.0  # mm, approximate value for detector resolution contribution
+        sigma_pix = pixel_size / np.sqrt(12)
+        sigma_y = np.sqrt((det_res ** 2 + sigma_pix ** 2))
+        dtheta = np.degrees(sigma_y / sdd)  # small angle approximation. All angles in radians.
+
+        #print("Q summing: %g" % dq_over_q) ## Work out some print functions throughout.
+        return dtheta, theta
 
     # We can't compute the resolution if the value of xi is not in the logs.
     # Since it was not always logged, check for it here.
@@ -1309,28 +1319,32 @@ def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
         # For old data, the resolution can't be computed, so use
         # the standard value for the instrument
         print("Could not find BL4B:Mot:xi.RBV: using supplied dQ/Q")
-        return default_dq
+        return default_dq, theta
+    
+    # Compute the trapezoidal equivalent sigma of the angular distribution
+    _, _, _, dth_over_th = trapezoidal_distribution_params(
+        ws, Theta_deg=np.degrees(theta)
+    )
+    dtheta = dth_over_th * theta    # Check if needs to be in radians or degrees!
 
-    # Xi reference would be the position of xi if the si slit were to be positioned
-    # at the sample. The distance from the sample to si is then xi_reference - xi.
-    xi_reference = 445
-    if ws.getInstrument().hasParameter("xi-reference"):
-        xi_reference = ws.getInstrument().getNumberParameter("xi-reference")[0]
+    return dtheta, theta
 
-    # Distance between the s1 and the sample
-    s1_sample_distance = 1485
-    if settings.s1_sample_distance is not None:
-        s1_sample_distance = settings.s1_sample_distance * 1000
+def compute_resolution(ws, theta=None, q_summing=False, wl_list=None):
+    """
+    Docstring for compute_resolution
+    
+    :param ws: Description
+    :param theta: Description
+    :param q_summing: Description
+    """
+    ## Need to check through all the None's etc.
+    ## Need to check separate outputs...
+    delta_th, theta_list = compute_theta_resolution(ws, theta=theta, q_summing=q_summing)
 
-    # Get slit gap openings.
-    s1h = abs(ws.getRun().getProperty("S1VHeight").value[0])
-    sih = abs(ws.getRun().getProperty("SiVHeight").value[0])
-    xi = abs(ws.getRun().getProperty("BL4B:Mot:xi.RBV").value[0])
-    sample_si_distance = xi_reference - xi
-    slit_distance = s1_sample_distance - sample_si_distance
-    dq_over_q = (s1h + sih) * 0.5 / slit_distance / theta
+    lambda_list, delta_lam = compute_wavelength_resolution(ws, wl_list=wl_list)
+
+    dq_over_q = np.sqrt((delta_lam / lambda_list) ** 2 + (delta_th / theta_list) ** 2)
     return dq_over_q
-
 
 ## New function for resolution, ready for testing.
 ## Check choices of returned values once ready to implement.
@@ -1449,7 +1463,7 @@ def _find_sigma_68(L_, l_, target_prob=0.68):
 ## Fix q-bin error and auto trimming points
 
 
-def compute_wavelength_resolution(ws):
+def compute_wavelength_resolution(ws, wl_list = None):
     """
     Compute the wavelength resolution from the meta data.
 
@@ -1457,6 +1471,8 @@ def compute_wavelength_resolution(ws):
     ----------
     ws : mantid.api.Workspace
         Mantid workspace to extract correction meta-data from.
+    wl_list : np.ndarray, optional
+        Wavelength values to compute the resolution for. If None, uses the ws X values.
 
     Returns
     -------
@@ -1474,6 +1490,12 @@ def compute_wavelength_resolution(ws):
         raise ValueError("Workspace must have only one spectrum")
 
     settings = read_settings(ws)
+
+    ## Need to check if this works or better to not be in a mantid workspace.
+    if wl_list is not None:
+        # Create a temporary workspace with the provided wavelength values
+        temp_ws = api.CreateWorkspace(DataX=wl_list, DataY=np.ones_like(wl_list), NSpec=1)
+        ws = temp_ws
 
     out = api.EvaluateFunction(
         Function=settings.wavelength_resolution_function, InputWorkspace=ws, OutputWorkspace="out"
