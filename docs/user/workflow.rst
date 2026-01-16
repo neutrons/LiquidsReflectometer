@@ -27,7 +27,7 @@ The reduction parameters are managed using the ``reduction_template_reader.Reduc
 Compatibility with RefRed
 .........................
 
-[Refred](https://github.com/neutrons/RefRed) is the user interface that helps users define reduction
+`RefRed <https://github.com/neutrons/RefRed>`_ is the user interface that helps users define reduction
 parameters by selecting the data to process, peak and background regions, etc. A complete reflectivity
 curve is generally comprised of multiple runs, and RefRed allows one to save a so-called template file
 that contains all the information needs to reduce each run in the set. The reduction backend (this package) has utilities to read and write such templates, which are stored in XML format. A template
