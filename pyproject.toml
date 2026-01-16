@@ -194,6 +194,7 @@ markers = [
   "datarepo: mark a test as using LiquidsReflectometer-data repository",
   "scripts: mark a test as a script that should be run manually",
 ]
+addopts = "--import-mode=importlib"  # to allow a unit test and integration test with the same module name
 
 #########
 #  RUFF
