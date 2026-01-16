@@ -9,6 +9,8 @@ User Guide
 .. toctree::
    :titlesonly:
 
+   user/workflow
+   user/event_processing
    user/dead_time_correction
    release_notes
 
