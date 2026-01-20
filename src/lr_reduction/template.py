@@ -195,14 +195,14 @@ def process_from_template(
 def process_from_template_ws(
     ws_sc: MantidWorkspace,
     template_data: str | ReductionParameters,
-    q_summing: bool = None,
+    q_summing: bool | None = None,
     tof_weighted: bool = False,
     bck_in_q: bool = False,
     clean: bool = False,
     info: bool = False,
     normalize: bool = True,
-    theta_value: float = None,
-    ws_db: MantidWorkspace = None,
+    theta_value: float | None = None,
+    ws_db: MantidWorkspace | None = None,
 ):
     """
     Reduce a Mantid workspace using the given template

@@ -19,7 +19,7 @@ def reduce(
     output_dir: str,
     average_overlap: bool = False,
     theta_offset: float | None = 0,
-    q_summing: bool = None,
+    q_summing: bool | None = None,
     bck_in_q: bool = False,
     is_live: bool = False,
     return_report: bool = False,
@@ -55,8 +55,9 @@ def reduce(
 
     Returns
     -------
-    int
-        The sequence identifier for the run sequence
+    int or tuple
+        The sequence identifier for the run sequence, or a tuple of
+        (sequence_id, report_html) if return_report is True.
     """
     # Get the sequence number
     sequence_number = 1
@@ -105,6 +106,12 @@ def reduce(
         write_template(seq_list, run_list, template_file, output_dir)
     else:
         logger.notice("Template data was passed instead of a file path: template data not saved")
+
+    if not run_list:
+        logger.warning("No partial results found to assemble")
+        if return_report:
+            return None, report
+        return None
 
     if return_report:
         return run_list[0], report

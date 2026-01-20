@@ -5,6 +5,7 @@ Meta-data information for LR reduction
 from enum import IntEnum
 
 import numpy as np
+from mantid.simpleapi import logger
 
 from lr_reduction.mantid_utils import SampleLogValues
 from lr_reduction.typing import MantidWorkspace
@@ -38,7 +39,7 @@ class DataType(IntEnum):
         try:
             # Determine whether this is a direct beam based on the geometry
             if (("BL4B:CS:Mode:Coordinates" in sample_logs and sample_logs["BL4B:CS:Mode:Coordinates"] == 0) or  # This is a new log for earth-centered
-                    sample_logs["BL4B:CS:ExpPl:OperatingMode"] == "Free Liquid"):  # This is backward compatibility from before the new log value
+                    sample_logs["BL4B:CS:ExpPl:OperatingMode"] == "Free Liquid"):  # This is for backward compatibility from before the new log value
                 # Earth-centered coordinate system
                 thi = sample_logs["thi"]
                 tthd = sample_logs["tthd"]
@@ -50,8 +51,8 @@ class DataType(IntEnum):
                 tthd = sample_logs["tthd"]
                 if np.fabs(tthd) < 0.001 and np.fabs(ths) < 0.001:
                     value = cls.DIRECT_BEAM
-        except Exception:  # noqa E722
-            pass  # missing logs, assume reflected beam
+        except KeyError as e:
+            logger.warning(f"Missing sample log {e}, assuming reflected beam")
         return value
 
     def __str__(self):

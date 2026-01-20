@@ -303,7 +303,7 @@ def generate_report_section_reduction_parameters(workspace: MantidWorkspace, tem
         template_data.norm_peak_range[0],
         template_data.norm_peak_range[1],
     )
-    meta += "<tr><td>Two backgrounds:</td><td>%s</td><td>-</td><tr>" % two_backgrounds
+    meta += "<tr><td>Two backgrounds:</td><td>%s</td><td>-</td></tr>" % two_backgrounds
     meta += "<tr><td>Background:</td><td>%s - %s</td><td>%s - %s</td></tr>" % (
         template_data.background_roi[0],
         template_data.background_roi[1],
@@ -562,16 +562,16 @@ def _plot2d(
     x: np.ndarray,
     y: np.ndarray,
     z: np.ndarray | list,
-    x_range: list=None,
-    y_range: list=None,
-    x_label: str="X pixel",
-    y_label: str="Y pixel",
-    title: str="",
-    x_bck_range: list=None,
-    y_bck_range: list=None,
-    swap_axes: bool=False,
-    x_zoom_range: list=None,
-    y_zoom_range: list=None,
+    x_range: list = None,
+    y_range: list = None,
+    x_label: str = "X pixel",
+    y_label: str = "Y pixel",
+    title: str = "",
+    x_bck_range: list = None,
+    y_bck_range: list = None,
+    swap_axes: bool = False,
+    x_zoom_range: list = None,
+    y_zoom_range: list = None,
 ):
     """
     Generate a simple 2D plot as an HTML snippet containing a Plotly graph embedded within a web page

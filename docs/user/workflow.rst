@@ -88,10 +88,13 @@ Autoreduction workflow
 ----------------------
 
 The autoreduction script is found in ``src/lr_autoreduce/reduce_REF_L.py``. On the analysis cluster,
-the autoreduction can be run manually inside the Pixi environment `lr_reduction`:
+the autoreduction can be run manually inside the Pixi environment ``lr_reduction``:
 
 .. code-block:: bash
 
     $ nsd-pixi-shell.sh lr_reduction
     (lr_reduction)$ mkdir output
     (lr_reduction)$ python src/lr_autoreduce/reduce_REF_L.py /SNS/REF_L/IPTS-35571/nexus/REF_L_223298.nxs.h5 output/ --no_publish
+This will reduce the specified data file and write the output to the ``output`` folder. The ``--no_publish``
+option prevents the script from trying to publish the HTML report to the web monitor. The HTML report can still
+be found in the output folder.

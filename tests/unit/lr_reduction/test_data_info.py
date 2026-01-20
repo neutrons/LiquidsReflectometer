@@ -76,7 +76,10 @@ def test_from_workspace_direct_beam_beam_centered(mock_sample_logs_class):
     assert result == DataType.DIRECT_BEAM
 
 
-def test_from_workspace_missing_logs():
+@patch("lr_reduction.data_info.SampleLogValues")
+def test_from_workspace_missing_logs(mock_sample_logs_class):
     """Test that missing logs default to reflected beam"""
+    mock_sample_logs_class.return_value = {}
+
     result = DataType.from_workspace(Mock())
     assert result == DataType.REFLECTED_BEAM

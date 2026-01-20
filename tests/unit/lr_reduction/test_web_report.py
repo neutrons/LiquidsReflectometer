@@ -54,12 +54,12 @@ def meta_data(workspace_sc, workspace_db, template_data):
     event_refl = EventReflectivity(workspace_sc,
                                    workspace_db,
                                    peak,
-                                    template_data.background_roi,
-                                    template_data.norm_peak_range,
-                                    template_data.norm_background_roi,
-                                    peak_center,
-                                    template_data.data_x_range,
-                                    template_data.norm_x_range,
+                                   template_data.background_roi,
+                                   template_data.norm_peak_range,
+                                   template_data.norm_background_roi,
+                                   peak_center,
+                                   template_data.data_x_range,
+                                   template_data.norm_x_range,
                                    theta=theta)
 
     meta_data = event_refl.to_dict()
@@ -71,7 +71,7 @@ def meta_data(workspace_sc, workspace_db, template_data):
 
 def test_generate_report_section_reduction_parameters(workspace_sc, template_data, meta_data):
     report = generate_report_section_reduction_parameters(workspace_sc, template_data, meta_data)
-    assert len(report) == 787
+    assert len(report) == 788
 
 
 def test_generate_report_plots_reflected_beam(workspace_sc, template_data):
