@@ -200,7 +200,7 @@ class RunCollection:
 
     def plot(self):
         """
-        Plot the collection of runs
+        Plot the combined reflectivity curve for a collection of runs
 
         Returns
         -------

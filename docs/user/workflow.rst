@@ -55,7 +55,7 @@ Reduction workflow
 ------------------
 
 The main reduction workflow, which will extract specular reflectivity from a data file given a
-reduction template, is found in the `workflow` module. This workflow will is the one performed
+reduction template, is found in the ``workflow`` module. This workflow is the one performed
 by the automated reduction system at BL4B:
 
 - It will extract the correct reduction parameters from the provided template
@@ -83,3 +83,15 @@ Once you have a template, you can simply do:
     workflow.reduce(ws, template_file, output_dir)
 
 This will produce output files in the specified output directory.
+
+Autoreduction workflow
+----------------------
+
+The autoreduction script is found in ``src/lr_autoreduce/reduce_REF_L.py``. On the analysis cluster,
+the autoreduction can be run manually inside the Pixi environment `lr_reduction`:
+
+.. code-block:: bash
+
+    $ nsd-pixi-shell.sh lr_reduction
+    (lr_reduction)$ mkdir output
+    (lr_reduction)$ python src/lr_autoreduce/reduce_REF_L.py /SNS/REF_L/IPTS-35571/nexus/REF_L_223298.nxs.h5 output/ --no_publish

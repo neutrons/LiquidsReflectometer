@@ -62,8 +62,9 @@ def html_wrapper(report: Union[str, None]) -> str:
     url = f"https://cdn.plot.ly/plotly-{js_version}.js"
     try:
         response = requests.head(url, timeout=5)
-        assert response.status_code == 200
-    except (requests.RequestException, AssertionError):
+        if response.status_code != 200:
+            raise requests.RequestException(f"CDN returned status {response.status_code}")
+    except requests.RequestException:
         logger.error(f"Plotly.js version {js_version} not found, using version 3.0.0 instead")
         url = "https://cdn.plot.ly/plotly-3.0.0.js"
 
@@ -124,13 +125,15 @@ def upload_report(html_report: str, run_number: Union[str, int]) -> Optional[req
     return publish_plot("REF_L", run_number, files={"file": html_report})
 
 
-def assemble_report(reflectivity_plot_div: str=None, report_sections: ReportSections=None) -> str:
+def assemble_report(reflectivity_plot_div: str | None = None, report_sections: ReportSections | None = None) -> str:
     """Assemble report HTML snippets into on final HTML report
 
     Parameters
     ----------
-    reflectivity_plot_div: str
-    report_sections: ReportSections
+    reflectivity_plot_div: str | None
+        HTML snippet for the reflectivity plot
+    report_sections: ReportSections | None
+        HTML snippets for the report sections
 
     Returns
     -------
@@ -165,23 +168,20 @@ def assemble_report(reflectivity_plot_div: str=None, report_sections: ReportSect
 
 def generate_report_sections(
     workspace: MantidWorkspace,
-    template_file: ReductionParameters,
+    template_file: str | ReductionParameters | None,
     meta_data: dict = None,
-    logfile=None,
 ) -> ReportSections:
     """
     Generate diagnostics plots and report metadata from a reduction workspace.
 
     Parameters
     ----------
-    workspace
+    workspace: MantidWorkspace
         Mantid workspace
-    template_file
-        Template file path or pre-parsed template data
-    meta_data
-        Metadata to embed in the report
-    logfile
-        Optional file-like object for logging
+    template_file: str | ReductionParameters | None
+        Template file path or pre-parsed template data, or `None` for a direct beam
+    meta_data : dict
+        Metadata to embed in the report, or `None` for a direct beam
 
     Returns
     -------
@@ -189,26 +189,14 @@ def generate_report_sections(
         Container holding HTML fragments for the reduction report
         (parameters, plots, and run metadata).
     """
-
-    def log(msg):
-        if logfile is not None:
-            logfile.write(msg + "\n")
-        logger.notice(msg)
-
     sample_logs = SampleLogValues(workspace)
     data_type = DataType.from_workspace(workspace)
-    log(f"  - Data type: {data_type.name}")
+    logger.notice(f"  - Data type: {data_type.name}")
 
     try:
         sequence_number = sample_logs["sequence_number"]
     except Exception:  # noqa: BLE001
         sequence_number = 1
-
-    # Read template if needed
-    if isinstance(template_file, str):
-        template_data = template.read_template(template_file, sequence_number)
-    else:
-        template_data = template_file
 
     try:
         number_events = workspace.getNumberEvents()
@@ -216,15 +204,19 @@ def generate_report_sections(
         number_events = 0
 
     plots = []
-    report = ""
-    run_meta_data = ""
 
-    log(f"  - generating report [{number_events}]")
+    logger.notice(f"  - generating report [{number_events}]")
 
     if data_type == DataType.REFLECTED_BEAM:
+        # Read template if needed
+        if isinstance(template_file, str):
+            template_data = template.read_template(template_file, sequence_number)
+        else:
+            template_data = template_file
         report = generate_report_section_reduction_parameters(workspace, template_data, meta_data)
     elif data_type == DataType.DIRECT_BEAM:
         report = generate_report_section_direct_beam_parameters(workspace)
+        template_data = None
     else:
         logger.error("Invalid data type for report: %s", data_type.name)
         return ReportSections("", [], "")
@@ -234,10 +226,10 @@ def generate_report_sections(
     try:
         plots = generate_report_plots(workspace, template_data, data_type)
     except Exception as e:  # noqa: BLE001
-        log(f"Could not generate plots: {e}")
+        logger.notice(f"Could not generate plots: {e}")
         logger.error("Could not generate plots", exc_info=True)
 
-    log(f"  - report: {len(report)} {len(plots)}")
+    logger.notice(f"  - report: {len(report)} {len(plots)}")
 
     return ReportSections(run_meta_data, plots, report)
 
@@ -263,14 +255,26 @@ def generate_report_section_run_meta_data(workspace: MantidWorkspace) -> str:
     meta = "<p>\n<table style='width:80%'>"
     meta += "<tr><td># events:</td><td>%s</td></tr>" % workspace.getNumberEvents()
 
-    p_charge = SampleLogValues(workspace)["gd_prtn_chrg"]
-    meta += "<tr><td>p-charge [uAh]:</td><td>%6.4g</td></tr>" % p_charge
+    try:
+        p_charge = SampleLogValues(workspace)["gd_prtn_chrg"]
+        meta += "<tr><td>p-charge [uAh]:</td><td>%6.4g</td></tr>" % p_charge
+    except KeyError:
+        meta += "<tr><td>p-charge [uAh]:</td><td>N/A</td></tr>"
     meta += "</table>\n<p>\n"
     return meta
 
 
-def generate_report_section_reduction_parameters(workspace, template_data, meta_data) -> str:
+def generate_report_section_reduction_parameters(workspace: MantidWorkspace, template_data: ReductionParameters, meta_data: dict) -> str:
     """Generate HTML report from a reduced workspace and template data
+
+    Parameters
+    ----------
+    workspace: MantidWorkspace
+        Reflected beam workspace
+    template_data
+        Reduction parameters
+    meta_data
+        Reduction metadata
 
     Returns
     -------
@@ -341,8 +345,13 @@ def generate_report_section_reduction_parameters(workspace, template_data, meta_
     return meta
 
 
-def generate_report_section_direct_beam_parameters(workspace) -> str:
-    """Generate HTML report from a reduced workspace and template data
+def generate_report_section_direct_beam_parameters(workspace: MantidWorkspace) -> str:
+    """Generate HTML report from a direct beam workspace
+
+    Parameters
+    ----------
+    workspace: MantidWorkspace
+        Direct beam workspace
 
     Returns
     -------
@@ -370,7 +379,29 @@ def generate_report_section_direct_beam_parameters(workspace) -> str:
 
 def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionParameters, data_type: DataType) -> list[str]:
     """
-    Generate diagnostics plots
+    Generate diagnostic plots from the event workspace
+
+    The generated plots are:
+
+    - X-Y plot
+    - Y-TOF plot
+    - Counts per Y pixel
+    - Counts per X pixel
+    - TOF distribution
+
+    Parameters
+    ----------
+    workspace: MantidWorkspace
+        Workspace for reflected or direct beam run
+    template_data: ReductionParameters
+        Reduction parameters
+    data_type: DataType
+        Data type (reflected or direct beam)
+
+    Returns
+    -------
+    list[str]
+        List of HTML snippets for the diagnostic plots
     """
     n_x = int(workspace.getInstrument().getNumberParameter("number-of-x-pixels")[0])
     n_y = int(workspace.getInstrument().getNumberParameter("number-of-y-pixels")[0])

@@ -53,6 +53,7 @@ autodoc_mock_imports = [
     "mantid.plots.plotfunctions",
     "mantid.plots.datafunctions",
     "mantid.plots.utility",
+    "requests",
 ]
 
 master_doc = "index"
@@ -61,6 +62,7 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
     "sphinx": ("https://www.sphinx-doc.org/en/master/", None),
     "mantid": ("https://docs.mantidproject.org/nightly/", None),
+    "requests": ("https://requests.readthedocs.io/en/latest/", None),
 }
 intersphinx_disabled_domains = ["std"]
 
