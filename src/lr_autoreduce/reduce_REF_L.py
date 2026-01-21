@@ -134,9 +134,11 @@ def autoreduce(
         # Generate simple report
         report_sections = generate_report_sections(ws, template_file)
         report = assemble_report(None, report_sections)
-    else:
+    elif data_type == DataType.UNKNOWN:
         logger.notice(f"Data type {data_type} not supported for autoreduction.")
         return
+    else:
+        raise ValueError(f"Unhandled data type: {data_type}")
 
     # Save to disk and (optionally) upload the HTML report
     match = re.search(r'REF_L_(\d+)', events_file)
