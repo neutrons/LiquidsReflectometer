@@ -577,6 +577,8 @@ class EventReflectivity:
             sequence_number=sequence_number,
             sequence_id=sequence_id,
             q_summing=self.q_summing,
+            specular_pixel=self.specular_pixel,
+            use_functional_bck=self.use_functional_bck,  # whether functional background was used
         )
 
     def specular(self, q_summing=False, tof_weighted=False, bck_in_q=False, clean=False, normalize=True):

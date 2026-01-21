@@ -15,6 +15,14 @@ lr_reduction.background
    :undoc-members:
    :show-inheritance:
 
+lr_reduction.data_info
+----------------------
+
+.. automodule:: lr_reduction.data_info
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 lr_reduction.event_reduction
 ----------------------------
 
@@ -91,6 +99,14 @@ lr_reduction.utils
 ------------------
 
 .. automodule:: lr_reduction.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+lr_reduction.web_report
+-----------------------
+
+.. automodule:: lr_reduction.web_report
    :members:
    :undoc-members:
    :show-inheritance:

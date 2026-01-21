@@ -8,10 +8,12 @@ from pathlib import Path
 
 import mantid.simpleapi as api
 import numpy as np
+from mantid.simpleapi import logger
 
 from lr_reduction import event_reduction, peak_finding, reduction_template_reader
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.reduction_template_reader import ReductionParameters
+from lr_reduction.typing import MantidWorkspace
 
 TOLERANCE = 0.07
 OUTPUT_NORM_DATA = False
@@ -191,18 +193,20 @@ def process_from_template(
 
 
 def process_from_template_ws(
-    ws_sc,
-    template_data,
-    q_summing=None,
-    tof_weighted=False,
-    bck_in_q=False,
-    clean=False,
-    info=False,
-    normalize=True,
-    theta_value=None,
-    ws_db=None,
+    ws_sc: MantidWorkspace,
+    template_data: str | ReductionParameters,
+    q_summing: bool | None = None,
+    tof_weighted: bool = False,
+    bck_in_q: bool = False,
+    clean: bool = False,
+    info: bool = False,
+    normalize: bool = True,
+    theta_value: float | None = None,
+    ws_db: MantidWorkspace | None = None,
 ):
     """
+    Reduce a Mantid workspace using the given template
+
     @param q_summing: If None, the template setting will be used; if True/False, override the template
     """
     # Get the sequence number
@@ -270,7 +274,7 @@ def process_from_template_ws(
         theta += template_data.angle_offset * np.pi / 180.0
 
     theta_degrees = theta * 180 / np.pi
-    print(
+    logger.notice(
         "wl=%g; ths=%g; thi=%g; offset=%g; theta used=%g"
         % (_wl, ths_value, thi_value, template_data.angle_offset, theta_degrees)
     )
@@ -289,6 +293,9 @@ def process_from_template_ws(
     # Use template const_q if q_summing not explicitly provided
     if q_summing is None:
         q_summing = template_data.const_q
+        logger.notice(f"Using template const_q: {q_summing}")
+    else:
+        logger.notice(f"Using const_q from input parameter: {q_summing}")
 
     # Fit the reflected beam position, which may not be in the middle and is
     # used in the q-summing calculation
@@ -300,7 +307,7 @@ def process_from_template_ws(
         peak_center, sc_width, _ = peak_finding.fit_signal_flat_bck(
             _x, _y, x_min=x_min, x_max=x_max, center=peak_center, sigma=3.0
         )
-        print("Peak center: %g" % peak_center)
+        logger.notice("Peak center: %g" % peak_center)
 
     if template_data.data_x_range_flag:
         low_res = template_data.data_x_range
@@ -368,12 +375,12 @@ def process_from_template_ws(
             a = ws_db.getRun()[scaling_factor_PV].value[0] ** 2
         else:
             a = ws_db.getRun()[scaling_factor_PV].value[0]
-        print("Composite scaling factor: %s" % a)
+        logger.notice("Composite scaling factor: %s" % a)
         d_refl /= a
         refl /= a
         b = err_a = err_b = 0
     elif normalize and template_data.scaling_factor_flag:
-        print("Normalization options: %s %s" % (normalize, template_data.scaling_factor_flag))
+        logger.notice("Normalization options: %s %s" % (normalize, template_data.scaling_factor_flag))
         # Get the scaling factors
         a, b, err_a, err_b = scaling_factor(template_data.scaling_factor_file, ws_sc)
         _tof = 4 * np.pi * np.sin(event_refl.theta) * event_refl.constant / qz
@@ -383,7 +390,7 @@ def process_from_template_ws(
         d_refl = np.sqrt(d_refl**2 / a_q**2 + refl**2 * d_a_q**2 / a_q**4)
         refl /= a_q
     else:
-        print("Skipping scaling factor")
+        logger.notice("Skipping scaling factor")
         a = b = 1
         err_a = err_b = 0
 

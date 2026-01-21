@@ -5,21 +5,24 @@ Autoreduction process for the Liquids Reflectometer
 import json
 import os
 
-import mantid.simpleapi as mtd_api
 import numpy as np
+from mantid.simpleapi import LoadEventNexus, logger
 
-from . import event_reduction, output, reduction_template_reader, template
+from lr_reduction import event_reduction, output, reduction_template_reader, template
+from lr_reduction.typing import MantidWorkspace
+from lr_reduction.web_report import assemble_report, generate_report_sections
 
 
 def reduce(
-    ws,
-    template_file,
-    output_dir,
-    average_overlap=False,
+    ws: MantidWorkspace,
+    template_file: str | dict,
+    output_dir: str,
+    average_overlap: bool = False,
     theta_offset: float | None = 0,
-    q_summing=None,
-    bck_in_q=False,
-    is_live=False,
+    q_summing: bool | None = None,
+    bck_in_q: bool = False,
+    is_live: bool = False,
+    return_report: bool = False,
 ):
     """
     Function called by reduce_REFL.py, which lives in /SNS/REF_L/shared/autoreduce
@@ -30,33 +33,38 @@ def reduce(
 
     Parameters
     ----------
+    ws : MantidWorkspace
+        The workspace to process
+    template_file : str
+        Path to the template file containing the reduction parameters
+    output_dir : str
+        Directory where the output files will be saved
     average_overlap : bool
         If True, the overlapping points will be averaged
+    theta_offset : float
+        Theta offset to apply. If None, the template value will be used.
     q_summing : bool
         If None, the template setting will be used; if True/False, override the template
     bck_in_q : bool
         If True, and constant-Q binning is used, the background will be estimated
         along constant-Q lines rather than along TOF/pixel boundaries.
-    theta_offset : float
-        Theta offset to apply. If None, the template value will be used.
     is_live : bool
         If True, the data is live and will be saved in a separate file to avoid conflict with auto-reduction
-    output_dir : str
-        Directory where the output files will be saved
-    template_file : str
-        Path to the template file containing the reduction parameters
+    return_report : bool
+        If True, return the generated report HTML string
 
     Returns
     -------
-    int
-        The sequence identifier for the run sequence
+    int or tuple
+        The sequence identifier for the run sequence, or a tuple of
+        (sequence_id, report_html) if return_report is True.
     """
     # Get the sequence number
     sequence_number = 1
     if ws.getRun().hasProperty("sequence_number"):
         sequence_number = ws.getRun().getProperty("sequence_number").value[0]
     # Read template if it was passed as a file path
-    # It can be passsed as a dict directly
+    # It can be passed as a dict directly
     if isinstance(template_file, str):
         template_data = template.read_template(template_file, sequence_number)
     else:
@@ -87,14 +95,26 @@ def reduce(
     coll.save_ascii(reduced_file, meta_as_json=True)
 
     # Assemble partial results into a single R(q)
-    seq_list, run_list = assemble_results(meta_data["sequence_id"], output_dir, average_overlap, is_live=is_live)
+    seq_list, run_list, refl_plot = assemble_results(meta_data["sequence_id"], output_dir, average_overlap, is_live=is_live)
+
+    report_sections = generate_report_sections(ws, template_data, meta_data)
+    report = assemble_report(refl_plot, report_sections)
 
     # Save template. This will not happen if the template_file input was
     # template data, which the template processing allows.
     if isinstance(template_file, str):
         write_template(seq_list, run_list, template_file, output_dir)
     else:
-        print("Template data was passed instead of a file path: template data not saved")
+        logger.notice("Template data was passed instead of a file path: template data not saved")
+
+    if not run_list:
+        logger.warning("No partial results found to assemble")
+        if return_report:
+            return None, report
+        return None
+
+    if return_report:
+        return run_list[0], report
 
     # Return the sequence identifier
     return run_list[0]
@@ -121,6 +141,8 @@ def assemble_results(first_run, output_dir, average_overlap=False, is_live=False
         The sequence identifiers
     run_list : list
         The run numbers
+    plot_combined : str
+        The combined reflectivity plot
     """
     # Keep track of sequence IDs and run numbers so we can make a new template
     seq_list = []
@@ -148,7 +170,9 @@ def assemble_results(first_run, output_dir, average_overlap=False, is_live=False
         output_file_name = "REFL_%s_live_estimate.txt" % first_run
     coll.save_ascii(os.path.join(output_dir, output_file_name))
 
-    return seq_list, run_list
+    plot_combined = coll.plot()
+
+    return seq_list, run_list, plot_combined
 
 
 def write_template(seq_list, run_list, template_file, output_dir):
@@ -177,7 +201,7 @@ def write_template(seq_list, run_list, template_file, output_dir):
                 data_sets[seq_list[i] - 1].data_files = [run_list[i]]
                 new_data_sets.append(data_sets[seq_list[i] - 1])
             else:
-                print("Too few entries [%s] in template for sequence number %s" % (len(data_sets), seq_list[i]))
+                logger.warning(f"Too few entries [{len(data_sets)}] in template for sequence number {seq_list[i]} when saving new template")
 
     # Save the template that was used
     xml_str = reduction_template_reader.to_xml(new_data_sets)
@@ -224,7 +248,7 @@ def offset_from_first_run(ws, template_file: str, output_dir: str):
 
     # Load normalization run
     print("    DB: %s" % template_data.norm_file)
-    ws_db = mtd_api.LoadEventNexus("REF_L_%s" % template_data.norm_file)
+    ws_db = LoadEventNexus("REF_L_%s" % template_data.norm_file)
 
     # Look for parameters that might have been determined earlier for this measurement
     options_file = os.path.join(output_dir, "REFL_%s_options.json" % sequence_id)
