@@ -608,8 +608,8 @@ class EventReflectivity:
             The reflectivity values
         d_refl
             The uncertainties in the reflectivity values
-        dq_over_q
-            The Q resolution values
+        dq_over_q_bins
+            The Q resolution associated with the q_bins
         """
         if tof_weighted:
             self.specular_weighted(q_summing=q_summing, bck_in_q=bck_in_q)
@@ -665,8 +665,6 @@ class EventReflectivity:
             The reflectivity values
         d_refl
             The uncertainties in the reflectivity values
-        dq_over_q
-            The Q resolution values
         """
         # Scattering data
         refl, d_refl = self._reflectivity(
@@ -755,8 +753,6 @@ class EventReflectivity:
             The reflectivity values
         d_refl
             The uncertainties in the reflectivity values
-        dq_over_q
-            The Q resolution values
         """
         # Event weights for normalization
         ## this gets the DB events and produces an array of weights and wavelength values
@@ -1285,7 +1281,7 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     default_dq : float
         Default dth/th value to use if resolution cannot be computed from logs.
     theta : float
-        Scattering angle in radians
+        Scattering angle in radians. If not provided will read ths or thi from ws.
     q_summing : bool
         If True, the pixel size will be used for the resolution
 
@@ -1297,7 +1293,18 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     settings = read_settings(ws)
 
     if theta is None:
-        theta = abs(ws.getRun().getProperty("ths").value[0]) * np.pi / 180.0
+        if (
+            "BL4B:CS:ExpPl:OperatingMode" in ws.getRun()
+            and ws.getRun().getProperty("BL4B:CS:ExpPl:OperatingMode").value[0] == "Free Liquid"
+        ) or (
+            "BL4B:CS:Mode:Coordinates" in ws.getRun()
+            and ws.getRun().getProperty("BL4B:Mode:Coordinates").value[0] == 0 # Earth-centered=0
+        ):
+            Theta_deg = abs(ws.getRun().getProperty("thi").value[0])
+            theta = np.radians(Theta_deg)
+        else:
+            Theta_deg = abs(ws.getRun().getProperty("ths").value[0])
+            theta = np.radians(Theta_deg)
 
     if q_summing:
         # Compute pixel contribution to angular resolution
@@ -1341,11 +1348,14 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
 
 def compute_resolution(ws, theta=None, q_summing=False, wl_list=None):
     """
-    Docstring for compute_resolution
+    Compute the q resolution including both theta and lambda terms.
     
-    :param ws: Description
-    :param theta: Description
-    :param q_summing: Description
+    :param ws: workspace for meta-data. If this is a lambda workspace 
+        already it can be used as the lambda imports in place of the wl_list.
+    :param theta: option to overwrite theta input, otherwise uses ths/thi value.
+    :param q_summing: Changes the angular calculation to be based on slits or pixel sizes depending on method of q conversion.
+    :param wl_list: Provide a list of wavelengths for the lambda calculation. 
+        If not provided it assumes the workspace contains wavelengths.
     """
     ## Need to check through all the None's etc.
     ## Need to check separate outputs...
@@ -1371,7 +1381,7 @@ def trapezoidal_distribution_params(ws, Theta_deg=None, FootPrint=None, SlitRati
     ws : mantid.api.Workspace
         Mantid workspace to extract correction meta-data from.
     Theta_deg : float
-        Incident beam angle in degrees.
+        Incident beam angle in degrees. If not provided will read ths or thi from ws.
     FootPrint : float (optional)
         Beam footprint length on sample [mm].
     SlitRatio : float (optional)
@@ -1409,7 +1419,16 @@ def trapezoidal_distribution_params(ws, Theta_deg=None, FootPrint=None, SlitRati
     dS1Si = dS1Samp - dSiSamp
 
     if Theta_deg is None:
-        Theta_deg = abs(ws.getRun().getProperty("ths").value[0])
+        if (
+            "BL4B:CS:ExpPl:OperatingMode" in ws.getRun()
+            and ws.getRun().getProperty("BL4B:CS:ExpPl:OperatingMode").value[0] == "Free Liquid"
+        ) or (
+            "BL4B:CS:Mode:Coordinates" in ws.getRun()
+            and ws.getRun().getProperty("BL4B:Mode:Coordinates").value[0] == 0 # Earth-centered=0
+        ):
+            Theta_deg = abs(ws.getRun().getProperty("thi").value[0])
+        else:
+            Theta_deg = abs(ws.getRun().getProperty("ths").value[0])
 
     # Slit openings - can be taken from a FootPrint and SlitRatio if provided, or the logs
     if FootPrint is not None and SlitRatio is not None:
@@ -1507,11 +1526,13 @@ def compute_wavelength_resolution(ws, wl_list = None):
         temp_ws = api.CreateWorkspace(DataX=wl_list, DataY=np.ones_like(wl_list), NSpec=1)
         ws = temp_ws
 
+    # TODO: Check error handling. If this isn't in wavelength should have an error on the calculation.
     out = api.EvaluateFunction(
         Function=settings.wavelength_resolution_function, InputWorkspace=ws, OutputWorkspace="out"
     )
 
     wavelength = out.readX(1)
     d_lambda = out.readY(1)
+    # TODO: Need to ensure don't have negative values and set to zero if negative.
 
     return np.array(wavelength), np.array(d_lambda)
