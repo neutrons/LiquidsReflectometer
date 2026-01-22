@@ -361,7 +361,7 @@ def process_from_template_ws(
     print(f"{'*' * 88}\nevent_refl:\n{event_refl}\n{'*' * 88}")
 
     # R(Q)
-    qz, refl, d_refl = event_refl.specular(
+    qz, refl, d_refl, dq_over_q = event_refl.specular(
         q_summing=q_summing, tof_weighted=tof_weighted, bck_in_q=bck_in_q, clean=clean, normalize=normalize
     )
     qz_mid = (qz[:-1] + qz[1:]) / 2.0
@@ -399,6 +399,7 @@ def process_from_template_ws(
     qz_mid = qz_mid[template_data.pre_cut : npts - template_data.post_cut]
     refl = refl[template_data.pre_cut : npts - template_data.post_cut]
     d_refl = d_refl[template_data.pre_cut : npts - template_data.post_cut]
+    dq_over_q = dq_over_q[template_data.pre_cut : npts - template_data.post_cut]
 
     if normalize and OUTPUT_NORM_DATA:
         lr = ws_sc.getRun().getProperty("LambdaRequest").value[0]
@@ -428,6 +429,6 @@ def process_from_template_ws(
         meta_data["tof_weighted"] = tof_weighted
         meta_data["bck_in_q"] = bck_in_q
         meta_data["theta_offset"] = template_data.angle_offset
-        return qz_mid, refl, d_refl, meta_data
+        return qz_mid, refl, d_refl, dq_over_q, meta_data
 
-    return qz_mid, refl, d_refl
+    return qz_mid, refl, d_refl, dq_over_q
