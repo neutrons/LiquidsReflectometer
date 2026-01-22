@@ -109,7 +109,7 @@ def functional_background(
         # which has been the default before implementing this more flexible
         # approach.
         if not r[0] == r[1]:
-            _b, _d_b, _ = event_reflectivity._reflectivity(
+            _b, _d_b = event_reflectivity._reflectivity(
                 ws,
                 peak_position=0,
                 q_bins=q_bins,

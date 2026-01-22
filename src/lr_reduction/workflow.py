@@ -81,7 +81,8 @@ def reduce(
 
     # Save partial results
     coll = output.RunCollection()
-    coll.add(qz_mid, refl, d_refl, dq_over_q=dq_over_q, meta_data=meta_data)
+    dq_calc = dq_over_q * qz_mid
+    coll.add(qz_mid, refl, d_refl, dq=dq_calc, meta_data=meta_data)
 
     # If this is live data, put it in a separate file to avoid conflict with auto-reduction
     if is_live:
@@ -411,9 +412,11 @@ def reduce_explorer(ws, ws_db, theta_pv=None, center_pixel=145, db_center_pixel=
     )
 
     # R(Q)
-    qz, refl, d_refl = event_refl.specular(
+    qz, refl, d_refl, dq_over_q_bins = event_refl.specular(
         q_summing=None, tof_weighted=False, bck_in_q=False, clean=False, normalize=True
     )
     qz_mid = (qz[:-1] + qz[1:]) / 2.0
+    dq_over_q = (dq_over_q_bins[:-1] + dq_over_q_bins[1:]) / 2.0
+    dq_output = dq_over_q * qz_mid
 
-    return qz_mid, refl, d_refl
+    return qz_mid, refl, d_refl, dq_output
