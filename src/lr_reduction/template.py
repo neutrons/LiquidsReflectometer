@@ -361,10 +361,11 @@ def process_from_template_ws(
     print(f"{'*' * 88}\nevent_refl:\n{event_refl}\n{'*' * 88}")
 
     # R(Q)
-    qz, refl, d_refl, dq_over_q = event_refl.specular(
+    qz, refl, d_refl, dq_over_q_bins = event_refl.specular(
         q_summing=q_summing, tof_weighted=tof_weighted, bck_in_q=bck_in_q, clean=clean, normalize=normalize
     )
     qz_mid = (qz[:-1] + qz[1:]) / 2.0
+    dq_over_q = (dq_over_q_bins[:-1] + dq_over_q_bins[1:]) / 2.0 # Check this.
 
     # When using composite direct beam, we don't need a scaling
     # factor file if the multiplier is in the logs
