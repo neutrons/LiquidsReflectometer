@@ -16,6 +16,7 @@ mantid.kernel.config.setLogLevel(3)
 from . import template
 from .event_reduction import apply_dead_time_correction, compute_resolution
 
+# TODO: Need to pull through the resolution changes here. Need to check where each function is used.
 
 def reduce_30Hz_from_ws(
     meas_ws_30Hz,
