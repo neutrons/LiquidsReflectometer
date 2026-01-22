@@ -608,6 +608,8 @@ class EventReflectivity:
             The reflectivity values
         d_refl
             The uncertainties in the reflectivity values
+        dq_over_q
+            The Q resolution values
         """
         if tof_weighted:
             self.specular_weighted(q_summing=q_summing, bck_in_q=bck_in_q)
@@ -620,7 +622,6 @@ class EventReflectivity:
         self.refl = self.refl[trim:]
         self.d_refl = self.d_refl[trim:]
         self.q_bins = self.q_bins[trim:]
-        self.dq_over_q = self.dq_over_q[trim:]
 
         # Remove leading artifact from the wavelength coverage
         # Remember that q_bins is longer than refl by 1 because
@@ -631,12 +632,16 @@ class EventReflectivity:
             self.refl = self.refl[idx[:-1]]
             self.d_refl = self.d_refl[idx[:-1]]
             self.q_bins = self.q_bins[idx]
-            self.dq_over_q = self.dq_over_q[idx[:-1]]
 
-        # TODO: integrate wavelength component to self.dq_over_q
         self.q_summing = q_summing
 
-        return self.q_bins, self.refl, self.d_refl, self.dq_over_q
+        # Compute Q resolution
+        # For now keep the dq_over_q the same length as the q_bins to ensure conversion to mid-points is the same.
+        lambda_bin_list = 4 * np.pi * np.sin(self.theta) / self.q_bins
+        dq_over_q_bins = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing, wl_list=lambda_bin_list) 
+        # TODO: Also check the FWHM vs Sigma output in the save file.
+        # TODO: Add in the different option for setting up the wavelength resolution function.
+        return self.q_bins, self.refl, self.d_refl, dq_over_q_bins
     
     def specular_unweighted(self, q_summing=False, normalize=True):
         """
@@ -660,9 +665,11 @@ class EventReflectivity:
             The reflectivity values
         d_refl
             The uncertainties in the reflectivity values
+        dq_over_q
+            The Q resolution values
         """
         # Scattering data
-        refl, d_refl, lambda_list = self._reflectivity(
+        refl, d_refl = self._reflectivity(
             self._ws_sc,
             peak_position=self.specular_pixel,
             peak=self.signal_peak,
@@ -683,7 +690,7 @@ class EventReflectivity:
             # we can bin the DB according to the same transform instead of binning and dividing in TOF.
             # This is mathematically equivalent and convenient in terms of abstraction for later
             # use for the constant-Q calculation elsewhere in the code.
-            direct_beam, d_direct_beam, _ = self._reflectivity(
+            direct_beam, d_direct_beam = self._reflectivity(
                 self._ws_db,
                 peak_position=0,
                 peak=self.norm_peak,
@@ -723,12 +730,9 @@ class EventReflectivity:
             d_refl[zero_db] = 0
 
         self.refl = refl
-        self.d_refl = d_refl
+        self.d_refl = d_refl 
 
-        # Compute Q resolution
-        self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing, wl_list=lambda_list)    
-
-        return self.q_bins, refl, d_refl, self.dq_over_q
+        return self.q_bins, refl, d_refl
 
     def specular_weighted(self, q_summing=True, bck_in_q=False):
         """
@@ -751,6 +755,8 @@ class EventReflectivity:
             The reflectivity values
         d_refl
             The uncertainties in the reflectivity values
+        dq_over_q
+            The Q resolution values
         """
         # Event weights for normalization
         ## this gets the DB events and produces an array of weights and wavelength values
@@ -765,7 +771,7 @@ class EventReflectivity:
         wl_var, _ = np.histogram(wl_events, bins=wl_bins, weights=wl_weights**2)
         wl_std = np.sqrt(wl_var) / (db_charge * _bin_width)
 
-        refl, d_refl, lambda_list = self._reflectivity(
+        refl, d_refl = self._reflectivity(
             self._ws_sc,
             peak_position=self.specular_pixel,
             peak=self.signal_peak,
@@ -784,14 +790,11 @@ class EventReflectivity:
             refl -= refl_bck
             d_refl = np.sqrt(d_refl**2 + d_refl_bck**2)
 
-        # Does there need to be a clean-up of non-zeros like in the unweighted version?
-
-        # Compute Q resolution
-        self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing, wl_list=lambda_list)    
+        # Does there need to be a clean-up of non-zeros like in the unweighted version?  
 
         self.refl = refl
         self.d_refl = d_refl
-        return self.q_bins, refl, d_refl, self.dq_over_q
+        return self.q_bins, refl, d_refl
 
     def _roi_integration(
         self, ws, peak, low_res, q_bins=None, wl_dist=None, wl_bins=None, wl_std=None, q_summing=False
@@ -805,7 +808,7 @@ class EventReflectivity:
         their position on the detector and place in the proper Q bin.
         """
         q_bins = self.q_bins if q_bins is None else q_bins
-        refl_bck, d_refl_bck, _ = self._reflectivity(
+        refl_bck, d_refl_bck = self._reflectivity(
             ws,
             peak_position=0,
             q_bins=q_bins,
@@ -952,7 +955,6 @@ class EventReflectivity:
         d_refl = np.zeros(shape)
         counts = np.zeros(shape)
         keep_weights = np.zeros(shape)
-        keep_lam = np.zeros(shape)
         # pixel_width only used for q_summing:
         _pixel_width = self.pixel_width if q_summing else 0.0
 
@@ -1047,12 +1049,10 @@ class EventReflectivity:
                         refl += _counts
                         counts += _norm
                         keep_weights += _for_errors
-                        keep_lam += wl_list # check this...
                     else:
                         refl[j - peak[0]] += _counts
                         counts[j - peak[0]] += _norm
                         keep_weights[j - peak[0]] += _for_errors
-                        keep_lam[j - peak[0]] += wl_list # check this...
                 # this workflow is used for specular_unweighted:
                 else:
                     _counts, _ = np.histogram(qz, bins=_q_bins, weights=event_weights)
@@ -1094,7 +1094,7 @@ class EventReflectivity:
             d_refl = np.sqrt(np.fabs(refl)) / charge
             refl /= charge
 
-        return refl, d_refl, keep_lam
+        return refl, d_refl
 
     def _get_events(self, ws, peak, low_res):
         """
@@ -1349,11 +1349,11 @@ def compute_resolution(ws, theta=None, q_summing=False, wl_list=None):
     """
     ## Need to check through all the None's etc.
     ## Need to check separate outputs...
-    delta_th_deg, theta_lis_deg = compute_theta_resolution(ws, theta=theta, q_summing=q_summing)
+    delta_th_deg, theta_deg = compute_theta_resolution(ws, theta=theta, q_summing=q_summing)
 
     lambda_list, delta_lam = compute_wavelength_resolution(ws, wl_list=wl_list)
 
-    dq_over_q = np.sqrt((delta_lam / lambda_list) ** 2 + (delta_th_deg / theta_lis_deg) ** 2)
+    dq_over_q = np.sqrt((delta_lam / lambda_list) ** 2 + (delta_th_deg / theta_deg) ** 2)
     return dq_over_q
 
 ## New function for resolution, ready for testing.
