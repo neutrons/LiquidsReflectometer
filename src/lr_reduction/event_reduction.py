@@ -573,7 +573,7 @@ class EventReflectivity:
             norm_run=norm_run,
             time=time.ctime(),
             dq0=dq0,
-            dq_over_q=self.dq_over_q,
+            #dq_over_q=self.dq_over_q, # This is no longer a single value. Is it ok just to remove from the meta_data?
             sequence_number=sequence_number,
             sequence_id=sequence_id,
             q_summing=self.q_summing,
@@ -620,6 +620,7 @@ class EventReflectivity:
         self.refl = self.refl[trim:]
         self.d_refl = self.d_refl[trim:]
         self.q_bins = self.q_bins[trim:]
+        self.dq_over_q = self.dq_over_q[trim:]
 
         # Remove leading artifact from the wavelength coverage
         # Remember that q_bins is longer than refl by 1 because
@@ -630,16 +631,13 @@ class EventReflectivity:
             self.refl = self.refl[idx[:-1]]
             self.d_refl = self.d_refl[idx[:-1]]
             self.q_bins = self.q_bins[idx]
+            self.dq_over_q = self.dq_over_q[idx[:-1]]
 
-        ## NEED TO MOVE THIS TO PREVIOUS LEVEL OF FUNCTION AND IS NOW A LIST SO NEEDS HANDLING AS ABOVE...
-        # Compute Q resolution
-        #self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing)
-        self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing, wl_list=lambda_list)
         # TODO: integrate wavelength component to self.dq_over_q
         self.q_summing = q_summing
 
-        return self.q_bins, self.refl, self.d_refl
-
+        return self.q_bins, self.refl, self.d_refl, self.dq_over_q
+    
     def specular_unweighted(self, q_summing=False, normalize=True):
         """
         Simple specular reflectivity calculation. This is the same approach as the
@@ -664,7 +662,7 @@ class EventReflectivity:
             The uncertainties in the reflectivity values
         """
         # Scattering data
-        refl, d_refl, _ = self._reflectivity(
+        refl, d_refl, lambda_list = self._reflectivity(
             self._ws_sc,
             peak_position=self.specular_pixel,
             peak=self.signal_peak,
@@ -727,7 +725,10 @@ class EventReflectivity:
         self.refl = refl
         self.d_refl = d_refl
 
-        return self.q_bins, refl, d_refl
+        # Compute Q resolution
+        self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing, wl_list=lambda_list)    
+
+        return self.q_bins, refl, d_refl, self.dq_over_q
 
     def specular_weighted(self, q_summing=True, bck_in_q=False):
         """
@@ -764,7 +765,7 @@ class EventReflectivity:
         wl_var, _ = np.histogram(wl_events, bins=wl_bins, weights=wl_weights**2)
         wl_std = np.sqrt(wl_var) / (db_charge * _bin_width)
 
-        refl, d_refl, _ = self._reflectivity(
+        refl, d_refl, lambda_list = self._reflectivity(
             self._ws_sc,
             peak_position=self.specular_pixel,
             peak=self.signal_peak,
@@ -785,9 +786,12 @@ class EventReflectivity:
 
         # Does there need to be a clean-up of non-zeros like in the unweighted version?
 
+        # Compute Q resolution
+        self.dq_over_q = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing, wl_list=lambda_list)    
+
         self.refl = refl
         self.d_refl = d_refl
-        return self.q_bins, refl, d_refl
+        return self.q_bins, refl, d_refl, self.dq_over_q
 
     def _roi_integration(
         self, ws, peak, low_res, q_bins=None, wl_dist=None, wl_bins=None, wl_std=None, q_summing=False
@@ -1288,7 +1292,7 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     Returns
     -------
     float
-        The dtheta/theta resolution
+        The dtheta and theta values in degrees
     """
     settings = read_settings(ws)
 
@@ -1296,8 +1300,7 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
         theta = abs(ws.getRun().getProperty("ths").value[0]) * np.pi / 180.0
 
     if q_summing:
-        # Q resolution is reported as FWHM, so here we consider this to be
-        # related to the pixel width
+        # Compute pixel contribution to angular resolution
         sdd = 1830
         if settings.sample_detector_distance:
             sdd = settings.sample_detector_distance * 1000
@@ -1308,10 +1311,15 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
         det_res = 1.0  # mm, approximate value for detector resolution contribution
         sigma_pix = pixel_size / np.sqrt(12)
         sigma_y = np.sqrt((det_res ** 2 + sigma_pix ** 2))
-        dtheta = np.degrees(sigma_y / sdd)  # small angle approximation. All angles in radians.
+
+        dtheta = np.arctan(sigma_y / sdd) # in radians
+        
+        # Want to export in degrees
+        dtheta_deg = np.degrees(dtheta)
+        theta_deg = np.degrees(theta)
 
         #print("Q summing: %g" % dq_over_q) ## Work out some print functions throughout.
-        return dtheta, theta
+        return dtheta_deg, theta_deg
 
     # We can't compute the resolution if the value of xi is not in the logs.
     # Since it was not always logged, check for it here.
@@ -1319,15 +1327,17 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
         # For old data, the resolution can't be computed, so use
         # the standard value for the instrument
         print("Could not find BL4B:Mot:xi.RBV: using supplied dQ/Q")
-        return default_dq, theta
+        theta_deg = np.degrees(theta)
+        return default_dq, theta_deg
     
     # Compute the trapezoidal equivalent sigma of the angular distribution
+    theta_deg = np.degrees(theta)
     _, _, _, dth_over_th = trapezoidal_distribution_params(
-        ws, Theta_deg=np.degrees(theta)
+        ws, Theta_deg=theta_deg
     )
-    dtheta = dth_over_th * theta    # Check if needs to be in radians or degrees!
+    dtheta_deg = dth_over_th * theta_deg
 
-    return dtheta, theta
+    return dtheta_deg, theta_deg
 
 def compute_resolution(ws, theta=None, q_summing=False, wl_list=None):
     """
@@ -1339,11 +1349,11 @@ def compute_resolution(ws, theta=None, q_summing=False, wl_list=None):
     """
     ## Need to check through all the None's etc.
     ## Need to check separate outputs...
-    delta_th, theta_list = compute_theta_resolution(ws, theta=theta, q_summing=q_summing)
+    delta_th_deg, theta_lis_deg = compute_theta_resolution(ws, theta=theta, q_summing=q_summing)
 
     lambda_list, delta_lam = compute_wavelength_resolution(ws, wl_list=wl_list)
 
-    dq_over_q = np.sqrt((delta_lam / lambda_list) ** 2 + (delta_th / theta_list) ** 2)
+    dq_over_q = np.sqrt((delta_lam / lambda_list) ** 2 + (delta_th_deg / theta_lis_deg) ** 2)
     return dq_over_q
 
 ## New function for resolution, ready for testing.

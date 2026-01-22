@@ -75,13 +75,13 @@ def reduce(
         template_data.angle_offset = theta_offset
 
     # Call the reduction using the template
-    qz_mid, refl, d_refl, meta_data = template.process_from_template_ws(
+    qz_mid, refl, d_refl, dq_over_q, meta_data = template.process_from_template_ws(
         ws, template_data, q_summing=q_summing, tof_weighted=bck_in_q, clean=q_summing, bck_in_q=bck_in_q, info=True
     )
 
     # Save partial results
     coll = output.RunCollection()
-    coll.add(qz_mid, refl, d_refl, meta_data=meta_data)
+    coll.add(qz_mid, refl, d_refl, dq_over_q=dq_over_q, meta_data=meta_data)
 
     # If this is live data, put it in a separate file to avoid conflict with auto-reduction
     if is_live:
