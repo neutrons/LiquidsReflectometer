@@ -265,6 +265,9 @@ def process_from_template_ws(
         if (
             "BL4B:CS:ExpPl:OperatingMode" in ws_sc.getRun()
             and ws_sc.getRun().getProperty("BL4B:CS:ExpPl:OperatingMode").value[0] == "Free Liquid"
+        ) or (
+            "BL4B:CS:Mode:Coordinates" in ws_sc.getRun()
+            and ws_sc.getRun().getProperty("BL4B:Mode:Coordinates").value[0] == 0 # Earth-centered=0
         ):
             theta = thi_value * np.pi / 180.0
         else:
