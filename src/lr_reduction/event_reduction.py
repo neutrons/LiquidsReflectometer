@@ -10,6 +10,7 @@ from typing import Optional
 
 import mantid.simpleapi as api
 import numpy as np
+import sympy as sp
 from scipy.optimize import brentq
 
 from lr_reduction.gravity_correction import GravityDirection, gravity_correction
@@ -640,7 +641,6 @@ class EventReflectivity:
         lambda_bin_list = 4 * np.pi * np.sin(self.theta) / self.q_bins
         dq_over_q_bins = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing, wl_list=lambda_bin_list) 
         # TODO: Also check the FWHM vs Sigma output in the save file.
-        # TODO: Add in the different option for setting up the wavelength resolution function.
         return self.q_bins, self.refl, self.d_refl, dq_over_q_bins
     
     def specular_unweighted(self, q_summing=False, normalize=True):
@@ -1520,19 +1520,71 @@ def compute_wavelength_resolution(ws, wl_list = None):
 
     settings = read_settings(ws)
 
-    ## Need to check if this works or better to not be in a mantid workspace.
+    ## Need to check if this works.
     if wl_list is not None:
+        # Parse function to be used on list rather than in workspace.
+        read_function = settings.wavelength_resolution_function
+        read_formula = UserDefinedFunction(read_function)
+        d_lambda = np.array(read_formula(wl_list))
+        wavelength = np.array(wl_list)
         # Create a temporary workspace with the provided wavelength values
-        temp_ws = api.CreateWorkspace(DataX=wl_list, DataY=np.ones_like(wl_list), NSpec=1)
-        ws = temp_ws
+        #temp_ws = api.CreateWorkspace(DataX=wl_list, DataY=np.ones_like(wl_list), NSpec=1)
+        #ws = temp_ws
+    else:
+        # TODO: Check error handling. If this isn't in wavelength should have an error on the calculation.
+        out = api.EvaluateFunction(
+            Function=settings.wavelength_resolution_function, InputWorkspace=ws, OutputWorkspace="out"
+        )
+        wavelength = np.array(out.readX(1))
+        d_lambda = np.array(out.readY(1))
+    
+    # Set any negative values to zero
+    d_lambda[d_lambda < 0] = 0
 
-    # TODO: Check error handling. If this isn't in wavelength should have an error on the calculation.
-    out = api.EvaluateFunction(
-        Function=settings.wavelength_resolution_function, InputWorkspace=ws, OutputWorkspace="out"
-    )
+    return wavelength, d_lambda
 
-    wavelength = out.readX(1)
-    d_lambda = out.readY(1)
-    # TODO: Need to ensure don't have negative values and set to zero if negative.
+def parse_user_expression(s: str):
+    '''
+    Parse function as a string into formula and params.
+    If entered from a Mantid function should skip the name part.
+    '''
+    parts = [p.strip() for p in s.split(",")]
 
-    return np.array(wavelength), np.array(d_lambda)
+    formula = None
+    params = {}
+
+    for part in parts:
+        key, value = [x.strip() for x in part.split("=", 1)]
+
+        if key.lower() == "formula":
+            formula = value
+        elif key.lower() == "name":
+            continue
+        else:
+            params[key] = float(value)
+
+    if formula is None:
+        raise ValueError("Missing Formula=...")
+
+    return formula, params
+
+class UserDefinedFunction:
+    def __init__(self, definition: str):
+        self.expr_str, self.params = parse_user_expression(definition)
+
+        self.x = sp.symbols("x")
+        self.param_symbols = {k: sp.symbols(k) for k in self.params}
+
+        self.expr = sp.sympify(
+            self.expr_str,
+            locals={"x": self.x, **self.param_symbols}
+        )
+
+        self._f = sp.lambdify(
+            (self.x, *self.param_symbols.values()),
+            self.expr,
+            modules="numpy"
+        )
+
+    def __call__(self, x):
+        return self._f(x, *self.params.values())
