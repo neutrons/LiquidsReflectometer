@@ -368,7 +368,7 @@ def process_from_template_ws(
         q_summing=q_summing, tof_weighted=tof_weighted, bck_in_q=bck_in_q, clean=clean, normalize=normalize
     )
     qz_mid = (qz[:-1] + qz[1:]) / 2.0
-    dq_over_q = (dq_over_q_bins[:-1] + dq_over_q_bins[1:]) / 2.0 # Check this.
+    dq_over_q = (dq_over_q_bins[:-1] + dq_over_q_bins[1:]) / 2.0
 
     # When using composite direct beam, we don't need a scaling
     # factor file if the multiplier is in the logs

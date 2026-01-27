@@ -640,7 +640,6 @@ class EventReflectivity:
         # For now keep the dq_over_q the same length as the q_bins to ensure conversion to mid-points is the same.
         lambda_bin_list = 4 * np.pi * np.sin(self.theta) / self.q_bins
         dq_over_q_bins = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing, wl_list=lambda_bin_list) 
-        # TODO: Also check the FWHM vs Sigma output in the save file.
         return self.q_bins, self.refl, self.d_refl, dq_over_q_bins
     
     def specular_unweighted(self, q_summing=False, normalize=True):
