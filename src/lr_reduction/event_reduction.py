@@ -1515,9 +1515,6 @@ def compute_wavelength_resolution(ws, wl_list = None):
     ValueError : if ws does not have exactly one spectrum
     """
 
-    if ws.spectrumInfo().size() != 1:
-        raise ValueError("Workspace must have only one spectrum")
-
     settings = read_settings(ws)
 
     ## Need to check if this works.
@@ -1531,6 +1528,8 @@ def compute_wavelength_resolution(ws, wl_list = None):
         #temp_ws = api.CreateWorkspace(DataX=wl_list, DataY=np.ones_like(wl_list), NSpec=1)
         #ws = temp_ws
     else:
+        if ws.spectrumInfo().size() != 1:
+            raise ValueError("Workspace must have only one spectrum")
         # TODO: Check error handling. If this isn't in wavelength should have an error on the calculation.
         out = api.EvaluateFunction(
             Function=settings.wavelength_resolution_function, InputWorkspace=ws, OutputWorkspace="out"
