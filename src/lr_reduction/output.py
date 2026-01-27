@@ -165,7 +165,7 @@ class RunCollection:
             self.d_refl_all = np.asarray(d_refl_all)
             self.d_qz_all = np.asarray(d_qz_all)
 
-    def save_ascii(self, file_path, meta_as_json=False):
+    def save_ascii(self, file_path, meta_as_json=False, fwhm=False):
         """
         Save R(Q) in ASCII format.
         This function merges the data before saving. It writes metadata and R(Q) data
@@ -179,6 +179,8 @@ class RunCollection:
             The path to the file where the ASCII data will be saved.
         meta_as_json : bool, optional
             If True, metadata will be written in JSON format. Default is False.
+        fwhm: bool, optional
+            If True, dq column is labelled on output as FWHM otherwise labeled as sigma.
         """
         self.calculate_scale_factors()
         self.merge()
@@ -234,7 +236,10 @@ class RunCollection:
                 initial_entry_written = True
 
             # Write R(q)
-            fd.write("# %-21s %-21s %-21s %-21s\n" % ("Q [1/Angstrom]", "R", "dR", "dQ [FWHM]"))
+            if fwhm:
+                fd.write("# %-21s %-21s %-21s %-21s\n" % ("Q [1/Angstrom]", "R", "dR", "dQ [FWHM]"))
+            else:
+                fd.write("# %-21s %-21s %-21s %-21s\n" % ("Q [1/Angstrom]", "R", "dR", "dQ [Resolution as Sigma]"))
             fd.writelines(
                 "%20.16f  %20.16f  %20.16f  %20.16f\n"
                 % (self.qz_all[i], self.refl_all[i], self.d_refl_all[i], self.d_qz_all[i])
