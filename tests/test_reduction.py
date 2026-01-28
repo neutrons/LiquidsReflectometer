@@ -138,7 +138,6 @@ def test_full_reduction(template_dir, nexus_dir):
 
         if first_run is None:
             first_run = run_number
-            resolution = dq_over_q #event_reduction.compute_resolution(ws_sc)
 
         for i in range(len(qz_mid)):
             dq_q_all.append(dq_over_q[i])
