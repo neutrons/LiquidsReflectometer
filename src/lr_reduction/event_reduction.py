@@ -639,9 +639,9 @@ class EventReflectivity:
         # Compute Q resolution
         # For now keep the dq_over_q the same length as the q_bins to ensure conversion to mid-points is the same.
         lambda_bin_list = 4 * np.pi * np.sin(self.theta) / self.q_bins
-        dq_over_q_bins = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing, wl_list=lambda_bin_list) 
+        dq_over_q_bins = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing, wl_list=lambda_bin_list)
         return self.q_bins, self.refl, self.d_refl, dq_over_q_bins
-    
+
     def specular_unweighted(self, q_summing=False, normalize=True):
         """
         Simple specular reflectivity calculation. This is the same approach as the
@@ -727,7 +727,7 @@ class EventReflectivity:
             d_refl[zero_db] = 0
 
         self.refl = refl
-        self.d_refl = d_refl 
+        self.d_refl = d_refl
 
         return self.q_bins, refl, d_refl
 
@@ -785,7 +785,7 @@ class EventReflectivity:
             refl -= refl_bck
             d_refl = np.sqrt(d_refl**2 + d_refl_bck**2)
 
-        # Does there need to be a clean-up of non-zeros like in the unweighted version?  
+        # Does there need to be a clean-up of non-zeros like in the unweighted version?
 
         self.refl = refl
         self.d_refl = d_refl
@@ -1319,7 +1319,7 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
         sigma_y = np.sqrt((det_res ** 2 + sigma_pix ** 2))
 
         dtheta = np.arctan(sigma_y / sdd) # in radians
-        
+
         # Want to export in degrees
         dtheta_deg = np.degrees(dtheta)
         theta_deg = np.degrees(theta)
@@ -1335,7 +1335,7 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
         print("Could not find BL4B:Mot:xi.RBV: using supplied dQ/Q")
         theta_deg = np.degrees(theta)
         return default_dq, theta_deg
-    
+
     # Compute the trapezoidal equivalent sigma of the angular distribution
     theta_deg = np.degrees(theta)
     _, _, _, dth_over_th = trapezoidal_distribution_params(
@@ -1348,12 +1348,12 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
 def compute_resolution(ws, theta=None, q_summing=False, wl_list=None):
     """
     Compute the q resolution including both theta and lambda terms.
-    
-    :param ws: workspace for meta-data. If this is a lambda workspace 
+
+    :param ws: workspace for meta-data. If this is a lambda workspace
         already it can be used as the lambda imports in place of the wl_list.
     :param theta: option to overwrite theta input, otherwise uses ths/thi value.
     :param q_summing: Changes the angular calculation to be based on slits or pixel sizes depending on method of q conversion.
-    :param wl_list: Provide a list of wavelengths for the lambda calculation. 
+    :param wl_list: Provide a list of wavelengths for the lambda calculation.
         If not provided it assumes the workspace contains wavelengths.
     """
     ## Need to check through all the None's etc.
@@ -1535,7 +1535,7 @@ def compute_wavelength_resolution(ws, wl_list = None):
         )
         wavelength = np.array(out.readX(1))
         d_lambda = np.array(out.readY(1))
-    
+
     # Set any negative values to zero
     d_lambda[d_lambda < 0] = 0
 
