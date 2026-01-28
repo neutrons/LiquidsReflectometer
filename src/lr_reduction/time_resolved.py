@@ -16,6 +16,7 @@ mantid.kernel.config.setLogLevel(3)
 from . import template
 from .event_reduction import apply_dead_time_correction, read_settings
 
+
 def reduce_30Hz_from_ws(
     meas_ws_30Hz,
     ref_ws_30Hz,
@@ -392,7 +393,7 @@ def plot_slices(reduced, title, time_interval, file_path, offset=10, show=True, 
     for _data in reduced:
         if show_dq:
             qz, refl, d_refl, dq = _data
-    
+
             plt.errorbar(
                 qz,
                 refl * _running_offset,
@@ -404,7 +405,7 @@ def plot_slices(reduced, title, time_interval, file_path, offset=10, show=True, 
             )
         else:
             qz, refl, d_refl, _ = _data
-    
+
             plt.errorbar(
                 qz,
                 refl * _running_offset,
