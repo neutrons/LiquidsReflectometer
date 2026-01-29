@@ -81,8 +81,6 @@ jobs:
           pixi run conda-build
           mkdir -p /tmp/local-channel/noarch
           cp *.conda /tmp/local-channel/noarch/
-          # extract version from the package file name "lr_reduction-<version>-<build>.conda"
-          echo "PKG_VERSION=$(ls *.conda | cut -d'-' -f2)" >> $GITHUB_ENV
 
       - name: Verify Conda Package
         uses: neutrons/conda-verify@v0.1.2
@@ -90,7 +88,7 @@ jobs:
           python-version: "3.11"
           local-channel: /tmp/local-channel
           module-name: ${{ env.PKG_NAME }}
-          package-name: ${{ env.PKG_NAME }}=${{ env.PKG_VERSION }} # install exact version
+          package-name: ${{ env.PKG_NAME }}
           extra-channels: neutrons mantid
           extra-commands: |
             python -c "import lr_reduction"
