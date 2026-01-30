@@ -108,7 +108,7 @@ name = "lr_reduction"
 version = "0.0.0"  # a placeholder overwritten when Pixi task "sync-version" is executed
 
 [tool.pixi.package.build]
-backend = { name = "pixi-build-python", version = "*" }
+backend = { name = "pixi-build-python", version = ">=0.2,<1" }
 
 [tool.pixi.package.host-dependencies]
 hatchling= ">=1.27.0,<2"
