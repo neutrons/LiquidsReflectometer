@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from pytest import approx
 
-from lr_reduction.scaling_factors import OverlapScalingFactor, ReducedData
+from lr_reduction.stitching import OverlapScalingFactor, ReducedData
 
 
 # Create some fake linear data for testing
