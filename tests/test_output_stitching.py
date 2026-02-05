@@ -43,6 +43,7 @@ def mock_run_data():
         "lambda_max": 10.0,
         "q_min": 0.01,
         "q_max": 0.1,
+        "dq_over_q": 0.027,
     }
 
     # Second run with overlap
@@ -59,6 +60,7 @@ def mock_run_data():
         "lambda_max": 10.0,
         "q_min": 0.08,
         "q_max": 0.2,
+        "dq_over_q": 0.027,
     }
 
     return [(q1, r1, dr1, meta1), (q2, r2, dr2, meta2)]

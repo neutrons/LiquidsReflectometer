@@ -59,9 +59,9 @@ class RunCollection:
         """
         Calculate scale factors for each run in the collection
         """
-        if self.stitching_type == StitchingType.NONE:
+        if self.template_data.stitching_type == StitchingType.NONE:
             self.scale_factors = [1.0 for _ in self.collection]
-        elif self.stitching_type == StitchingType.AUTOMATIC_AVERAGE:
+        elif self.template_data.stitching_type == StitchingType.AUTOMATIC_AVERAGE:
 
             # Convert collection to type used in scaling factor calculation
             collection_reduced_data = [ReducedData(run['q'], run['r'], run['dr']) for run in self.collection]
@@ -189,8 +189,8 @@ class RunCollection:
                         fd.write("# Bck in Q: %s\n" % _meta["bck_in_q"])
                     if "theta_offset" in _meta:
                         fd.write("# Theta offset: %s\n" % _meta["theta_offset"])
-                    fd.write("# Stitching type: %s\n" % self.stitching_type.value)
-                    if self.stitching_type != StitchingType.NONE:
+                    fd.write("# Stitching type: %s\n" % self.template_data.stitching_type.value)
+                    if self.template_data.stitching_type != StitchingType.NONE:
                         fd.write("# Scale factor q min: %s\n" % self.template_data.sf_qmin)
                         fd.write("# Scale factor q max: %s\n" % self.template_data.sf_qmax)
                     if meta_as_json:
