@@ -6,15 +6,12 @@ import json
 import os
 
 import numpy as np
-from docutils.nodes import meta
 from mantid.simpleapi import LoadEventNexus, logger
-from test.data.REFL_188298_data_reduction_script import template_data
+from scaling_factors.calculate import StitchingType
 
 from lr_reduction import event_reduction, output, reduction_template_reader, template
 from lr_reduction.typing import MantidWorkspace
 from lr_reduction.web_report import assemble_report, generate_report_sections
-from scaling_factors.calculate import StitchingType
-from tests.unit.lr_reduction.test_web_report import meta_data
 
 
 def reduce(

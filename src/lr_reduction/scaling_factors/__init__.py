@@ -7,8 +7,8 @@ from lr_reduction.scaling_factors.calculate import (
 )
 
 __all__ = [
-    "StitchingType"
-    "ReducedData",
+    "StitchingType", # noqa: F401
+    "ReducedData",  # noqa: F401
     "OverlapInfo",
     "scaling_factor_critical_edge",
     "OverlapScalingFactor",
