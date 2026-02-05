@@ -7,6 +7,7 @@ import json
 import numpy as np
 from plot_publisher import plot1d
 
+from lr_reduction.reduction_template_reader import ReductionParameters
 from lr_reduction.scaling_factors.calculate import (
     OverlapScalingFactor,
     ReducedData,
@@ -22,10 +23,11 @@ class RunCollection:
     A collection of runs to assemble into a single R(Q)
     """
 
-    def __init__(self, average_overlap=False, template_data=None):
+    def __init__(self, average_overlap=False, template_data=ReductionParameters()):
         self.collection = []
         self.average_overlap = average_overlap
         self.template_data = template_data
+        self.scale_factors = []
         self.qz_all = []
         self.refl_all = []
         self.d_refl_all = []

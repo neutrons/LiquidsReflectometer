@@ -16,7 +16,7 @@ class StitchingType(Enum):
         if value is None:
             return cls.NONE
         for item in cls:
-            if item.value == value.lower():
+            if item.value.casefold() == value.casefold():
                 return item
         # reached if value cannot be matched
         raise ValueError(f"Invalid StitchingType value: {value}")
