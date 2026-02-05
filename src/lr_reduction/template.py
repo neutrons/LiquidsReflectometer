@@ -11,6 +11,7 @@ import numpy as np
 from mantid.simpleapi import logger
 
 from lr_reduction import event_reduction, peak_finding, reduction_template_reader
+from lr_reduction.data_info import CoordinateSystem
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.reduction_template_reader import ReductionParameters
 from lr_reduction.typing import MantidWorkspace
@@ -262,13 +263,8 @@ def process_from_template_ws(
     if theta_value is not None:
         theta = theta_value * np.pi / 180.0
     else:
-        if (
-            "BL4B:CS:ExpPl:OperatingMode" in ws_sc.getRun()
-            and ws_sc.getRun().getProperty("BL4B:CS:ExpPl:OperatingMode").value[0] == "Free Liquid"
-        ) or (
-            "BL4B:CS:Mode:Coordinates" in ws_sc.getRun()
-            and ws_sc.getRun().getProperty("BL4B:Mode:Coordinates").value[0] == 0 # Earth-centered=0
-        ):
+        coordinate_system = CoordinateSystem.from_workspace(ws_sc)
+        if coordinate_system == CoordinateSystem.EARTH_CENTERED:
             theta = thi_value * np.pi / 180.0
         else:
             theta = ths_value * np.pi / 180.0

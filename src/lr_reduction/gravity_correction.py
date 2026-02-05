@@ -2,6 +2,7 @@ from enum import IntEnum
 
 import numpy as np
 
+from lr_reduction.data_info import CoordinateSystem
 from lr_reduction.typing import MantidWorkspace
 from lr_reduction.utils import workspace_handle
 
@@ -94,15 +95,11 @@ def _theta_in(workspace: MantidWorkspace) -> float:
 
     # Angle calculated from thi and a flag on earth-centered vs beam-centered
     thi = _log_value(run, "BL4B:Mot:thi.RBV")
-    if "BL4B:CS:Mode:Coordinates" in run:
-        if _log_value(run, "BL4B:CS:Mode:Coordinates") == 0:  # Earth-centered=0
-            theta_in = thi
-        else:
-            theta_in = thi - 4.0  # Beamline optics gives -4 deg incline. In future will have PV.
-    elif _log_value(run, "BL4B:CS:ExpPl:OperatingMode", default="") == "Free Liquid":
+    coordinate_system = CoordinateSystem.from_workspace(workspace)
+    if coordinate_system == CoordinateSystem.EARTH_CENTERED:
         theta_in = thi
     else:
-        theta_in = thi - 4.0
+        theta_in = thi - 4.0  # Beamline optics gives -4 deg incline. In future will have PV.
     return abs(theta_in)
 
 
