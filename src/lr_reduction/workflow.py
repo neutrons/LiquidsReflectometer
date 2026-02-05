@@ -97,7 +97,7 @@ def reduce(
     coll.save_ascii(reduced_file, meta_as_json=True)
 
     # Assemble partial results into a single R(q)
-    seq_list, run_list, sf_list, refl_plot = assemble_report(meta_data["sequence_id"],
+    seq_list, run_list, sf_list, refl_plot = assemble_results(meta_data["sequence_id"],
                                                              output_dir, average_overlap,
                                                              is_live=is_live,
                                                              template_data=template_data)

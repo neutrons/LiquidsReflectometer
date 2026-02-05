@@ -54,6 +54,7 @@ class RunCollection:
             resolution = meta_data["dq_over_q"]
             dq = resolution * q
         self.collection.append(dict(q=q, r=r, dr=dr, dq=dq, info=meta_data))
+        self.scale_factors.append(1.0)
 
     def calculate_scale_factors(self):
         """
@@ -71,14 +72,14 @@ class RunCollection:
                     ce = scaling_factor_critical_edge(self.template_data.sf_qmin,
                                                       self.template_data.sf_qmax,
                                                       collection_reduced_data)
-                    self.scale_factors.append(ce)
+                    self.scale_factors[0] = ce
                 else:
                     overlap_sf_calculator = OverlapScalingFactor(
                         left_data=collection_reduced_data[i - 1],
                         right_data=collection_reduced_data[i]
                     )
                     sf = overlap_sf_calculator.get_scaling_factor()
-                    self.scale_factors.append(sf)
+                    self.scale_factors[i] = sf
 
 
     def merge(self):
