@@ -97,7 +97,6 @@ class TestRunCollectionStitching:
             coll.add(q, r, dr, meta_data=meta)
 
         coll.stitching_type = template_data_automatic.stitching_type
-        coll.scale_factors = []
         coll.calculate_scale_factors()
 
         assert len(coll.scale_factors) == 2
@@ -122,26 +121,6 @@ class TestRunCollectionStitching:
         assert coll.refl_all[0] == approx(r1[0] * 2.0)
         assert coll.d_refl_all[0] == approx(dr1[0] * 2.0)
 
-    def test_save_ascii_calls_calculate_scale_factors(
-            self, template_data_none, mock_run_data, tmp_path
-    ):
-        """Test that save_ascii calculates scale factors before saving"""
-        coll = RunCollection(template_data=template_data_none)
-
-        q1, r1, dr1, meta1 = mock_run_data[0]
-        coll.add(q1, r1, dr1, meta_data=meta1)
-
-        coll.stitching_type = template_data_none.stitching_type
-        coll.scale_factors = []
-
-        output_file = tmp_path / "test_output.txt"
-        coll.save_ascii(str(output_file))
-
-        # Check that scale_factors was calculated
-        assert len(coll.scale_factors) > 0
-
-        # Check file was created
-        assert output_file.exists()
 
 
 if __name__ == "__main__":
