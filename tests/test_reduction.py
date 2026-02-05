@@ -107,7 +107,7 @@ def test_q_summing_as_option(template_dir, nexus_dir, template_file, q_summing, 
         ws_sc = mtd_api.Load("REF_L_%s" % 198415)
 
     with patch.object(event_reduction.EventReflectivity, "specular") as mock_specular:
-        mock_specular.return_value = (np.array([1, 2, 3]), np.array([0.1, 0.2]), np.array([0.01, 0.02]))
+        mock_specular.return_value = (np.array([1, 2, 3]), np.array([0.1, 0.2]), np.array([0.01, 0.02]), np.array([0.01, 0.02]))
 
         qz_mid, refl, _, dq_over_q, meta_data = template.process_from_template_ws(
             ws_sc, template_path, tof_weighted=tof_weighted, info=True, q_summing=q_summing

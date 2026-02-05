@@ -92,10 +92,10 @@ def test_full_reduction(nexus_dir, template_dir):
     template_data = template.read_template(template_path, sequence_number)
     template_data.dead_time = True
 
-    _, r1, _ = template.process_from_template_ws(ws, template_data)
+    _, r1, _, _ = template.process_from_template_ws(ws, template_data)
 
     template_data.dead_time = False
-    _, r2, _ = template.process_from_template_ws(ws, template_data)
+    _, r2, _, _ = template.process_from_template_ws(ws, template_data)
 
     corr = r1 / r2
     for c in corr:
