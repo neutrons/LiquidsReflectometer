@@ -1,10 +1,25 @@
 from dataclasses import dataclass
+from enum import Enum
 from typing import Literal
 
 import numpy as np
 from mantid import mtd
 from mantid.simpleapi import CreateWorkspace, Fit, ReplaceSpecialValues, logger
 
+
+class StitchingType(Enum):
+    NONE = "None"
+    AUTOMATIC_AVERAGE = "AutomaticAverage"
+
+    @classmethod
+    def from_value(cls, value: str):
+        if value is None:
+            return cls.NONE
+        for item in cls:
+            if item.value == value.lower():
+                return item
+        # reached if value cannot be matched
+        raise ValueError(f"Invalid StitchingType value: {value}")
 
 @dataclass
 class ReducedData:

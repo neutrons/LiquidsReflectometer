@@ -10,6 +10,7 @@ from typing import Optional
 from lr_reduction import __version__ as VERSION
 from lr_reduction.gravity_correction import GravityDirection
 from lr_reduction.instrument_settings import InstrumentSettings
+from lr_reduction.scaling_factors.calculate import StitchingType
 
 # Get the mantid version being used, if available
 try:
@@ -91,6 +92,12 @@ class ReductionParameters:
 
         # Gravity correction
         self.gravity_direction = None
+
+        # Stitching
+        self.reflectivity_scale_factor = 1.0
+        self.stitching_type = StitchingType.NONE
+        self.sf_qmin = 0.00
+        self.sf_qmax = 0.01
 
     def from_dict(self, data_dict, permissible=True):
         """
@@ -203,6 +210,15 @@ class ReductionParameters:
 
         # Emission time correction
         _xml += "<use_emission_time>%s</use_emission_time>\n" % str(self.use_emission_time)
+
+        # Stitching
+        _xml += "<reflectivity_scale_factor>%s</reflectivity_scale_factor>\n" % str(self.reflectivity_scale_factor)
+        _xml += "<stitching_type>%s</stitching_type>\n" % str(self.stitching_type.value)
+        _xml += "<sf_qmin>%s</sf_qmin>\n" % str(self.sf_qmin)
+        _xml += "<sf_qmax>%s</sf_qmax>\n" % str(self.sf_qmax)
+
+
+
         _xml += "</RefLData>\n"
 
         return _xml
@@ -346,6 +362,14 @@ class ReductionParameters:
         # Defaults to True, but will be skipped if the necessary meta data is not found
         self.use_emission_time = getBoolElement(instrument_dom, "use_emission_time", default=True)
 
+        # Stitching
+        self.reflectivity_scale_factor = getFloatElement(
+            instrument_dom, "reflectivity_scale_factor", default=self.reflectivity_scale_factor
+        )
+        stitch_str = getStringElement(instrument_dom, "stitching_type", default=None)
+        self.stitching_type = StitchingType.from_value(stitch_str)
+        self.sf_qmin = getFloatElement(instrument_dom, "sf_qmin", default=self.sf_qmin)
+        self.sf_qmax = getFloatElement(instrument_dom, "sf_qmax", default=self.sf_qmax)
 
 #############################################
 ### Utility functions to read XML content ###

@@ -6,6 +6,7 @@ import json
 
 import numpy as np
 from plot_publisher import plot1d
+from scaling_factors.calculate import OverlapScalingFactor, ReducedData, StitchingType, scaling_factor_critical_edge
 
 from . import __version__ as VERSION
 
@@ -15,9 +16,10 @@ class RunCollection:
     A collection of runs to assemble into a single R(Q)
     """
 
-    def __init__(self, average_overlap=False):
+    def __init__(self, average_overlap=False, template_data=None):
         self.collection = []
         self.average_overlap = average_overlap
+        self.template_data = template_data
         self.qz_all = []
         self.refl_all = []
         self.d_refl_all = []
@@ -45,6 +47,32 @@ class RunCollection:
             dq = resolution * q
         self.collection.append(dict(q=q, r=r, dr=dr, dq=dq, info=meta_data))
 
+    def calculate_scale_factors(self):
+        """
+        Calculate scale factors for each run in the collection
+        """
+        if self.stitching_type == StitchingType.NONE:
+            self.scale_factors = [1.0 for _ in self.collection]
+        elif self.stitching_type == StitchingType.AUTOMATIC_AVERAGE:
+
+            # Convert collection to type used in scaling factor calculation
+            collection_reduced_data = [ReducedData(run['q'], run['r'], run['dr']) for run in self.collection]
+
+            for i, item in enumerate(collection_reduced_data):
+                if i == 0:
+                    ce = scaling_factor_critical_edge(self.template_data.sf_qmin,
+                                                      self.template_data.sf_qmax,
+                                                      collection_reduced_data)
+                    self.scale_factors.append(ce)
+                else:
+                    overlap_sf_calculator = OverlapScalingFactor(
+                        left_data=collection_reduced_data[i - 1],
+                        right_data=collection_reduced_data[i]
+                    )
+                    sf = overlap_sf_calculator.get_scaling_factor()
+                    self.scale_factors.append(sf)
+
+
     def merge(self):
         """
         Merge the collection of runs
@@ -54,11 +82,11 @@ class RunCollection:
         d_refl_all = []
         d_qz_all = []
 
-        for item in self.collection:
+        for idx, item in enumerate(self.collection):
             for i in range(len(item["q"])):
                 qz_all.append(item["q"][i])
-                refl_all.append(item["r"][i])
-                d_refl_all.append(item["dr"][i])
+                refl_all.append(item["r"][i] * self.scale_factors[idx])
+                d_refl_all.append(item["dr"][i] * self.scale_factors[idx])
                 d_qz_all.append(item["dq"][i])
 
         qz_all = np.asarray(qz_all)
@@ -131,12 +159,13 @@ class RunCollection:
         meta_as_json : bool, optional
             If True, metadata will be written in JSON format. Default is False.
         """
+        self.calculate_scale_factors()
         self.merge()
 
         with open(file_path, "w") as fd:
             # Write meta data
             initial_entry_written = False
-            for item in self.collection:
+            for i, item in enumerate(self.collection):
                 _meta = item["info"]
                 if not initial_entry_written:
                     fd.write("# Experiment %s Run %s\n" % (_meta["experiment"], _meta["run_number"]))
@@ -152,10 +181,14 @@ class RunCollection:
                         fd.write("# Bck in Q: %s\n" % _meta["bck_in_q"])
                     if "theta_offset" in _meta:
                         fd.write("# Theta offset: %s\n" % _meta["theta_offset"])
+                    fd.write("# Stitching type: %s\n" % self.stitching_type.value)
+                    if self.stitching_type != StitchingType.NONE:
+                        fd.write("# Scale factor q min: %s\n" % self.template_data.sf_qmin)
+                        fd.write("# Scale factor q max: %s\n" % self.template_data.sf_qmax)
                     if meta_as_json:
                         fd.write("# Meta:%s\n" % json.dumps(_meta))
                     fd.write("# DataRun   NormRun   TwoTheta(deg)  LambdaMin(A)   ")
-                    fd.write("LambdaMax(A) Qmin(1/A)    Qmax(1/A)    SF_A         SF_B\n")
+                    fd.write("LambdaMax(A) Qmin(1/A)    Qmax(1/A)    SF_A         SF_B      SF\n")
                     fd.write("")
                 if "scaling_factors" in _meta:
                     a = _meta["scaling_factors"]["a"]
@@ -174,8 +207,9 @@ class RunCollection:
                     _meta["q_max"],
                     a,
                     b,
+                    self.scale_factors[i],
                 )
-                fd.write("# %-9s %-9s %-14.6g %-14.6g %-12.6g %-12.6s %-12.6s %-12.6s %-12.6s\n" % value_list)
+                fd.write("# %-9s %-9s %-14.6g %-14.6g %-12.6g %-12.6s %-12.6s %-12.6s %-12.6s %-12.6s\n" % value_list)
                 initial_entry_written = True
 
             # Write R(q)
