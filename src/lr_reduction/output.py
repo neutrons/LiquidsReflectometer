@@ -6,7 +6,13 @@ import json
 
 import numpy as np
 from plot_publisher import plot1d
-from scaling_factors.calculate import OverlapScalingFactor, ReducedData, StitchingType, scaling_factor_critical_edge
+
+from lr_reduction.scaling_factors.calculate import (
+    OverlapScalingFactor,
+    ReducedData,
+    StitchingType,
+    scaling_factor_critical_edge,
+)
 
 from . import __version__ as VERSION
 
