@@ -18,7 +18,8 @@ def make_mock_ws():
         def get_property_side_effect(name):
             val = properties.get(name)
             if val is None:
-                raise KeyError(f"Property {name} not in mock properties")
+                # Mantid raises RuntimeError if property not found for workspace run
+                raise RuntimeError(f"Property {name} not in mock properties")
             mock = MagicMock()
             mock.value = [val]  # keep consistent with .value[0]
             return mock

@@ -13,6 +13,7 @@ import numpy as np
 import sympy as sp
 from scipy.optimize import brentq
 
+from lr_reduction.data_info import CoordinateSystem
 from lr_reduction.gravity_correction import GravityDirection, gravity_correction
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.utils import mantid_algorithm_exec
@@ -574,7 +575,6 @@ class EventReflectivity:
             norm_run=norm_run,
             time=time.ctime(),
             dq0=dq0,
-            #dq_over_q=self.dq_over_q, # This is no longer a single value. Is it ok just to remove from the meta_data?
             sequence_number=sequence_number,
             sequence_id=sequence_id,
             q_summing=self.q_summing,
@@ -1292,13 +1292,8 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     settings = read_settings(ws)
 
     if theta is None:
-        if (
-            "BL4B:CS:ExpPl:OperatingMode" in ws.getRun()
-            and ws.getRun().getProperty("BL4B:CS:ExpPl:OperatingMode").value[0] == "Free Liquid"
-        ) or (
-            "BL4B:CS:Mode:Coordinates" in ws.getRun()
-            and ws.getRun().getProperty("BL4B:Mode:Coordinates").value[0] == 0 # Earth-centered=0
-        ):
+        coordinate_system = CoordinateSystem.from_workspace(ws)
+        if coordinate_system == CoordinateSystem.EARTH_CENTERED:
             Theta_deg = abs(ws.getRun().getProperty("thi").value[0])
             theta = np.radians(Theta_deg)
         else:
@@ -1418,13 +1413,8 @@ def trapezoidal_distribution_params(ws, Theta_deg=None, FootPrint=None, SlitRati
     dS1Si = dS1Samp - dSiSamp
 
     if Theta_deg is None:
-        if (
-            "BL4B:CS:ExpPl:OperatingMode" in ws.getRun()
-            and ws.getRun().getProperty("BL4B:CS:ExpPl:OperatingMode").value[0] == "Free Liquid"
-        ) or (
-            "BL4B:CS:Mode:Coordinates" in ws.getRun()
-            and ws.getRun().getProperty("BL4B:Mode:Coordinates").value[0] == 0 # Earth-centered=0
-        ):
+        coordinate_system = CoordinateSystem.from_workspace(ws)
+        if coordinate_system == CoordinateSystem.EARTH_CENTERED:
             Theta_deg = abs(ws.getRun().getProperty("thi").value[0])
         else:
             Theta_deg = abs(ws.getRun().getProperty("ths").value[0])
