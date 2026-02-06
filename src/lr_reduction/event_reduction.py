@@ -10,12 +10,12 @@ from typing import Optional
 
 import mantid.simpleapi as api
 import numpy as np
-import sympy as sp
 from scipy.optimize import brentq
 
 from lr_reduction.data_info import CoordinateSystem
 from lr_reduction.gravity_correction import GravityDirection, gravity_correction
 from lr_reduction.instrument_settings import InstrumentSettings
+from lr_reduction.user_defined_function import UserDefinedFunction
 from lr_reduction.utils import mantid_algorithm_exec
 
 from . import background, dead_time_correction
@@ -1510,12 +1510,9 @@ def compute_wavelength_resolution(ws, wl_list = None):
     if wl_list is not None:
         # Parse function to be used on list rather than in workspace.
         read_function = settings.wavelength_resolution_function
-        read_formula = UserDefinedFunction(read_function)
-        d_lambda = np.array(read_formula(wl_list))
+        resolution_function = UserDefinedFunction(read_function)
+        d_lambda = np.array(resolution_function(wl_list))
         wavelength = np.array(wl_list)
-        # Create a temporary workspace with the provided wavelength values
-        #temp_ws = api.CreateWorkspace(DataX=wl_list, DataY=np.ones_like(wl_list), NSpec=1)
-        #ws = temp_ws
     else:
         if ws.spectrumInfo().size() != 1:
             raise ValueError("Workspace must have only one spectrum")
@@ -1530,49 +1527,3 @@ def compute_wavelength_resolution(ws, wl_list = None):
     d_lambda[d_lambda < 0] = 0
 
     return wavelength, d_lambda
-
-def parse_user_expression(s: str):
-    '''
-    Parse function as a string into formula and params.
-    If entered from a Mantid function should skip the name part.
-    '''
-    parts = [p.strip() for p in s.split(",")]
-
-    formula = None
-    params = {}
-
-    for part in parts:
-        key, value = [x.strip() for x in part.split("=", 1)]
-
-        if key.lower() == "formula":
-            formula = value
-        elif key.lower() == "name":
-            continue
-        else:
-            params[key] = float(value)
-
-    if formula is None:
-        raise ValueError("Missing Formula=...")
-
-    return formula, params
-
-class UserDefinedFunction:
-    def __init__(self, definition: str):
-        self.expr_str, self.params = parse_user_expression(definition)
-
-        self.x = sp.symbols("x")
-        self.param_symbols = {k: sp.symbols(k) for k in self.params}
-
-        self.expr = sp.sympify(
-            self.expr_str,
-            locals={"x": self.x, **self.param_symbols}
-        )
-
-        self._f = sp.lambdify(
-            (self.x, *self.param_symbols.values()),
-            self.expr,
-            modules="numpy"
-        )
-
-    def __call__(self, x):
-        return self._f(x, *self.params.values())
