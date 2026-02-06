@@ -87,6 +87,8 @@ matplotlib = "==3.9.4"
 plot-publisher = ">=1.0,<2.0"
 pyqt = ">=5,<6"
 qtpy = ">=2.4.3"
+sympy = ">=1.14.0,<2"
+jupyter = ">=1.1.1,<2"
 
 # Pypi packages to be installed in the environments with `pip`
 [tool.pixi.pypi-dependencies]
@@ -102,6 +104,7 @@ matplotlib = "==3.9.4"
 plot-publisher = ">=1.0,<2.0"
 pyqt = ">=5,<6"
 qtpy = ">=2.4.3"
+sympy = ">=1.14.0,<2"
 
 [tool.pixi.package]
 name = "lr_reduction"

@@ -37,22 +37,65 @@ class DataType(IntEnum):
         sample_logs = SampleLogValues(input_workspace)
         value = cls.REFLECTED_BEAM
         try:
+            coordinate_system = CoordinateSystem.from_workspace(input_workspace)
             # Determine whether this is a direct beam based on the geometry
-            if (("BL4B:CS:Mode:Coordinates" in sample_logs and sample_logs["BL4B:CS:Mode:Coordinates"] == 0) or  # This is a new log for earth-centered
-                    sample_logs["BL4B:CS:ExpPl:OperatingMode"] == "Free Liquid"):  # This is for backward compatibility from before the new log value
-                # Earth-centered coordinate system
+            if coordinate_system == CoordinateSystem.EARTH_CENTERED:
                 thi = sample_logs["thi"]
                 tthd = sample_logs["tthd"]
                 if np.isclose(thi, tthd, atol=0.01):
                     value = cls.DIRECT_BEAM
-            else:
+            elif coordinate_system == CoordinateSystem.BEAM_CENTERED:
                 # Beam-centered coordinate system
                 ths = sample_logs["ths"]
                 tthd = sample_logs["tthd"]
                 if np.fabs(tthd) < 0.001 and np.fabs(ths) < 0.001:
                     value = cls.DIRECT_BEAM
-        except KeyError as e:
+            else:
+                logger.warning("Unknown coordinate system; assuming reflected beam")
+        except RuntimeError as e:
             logger.warning(f"Missing sample log {e}, assuming reflected beam")
+        return value
+
+    def __str__(self):
+        return self.name
+
+
+class CoordinateSystem(IntEnum):
+    """
+    Enum to represent the coordinate system used in the experiment.
+
+    Attributes:
+        UNKNOWN (int): Represents unknown coordinate system.
+        EARTH_CENTERED (int): Represents the Earth-centered coordinate system.
+        BEAM_CENTERED (int): Represents the Beam-centered coordinate system.
+    """
+
+    UNKNOWN = -1
+    EARTH_CENTERED = 0
+    BEAM_CENTERED = 1
+
+    @classmethod
+    def from_workspace(cls, input_workspace: MantidWorkspace):
+        """
+        Determine the coordinate system from the given workspace.
+        """
+        sample_logs = SampleLogValues(input_workspace)
+        value = cls.UNKNOWN
+        try:
+            # This is the new log for coordinate system mode
+            if "BL4B:CS:Mode:Coordinates" in sample_logs:
+                if sample_logs["BL4B:CS:Mode:Coordinates"] == 0:
+                    value = cls.EARTH_CENTERED
+                else:
+                    value = cls.BEAM_CENTERED
+            # Fallback to older method using operating mode
+            elif "BL4B:CS:ExpPl:OperatingMode" in sample_logs:
+                if sample_logs["BL4B:CS:ExpPl:OperatingMode"] == "Free Liquid":
+                    value = cls.EARTH_CENTERED
+                else:
+                    value = cls.BEAM_CENTERED
+        except RuntimeError as e:
+            logger.warning(f"Missing sample log {e}, unable to determine coordinate system")
         return value
 
     def __str__(self):
