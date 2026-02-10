@@ -10,7 +10,7 @@ from typing import Optional
 from lr_reduction import __version__ as VERSION
 from lr_reduction.gravity_correction import GravityDirection
 from lr_reduction.instrument_settings import InstrumentSettings
-from lr_reduction.scaling_factors.calculate import StitchingConfiguration
+from lr_reduction.scaling_factors.calculate import StitchingConfiguration, StitchingType
 
 # Get the mantid version being used, if available
 try:

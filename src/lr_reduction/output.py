@@ -198,7 +198,7 @@ class RunCollection:
                     if "theta_offset" in _meta:
                         fd.write("# Theta offset: %s\n" % _meta["theta_offset"])
                     fd.write("# Stitching type: %s\n" % self.stitching_configuration.type.value)
-                    if self.stitching_configuration.stitching_type != StitchingType.NONE:
+                    if self.stitching_configuration.type != StitchingType.NONE:
                         fd.write("# Scale factor q min: %s\n" % self.stitching_configuration.scale_factor_qmin)
                         fd.write("# Scale factor q max: %s\n" % self.stitching_configuration.scale_factor_qmax)
                     if meta_as_json:
