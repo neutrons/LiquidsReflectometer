@@ -4,26 +4,24 @@ import pytest
 from pytest import approx
 
 from lr_reduction.output import RunCollection
-from lr_reduction.reduction_template_reader import ReductionParameters
-from lr_reduction.scaling_factors.calculate import StitchingType
+from lr_reduction.scaling_factors.calculate import StitchingConfiguration, StitchingType
 
 
 @pytest.fixture
-def template_data_none():
-    """Create template data with no stitching"""
-    template = ReductionParameters()
-    template.stitching_type = StitchingType.NONE
-    return template
+def stitching_configuration_default():
+    """Create default stitching configuration"""
+    return StitchingConfiguration()
 
 
 @pytest.fixture
-def template_data_automatic():
-    """Create template data with automatic stitching"""
-    template = ReductionParameters()
-    template.stitching_type = StitchingType.AUTOMATIC_AVERAGE
-    template.sf_qmin = 0.01
-    template.sf_qmax = 0.05
-    return template
+def stitching_configuration_automatic_average(normalize_first_angle=False):
+    """Create a stitching configuration with automatic stitching"""
+    stitching_configuration = StitchingConfiguration()
+    stitching_configuration.type = StitchingType.AUTOMATIC_AVERAGE
+    stitching_configuration.scale_factor_qmin = 0.01
+    stitching_configuration.scale_factor_qmax = 0.05
+    stitching_configuration.normalize_first_angle = normalize_first_angle
+    return stitching_configuration
 
 
 @pytest.fixture
@@ -69,51 +67,40 @@ def mock_run_data():
 class TestRunCollectionStitching:
     """Test RunCollection stitching functionality"""
 
-    def test_init_with_template_data(self, template_data_none):
-        """Test RunCollection initialization with template data"""
-        coll = RunCollection(template_data=template_data_none)
-        assert coll.template_data == template_data_none
-        assert coll.collection == []
-
-    def test_calculate_scale_factors_none(self, template_data_none, mock_run_data):
+    def test_calculate_scale_factors_none(self, stitching_configuration_default, mock_run_data):
         """Test that NONE stitching type returns all 1.0 scale factors"""
-        coll = RunCollection(template_data=template_data_none)
+        coll = RunCollection(stitching_configuration=stitching_configuration_default)
 
         for q, r, dr, meta in mock_run_data:
             coll.add(q, r, dr, meta_data=meta)
 
-        coll.stitching_type = template_data_none.stitching_type
-        coll.scale_factors = []
+        coll.stitching_type = stitching_configuration_default.type
         coll.calculate_scale_factors()
 
         assert len(coll.scale_factors) == 2
         assert all(sf == 1.0 for sf in coll.scale_factors)
 
-    def test_calculate_scale_factors_automatic(self, template_data_automatic, mock_run_data):
+    def test_calculate_scale_factors_automatic(self, stitching_configuration_automatic_average, mock_run_data):
         """Test automatic stitching scale factor calculation"""
-        coll = RunCollection(template_data=template_data_automatic)
+        coll = RunCollection(stitching_configuration=stitching_configuration_automatic_average)
 
         for q, r, dr, meta in mock_run_data:
             coll.add(q, r, dr, meta_data=meta)
 
-        coll.stitching_type = template_data_automatic.stitching_type
         coll.calculate_scale_factors()
 
         assert len(coll.scale_factors) == 2
-        # First scale factor should be from critical edge
-        assert isinstance(coll.scale_factors[0], float)
-        # Second scale factor should be from overlap
-        assert isinstance(coll.scale_factors[1], float)
+        assert coll.scale_factors[0] == approx(1.0)
+        assert coll.scale_factors[1] == approx(0.25)
 
-    def test_merge_applies_scale_factors(self, template_data_none, mock_run_data):
+    def test_merge_applies_scale_factors(self, stitching_configuration_default, mock_run_data):
         """Test that merge applies scale factors to reflectivity"""
-        coll = RunCollection(template_data=template_data_none)
+        coll = RunCollection(stitching_configuration=stitching_configuration_default)
 
         q1, r1, dr1, meta1 = mock_run_data[0]
         coll.add(q1, r1, dr1, meta_data=meta1)
 
         # Set manual scale factor
-        coll.stitching_type = StitchingType.NONE
         coll.scale_factors = [2.0]  # Scale by 2
         coll.merge()
 
@@ -121,6 +108,21 @@ class TestRunCollectionStitching:
         assert coll.refl_all[0] == approx(r1[0] * 2.0)
         assert coll.d_refl_all[0] == approx(dr1[0] * 2.0)
 
+    def test_normalize_first_angle_true(self, stitching_configuration_automatic_average, mock_run_data):
+        """Test that setting normalize_first_angle True updates the first edge"""
+        stitching_configuration_automatic_average.normalize_first_angle = True
+        coll = RunCollection(stitching_configuration=stitching_configuration_automatic_average)
+
+        for q, r, dr, meta in mock_run_data:
+            coll.add(q, r, dr, meta_data=meta)
+
+        coll.calculate_scale_factors()
+
+        print(coll.scale_factors)
+
+        assert len(coll.scale_factors) == 2
+        assert coll.scale_factors[0] == approx(0.5)
+        assert coll.scale_factors[1] == approx(0.25)
 
 
 if __name__ == "__main__":

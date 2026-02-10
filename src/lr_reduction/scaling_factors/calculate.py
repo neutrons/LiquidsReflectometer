@@ -21,6 +21,20 @@ class StitchingType(Enum):
         # reached if value cannot be matched
         raise ValueError(f"Invalid StitchingType value: {value}")
 
+class StitchingConfiguration:
+    """Class to hold configuration for stitching."""
+
+    def __init__(self, stitching_type: StitchingType = StitchingType.NONE,
+                 reflectivity_scale_factor: float = 1.0,
+                 scale_factor_qmin: float = 0.00,
+                 scale_factor_qmax: float = 0.01,
+                 normalize_first_angle=False):
+        self.type = stitching_type
+        self.reflectivity_scale_factor = reflectivity_scale_factor
+        self.scale_factor_qmin = scale_factor_qmin
+        self.scale_factor_qmax = scale_factor_qmax
+        self.normalize_first_angle = normalize_first_angle
+
 @dataclass
 class ReducedData:
     """Class for reduced data."""

@@ -9,7 +9,6 @@ import numpy as np
 from mantid.simpleapi import LoadEventNexus, logger
 
 from lr_reduction import event_reduction, output, reduction_template_reader, template
-from lr_reduction.scaling_factors.calculate import StitchingType
 from lr_reduction.typing import MantidWorkspace
 from lr_reduction.web_report import assemble_report, generate_report_sections
 
@@ -82,7 +81,6 @@ def reduce(
 
     # Save partial results
     coll = output.RunCollection()
-    coll.template_data.stitching_type = StitchingType.NONE
     coll.add(qz_mid, refl, d_refl, meta_data=meta_data)
 
     # If this is live data, put it in a separate file to avoid conflict with auto-reduction
@@ -100,7 +98,7 @@ def reduce(
     seq_list, run_list, sf_list, refl_plot = assemble_results(meta_data["sequence_id"],
                                                              output_dir, average_overlap,
                                                              is_live=is_live,
-                                                             template_data=template_data)
+                                                             stitching_configuration=template_data.stitching_configuration)
     report_sections = generate_report_sections(ws, template_data, meta_data)
     report = assemble_report(refl_plot, report_sections)
 
@@ -124,7 +122,7 @@ def reduce(
     return run_list[0]
 
 
-def assemble_results(first_run, output_dir, average_overlap=False, is_live=False, template_data=None):
+def assemble_results(first_run, output_dir, average_overlap=False, is_live=False, stitching_configuration=None):
     """
     Find related runs and assemble them in one R(q) data set
 
@@ -138,8 +136,8 @@ def assemble_results(first_run, output_dir, average_overlap=False, is_live=False
         If True, the overlapping points will be averaged
     is_live : bool
         If True, the data is live and will be saved in a separate file to avoid conflict with auto-reduction
-    template_data : ReductionParameters
-        The template data used for the reduction
+    stitching_configuration : StitchingConfiguration | None
+        The configuration used to stitch runs
 
     Returns
     -------
@@ -153,7 +151,7 @@ def assemble_results(first_run, output_dir, average_overlap=False, is_live=False
     # Keep track of sequence IDs and run numbers so we can make a new template
     seq_list = []
     run_list = []
-    coll = output.RunCollection(average_overlap=average_overlap, template_data=template_data)
+    coll = output.RunCollection(average_overlap=average_overlap, stitching_configuration=stitching_configuration)
 
     file_list = sorted(os.listdir(output_dir))
     for item in file_list:

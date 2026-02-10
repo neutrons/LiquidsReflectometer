@@ -7,10 +7,10 @@ import json
 import numpy as np
 from plot_publisher import plot1d
 
-from lr_reduction.reduction_template_reader import ReductionParameters
 from lr_reduction.scaling_factors.calculate import (
     OverlapScalingFactor,
     ReducedData,
+    StitchingConfiguration,
     StitchingType,
     scaling_factor_critical_edge,
 )
@@ -23,10 +23,10 @@ class RunCollection:
     A collection of runs to assemble into a single R(Q)
     """
 
-    def __init__(self, average_overlap=False, template_data=ReductionParameters()):
+    def __init__(self, average_overlap=False, stitching_configuration: StitchingConfiguration | None = None):
         self.collection = []
+        self.stitching_configuration = stitching_configuration if stitching_configuration else StitchingConfiguration(StitchingType.NONE)
         self.average_overlap = average_overlap
-        self.template_data = template_data
         self.scale_factors = []
         self.qz_all = []
         self.refl_all = []
@@ -60,27 +60,34 @@ class RunCollection:
         """
         Calculate scale factors for each run in the collection
         """
-        if self.template_data.stitching_type == StitchingType.NONE:
-            self.scale_factors = [1.0 for _ in self.collection]
-        elif self.template_data.stitching_type == StitchingType.AUTOMATIC_AVERAGE:
+
+        if self.stitching_configuration.type == StitchingType.NONE:
+            return
+        elif self.stitching_configuration.type == StitchingType.AUTOMATIC_AVERAGE:
 
             # Convert collection to type used in scaling factor calculation
-            collection_reduced_data = [ReducedData(run['q'], run['r'], run['dr']) for run in self.collection]
+            # Sorted by increasing q with references to original indices
+            sorted_indices, sorted_collection_reduced_data = zip(
+                *sorted(
+                    ((i, ReducedData(run['q'], run['r'], run['dr'])) for i, run in enumerate(self.collection)),
+                    key=lambda t: t[1].q[0]
+                )
+            )
 
-            for i, item in enumerate(collection_reduced_data):
-                if i == 0:
-                    ce = scaling_factor_critical_edge(self.template_data.sf_qmin,
-                                                      self.template_data.sf_qmax,
-                                                      collection_reduced_data)
-                    self.scale_factors[0] = ce
-                else:
+            # Apply critical edge scaling if enabled
+            if self.stitching_configuration.normalize_first_angle:
+                ce = scaling_factor_critical_edge(self.stitching_configuration.scale_factor_qmin, self.stitching_configuration.scale_factor_qmax, sorted_collection_reduced_data)
+                self.scale_factors[sorted_indices[0]] = ce
+
+            # Apply scaling for remaining runs
+            if len(sorted_collection_reduced_data) > 1:
+                for i in range(1, len(sorted_indices)):
                     overlap_sf_calculator = OverlapScalingFactor(
-                        left_data=collection_reduced_data[i - 1],
-                        right_data=collection_reduced_data[i]
+                        left_data=sorted_collection_reduced_data[sorted_indices[i- 1]],
+                        right_data=sorted_collection_reduced_data[sorted_indices[i]]
                     )
                     sf = overlap_sf_calculator.get_scaling_factor()
-                    self.scale_factors[i] = sf
-
+                    self.scale_factors[sorted_indices[i]] = sf
 
     def merge(self):
         """
@@ -190,10 +197,10 @@ class RunCollection:
                         fd.write("# Bck in Q: %s\n" % _meta["bck_in_q"])
                     if "theta_offset" in _meta:
                         fd.write("# Theta offset: %s\n" % _meta["theta_offset"])
-                    fd.write("# Stitching type: %s\n" % self.template_data.stitching_type.value)
-                    if self.template_data.stitching_type != StitchingType.NONE:
-                        fd.write("# Scale factor q min: %s\n" % self.template_data.sf_qmin)
-                        fd.write("# Scale factor q max: %s\n" % self.template_data.sf_qmax)
+                    fd.write("# Stitching type: %s\n" % self.stitching_configuration.type.value)
+                    if self.stitching_configuration.stitching_type != StitchingType.NONE:
+                        fd.write("# Scale factor q min: %s\n" % self.stitching_configuration.scale_factor_qmin)
+                        fd.write("# Scale factor q max: %s\n" % self.stitching_configuration.scale_factor_qmax)
                     if meta_as_json:
                         fd.write("# Meta:%s\n" % json.dumps(_meta))
                     fd.write("# DataRun   NormRun   TwoTheta(deg)  LambdaMin(A)   ")
