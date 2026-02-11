@@ -237,7 +237,7 @@ class OverlapScalingFactor:
             logger.warning("Left mean value is zero; setting scaling factor to 1.0 to avoid division by zero.")
             sf = 1.0
         else:
-            sf = right_mean / left_mean
+            sf = left_mean / right_mean
         return sf
 
     def calculate_mean_over_range(self, range_to_use: np.ndarray, a: float, b: float) -> float:

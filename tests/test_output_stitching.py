@@ -91,7 +91,7 @@ class TestRunCollectionStitching:
 
         assert len(coll.scale_factors) == 2
         assert coll.scale_factors[0] == approx(1.0)
-        assert coll.scale_factors[1] == approx(0.25)
+        assert coll.scale_factors[1] == approx(4.0)
 
     def test_merge_applies_scale_factors(self, stitching_configuration_default, mock_run_data):
         """Test that merge applies scale factors to reflectivity"""
@@ -118,11 +118,9 @@ class TestRunCollectionStitching:
 
         coll.calculate_scale_factors()
 
-        print(coll.scale_factors)
-
         assert len(coll.scale_factors) == 2
         assert coll.scale_factors[0] == approx(0.5)
-        assert coll.scale_factors[1] == approx(0.25)
+        assert coll.scale_factors[1] == approx(4.0)
 
 
 if __name__ == "__main__":
