@@ -27,7 +27,6 @@ class RunCollection:
         self.collection = []
         self.stitching_configuration = stitching_configuration if stitching_configuration else StitchingConfiguration(StitchingType.NONE)
         self.average_overlap = average_overlap
-        self.scale_factors = []
         self.qz_all = []
         self.refl_all = []
         self.d_refl_all = []
@@ -54,7 +53,7 @@ class RunCollection:
             resolution = meta_data["dq_over_q"]
             dq = resolution * q
         self.collection.append(dict(q=q, r=r, dr=dr, dq=dq, info=meta_data))
-        self.scale_factors.append(1.0)
+        self.stitching_configuration.reflectivity_scale_factors.append(1.0)
 
     def calculate_scale_factors(self):
         """
@@ -74,10 +73,14 @@ class RunCollection:
                 )
             )
 
+            # Track a cumulative scale factor to properly scale subsequent runs
+            cumulative_scale_factor = 1.0
+
             # Apply critical edge scaling if enabled
             if self.stitching_configuration.normalize_first_angle:
                 ce = scaling_factor_critical_edge(self.stitching_configuration.scale_factor_qmin, self.stitching_configuration.scale_factor_qmax, sorted_collection_reduced_data)
-                self.scale_factors[sorted_indices[0]] = ce
+                self.stitching_configuration.reflectivity_scale_factors[sorted_indices[0]] = ce
+                cumulative_scale_factor = ce
 
             # Apply scaling for remaining runs
             if len(sorted_collection_reduced_data) > 1:
@@ -87,7 +90,8 @@ class RunCollection:
                         right_data=sorted_collection_reduced_data[sorted_indices[i]]
                     )
                     sf = overlap_sf_calculator.get_scaling_factor()
-                    self.scale_factors[sorted_indices[i]] = sf
+                    cumulative_scale_factor *= sf
+                    self.stitching_configuration.reflectivity_scale_factors[sorted_indices[i]] = cumulative_scale_factor
 
     def merge(self):
         """
@@ -101,8 +105,8 @@ class RunCollection:
         for idx, item in enumerate(self.collection):
             for i in range(len(item["q"])):
                 qz_all.append(item["q"][i])
-                refl_all.append(item["r"][i] * self.scale_factors[idx])
-                d_refl_all.append(item["dr"][i] * self.scale_factors[idx])
+                refl_all.append(item["r"][i] * self.stitching_configuration.reflectivity_scale_factors[idx])
+                d_refl_all.append(item["dr"][i] * self.stitching_configuration.reflectivity_scale_factors[idx])
                 d_qz_all.append(item["dq"][i])
 
         qz_all = np.asarray(qz_all)
@@ -204,7 +208,7 @@ class RunCollection:
                     if meta_as_json:
                         fd.write("# Meta:%s\n" % json.dumps(_meta))
                     fd.write("# DataRun   NormRun   TwoTheta(deg)  LambdaMin(A)   ")
-                    fd.write("LambdaMax(A) Qmin(1/A)    Qmax(1/A)    SF_A         SF_B      SF\n")
+                    fd.write("LambdaMax(A) Qmin(1/A)    Qmax(1/A)    SF_A         SF_B          SF\n")
                     fd.write("")
                 if "scaling_factors" in _meta:
                     a = _meta["scaling_factors"]["a"]
@@ -223,7 +227,7 @@ class RunCollection:
                     _meta["q_max"],
                     a,
                     b,
-                    self.scale_factors[i],
+                    self.stitching_configuration.reflectivity_scale_factors[i],
                 )
                 fd.write("# %-9s %-9s %-14.6g %-14.6g %-12.6g %-12.6s %-12.6s %-12.6s %-12.6s %-12.6s\n" % value_list)
                 initial_entry_written = True

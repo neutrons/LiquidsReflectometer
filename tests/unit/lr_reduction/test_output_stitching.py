@@ -77,8 +77,8 @@ class TestRunCollectionStitching:
         coll.stitching_type = stitching_configuration_default.type
         coll.calculate_scale_factors()
 
-        assert len(coll.scale_factors) == 2
-        assert all(sf == 1.0 for sf in coll.scale_factors)
+        assert len(coll.stitching_configuration.reflectivity_scale_factors) == 2
+        assert all(sf == 1.0 for sf in coll.stitching_configuration.reflectivity_scale_factors)
 
     def test_calculate_scale_factors_automatic(self, stitching_configuration_automatic_average, mock_run_data):
         """Test automatic stitching scale factor calculation"""
@@ -89,9 +89,9 @@ class TestRunCollectionStitching:
 
         coll.calculate_scale_factors()
 
-        assert len(coll.scale_factors) == 2
-        assert coll.scale_factors[0] == approx(1.0)
-        assert coll.scale_factors[1] == approx(4.0)
+        assert len(coll.stitching_configuration.reflectivity_scale_factors) == 2
+        assert coll.stitching_configuration.reflectivity_scale_factors[0] == approx(1.0)
+        assert coll.stitching_configuration.reflectivity_scale_factors[1] == approx(4.0)
 
     def test_merge_applies_scale_factors(self, stitching_configuration_default, mock_run_data):
         """Test that merge applies scale factors to reflectivity"""
@@ -101,7 +101,7 @@ class TestRunCollectionStitching:
         coll.add(q1, r1, dr1, meta_data=meta1)
 
         # Set manual scale factor
-        coll.scale_factors = [2.0]  # Scale by 2
+        coll.stitching_configuration.reflectivity_scale_factors = [2.0]  # Scale by 2
         coll.merge()
 
         # Check that reflectivity was scaled
@@ -118,9 +118,9 @@ class TestRunCollectionStitching:
 
         coll.calculate_scale_factors()
 
-        assert len(coll.scale_factors) == 2
-        assert coll.scale_factors[0] == approx(0.5)
-        assert coll.scale_factors[1] == approx(4.0)
+        assert len(coll.stitching_configuration.reflectivity_scale_factors) == 2
+        assert coll.stitching_configuration.reflectivity_scale_factors[0] == approx(0.5)
+        assert coll.stitching_configuration.reflectivity_scale_factors[1] == approx(2.0)
 
 
 if __name__ == "__main__":
