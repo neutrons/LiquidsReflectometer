@@ -5,11 +5,12 @@ Adapted from Mantid code.
 
 import time
 import xml.dom.minidom
-from typing import Optional
+from typing import List, Optional
 
 from lr_reduction import __version__ as VERSION
 from lr_reduction.gravity_correction import GravityDirection
 from lr_reduction.instrument_settings import InstrumentSettings
+from lr_reduction.scaling_factors.calculate import StitchingConfiguration, StitchingType
 
 # Get the mantid version being used, if available
 try:
@@ -91,6 +92,49 @@ class ReductionParameters:
 
         # Gravity correction
         self.gravity_direction = None
+
+        # Stitching
+        self.stitching_configuration = StitchingConfiguration()
+
+    @property
+    def stitching_type(self) -> StitchingType:
+        return self.stitching_configuration.type
+
+    @stitching_type.setter
+    def stitching_type(self, value: StitchingType):
+        self.stitching_configuration.type = value
+
+    @property
+    def reflectivity_scale_factors(self) -> List[float]:
+        return self.stitching_configuration.reflectivity_scale_factors
+
+    @reflectivity_scale_factors.setter
+    def reflectivity_scale_factors(self, value: List[float]):
+        self.stitching_configuration.reflectivity_scale_factors = value
+
+    @property
+    def scale_factor_qmin(self) -> float:
+        return self.stitching_configuration.scale_factor_qmin
+
+    @scale_factor_qmin.setter
+    def scale_factor_qmin(self, value: float):
+        self.stitching_configuration.scale_factor_qmin = value
+
+    @property
+    def scale_factor_qmax(self) -> float:
+        return self.stitching_configuration.scale_factor_qmax
+
+    @scale_factor_qmax.setter
+    def scale_factor_qmax(self, value: float):
+        self.stitching_configuration.scale_factor_qmax = value
+
+    @property
+    def normalize_first_angle(self) -> bool:
+        return self.stitching_configuration.normalize_first_angle
+
+    @normalize_first_angle.setter
+    def normalize_first_angle(self, value: bool):
+        self.stitching_configuration.normalize_first_angle = value
 
     def from_dict(self, data_dict, permissible=True):
         """
@@ -203,6 +247,16 @@ class ReductionParameters:
 
         # Emission time correction
         _xml += "<use_emission_time>%s</use_emission_time>\n" % str(self.use_emission_time)
+
+        # Stitching
+        _xml += "<stitching_type>%s</stitching_type>\n" % str(self.stitching_configuration.type.value)
+        _xml += "<stitching_reflectivity_scale_factors>%s</stitching_reflectivity_scale_factors>\n" % ",".join([str(i) for i in self.stitching_configuration.reflectivity_scale_factors])
+        _xml += "<stitching_scale_factor_qmin>%s</stitching_scale_factor_qmin>\n" % str(self.stitching_configuration.scale_factor_qmin)
+        _xml += "<stitching_scale_factor_qmax>%s</stitching_scale_factor_qmax>\n" % str(self.stitching_configuration.scale_factor_qmax)
+        _xml += "<stitching_normalize_first_angle>%s</stitching_normalize_first_angle>\n" % str(
+            self.stitching_configuration.normalize_first_angle
+        )
+
         _xml += "</RefLData>\n"
 
         return _xml
@@ -346,6 +400,16 @@ class ReductionParameters:
         # Defaults to True, but will be skipped if the necessary meta data is not found
         self.use_emission_time = getBoolElement(instrument_dom, "use_emission_time", default=True)
 
+        # Stitching
+        type_str = getStringElement(instrument_dom, "stitching_type", default=self.stitching_configuration.type.value)
+        self.stitching_configuration.type = StitchingType.from_value(type_str)
+        reflectivity_scale_factors_str = getStringElement(instrument_dom, "stitching_reflectivity_scale_factors", default=self.stitching_configuration.reflectivity_scale_factors)
+        if isinstance(reflectivity_scale_factors_str, str):
+            # if default value is used, stitching configuration already initialized a list
+            self.stitching_configuration.reflectivity_scale_factors = [float(sf) for sf in reflectivity_scale_factors_str.split(',')]
+        self.stitching_configuration.scale_factor_qmin = getFloatElement(instrument_dom, "stitching_scale_factor_qmin", default=self.stitching_configuration.scale_factor_qmin)
+        self.stitching_configuration.scale_factor_qmax = getFloatElement(instrument_dom, "stitching_scale_factor_qmax", default=self.stitching_configuration.scale_factor_qmax)
+        self.stitching_configuration.normalize_first_angle = getBoolElement(instrument_dom, "stitching_normalize_first_angle", default=self.stitching_configuration.normalize_first_angle)
 
 #############################################
 ### Utility functions to read XML content ###

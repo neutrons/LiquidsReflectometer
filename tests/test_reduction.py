@@ -11,6 +11,7 @@ import pytest
 
 # lr_reduction imports
 from lr_reduction import event_reduction, template, workflow
+from lr_reduction.template import read_template
 from lr_reduction.utils import amend_config
 
 mtd_api.config["default.facility"] = "SNS"
@@ -196,6 +197,42 @@ def test_reduce_workflow(template_dir, nexus_dir, tmp_path):
         fractional_differences = (_data[i] - _refl[i]) / _data[i]
         average_fractional_difference = np.fabs(np.sum(fractional_differences) / len(_refl[i]))
         assert average_fractional_difference < 0.07
+
+def test_reduce_workflow_with_stitching_automatic_average(template_dir, nexus_dir, tmp_path):
+    """
+    Test the complete working, but this time we average the point in the
+    overlap regions.
+    """
+    template_path = os.path.join(template_dir, "template_stitching_automatic_average.xml")
+    output_dir = tmp_path
+    reduced_path = os.path.join(output_dir, "REFL_198409_combined_data_auto.txt")
+
+    for i in range(198409, 198417):
+        with amend_config(data_dir=nexus_dir):
+            ws = mtd_api.Load("REF_L_%s" % i)
+        workflow.reduce(ws, template_path, output_dir=output_dir, average_overlap=True)
+
+    reference_path = os.path.join(template_dir, "reference_rq_avg.txt")
+    if os.path.isfile(reference_path):
+        _data = np.loadtxt(reference_path).T
+
+    if os.path.isfile(reduced_path):
+        _refl = np.loadtxt(reduced_path).T
+
+    template_out_path = os.path.join(output_dir, "REF_L_198409_auto_template.xml")
+
+    assert os.path.isfile(template_out_path)
+
+    template_out = read_template(template_out_path, 198409)
+    assert len(template_out.stitching_configuration.reflectivity_scale_factors) == 8
+    assert template_out.reflectivity_scale_factors[0] == pytest.approx(1.0)
+    assert template_out.reflectivity_scale_factors[1] == pytest.approx(1.0844, abs=1e-4)
+    assert template_out.reflectivity_scale_factors[2] == pytest.approx(1.0684, abs=1e-4)
+    assert template_out.reflectivity_scale_factors[3] == pytest.approx(0.9765, abs=1e-4)
+    assert template_out.reflectivity_scale_factors[4] == pytest.approx(1.1195, abs=1e-4)
+    assert template_out.reflectivity_scale_factors[5] == pytest.approx(1.1305, abs=1e-4)
+    assert template_out.reflectivity_scale_factors[6] == pytest.approx(1.2301, abs=1e-4)
+    assert template_out.reflectivity_scale_factors[7] == pytest.approx(1.1636, abs=1e-4)
 
 
 def test_reduce_functional_bck(nexus_dir, template_dir, tmp_path):
