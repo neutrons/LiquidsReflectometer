@@ -14,13 +14,13 @@ def stitching_configuration_default():
 
 
 @pytest.fixture
-def stitching_configuration_automatic_average(normalize_first_angle=False):
+def stitching_configuration_automatic_average():
     """Create a stitching configuration with automatic stitching"""
     stitching_configuration = StitchingConfiguration()
     stitching_configuration.type = StitchingType.AUTOMATIC_AVERAGE
     stitching_configuration.scale_factor_qmin = 0.01
     stitching_configuration.scale_factor_qmax = 0.05
-    stitching_configuration.normalize_first_angle = normalize_first_angle
+    stitching_configuration.normalize_first_angle = False
     return stitching_configuration
 
 
@@ -74,11 +74,10 @@ class TestRunCollectionStitching:
         for q, r, dr, meta in mock_run_data:
             coll.add(q, r, dr, meta_data=meta)
 
-        coll.stitching_type = stitching_configuration_default.type
         coll.calculate_scale_factors()
 
-        assert len(coll.stitching_configuration.reflectivity_scale_factors) == 2
-        assert all(sf == 1.0 for sf in coll.stitching_configuration.reflectivity_scale_factors)
+        assert len(coll.stitching_reflectivity_scale_factors) == 2
+        assert all(sf == 1.0 for sf in coll.stitching_reflectivity_scale_factors)
 
     def test_calculate_scale_factors_automatic(self, stitching_configuration_automatic_average, mock_run_data):
         """Test automatic stitching scale factor calculation"""
@@ -89,9 +88,25 @@ class TestRunCollectionStitching:
 
         coll.calculate_scale_factors()
 
-        assert len(coll.stitching_configuration.reflectivity_scale_factors) == 2
-        assert coll.stitching_configuration.reflectivity_scale_factors[0] == approx(1.0)
-        assert coll.stitching_configuration.reflectivity_scale_factors[1] == approx(4.0)
+        assert len(coll.stitching_reflectivity_scale_factors) == 2
+        assert coll.stitching_reflectivity_scale_factors[0] == approx(1.0)
+        assert coll.stitching_reflectivity_scale_factors[1] == approx(4.0)
+
+    def test_calculate_scale_factors_automatic_out_of_order(
+        self, stitching_configuration_automatic_average, mock_run_data
+    ):
+        """Test automatic stitching when runs are added out of q-order"""
+        coll = RunCollection(stitching_configuration=stitching_configuration_automatic_average)
+        # Add higher-q run first, then lower-q run
+        q2, r2, dr2, meta2 = mock_run_data[1]
+        q1, r1, dr1, meta1 = mock_run_data[0]
+        coll.add(q2, r2, dr2, meta_data=meta2)
+        coll.add(q1, r1, dr1, meta_data=meta1)
+        coll.calculate_scale_factors()
+        # Scale factors should be reversed from the base case (test_calculate_scale_factors_automatic)
+        assert len(coll.stitching_reflectivity_scale_factors) == 2
+        assert coll.stitching_reflectivity_scale_factors[0] == approx(4.0)
+        assert coll.stitching_reflectivity_scale_factors[1] == approx(1.0)
 
     def test_merge_applies_scale_factors(self, stitching_configuration_default, mock_run_data):
         """Test that merge applies scale factors to reflectivity"""
@@ -101,7 +116,7 @@ class TestRunCollectionStitching:
         coll.add(q1, r1, dr1, meta_data=meta1)
 
         # Set manual scale factor
-        coll.stitching_configuration.reflectivity_scale_factors = [2.0]  # Scale by 2
+        coll.stitching_reflectivity_scale_factors = [2.0]  # Scale by 2
         coll.merge()
 
         # Check that reflectivity was scaled
@@ -118,9 +133,9 @@ class TestRunCollectionStitching:
 
         coll.calculate_scale_factors()
 
-        assert len(coll.stitching_configuration.reflectivity_scale_factors) == 2
-        assert coll.stitching_configuration.reflectivity_scale_factors[0] == approx(0.5)
-        assert coll.stitching_configuration.reflectivity_scale_factors[1] == approx(2.0)
+        assert len(coll.stitching_reflectivity_scale_factors) == 2
+        assert coll.stitching_reflectivity_scale_factors[0] == approx(0.5)
+        assert coll.stitching_reflectivity_scale_factors[1] == approx(2.0)
 
 
 if __name__ == "__main__":

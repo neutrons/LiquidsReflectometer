@@ -71,7 +71,7 @@ def meta_data(workspace_sc, workspace_db, template_data):
 
 def test_generate_report_section_reduction_parameters(workspace_sc, template_data, meta_data):
     report = generate_report_section_reduction_parameters(workspace_sc, template_data, meta_data)
-    assert len(report) == 788
+    assert len(report) == 942
 
 
 def test_generate_report_plots_reflected_beam(workspace_sc, template_data):

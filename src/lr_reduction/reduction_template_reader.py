@@ -5,7 +5,7 @@ Adapted from Mantid code.
 
 import time
 import xml.dom.minidom
-from typing import List, Optional
+from typing import Optional
 
 from lr_reduction import __version__ as VERSION
 from lr_reduction.gravity_correction import GravityDirection
@@ -95,6 +95,7 @@ class ReductionParameters:
 
         # Stitching
         self.stitching_configuration = StitchingConfiguration()
+        self.stitching_reflectivity_scale_factor = 1.0
 
     @property
     def stitching_type(self) -> StitchingType:
@@ -103,14 +104,6 @@ class ReductionParameters:
     @stitching_type.setter
     def stitching_type(self, value: StitchingType):
         self.stitching_configuration.type = value
-
-    @property
-    def reflectivity_scale_factors(self) -> List[float]:
-        return self.stitching_configuration.reflectivity_scale_factors
-
-    @reflectivity_scale_factors.setter
-    def reflectivity_scale_factors(self, value: List[float]):
-        self.stitching_configuration.reflectivity_scale_factors = value
 
     @property
     def scale_factor_qmin(self) -> float:
@@ -250,12 +243,12 @@ class ReductionParameters:
 
         # Stitching
         _xml += "<stitching_type>%s</stitching_type>\n" % str(self.stitching_configuration.type.value)
-        _xml += "<stitching_reflectivity_scale_factors>%s</stitching_reflectivity_scale_factors>\n" % ",".join([str(i) for i in self.stitching_configuration.reflectivity_scale_factors])
         _xml += "<stitching_scale_factor_qmin>%s</stitching_scale_factor_qmin>\n" % str(self.stitching_configuration.scale_factor_qmin)
         _xml += "<stitching_scale_factor_qmax>%s</stitching_scale_factor_qmax>\n" % str(self.stitching_configuration.scale_factor_qmax)
         _xml += "<stitching_normalize_first_angle>%s</stitching_normalize_first_angle>\n" % str(
             self.stitching_configuration.normalize_first_angle
         )
+        _xml += "<stitching_reflectivity_scale_factor>%s</stitching_reflectivity_scale_factor>\n" % str(self.stitching_reflectivity_scale_factor)
 
         _xml += "</RefLData>\n"
 
@@ -403,13 +396,11 @@ class ReductionParameters:
         # Stitching
         type_str = getStringElement(instrument_dom, "stitching_type", default=self.stitching_configuration.type.value)
         self.stitching_configuration.type = StitchingType.from_value(type_str)
-        reflectivity_scale_factors_str = getStringElement(instrument_dom, "stitching_reflectivity_scale_factors", default=self.stitching_configuration.reflectivity_scale_factors)
-        if isinstance(reflectivity_scale_factors_str, str):
-            # if default value is used, stitching configuration already initialized a list
-            self.stitching_configuration.reflectivity_scale_factors = [float(sf) for sf in reflectivity_scale_factors_str.split(',')]
         self.stitching_configuration.scale_factor_qmin = getFloatElement(instrument_dom, "stitching_scale_factor_qmin", default=self.stitching_configuration.scale_factor_qmin)
         self.stitching_configuration.scale_factor_qmax = getFloatElement(instrument_dom, "stitching_scale_factor_qmax", default=self.stitching_configuration.scale_factor_qmax)
         self.stitching_configuration.normalize_first_angle = getBoolElement(instrument_dom, "stitching_normalize_first_angle", default=self.stitching_configuration.normalize_first_angle)
+        self.stitching_reflectivity_scale_factor = getFloatElement(instrument_dom, "stitching_reflectivity_scale_factor", default=self.stitching_reflectivity_scale_factor)
+
 
 #############################################
 ### Utility functions to read XML content ###

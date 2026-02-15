@@ -26,6 +26,7 @@ class RunCollection:
     def __init__(self, average_overlap=False, stitching_configuration: StitchingConfiguration | None = None):
         self.collection = []
         self.stitching_configuration = stitching_configuration if stitching_configuration else StitchingConfiguration(StitchingType.NONE)
+        self.stitching_reflectivity_scale_factors = []
         self.average_overlap = average_overlap
         self.qz_all = []
         self.refl_all = []
@@ -53,7 +54,7 @@ class RunCollection:
             resolution = meta_data["dq_over_q"]
             dq = resolution * q
         self.collection.append(dict(q=q, r=r, dr=dr, dq=dq, info=meta_data))
-        self.stitching_configuration.reflectivity_scale_factors.append(1.0)
+        self.stitching_reflectivity_scale_factors.append(1.0)
 
     def calculate_scale_factors(self):
         """
@@ -79,19 +80,19 @@ class RunCollection:
             # Apply critical edge scaling if enabled
             if self.stitching_configuration.normalize_first_angle:
                 ce = scaling_factor_critical_edge(self.stitching_configuration.scale_factor_qmin, self.stitching_configuration.scale_factor_qmax, sorted_collection_reduced_data)
-                self.stitching_configuration.reflectivity_scale_factors[sorted_indices[0]] = ce
+                self.stitching_reflectivity_scale_factors[sorted_indices[0]] = ce
                 cumulative_scale_factor = ce
 
             # Apply scaling for remaining runs
             if len(sorted_collection_reduced_data) > 1:
                 for i in range(1, len(sorted_indices)):
                     overlap_sf_calculator = OverlapScalingFactor(
-                        left_data=sorted_collection_reduced_data[sorted_indices[i- 1]],
-                        right_data=sorted_collection_reduced_data[sorted_indices[i]]
+                        left_data=sorted_collection_reduced_data[i- 1],
+                        right_data=sorted_collection_reduced_data[i]
                     )
                     sf = overlap_sf_calculator.get_scaling_factor()
                     cumulative_scale_factor *= sf
-                    self.stitching_configuration.reflectivity_scale_factors[sorted_indices[i]] = cumulative_scale_factor
+                    self.stitching_reflectivity_scale_factors[sorted_indices[i]] = cumulative_scale_factor
 
     def merge(self):
         """
@@ -105,8 +106,8 @@ class RunCollection:
         for idx, item in enumerate(self.collection):
             for i in range(len(item["q"])):
                 qz_all.append(item["q"][i])
-                refl_all.append(item["r"][i] * self.stitching_configuration.reflectivity_scale_factors[idx])
-                d_refl_all.append(item["dr"][i] * self.stitching_configuration.reflectivity_scale_factors[idx])
+                refl_all.append(item["r"][i] * self.stitching_reflectivity_scale_factors[idx])
+                d_refl_all.append(item["dr"][i] * self.stitching_reflectivity_scale_factors[idx])
                 d_qz_all.append(item["dq"][i])
 
         qz_all = np.asarray(qz_all)
@@ -227,7 +228,7 @@ class RunCollection:
                     _meta["q_max"],
                     a,
                     b,
-                    self.stitching_configuration.reflectivity_scale_factors[i],
+                    self.stitching_reflectivity_scale_factors[i],
                 )
                 fd.write("# %-9s %-9s %-14.6g %-14.6g %-12.6g %-12.6s %-12.6s %-12.6s %-12.6s %-12.6s\n" % value_list)
                 initial_entry_written = True
@@ -264,9 +265,9 @@ class RunCollection:
         refl_curves = []
         run_names = []
 
-        for item in self.collection:
+        for i, item in enumerate(self.collection):
             refl_curves.append([item["q"], item["r"], item["dr"], item["dq"]])
-            run_names.append(f"Run: {item['info']['run_number']}")
+            run_names.append(f"Run: {item['info']['run_number']}  SF: {self.stitching_reflectivity_scale_factors[i]:.3f}")
 
         # run_number parameter is only used when publish=True
         return plot1d(run_number="dummy_run", data_list=refl_curves, data_names=run_names,

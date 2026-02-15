@@ -1,6 +1,6 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import List, Literal
+from typing import Literal
 
 import numpy as np
 from mantid import mtd
@@ -25,7 +25,6 @@ class StitchingType(Enum):
 class StitchingConfiguration:
     """Class to hold configuration for stitching."""
     type: StitchingType = StitchingType.NONE
-    reflectivity_scale_factors: List[float] = field(default_factory=list)
     scale_factor_qmin: float = 0.00
     scale_factor_qmax: float = 0.01
     normalize_first_angle: bool = False

@@ -177,7 +177,7 @@ def assemble_results(first_run, output_dir, average_overlap=False, is_live=False
     coll.save_ascii(os.path.join(output_dir, output_file_name))
 
     plot_combined = coll.plot()
-    return seq_list, run_list, coll.stitching_configuration.reflectivity_scale_factors, plot_combined
+    return seq_list, run_list, coll.stitching_reflectivity_scale_factors, plot_combined
 
 
 def write_template(seq_list, run_list, sf_list, template_file, output_dir):
@@ -206,7 +206,7 @@ def write_template(seq_list, run_list, sf_list, template_file, output_dir):
         for i in range(len(seq_list)):
             if len(data_sets) >= seq_list[i]:
                 data_sets[seq_list[i] - 1].data_files = [run_list[i]]
-                data_sets[seq_list[i] - 1].stitching_configuration.reflectivity_scale_factors = sf_list
+                data_sets[seq_list[i] - 1].stitching_reflectivity_scale_factor = sf_list[i]
                 new_data_sets.append(data_sets[seq_list[i] - 1])
             else:
                 logger.warning(f"Too few entries [{len(data_sets)}] in template for sequence number {seq_list[i]} when saving new template")
