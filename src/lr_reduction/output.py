@@ -25,7 +25,7 @@ class RunCollection:
 
     def __init__(self, average_overlap=False, stitching_configuration: StitchingConfiguration | None = None):
         self.collection = []
-        self.stitching_configuration = stitching_configuration if stitching_configuration else StitchingConfiguration(StitchingType.NONE)
+        self.stitching_configuration = stitching_configuration or StitchingConfiguration(StitchingType.NONE)
         self.stitching_reflectivity_scale_factors = []
         self.average_overlap = average_overlap
         self.qz_all = []
