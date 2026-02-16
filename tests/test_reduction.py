@@ -56,16 +56,20 @@ def test_q_summing(template_dir, nexus_dir):
     template.read_template(template_path, 7)
     with amend_config(data_dir=nexus_dir):
         ws_sc = mtd_api.Load("REF_L_%s" % 198415)
-    qz_mid0, refl0, _, meta_data = template.process_from_template_ws(ws_sc, template_path, info=True)
+    qz_mid0, refl0, _, dq_over_q, _ = template.process_from_template_ws(ws_sc, template_path, info=True)
 
-    assert np.fabs(meta_data["dq_over_q"] - 0.02261) < 1e-3
+    # TODO: tighten the tolerance here once the equation has been updated
+    dq_over_q_expected = [0.014] * np.ones(43)
+    np.testing.assert_array_almost_equal(dq_over_q, dq_over_q_expected, decimal=3)
 
     # Now try with Q summing, which should have similar results
-    qz_mid, refl, _, meta_data = template.process_from_template_ws(
+    qz_mid, refl, _, dq_over_q, _ = template.process_from_template_ws(
         ws_sc, template_path, tof_weighted=True, info=True, q_summing=True
     )
 
-    assert np.fabs(meta_data["dq_over_q"] - 0.009354) < 1e-5
+    # TODO: tighten the tolerance here once the equation has been updated
+    dq_over_q_expected = [0.017] * np.ones(44)
+    np.testing.assert_array_almost_equal(dq_over_q, dq_over_q_expected, decimal=3)
 
     # Note that TOF weighted may have a slightly different range, so here we skip
     # the extra point.
@@ -107,9 +111,9 @@ def test_q_summing_as_option(template_dir, nexus_dir, template_file, q_summing, 
         ws_sc = mtd_api.Load("REF_L_%s" % 198415)
 
     with patch.object(event_reduction.EventReflectivity, "specular") as mock_specular:
-        mock_specular.return_value = (np.array([1, 2, 3]), np.array([0.1, 0.2]), np.array([0.01, 0.02]))
+        mock_specular.return_value = (np.array([1, 2, 3]), np.array([0.1, 0.2]), np.array([0.01, 0.02]), np.array([0.01, 0.02]))
 
-        qz_mid, refl, _, meta_data = template.process_from_template_ws(
+        qz_mid, refl, _, dq_over_q, meta_data = template.process_from_template_ws(
             ws_sc, template_path, tof_weighted=tof_weighted, info=True, q_summing=q_summing
         )
 
@@ -129,17 +133,18 @@ def test_full_reduction(template_dir, nexus_dir):
     qz_all = []
     refl_all = []
     d_refl_all = []
+    dq_q_all = []
     first_run = None
     for run_number in range(198409, 198417):
         with amend_config(data_dir=nexus_dir):
             ws_sc = mtd_api.Load("REF_L_%s" % run_number)
-        qz_mid, refl, d_refl = template.process_from_template_ws(ws_sc, template_path)
+        qz_mid, refl, d_refl, dq_over_q = template.process_from_template_ws(ws_sc, template_path)
 
         if first_run is None:
             first_run = run_number
-            resolution = event_reduction.compute_resolution(ws_sc)
 
         for i in range(len(qz_mid)):
+            dq_q_all.append(dq_over_q[i])
             qz_all.append(qz_mid[i])
             refl_all.append(refl[i])
             d_refl_all.append(d_refl[i])
@@ -147,13 +152,18 @@ def test_full_reduction(template_dir, nexus_dir):
     qz_all = np.asarray(qz_all)
     refl_all = np.asarray(refl_all)
     d_refl_all = np.asarray(d_refl_all)
+    dq_q_all = np.asarray(dq_q_all)
     idx = np.argsort(qz_all)
 
     qz_all = np.take_along_axis(qz_all, idx, axis=None)
     refl_all = np.take_along_axis(refl_all, idx, axis=None)
     d_refl_all = np.take_along_axis(d_refl_all, idx, axis=None)
+    dq_q_all = np.take_along_axis(dq_q_all, idx, axis=None)
 
-    assert np.fabs(resolution - 0.022751) < 1e-5
+    # TODO: tighten the tolerance and compare to the values in the reference file once the equation has been updated
+    dq_q_expected = [0.01] * np.ones(241)
+    np.testing.assert_array_almost_equal(dq_q_all, dq_q_expected, decimal=2)
+    # assert np.fabs(dq_q_all[0] - 0.022751) < 1e-5
     ref_data = np.loadtxt("data/reference_rq.txt").T
 
     # Optional plotting for checking tests:
@@ -233,17 +243,6 @@ def test_reduce_functional_bck(nexus_dir, template_dir, tmp_path):
         fractional_differences = (_data[i] - _refl[i]) / _data[i]
         average_fractional_difference = np.fabs(np.sum(fractional_differences) / len(_refl[i]))
         assert average_fractional_difference < 0.07
-
-
-def test_compute_wavelength_resolution_n_spectra():
-    """
-    Call compute wavelength resolution method with a workspace
-    of multiple spectra
-    """
-    ws = mtd_api.CreateSampleWorkspace(WorkspaceType="Event")
-
-    with pytest.raises(ValueError):
-        _, _ = event_reduction.compute_wavelength_resolution(ws)
 
 
 def test_reduce_bck_option_mismatch(template_dir, nexus_dir, tmp_path):

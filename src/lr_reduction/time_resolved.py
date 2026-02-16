@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 mantid.kernel.config.setLogLevel(3)
 
 from . import template
-from .event_reduction import apply_dead_time_correction, compute_resolution
+from .event_reduction import apply_dead_time_correction, read_settings
 
 
 def reduce_30Hz_from_ws(
@@ -99,7 +99,8 @@ def reduce_30Hz_from_ws(
     dq0 = 0
     if meas_ws_30Hz.getInstrument().hasParameter("dq-constant"):
         dq0 = meas_ws_30Hz.getInstrument().getNumberParameter("dq-constant")[0]
-    dq_slope = compute_resolution(meas_ws_30Hz)
+    # To be backwards compatible with the old normalisation methods keep the compute_resolution from before here
+    dq_slope = old_compute_resolution(meas_ws_30Hz)
     print("Resolution: %g + %g Q" % (dq0, dq_slope))
     dq = dq0 + dq_slope * q[_idx]
     return np.asarray([q[_idx], r_q_final[_idx], dr_q_final[_idx], dq])
@@ -362,9 +363,7 @@ def reduce_slices_ws(
         try:
             _reduced = template.process_from_template_ws(tmpws, template_data, theta_value=theta_value, ws_db=ws_db)
 
-            dq0 = 0
-            dq_slope = compute_resolution(tmpws)
-            dq = dq0 + dq_slope * _reduced[0]
+            dq = _reduced[0] * _reduced[3]
             _reduced = [_reduced[0], _reduced[1], _reduced[2], dq]
             _reduced = np.asarray(_reduced)
 
@@ -386,22 +385,35 @@ def reduce_slices_ws(
     return reduced
 
 
-def plot_slices(reduced, title, time_interval, file_path, offset=10, show=True):
+def plot_slices(reduced, title, time_interval, file_path, offset=10, show=True, show_dq=True):
     fig, ax = plt.subplots(figsize=(6, 6))
 
     total_time = 0
     _running_offset = 1.0
     for _data in reduced:
-        qz, refl, d_refl, _ = _data
+        if show_dq:
+            qz, refl, d_refl, dq = _data
 
-        plt.errorbar(
-            qz,
-            refl * _running_offset,
-            yerr=d_refl * _running_offset,
-            markersize=4,
-            marker="o",
-            label="T=%g s" % total_time,
-        )
+            plt.errorbar(
+                qz,
+                refl * _running_offset,
+                yerr=d_refl * _running_offset,
+                xerr=dq,
+                markersize=4,
+                marker="o",
+                label="T=%g s" % total_time,
+            )
+        else:
+            qz, refl, d_refl, _ = _data
+
+            plt.errorbar(
+                qz,
+                refl * _running_offset,
+                yerr=d_refl * _running_offset,
+                markersize=4,
+                marker="o",
+                label="T=%g s" % total_time,
+            )
 
         total_time += time_interval
         _running_offset *= offset
@@ -439,3 +451,71 @@ def package_json_data(dynamic_run, dyn_data_dir, out_array=None):
             json.dump(dict(times=compiled_times, data=compiled_array), fp)
 
     return compiled_times, compiled_array
+
+
+def old_compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
+    """
+    Compute the Q resolution from the meta data.
+    Corrected to include both slits.
+
+    Parameters
+    ----------
+    ws : mantid.api.Workspace
+        Mantid workspace to extract correction meta-data from.
+    theta : float
+        Scattering angle in radians
+    q_summing : bool
+        If True, the pixel size will be used for the resolution
+
+    Returns
+    -------
+    float
+        The dQ/Q resolution (FWHM)
+    """
+    settings = read_settings(ws)
+
+    if theta is None:
+        theta = abs(ws.getRun().getProperty("ths").value[0]) * np.pi / 180.0
+
+    if q_summing:
+        # Q resolution is reported as FWHM, so here we consider this to be
+        # related to the pixel width
+        sdd = 1830
+        if settings.sample_detector_distance:
+            sdd = settings.sample_detector_distance * 1000
+        pixel_size = 0.7
+        if settings.pixel_width:
+            pixel_size = settings.pixel_width
+
+        # All angles here in radians, assuming small angles
+        dq_over_q = np.arcsin(pixel_size / sdd) / theta
+        print("Q summing: %g" % dq_over_q)
+        return dq_over_q
+
+    # We can't compute the resolution if the value of xi is not in the logs.
+    # Since it was not always logged, check for it here.
+    if not ws.getRun().hasProperty("BL4B:Mot:xi.RBV"):
+        # For old data, the resolution can't be computed, so use
+        # the standard value for the instrument
+        print("Could not find BL4B:Mot:xi.RBV: using supplied dQ/Q")
+        return default_dq
+
+    # Xi reference would be the position of xi if the si slit were to be positioned
+    # at the sample. The distance from the sample to si is then xi_reference - xi.
+    xi_reference = 445
+    if ws.getInstrument().hasParameter("xi-reference"):
+        xi_reference = ws.getInstrument().getNumberParameter("xi-reference")[0]
+
+    # Distance between the s1 and the sample
+    s1_sample_distance = 1485
+    if settings.s1_sample_distance is not None:
+        s1_sample_distance = settings.s1_sample_distance * 1000
+
+    # Get slit gap openings.
+    s1h = abs(ws.getRun().getProperty("S1VHeight").value[0])
+    sih = abs(ws.getRun().getProperty("SiVHeight").value[0])
+    xi = abs(ws.getRun().getProperty("BL4B:Mot:xi.RBV").value[0])
+    sample_si_distance = xi_reference - xi
+    slit_distance = s1_sample_distance - sample_si_distance
+    dq_over_q = (s1h + sih) * 0.5 / slit_distance / theta
+    return dq_over_q
