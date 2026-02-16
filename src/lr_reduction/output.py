@@ -87,7 +87,7 @@ class RunCollection:
             if len(sorted_collection_reduced_data) > 1:
                 for i in range(1, len(sorted_indices)):
                     overlap_sf_calculator = OverlapScalingFactor(
-                        left_data=sorted_collection_reduced_data[i- 1],
+                        left_data=sorted_collection_reduced_data[i - 1],
                         right_data=sorted_collection_reduced_data[i]
                     )
                     sf = overlap_sf_calculator.get_scaling_factor()

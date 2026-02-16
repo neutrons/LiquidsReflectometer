@@ -182,8 +182,6 @@ def generate_report_sections(
         Template file path or pre-parsed template data, or `None` for a direct beam
     meta_data : dict
         Metadata to embed in the report, or `None` for a direct beam
-    stitching_configration : StitchingConfiguration | None
-        The stitching configuration used for the data in this report
 
     Returns
     -------

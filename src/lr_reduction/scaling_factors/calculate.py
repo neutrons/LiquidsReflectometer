@@ -8,6 +8,7 @@ from mantid.simpleapi import CreateWorkspace, Fit, ReplaceSpecialValues, logger
 
 
 class StitchingType(Enum):
+    """Enum for stitching types"""
     NONE = "None"
     AUTOMATIC_AVERAGE = "AutomaticAverage"
 

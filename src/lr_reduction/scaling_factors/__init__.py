@@ -9,8 +9,8 @@ from lr_reduction.scaling_factors.calculate import (
 
 __all__ = [
     "StitchingConfiguration",
-    "StitchingType", # noqa: F401
-    "ReducedData",  # noqa: F401
+    "StitchingType",
+    "ReducedData",
     "OverlapInfo",
     "scaling_factor_critical_edge",
     "OverlapScalingFactor",
