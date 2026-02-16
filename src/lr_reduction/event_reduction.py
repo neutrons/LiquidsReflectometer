@@ -15,6 +15,7 @@ from scipy.optimize import brentq
 from lr_reduction.data_info import CoordinateSystem
 from lr_reduction.gravity_correction import GravityDirection, gravity_correction
 from lr_reduction.instrument_settings import InstrumentSettings
+from lr_reduction.typing import MantidWorkspace
 from lr_reduction.user_defined_function import UserDefinedFunction
 from lr_reduction.utils import mantid_algorithm_exec
 
@@ -639,7 +640,7 @@ class EventReflectivity:
         # Compute Q resolution
         # For now keep the dq_over_q the same length as the q_bins to ensure conversion to mid-points is the same.
         lambda_bin_list = 4 * np.pi * np.sin(self.theta) / self.q_bins
-        dq_over_q_bins = compute_resolution(self._ws_sc, theta=self.theta, q_summing=q_summing, wl_list=lambda_bin_list)
+        dq_over_q_bins = compute_resolution(self._ws_sc, wl_list=lambda_bin_list, theta=self.theta, q_summing=q_summing)
         return self.q_bins, self.refl, self.d_refl, dq_over_q_bins
 
     def specular_unweighted(self, q_summing=False, normalize=True):
@@ -1268,7 +1269,7 @@ class EventReflectivity:
         return tofs
 
 
-def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
+def compute_theta_resolution(ws: MantidWorkspace, default_dq: float=0.027, theta: float=None, q_summing: bool=False) -> tuple[float, float]:
     """
     Compute the theta component of the q resolution.
     Corrected to include both slits.
@@ -1286,8 +1287,8 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
 
     Returns
     -------
-    float
-        The dtheta and theta values in degrees
+    tuple[float, float]
+        The theta and dtheta values in degrees
     """
     settings = read_settings(ws)
 
@@ -1310,6 +1311,7 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
             pixel_size = settings.pixel_width
 
         det_res = 1.0  # mm, approximate value for detector resolution contribution
+        # Standard deviation of a top-hat function (uniform distribution)
         sigma_pix = pixel_size / np.sqrt(12)
         sigma_y = np.sqrt((det_res ** 2 + sigma_pix ** 2))
 
@@ -1320,7 +1322,7 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
         theta_deg = np.degrees(theta)
 
         #print("Q summing: %g" % dq_over_q) ## Work out some print functions throughout.
-        return dtheta_deg, theta_deg
+        return theta_deg, dtheta_deg
 
     # We can't compute the resolution if the value of xi is not in the logs.
     # Since it was not always logged, check for it here.
@@ -1329,7 +1331,7 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
         # the standard value for the instrument
         print("Could not find BL4B:Mot:xi.RBV: using supplied dQ/Q")
         theta_deg = np.degrees(theta)
-        return default_dq, theta_deg
+        return theta_deg, default_dq
 
     # Compute the trapezoidal equivalent sigma of the angular distribution
     theta_deg = np.degrees(theta)
@@ -1338,27 +1340,29 @@ def compute_theta_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
     )
     dtheta_deg = dth_over_th * theta_deg
 
-    return dtheta_deg, theta_deg
+    return theta_deg, dtheta_deg
 
-def compute_resolution(ws, theta=None, q_summing=False, wl_list=None):
+
+def compute_resolution(ws: MantidWorkspace, wl_list: np.ndarray, theta: float=None, q_summing: bool=False) -> np.ndarray:
     """
     Compute the q resolution including both theta and lambda terms.
 
     :param ws: workspace for meta-data. If this is a lambda workspace
         already it can be used as the lambda imports in place of the wl_list.
+    :param wl_list: Provide a list of wavelengths for the lambda calculation.
     :param theta: option to overwrite theta input, otherwise uses ths/thi value.
     :param q_summing: Changes the angular calculation to be based on slits or pixel sizes depending on method of q conversion.
-    :param wl_list: Provide a list of wavelengths for the lambda calculation.
-        If not provided it assumes the workspace contains wavelengths.
     """
     ## Need to check through all the None's etc.
     ## Need to check separate outputs...
-    delta_th_deg, theta_deg = compute_theta_resolution(ws, theta=theta, q_summing=q_summing)
+    theta_deg, delta_th_deg = compute_theta_resolution(ws, theta=theta, q_summing=q_summing)
 
-    lambda_list, delta_lam = compute_wavelength_resolution(ws, wl_list=wl_list)
+    wl_resolution_function = read_settings(ws).wavelength_resolution_function
+    lambda_list, delta_lam = compute_wavelength_resolution(wl_list, wl_resolution_function)
 
     dq_over_q = np.sqrt((delta_lam / lambda_list) ** 2 + (delta_th_deg / theta_deg) ** 2)
     return dq_over_q
+
 
 ## New function for resolution, ready for testing.
 ## Check choices of returned values once ready to implement.
@@ -1481,16 +1485,16 @@ def _find_sigma_68(L_, l_, target_prob=0.68):
 ## Fix q-bin error and auto trimming points
 
 
-def compute_wavelength_resolution(ws, wl_list = None):
+def compute_wavelength_resolution(wl_list: np.ndarray, resolution_function_str: str) -> tuple[np.ndarray, np.ndarray]:
     """
-    Compute the wavelength resolution from the meta data.
+    Compute the wavelength resolution using the given resolution function.
 
     Parameters
     ----------
-    ws : mantid.api.Workspace
-        Mantid workspace to extract correction meta-data from.
-    wl_list : np.ndarray, optional
-        Wavelength values to compute the resolution for. If None, uses the ws X values.
+    wl_list : np.ndarray
+        Wavelength values to compute the resolution for.
+    resolution_function_str : str
+        User-defined resolution function.
 
     Returns
     -------
@@ -1498,30 +1502,11 @@ def compute_wavelength_resolution(ws, wl_list = None):
         (wavelength, d_lambda):
             wavelength: the fitted wavelength values
             d_lambda: the difference between wavelength and the fit
-
-    Raises
-    ------
-    ValueError : if ws does not have exactly one spectrum
     """
-
-    settings = read_settings(ws)
-
-    ## Need to check if this works.
-    if wl_list is not None:
-        # Parse function to be used on list rather than in workspace.
-        read_function = settings.wavelength_resolution_function
-        resolution_function = UserDefinedFunction(read_function)
-        d_lambda = np.array(resolution_function(wl_list))
-        wavelength = np.array(wl_list)
-    else:
-        if ws.spectrumInfo().size() != 1:
-            raise ValueError("Workspace must have only one spectrum")
-        # TODO: Check error handling. If this isn't in wavelength should have an error on the calculation.
-        out = api.EvaluateFunction(
-            Function=settings.wavelength_resolution_function, InputWorkspace=ws, OutputWorkspace="out"
-        )
-        wavelength = np.array(out.readX(1))
-        d_lambda = np.array(out.readY(1))
+    # Parse user-defined resolution function
+    resolution_function = UserDefinedFunction(resolution_function_str)
+    d_lambda = np.array(resolution_function(wl_list))
+    wavelength = np.array(wl_list)
 
     # Set any negative values to zero
     d_lambda[d_lambda < 0] = 0
