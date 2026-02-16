@@ -288,7 +288,7 @@ def generate_report_section_reduction_parameters(workspace: MantidWorkspace, tem
     two_backgrounds = meta_data["use_functional_bck"]
 
     meta = "<table style='width:80%'>"
-    meta += "<tr><td>Run:</td><td><b>%s</b> </td></td><td><b>Direct beam: %s</b></td></tr>" % (
+    meta += "<tr><td>Run:</td><td><b>%s</b></td><td><b>Direct beam: %s</b></td></tr>" % (
         int(sample_logs["run_number"]),
         direct_beam,
     )
@@ -297,7 +297,7 @@ def generate_report_section_reduction_parameters(workspace: MantidWorkspace, tem
         meta += "<tr><td>Specular peak:</td><td>%g</td><td>-</td></tr>" % (
             meta_data["specular_pixel"],
         )
-    meta += "<tr><td>Peak range:</td><td>%s - %s</td></td><td>%s - %s</td></tr>" % (
+    meta += "<tr><td>Peak range:</td><td>%s - %s</td><td>%s - %s</td></tr>" % (
         template_data.data_peak_range[0],
         template_data.data_peak_range[1],
         template_data.norm_peak_range[0],
@@ -326,6 +326,16 @@ def generate_report_section_reduction_parameters(workspace: MantidWorkspace, tem
         sample_logs["sequence_number"],
         sample_logs["sequence_total"],
     )
+
+    meta += "<tr><td>Stitching Type:</td><td>%s</td></tr>" % (template_data.stitching_configuration.type.value)
+    meta += "<tr><td>Stitching Q range:</td><td>%s - %s</td></tr>" % (
+        template_data.stitching_configuration.scale_factor_qmin,
+        template_data.stitching_configuration.scale_factor_qmax,
+    )
+    meta += "<tr><td>Stitching normalize first angle:</td><td>%s</td></tr>" % (
+        template_data.stitching_configuration.normalize_first_angle
+    )
+
     meta += "<tr><td>Report time:</td><td>%s</td></tr>" % time.ctime()
     meta += "</table>\n"
 

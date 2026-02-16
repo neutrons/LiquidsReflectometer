@@ -95,15 +95,17 @@ def reduce(
     coll.save_ascii(reduced_file, meta_as_json=True)
 
     # Assemble partial results into a single R(q)
-    seq_list, run_list, refl_plot = assemble_results(meta_data["sequence_id"], output_dir, average_overlap, is_live=is_live)
-
+    seq_list, run_list, sf_list, refl_plot = assemble_results(meta_data["sequence_id"],
+                                                             output_dir, average_overlap,
+                                                             is_live=is_live,
+                                                             stitching_configuration=template_data.stitching_configuration)
     report_sections = generate_report_sections(ws, template_data, meta_data)
     report = assemble_report(refl_plot, report_sections)
 
     # Save template. This will not happen if the template_file input was
     # template data, which the template processing allows.
     if isinstance(template_file, str):
-        write_template(seq_list, run_list, template_file, output_dir)
+        write_template(seq_list, run_list, sf_list, template_file, output_dir)
     else:
         logger.notice("Template data was passed instead of a file path: template data not saved")
 
@@ -120,7 +122,7 @@ def reduce(
     return run_list[0]
 
 
-def assemble_results(first_run, output_dir, average_overlap=False, is_live=False):
+def assemble_results(first_run, output_dir, average_overlap=False, is_live=False, stitching_configuration=None):
     """
     Find related runs and assemble them in one R(q) data set
 
@@ -134,6 +136,8 @@ def assemble_results(first_run, output_dir, average_overlap=False, is_live=False
         If True, the overlapping points will be averaged
     is_live : bool
         If True, the data is live and will be saved in a separate file to avoid conflict with auto-reduction
+    stitching_configuration : StitchingConfiguration | None
+        The configuration used to stitch runs
 
     Returns
     -------
@@ -141,13 +145,15 @@ def assemble_results(first_run, output_dir, average_overlap=False, is_live=False
         The sequence identifiers
     run_list : list
         The run numbers
+    sf_list: list
+        The stitching scaling factors used in the run collection
     plot_combined : str
         The combined reflectivity plot
     """
     # Keep track of sequence IDs and run numbers so we can make a new template
     seq_list = []
     run_list = []
-    coll = output.RunCollection(average_overlap=average_overlap)
+    coll = output.RunCollection(average_overlap=average_overlap, stitching_configuration=stitching_configuration)
 
     file_list = sorted(os.listdir(output_dir))
     for item in file_list:
@@ -171,11 +177,10 @@ def assemble_results(first_run, output_dir, average_overlap=False, is_live=False
     coll.save_ascii(os.path.join(output_dir, output_file_name))
 
     plot_combined = coll.plot()
+    return seq_list, run_list, coll.stitching_reflectivity_scale_factors, plot_combined
 
-    return seq_list, run_list, plot_combined
 
-
-def write_template(seq_list, run_list, template_file, output_dir):
+def write_template(seq_list, run_list, sf_list, template_file, output_dir):
     """
     Read the appropriate entry in a template file and save an updated
     copy with the updated run number.
@@ -186,6 +191,8 @@ def write_template(seq_list, run_list, template_file, output_dir):
         The sequence identifiers
     run_list : list
         The run numbers
+    sf_list: list
+        The scaling factors
     template_file : str
         Path to the template file
     output_dir : str
@@ -199,6 +206,7 @@ def write_template(seq_list, run_list, template_file, output_dir):
         for i in range(len(seq_list)):
             if len(data_sets) >= seq_list[i]:
                 data_sets[seq_list[i] - 1].data_files = [run_list[i]]
+                data_sets[seq_list[i] - 1].stitching_reflectivity_scale_factor = sf_list[i]
                 new_data_sets.append(data_sets[seq_list[i] - 1])
             else:
                 logger.warning(f"Too few entries [{len(data_sets)}] in template for sequence number {seq_list[i]} when saving new template")

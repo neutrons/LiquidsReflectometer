@@ -1,10 +1,34 @@
 from dataclasses import dataclass
+from enum import Enum
 from typing import Literal
 
 import numpy as np
 from mantid import mtd
 from mantid.simpleapi import CreateWorkspace, Fit, ReplaceSpecialValues, logger
 
+
+class StitchingType(Enum):
+    """Enum for stitching types"""
+    NONE = "None"
+    AUTOMATIC_AVERAGE = "AutomaticAverage"
+
+    @classmethod
+    def from_value(cls, value: str):
+        if value is None:
+            return cls.NONE
+        for item in cls:
+            if item.value.casefold() == value.casefold():
+                return item
+        # reached if value cannot be matched
+        raise ValueError(f"Invalid StitchingType value: {value}")
+
+@dataclass
+class StitchingConfiguration:
+    """Class to hold configuration for stitching."""
+    type: StitchingType = StitchingType.NONE
+    scale_factor_qmin: float = 0.00
+    scale_factor_qmax: float = 0.01
+    normalize_first_angle: bool = False
 
 @dataclass
 class ReducedData:
@@ -208,7 +232,7 @@ class OverlapScalingFactor:
             logger.warning("Left mean value is zero; setting scaling factor to 1.0 to avoid division by zero.")
             sf = 1.0
         else:
-            sf = right_mean / left_mean
+            sf = left_mean / right_mean
         return sf
 
     def calculate_mean_over_range(self, range_to_use: np.ndarray, a: float, b: float) -> float:

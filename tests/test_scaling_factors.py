@@ -76,7 +76,7 @@ def test_overlap_scaling_factor(fake_data, shifted_fake_data):
     sf = overlap_sf.get_scaling_factor()
 
     assert isinstance(sf, float)
-    assert sf == approx(0.25, abs=1e-9)  # Since fake_data r=2 and shifted_fake_data r=0.5
+    assert sf == approx(4.0, abs=1e-9)  # Since fake_data r=2 and shifted_fake_data r=0.5
 
 
 def test_overlap_scaling_factor_no_overlap(fake_data, fake_data_no_overlap):

@@ -95,7 +95,7 @@ def test_scale_factor_for_overlap_region(overlap_scaling_factor):
     a_right = 0.0
     b_right = 0.5
     sf = overlap_scaling_factor.scale_factor_for_overlap_region(fit_range, a_left, b_left, a_right, b_right)
-    assert sf == approx(0.25, abs=1e-9)  # Since left mean is 2.0 and right mean is 0.5
+    assert sf == approx(4.0, abs=1e-9)  # Since left mean is 2.0 and right mean is 0.5
 
 
 def test_calculate_mean_over_range(overlap_scaling_factor):

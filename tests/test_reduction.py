@@ -11,6 +11,8 @@ import pytest
 
 # lr_reduction imports
 from lr_reduction import event_reduction, template, workflow
+from lr_reduction.scaling_factors.calculate import StitchingType
+from lr_reduction.template import read_template
 from lr_reduction.utils import amend_config
 
 mtd_api.config["default.facility"] = "SNS"
@@ -196,6 +198,32 @@ def test_reduce_workflow(template_dir, nexus_dir, tmp_path):
         fractional_differences = (_data[i] - _refl[i]) / _data[i]
         average_fractional_difference = np.fabs(np.sum(fractional_differences) / len(_refl[i]))
         assert average_fractional_difference < 0.07
+
+def test_reduce_workflow_with_stitching_automatic_average(template_dir, nexus_dir, tmp_path):
+    """
+    Test the complete working, but this time we average the point in the
+    overlap regions.
+    """
+    template_path = os.path.join(template_dir, "template_stitching_automatic_average.xml")
+    output_dir = tmp_path
+
+    for i in range(198409, 198417):
+        with amend_config(data_dir=nexus_dir):
+            ws = mtd_api.Load("REF_L_%s" % i)
+        workflow.reduce(ws, template_path, output_dir=output_dir, average_overlap=True)
+
+    template_out_path = os.path.join(output_dir, "REF_L_198409_auto_template.xml")
+
+    assert os.path.isfile(template_out_path)
+
+    template_out = read_template(template_out_path, 198409)
+
+    assert template_out.stitching_reflectivity_scale_factor == 1.0
+    assert template_out.stitching_configuration.type == StitchingType.AUTOMATIC_AVERAGE
+    assert template_out.stitching_configuration.scale_factor_qmin == 0.01
+    assert template_out.stitching_configuration.scale_factor_qmax == 0.03
+    assert template_out.stitching_configuration.normalize_first_angle is False
+    # TODO: Add to this test once save/loading is complete in ewm13786
 
 
 def test_reduce_functional_bck(nexus_dir, template_dir, tmp_path):
