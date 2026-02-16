@@ -266,7 +266,7 @@ class RunCollection:
         run_names = []
 
         for i, item in enumerate(self.collection):
-            refl_curves.append([item["q"], item["r"], item["dr"], item["dq"]])
+            refl_curves.append([item["q"], item["r"] * self.stitching_reflectivity_scale_factors[i], item["dr"] * self.stitching_reflectivity_scale_factors[i], item["dq"]])
             run_names.append(f"Run: {item['info']['run_number']}  SF: {self.stitching_reflectivity_scale_factors[i]:.3f}")
 
         # run_number parameter is only used when publish=True
