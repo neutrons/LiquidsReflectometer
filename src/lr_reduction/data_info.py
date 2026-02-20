@@ -8,7 +8,7 @@ import numpy as np
 from mantid.simpleapi import logger
 
 from lr_reduction.mantid_utils import SampleLogValues
-from lr_reduction.typing import MantidWorkspace
+from lr_reduction.types import MantidWorkspace
 
 
 class DataType(IntEnum):

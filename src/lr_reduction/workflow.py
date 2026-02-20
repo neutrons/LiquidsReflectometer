@@ -9,7 +9,7 @@ import numpy as np
 from mantid.simpleapi import LoadEventNexus, logger
 
 from lr_reduction import event_reduction, output, reduction_template_reader, template
-from lr_reduction.typing import MantidWorkspace
+from lr_reduction.types import MantidWorkspace
 from lr_reduction.web_report import assemble_report, generate_report_sections
 
 
