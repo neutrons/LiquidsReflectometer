@@ -2,7 +2,7 @@ from enum import IntEnum
 
 import numpy as np
 
-from lr_reduction.typing import MantidWorkspace
+from lr_reduction.types import MantidWorkspace
 from lr_reduction.utils import workspace_handle
 
 

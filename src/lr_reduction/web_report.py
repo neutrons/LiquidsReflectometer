@@ -17,7 +17,7 @@ from lr_reduction import template
 from lr_reduction.data_info import DataType
 from lr_reduction.mantid_utils import SampleLogValues
 from lr_reduction.reduction_template_reader import ReductionParameters
-from lr_reduction.typing import MantidWorkspace
+from lr_reduction.types import MantidWorkspace
 
 XY_PLOT_ZOOM_X_RANGE = [25, 225]
 XY_PLOT_ZOOM_Y_RANGE = [100, 200]

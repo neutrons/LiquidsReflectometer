@@ -13,7 +13,7 @@ from mantid.simpleapi import logger
 from lr_reduction import event_reduction, peak_finding, reduction_template_reader
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.reduction_template_reader import ReductionParameters
-from lr_reduction.typing import MantidWorkspace
+from lr_reduction.types import MantidWorkspace
 
 TOLERANCE = 0.07
 OUTPUT_NORM_DATA = False

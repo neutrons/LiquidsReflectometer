@@ -6,7 +6,7 @@ from typing import Union
 from mantid.kernel import ConfigService
 from mantid.simpleapi import mtd
 
-from lr_reduction.typing import MantidWorkspace
+from lr_reduction.types import MantidWorkspace
 
 
 def mantid_algorithm_exec(algorithm_class, **kwargs):
