@@ -7,13 +7,15 @@ import new_reduction_from_template as new_template
 from pathlib import Path
 
 def example_template_reduction():
+    # Example for just a single angle.
     
     print("\n" + "="*60)
     print("TEMPLATE REDUCTION EXAMPLE")
     print("="*60)
     
-    datapath = Path('/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Workflowtesting/')
-    DBpath = Path('/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Cd_DB_processing_013026/DBs/')
+    # These shouldn't be needed in the longer term.
+    datapath = Path('/SNS/REF_L/IPTS-36119/nexus')
+    DBpath = Path('/SNS/REF_L/IPTS-36119/shared')
 
     # This needs to include anything you want to set that isn't in the template file or you want to deviate from the template file.
     override_params = {
@@ -25,7 +27,7 @@ def example_template_reduction():
         'AutoScale': False
     }
 
-    results = new_template.reduce_from_template(211029, datapath / "test_template.xml", "IPTS-36119", datapath=datapath, override_params=override_params, plot=True)
+    results = new_template.reduce_from_template(211029, datapath / "test_template.xml", "IPTS-36119", datapath=datapath, template_path=datapath, override_params=override_params, plot=True)
    
     #print(f"\nReduced {len(config.RBnum)} runs")
     print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
@@ -33,13 +35,14 @@ def example_template_reduction():
     return results
 
 def example_template_reduction_3ang():
+    # Example with 3 angles in a set
     
     print("\n" + "="*60)
     print("TEMPLATE REDUCTION EXAMPLE")
     print("="*60)
     
-    datapath = Path('/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Workflowtesting/')
-    DBpath = Path('/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Cd_DB_processing_013026/DBs/')
+    datapath = Path('/SNS/REF_L/IPTS-36119/nexus')
+    DBpath = Path('/SNS/REF_L/IPTS-36119/shared')
 
     DB_list = ['A1_air_div1_Cd_DB.dat','A1_air_div1_Cd_DB.dat','A1_air_div1_Cd_DB.dat']
 
@@ -55,7 +58,7 @@ def example_template_reduction_3ang():
             'AutoScale': True
         }
 
-        results = new_template.reduce_from_template(run, datapath / "test_template_3ang.xml", "IPTS-36119", datapath=datapath, override_params=override_params, plot=True)
+        results = new_template.reduce_from_template(run, datapath / "test_template_3ang.xml", "IPTS-36119", datapath=datapath,template_path=datapath,override_params=override_params, plot=True)
    
         #print(f"\nReduced {len(config.RBnum)} runs")
         print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
@@ -63,15 +66,15 @@ def example_template_reduction_3ang():
 
     return results
 
-# THIS ONE DOESN'T WORK YET AS IT DOESN'T SAVE THE TEMPLATE CORRECTLY
 def example_template_reduction_new():
+    # Example to redo the prior reduction but reading from the new template.
     
     print("\n" + "="*60)
     print("TEMPLATE REDUCTION EXAMPLE")
     print("="*60)
     
-    datapath = Path('/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Workflowtesting/')
-    DBpath = Path('/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Cd_DB_processing_013026/DBs/')
+    datapath = Path('/SNS/REF_L/IPTS-36119/nexus')
+    DBpath = Path('/SNS/REF_L/IPTS-36119/shared')
 
     #DB_list = ['A1_air_div1_Cd_DB.dat','A1_air_div1_Cd_DB.dat','A1_air_div1_Cd_DB.dat']
 
@@ -84,7 +87,7 @@ def example_template_reduction_new():
             'DBpath': DBpath
         }
 
-        results = new_template.reduce_from_template(run, datapath / "REFL_211029_template_new.xml", "IPTS-36119", datapath=datapath, override_params=override_params, plot=True)
+        results = new_template.reduce_from_template(run, datapath / "REFL_211029_template_new.xml", "IPTS-36119", datapath=datapath, template_path=datapath, override_params=override_params, plot=True)
    
         #print(f"\nReduced {len(config.RBnum)} runs")
         print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
@@ -95,5 +98,5 @@ def example_template_reduction_new():
 if __name__ == '__main__':
     # Run examples
     #example_template_reduction()
-    #example_template_reduction_3ang()
+    example_template_reduction_3ang()
     example_template_reduction_new()

@@ -1,6 +1,6 @@
 import h5py
 #import template
-from nr_reduction_unified import NR_Reduction  # TODO: Fix names of files!!
+from nr_reduction_calc import NR_Reduction  # TODO: Fix names of files!!
 from nr_reduction_config import NRReductionConfig
 from pathlib import Path
 import os
@@ -11,7 +11,7 @@ import new_reduction_template_reader as reduction_template_reader
 from matplotlib import pyplot as plt
 
 
-def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, override_params: dict = None, plot=True):
+def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True):
     """
     Wrapper function to reduce a single run with reading of parameters from an xml template of the lr_reduction format.
     Then collect like results within the save folder and combine them together.
@@ -22,17 +22,22 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     individual run in an equivalent format to prior autoreduction processes. Then loads and sorts any which have the same seq_id in
     the title and combines them into an output file. Equivalent to prior autoreduction processes.
 
-    NOTE: new files for reading the template were made to separate from Mantid due to a typing.py bug. Once rectified might be better
-    to move back to existing reader.
+    At the moment this goes between template file xml -> template dict -> config -> reduction -> new_template dict -> xml.
+    Can be simplified in future.
+
+    NOTE: new files for reading the template were made to not cause issues with prior setup but can be changed in future.
     
     runno: reflectivity run number
     template_file: template file, including Path
     experiment_id: str IPTS number which appends to datapath if this isn't provided (e.g. "IPTS-36119")
     datapath: Path optional override of location to look up NEXUS file
+    template_path: Path optional override of template location. Otherwise uses IPTS shared folder
     override_params: dict  Dictionary of config settings to override the defaults in either the template reader or the NRReduction config defaults.
     plot: bool Toggle to plot outputs during reduction steps.
+
+    returns 
+        combined_results: dict of Q, R, dR, dQ. This is assembled with anything else on same seq num. #TODO: check if need individual one returned too.
     """
-    # NOTE: DBname will need to be in override_params for now.
 
     # Get sequence number from file
     if not datapath:
@@ -44,7 +49,6 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     f.close()
 
     # Read the template file
-    # TODO: decide if this is a good reader or needs some altering. Does a load of mantid stuff!
     template_data = read_template(template_file, seq_num)
     # Apply template to config
     config = config_from_template(template_data)
@@ -88,18 +92,19 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     if plot:
         plot_reflectivity([combined_results], RQ4 = config.plotQ4)
 
-    # Save new template. Including new flags for other aspects?!
-    # Normalize, Autoscale, useCalcTheta, Qline_threshold, ScaleFactor, DetResFn, DetSigma, Thetamethod, DBname
-    # If add these into the template also need to add them to the config_from_template.
+    # Save new template. Including new flags for other aspects. #TODO: check if it covers all we need.
+    if template_path is None:
+        template_path = Path("/SNS/REF_L") / experiment_id / "shared"
+
     template_updated = template_to_config(config, template_data)
+    # For now is set to save with a "new" appended file name to be separate from refred but this can be changed moving forward.
     template_save_name = f"REFL_{seq_id}_template_new.xml"
     prior_template = template_file
-    if Path(datapath / template_save_name).exists():
-        file_to_change = datapath / template_save_name
+    if Path(template_path / template_save_name).exists():
+        file_to_change = template_path / template_save_name # If later in sequence want to update the new one not the old refred one.
     else:
-        file_to_change = datapath / prior_template
-    write_template(seq_list, run_list, file_to_change, template_updated, seq_num, datapath, save_name=template_save_name)
-    # TODO: FIX THE template save path...
+        file_to_change = template_path / prior_template
+    write_template(seq_list, run_list, file_to_change, template_updated, seq_num, template_path, save_name=template_save_name)
 
     return combined_results
 
@@ -121,15 +126,10 @@ def config_from_template(template_data):
     # NOTE: Various of the config items expect arrays so ensure is set as single item array here.
 
     # Determine reduction method from template
-    # const_q=True -> MeanTheta; const_q=False -> constantTOF
-    # TODO: Add better/different flag for method. Expect other paramters needed elsewhere too...
-    #method = 'MeanTheta' if template_data.const_q else 'constantTOF'
-    # attempt 1
-    #print(method)
     if template_data.q_method != False and template_data.q_method is not None: # Should this be None or False? Not sure where the False comes from...
         method = template_data.q_method
     else:
-        method = 'MeanTheta' if template_data.const_q else 'constantTOF'
+        method = 'MeanTheta' if template_data.const_q else 'constantTOF' #TODO: decide if this should be MeanTheta or constantQ
     
     # Initialize configuration
     config = NRReductionConfig(method=method)
@@ -159,7 +159,7 @@ def config_from_template(template_data):
     # TODO: does the gravity direction part need adding? does the emission time use need adding?
     #       do the flags on instrument settings need to be added?
 
-    # TODO: Update with new flags in template if they work!
+    # Update with new flags in template if they exist
     config.Normalize = getattr(template_data, "norm_scale", config.Normalize)
     config.DBname = [getattr(template_data, "DB_file", config.DBname)]
     config.AutoScale = getattr(template_data, "autoscale", config.AutoScale)
@@ -198,8 +198,22 @@ def template_to_config(config_data, template_data):
     return template
 
 
-
 def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False):
+    """
+    Assemble the results for any files in the saved directory that have the same sequence number.
+    Finds files saved witht the "partial.dat" ending, sorts the data , autoscales if the flag applied,
+    combines and returns the seq list, run list and combined data as a dict.
+
+    seq_id: Sequence ID of set to combined
+    output_dir: Path to save out combined file
+    autoscale: Bool to apply scaling in R between settings, scales to first in series
+    plot: Bool to plot combined output
+    RQ4: Bool to plot as RQ4 instead of R.
+
+    returns
+        seq_list, run_list, combined results
+
+    """
  
     # Keep track of sequence IDs and run numbers so we can make a new template
     seq_list = []
@@ -226,7 +240,7 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
         data_array.append(data)
     print("Data loaded:", len(data_array))
 
-    # Do a sort based on lowest q?? TODO: work out this sorting part...
+    # Do a sort based on lowest q?? TODO: work out this sorting part... Hasn't been fully tested.
     to_sort = []
     for run in range(len(data_array)):
         first_q = data_array[run][0,0]
@@ -281,7 +295,6 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
 
     return seq_list, run_list, combine_results
 
-# TODO: Fix and update this part!! Need it to take the template_data to xml and join with other parts.
 def write_template(seq_list, run_list, file_to_change, template_data_updated, seq_updated, output_dir, save_name=None):
     """
     Read the appropriate entry in a template file and save an updated
@@ -298,9 +311,6 @@ def write_template(seq_list, run_list, file_to_change, template_data_updated, se
     output_dir : str
         Directory where the output files are saved
     """
-    #print(seq_updated)
-    #print(seq_list)
-    #print(run_list)
     print("Reading file", file_to_change)
     with open(file_to_change, "r") as fd:
         xml_str = fd.read()
@@ -330,8 +340,9 @@ def write_template(seq_list, run_list, file_to_change, template_data_updated, se
     xml_str = reduction_template_reader.to_xml(to_save)
     with open(os.path.join(output_dir, save_name), "w") as fd:
         fd.write(xml_str)
+    print("Saving to file", save_name)
 
-# TODO: Fix to use the one inside template.py. This is needed at the moment from issue with mantid/typing.py
+# TODO: Fix to use the one inside template.py.
 def read_template(template_file: str, sequence_number: int) -> ReductionParameters:
     """
     Read template from file.

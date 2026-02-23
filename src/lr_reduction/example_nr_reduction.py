@@ -5,7 +5,7 @@ Example usage of the unified NR reduction class
 Demonstrates how to configure and run reductions using both constantQ, constantTOF and MeanTheta methods
 """
 
-from nr_reduction_unified import NR_Reduction
+from nr_reduction_calc import NR_Reduction
 from nr_reduction_config import NRReductionConfig
 import numpy as np
 
@@ -20,9 +20,9 @@ def example_constant_q_reduction():
     config = NRReductionConfig(method='constantQ')
 
     # Path needs to be setup for these tests but should be able to turn off later.    
-    config.Spath = '/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Workflowtesting/'
-    config.NEXUSpathRB = '/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Workflowtesting/'
-    config.DBpath = '/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Cd_DB_processing_013026/DBs/'
+    #config.Spath = # Append path if required.
+    #config.NEXUSpathRB = # Append path if required.
+    #config.DBpath = # Append path if required.
 
     config.experiment_id = "IPTS-36119"
 
@@ -32,12 +32,6 @@ def example_constant_q_reduction():
     config.RB_Ymin=[157,157,155]
     config.RB_Ymax=[165,166,169]
 
-    config.DBname = ['A1_air_div10_Cd_DB.dat', 'A2_air_div10_Cd_DB.dat', 'A3_air_div10_Cd_DB.dat']
-    config.RBnum = np.array([210975, 210976, 210977])
-    config.RB_Ymin = [157, 154, 149]
-    config.RB_Ymax = [166, 168, 173]
-    #config.RB_Ymin = [140, 140, 140]
-    #config.RB_Ymax = [180, 180, 180]
     config.ThetaShift = [0, 0, 0]
     config.useBS = [1, 1, 1]
     config.ScaleFactor = [1, 1, 1]
@@ -68,9 +62,6 @@ def example_constant_q_reduction():
     reducer = NR_Reduction(config)
     results = reducer.reduce()
     
-    # Save results
-    #reducer.save_results(results)
-    
     print(f"\nReduced {len(config.RBnum)} runs")
     print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
     
@@ -87,9 +78,9 @@ def example_mean_theta_reduction():
     config = NRReductionConfig(method='meanTheta')
     
     # Path needs to be setup for these tests but should be able to turn off later.    
-    config.Spath = '/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Workflowtesting/'
-    config.NEXUSpathRB = '/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Workflowtesting/'
-    config.DBpath = '/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Cd_DB_processing_013026/DBs/'
+    #config.Spath = # Append path if required.
+    #config.NEXUSpathRB = # Append path if required.
+    #config.DBpath = # Append path if required.
 
     config.experiment_id = "IPTS-36119"
     # Set data
@@ -97,8 +88,6 @@ def example_mean_theta_reduction():
     config.RBnum = np.array([210975, 210976, 210977])
     config.RB_Ymin = [157, 155, 149]
     config.RB_Ymax = [165, 167, 174]
-    #config.RB_Ymin = [140, 140, 120]
-    #config.RB_Ymax = [180, 180, 200]
     config.ThetaShift = [0, 0, 0]
     config.useBS = [1, 1, 1]
     config.ScaleFactor = [1, 1, 1]
@@ -131,9 +120,6 @@ def example_mean_theta_reduction():
     reducer = NR_Reduction(config)
     results = reducer.reduce()
     
-    # Save results
-    #reducer.save_results(results)
-    
     print(f"\nReduced {len(config.RBnum)} runs with repeat averaging")
     print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
     
@@ -150,9 +136,9 @@ def example_constant_tof_reduction():
     config = NRReductionConfig(method='constantTOF')
     
     # Path needs to be setup for these tests but should be able to turn off later.    
-    config.Spath = '/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Workflowtesting/'
-    config.NEXUSpathRB = '/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Workflowtesting/'
-    config.DBpath = '/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Cd_DB_processing_013026/DBs/'
+    #config.Spath = # Append path if required.
+    #config.NEXUSpathRB = # Append path if required.
+    #config.DBpath = # Append path if required.
 
     config.experiment_id = "IPTS-36119"
     # Set data
@@ -160,10 +146,7 @@ def example_constant_tof_reduction():
     config.RBnum=[211029,211030,211031]
     config.RB_Ymin=[157,157,155]
     config.RB_Ymax=[165,166,169]
-    #config.DBname = ['A1_air_div10_Cd_DB.dat', 'A2_air_div10_Cd_DB.dat', 'A3_air_div10_Cd_DB.dat']
-    #config.RBnum = np.array([210975, 210976, 210977])
-    #config.RB_Ymin = [157, 155, 149]
-    #config.RB_Ymax = [165, 167, 174]
+
     config.ThetaShift = [0, 0, 0]
     config.useBS = [1, 1, 1]
     config.ScaleFactor = [1, 1, 1]
@@ -193,54 +176,8 @@ def example_constant_tof_reduction():
     reducer = NR_Reduction(config)
     results = reducer.reduce()
     
-    # Save results
-   # reducer.save_results(results)
-    
     print(f"\nReduced {len(config.RBnum)} runs (TOF-binned)")
     print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
-    
-    return results
-
-
-def example_custom_parameters():
-    """Example: Custom configuration with modified parameters"""
-    print("\n" + "="*60)
-    print("CUSTOM REDUCTION WITH MODIFIED PARAMETERS")
-    print("="*60)
-    
-    # Start with MeanTheta method and customize
-    config = NRReductionConfig(method='meanTheta')
-    
-    # Path needs to be setup for these tests but should be able to turn off later.    
-    config.Spath = '/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Workflowtesting/'
-    config.NEXUSpathRB = '/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Workflowtesting/'
-    config.DBpath = '/Users/r2i/Library/CloudStorage/OneDrive-OakRidgeNationalLaboratory/Documents/4B/Reduction/GitHub/Cd_DB_processing_013026/DBs/'
-    config.experiment_id = "IPTS-36119"
-    # Customize resolution parameters
-    config.DetSigma = 1.0  # Higher resolution
-    config.DetResFn = 'gaussian'  # Gaussian profile
-    
-    # Customize Q-space
-    config.qmin = 0.015
-    config.qmax = 0.30
-    config.dqbin = 0.008
-    
-    # Customize thresholds
-    config.Qline_threshold = 0.95  # Higher threshold
-    
-    # Set data
-    config.DBname = ['A1_air_div10_Cd_DB.dat', 'A2_air_div10_Cd_DB.dat', 'A3_air_div10_Cd_DB.dat']
-    config.RBnum = np.array([210975, 210976, 210977])
-    config.RB_Ymin = [157, 155, 149]
-    config.RB_Ymax = [165, 167, 174]
-    config.Sname = "NR_custom_params"
-    
-    # Run reduction
-    reducer = NR_Reduction(config)
-    results = reducer.reduce()
-    
-    print(f"\nCustom reduction completed")
-    print(f"Number of Q points: {len(results['Q'])}")
     
     return results
 
@@ -250,6 +187,6 @@ if __name__ == '__main__':
     example_constant_q_reduction()
     example_mean_theta_reduction()
     example_constant_tof_reduction()
-    example_custom_parameters()
+
 
     
