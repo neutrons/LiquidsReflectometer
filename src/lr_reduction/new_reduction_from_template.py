@@ -104,7 +104,7 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
         file_to_change = template_path / template_save_name # If later in sequence want to update the new one not the old refred one.
     else:
         file_to_change = template_path / prior_template
-    write_template(seq_list, run_list, file_to_change, template_updated, seq_num, template_path, save_name=template_save_name)
+    write_template(seq_list, run_list, file_to_change, template_updated, seq_num, template_path, save_name=template_save_name, prior_template=prior_template)
 
     return combined_results
 
@@ -295,7 +295,7 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
 
     return seq_list, run_list, combine_results
 
-def write_template(seq_list, run_list, file_to_change, template_data_updated, seq_updated, output_dir, save_name=None):
+def write_template(seq_list, run_list, file_to_change, template_data_updated, seq_updated, output_dir, save_name=None, prior_template=None):
     """
     Read the appropriate entry in a template file and save an updated
     copy with the updated run number.
@@ -321,6 +321,20 @@ def write_template(seq_list, run_list, file_to_change, template_data_updated, se
         to_save = []
         for i in range(len(seq_list)):
             if len(data_sets) >= seq_list[i]:
+                if seq_list[i] == seq_updated:
+                    # Change the run number and all entries
+                    for attr, value in vars(template_data_updated).items():
+                        setattr(data_sets[seq_list[i] - 1], attr, value)
+                    #data_sets[seq_list[i] - 1] = template_data_updated
+                    data_sets[seq_list[i] - 1].data_files = [run_list[i]]
+                    to_save.append(data_sets[seq_list[i] - 1])
+                else:
+                    data_sets[seq_list[i] - 1] = template_data_updated
+                    to_save.append(data_sets[seq_list[i] - 1])
+            elif len(data_sets) == seq_list[i] - 1:
+                # duplicate the previous entry. Allows it to add into the next sequence spot. #TODO: this logic needs attention!
+                data_sets.append(data_sets[-1])
+                # repeat above for now
                 if seq_list[i] == seq_updated:
                     # Change the run number and all entries
                     for attr, value in vars(template_data_updated).items():
