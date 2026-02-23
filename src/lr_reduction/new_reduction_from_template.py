@@ -84,7 +84,10 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     reduce_calc.save_results(result, sname=f"{config.Sname}_partial")
 
     # Collect "like" runs together 
-    seq_list, run_list, combined_results = assemble_results(seq_id, config.Spath, autoscale=config.AutoScale, plot=plot, RQ4=config.plotQ4)
+    seq_list, run_list, combined_results, scaling_factors = assemble_results(seq_id, config.Spath, autoscale=config.AutoScale, plot=plot, RQ4=config.plotQ4)
+    # Add scaling factor to output
+    scale_list = np.array([np.float64(1)] + scaling_factors)
+    config.ScaleFactor *= scale_list
     # Save combined data
     reduce_calc.save_results(combined_results, sname=f"REFL_{seq_id}_combined_data")
 
@@ -252,6 +255,7 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
     # TODO: add better autoscaling options. Make scaling a function in nr_tools?
     Q, R, dR, dQ = [], [], [], []
     dict_output = []
+    scaling_factors = []
     for run, result in enumerate(sorted_data):
         if autoscale and run != 0:
             mask1 = Q[run-1] >= min(result[0, :])
@@ -268,6 +272,7 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
             result[2, :] *= scale
 
             print('Scaling factor:', np.round(scale, 3))
+            scaling_factors.append(scale)
 
         Q.append(result[0, :])
         R.append(result[1, :])
@@ -293,7 +298,7 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
     idx = np.argsort(Q_combined)
     combine_results = {'Q': Q_combined[idx], 'R': R_combined[idx], 'dR': dR_combined[idx], 'dQ': dQ_combined[idx]}
 
-    return seq_list, run_list, combine_results
+    return seq_list, run_list, combine_results, scaling_factors
 
 def write_template(seq_list, run_list, file_to_change, template_data_updated, seq_updated, output_dir, save_name=None, prior_template=None):
     """

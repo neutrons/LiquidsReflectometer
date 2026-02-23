@@ -934,7 +934,10 @@ class NR_Reduction:
             f"Method = {self.config.method}\n"
             f"Normalize = {self.config.Normalize}\n"
             f"Autoscale = {self.config.AutoScale}\n"
-            f"columns = Q, R, dR, dQ\n"
+            f"Scaling factors = {self.config.ScaleFactor}\n"
+            f"Lambda Range = {self.config.LambdaMinUse}\u212B to {self.config.LambdaMaxUse}\u212B\n"
+            f"THS = {self.log_values['ths']}, THI = {self.log_values['thi']}, ThCen = {self.log_values['ThCen']}\n"
+            f"columns = Q, R, dR, dQ (sigma)\n"
             f"{'---' * 20}"
         )
         if not sname:
