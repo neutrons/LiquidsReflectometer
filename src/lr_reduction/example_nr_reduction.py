@@ -20,11 +20,11 @@ def example_constant_q_reduction():
     config = NRReductionConfig(method='constantQ')
 
     # Path needs to be setup for these tests but should be able to turn off later.    
-    #config.Spath = # Append path if required.
+    config.Spath = '/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/'
     #config.NEXUSpathRB = # Append path if required.
-    #config.DBpath = # Append path if required.
+    config.DBpath = '/SNS/REF_L/shared/Cd_DB_processing/DBs/'
 
-    config.experiment_id = "IPTS-36119"
+    config.experiment_id = "IPTS-30101"
 
     # Set data
     config.DBname = ['A1_air_div1_Cd_DB.dat', 'A2_air_div1_Cd_DB.dat', 'A3_air_div1_Cd_DB.dat']
@@ -46,7 +46,7 @@ def example_constant_q_reduction():
     ))
 
     # Output name
-    config.Sname = "NR_constantQ_test_2"
+    config.Sname = "NR_constantQ"
     
     # Processing options
     config.Normalize = False
@@ -78,11 +78,11 @@ def example_mean_theta_reduction():
     config = NRReductionConfig(method='meanTheta')
     
     # Path needs to be setup for these tests but should be able to turn off later.    
-    #config.Spath = # Append path if required.
+    config.Spath = '/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/'
     #config.NEXUSpathRB = # Append path if required.
-    #config.DBpath = # Append path if required.
+    config.DBpath = '/SNS/REF_L/shared/Cd_DB_processing/DBs/'
 
-    config.experiment_id = "IPTS-36119"
+    config.experiment_id = "IPTS-30101"
     # Set data
     config.DBname = ['A1_air_div10_Cd_DB.dat', 'A2_air_div10_Cd_DB.dat', 'A3_air_div10_Cd_DB.dat']
     config.RBnum = np.array([210975, 210976, 210977])
@@ -102,7 +102,7 @@ def example_mean_theta_reduction():
     ))
 
     # Output name
-    config.Sname = "NR_meanTheta_test_v4"
+    config.Sname = "NR_meanTheta"
     
     # Processing options
     config.Normalize = False
@@ -136,11 +136,11 @@ def example_constant_tof_reduction():
     config = NRReductionConfig(method='constantTOF')
     
     # Path needs to be setup for these tests but should be able to turn off later.    
-    #config.Spath = # Append path if required.
+    config.Spath = '/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/'
     #config.NEXUSpathRB = # Append path if required.
-    #config.DBpath = # Append path if required.
+    config.DBpath = '/SNS/REF_L/shared/Cd_DB_processing/DBs/'
 
-    config.experiment_id = "IPTS-36119"
+    config.experiment_id = "IPTS-30101"
     # Set data
     config.DBname = ['A1_air_div1_Cd_DB.dat', 'A2_air_div1_Cd_DB.dat', 'A3_air_div1_Cd_DB.dat']
     config.RBnum=[211029,211030,211031]
@@ -160,7 +160,7 @@ def example_constant_tof_reduction():
     ))
     
     # Output name
-    config.Sname = "NR_constantTOF_col_v2"
+    config.Sname = "NR_constantTOF"
     
     # Processing options
     config.Normalize = False

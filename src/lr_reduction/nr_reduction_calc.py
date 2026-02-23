@@ -70,7 +70,7 @@ class NR_Reduction:
         if not self.config.tof_max:
             self.config.tof_max = [50000] * n_settings 
             
-    def reduce(self, save=True, save_all=False, plot=True):
+    def reduce(self, save=True, save_all=True, plot=True):
         """
         Perform the reduction of all angle settings and combine into an output.
         
@@ -108,8 +108,9 @@ class NR_Reduction:
             dQ.append(result['dq'])
             if save_all:
                 # save out individual parts
-                # TODO: Need to fix the saving logic for multiple runs!!
-                self.save_results(result, sname=f"{self.config.Sname}_{i}")
+                # TODO: Need to fix the saving logic for multiple runs!! At the moment the save looks for the capitals...
+                result_out = {'Q': result['q'], 'R': result['r'], 'dR': result['dr'], 'dQ': result['dq']}
+                self.save_results(result_out, sname=f"{self.config.Sname}_{i}")
         
         # Combine results for all settings
         Q_combined = np.concatenate(Q)
