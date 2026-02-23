@@ -78,16 +78,13 @@ def example_template_reduction_new():
     runs = [211029, 211030, 211031]
     for idx, run in enumerate(runs):
     #    # This needs to include anything you want to set that isn't in the template file or you want to deviate from the template file.
-    #    override_params = {
-    #        'DBname': [DB_list[idx]],
-    #        'Spath': datapath,
-    #        'NEXUSpathRB': datapath,
-    #        'DBpath': DBpath,
-    #        'useCalcTheta': True,
-    #        'AutoScale': True
-    #    }
+        override_params = {
+            'Spath': datapath,
+            'NEXUSpathRB': datapath,
+            'DBpath': DBpath
+        }
 
-        results = new_template.reduce_from_template(run, datapath / "REFL_211029_template_new.xml", "IPTS-36119", datapath=datapath, plot=True)
+        results = new_template.reduce_from_template(run, datapath / "REFL_211029_template_new.xml", "IPTS-36119", datapath=datapath, override_params=override_params, plot=True)
    
         #print(f"\nReduced {len(config.RBnum)} runs")
         print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
@@ -98,5 +95,5 @@ def example_template_reduction_new():
 if __name__ == '__main__':
     # Run examples
     #example_template_reduction()
-    example_template_reduction_3ang()
+    #example_template_reduction_3ang()
     example_template_reduction_new()

@@ -46,7 +46,6 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     # Read the template file
     # TODO: decide if this is a good reader or needs some altering. Does a load of mantid stuff!
     template_data = read_template(template_file, seq_num)
-
     # Apply template to config
     config = config_from_template(template_data)
     config.RBnum = [runno]
@@ -70,6 +69,7 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
                 raise AttributeError(f"{key} is not a valid config parameter")
 
     #print(vars(config)) # Print to check the changes.
+    #print(vars(template_data))
 
     # Run reduction
     reduce_calc = NR_Reduction(config)
@@ -91,11 +91,15 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     # Save new template. Including new flags for other aspects?!
     # Normalize, Autoscale, useCalcTheta, Qline_threshold, ScaleFactor, DetResFn, DetSigma, Thetamethod, DBname
     # If add these into the template also need to add them to the config_from_template.
+    template_updated = template_to_config(config, template_data)
     template_save_name = f"REFL_{seq_id}_template_new.xml"
-    write_template(seq_list, run_list, template_file, datapath, save_name=template_save_name)
+    prior_template = template_file
+    if Path(datapath / template_save_name).exists():
+        file_to_change = datapath / template_save_name
+    else:
+        file_to_change = datapath / prior_template
+    write_template(seq_list, run_list, file_to_change, template_updated, seq_num, datapath, save_name=template_save_name)
     # TODO: FIX THE template save path...
-
-    # TODO: Issue is it doesn't populate the new fields correctly...
 
     return combined_results
 
@@ -119,9 +123,10 @@ def config_from_template(template_data):
     # Determine reduction method from template
     # const_q=True -> MeanTheta; const_q=False -> constantTOF
     # TODO: Add better/different flag for method. Expect other paramters needed elsewhere too...
-    method = 'MeanTheta' if template_data.const_q else 'constantTOF'
+    #method = 'MeanTheta' if template_data.const_q else 'constantTOF'
     # attempt 1
-    if template_data.q_method is not None:
+    #print(method)
+    if template_data.q_method != False and template_data.q_method is not None: # Should this be None or False? Not sure where the False comes from...
         method = template_data.q_method
     else:
         method = 'MeanTheta' if template_data.const_q else 'constantTOF'
@@ -155,15 +160,44 @@ def config_from_template(template_data):
     #       do the flags on instrument settings need to be added?
 
     # TODO: Update with new flags in template if they work!
-    
     config.Normalize = getattr(template_data, "norm_scale", config.Normalize)
-    config.DBname = getattr(template_data, "DB_file", config.DBname)
+    config.DBname = [getattr(template_data, "DB_file", config.DBname)]
     config.AutoScale = getattr(template_data, "autoscale", config.AutoScale)
-    config.useCalcTheta = getattr(template_data, "use_cal_theta", config.useCalcTheta)
+    config.useCalcTheta = getattr(template_data, "use_calc_theta", config.useCalcTheta)
     config.Qline_threshold = getattr(template_data, "qline_threshold", config.Qline_threshold)
     config.ScaleFactor = [getattr(template_data, "scale_factor", 1.0)]
     
     return config
+
+def template_to_config(config_data, template_data):
+    """
+    Reverse of the config settings back into the template format. Needed whilst keeping the xml format.
+    """
+    template = template_data
+    template.q_method = config_data.method
+    template.data_peak_range = [config_data.RB_Ymin[0], config_data.RB_Ymax[0]]
+    if config_data.useBS[0] == 1:
+        template.subtract_background = True
+    else:
+        template.subtract_background = False
+    template.background_roi = config_data.BkgROI[0] # TODO: need to check what happens with the order of settings here.
+    template.tof_range = [config_data.tof_min[0], config_data.tof_max[0]]
+    template.data_x_range = config_data.data_x_range
+    template.q_min = config_data.qmin
+    template.q_step = config_data.dqbin
+    template.angle_offset = config_data.ThetaShift[0]
+    template.dead_time_value = config_data.dead_time
+    template.dead_time_tof_step = config_data.dead_time_tof_step
+    template.norm_scale = config_data.Normalize
+    template.DB_file = config_data.DBname[0]
+    template.autoscale = config_data.AutoScale
+    template.use_calc_theta = config_data.useCalcTheta
+    template.qline_threshold = config_data.Qline_threshold
+    template.scale_factor = config_data.ScaleFactor[0]
+
+    return template
+
+
 
 def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False):
  
@@ -247,8 +281,8 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
 
     return seq_list, run_list, combine_results
 
-# TODO: Fix and update this part!!
-def write_template(seq_list, run_list, template_file, output_dir, save_name=None):
+# TODO: Fix and update this part!! Need it to take the template_data to xml and join with other parts.
+def write_template(seq_list, run_list, file_to_change, template_data_updated, seq_updated, output_dir, save_name=None):
     """
     Read the appropriate entry in a template file and save an updated
     copy with the updated run number.
@@ -264,23 +298,36 @@ def write_template(seq_list, run_list, template_file, output_dir, save_name=None
     output_dir : str
         Directory where the output files are saved
     """
-    with open(template_file, "r") as fd:
+    #print(seq_updated)
+    #print(seq_list)
+    #print(run_list)
+    print("Reading file", file_to_change)
+    with open(file_to_change, "r") as fd:
         xml_str = fd.read()
+        # Read the template
         data_sets = reduction_template_reader.from_xml(xml_str)
 
-        new_data_sets = []
+        # For each item in seq_list, store this entry from the read file.
+        to_save = []
         for i in range(len(seq_list)):
             if len(data_sets) >= seq_list[i]:
-                data_sets[seq_list[i] - 1].data_files = [run_list[i]]
-                new_data_sets.append(data_sets[seq_list[i] - 1])
+                if seq_list[i] == seq_updated:
+                    # Change the run number and all entries
+                    for attr, value in vars(template_data_updated).items():
+                        setattr(data_sets[seq_list[i] - 1], attr, value)
+                    #data_sets[seq_list[i] - 1] = template_data_updated
+                    data_sets[seq_list[i] - 1].data_files = [run_list[i]]
+                    to_save.append(data_sets[seq_list[i] - 1])
+                else:
+                    data_sets[seq_list[i] - 1] = template_data_updated
+                    to_save.append(data_sets[seq_list[i] - 1])
             else:
                 print("Too few entries [%s] in template for sequence number %s" % (len(data_sets), seq_list[i]))
 
     if not save_name:
         save_name = "REF_L_%s_auto_template.xml" % run_list[0]
 
-    # Save the template that was used
-    xml_str = reduction_template_reader.to_xml(new_data_sets)
+    xml_str = reduction_template_reader.to_xml(to_save)
     with open(os.path.join(output_dir, save_name), "w") as fd:
         fd.write(xml_str)
 

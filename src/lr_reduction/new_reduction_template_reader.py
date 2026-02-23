@@ -258,12 +258,12 @@ class ReductionParameters:
 
         # New parts added from new reduction config scheme
         self.norm_scale = getBoolElement(instrument_dom, "norm_scale", default=self.norm_scale)
-        self.DB_file = getBoolElement(instrument_dom, "DB_file", default=self.DB_file)
-        self.q_method = getBoolElement(instrument_dom, "q_method", default=self.q_method)
+        self.DB_file = getStringElement(instrument_dom, "DB_file", default=self.DB_file)
+        self.q_method = getStringElement(instrument_dom, "q_method", default=self.q_method)
         self.autoscale = getBoolElement(instrument_dom, "autoscale", default=self.autoscale)
         self.use_calc_theta = getBoolElement(instrument_dom, "use_calc_theta", default=self.use_calc_theta)
-        self.qline_threshold = getBoolElement(instrument_dom, "qline_threshold", default=self.qline_threshold)
-        self.scale_factor = getBoolElement(instrument_dom, "scale_factor", default=self.scale_factor)
+        self.qline_threshold = getFloatElement(instrument_dom, "qline_threshold", default=self.qline_threshold)
+        self.scale_factor = getFloatElement(instrument_dom, "scale_factor", default=self.scale_factor)
 
 
         # Instrument settings
