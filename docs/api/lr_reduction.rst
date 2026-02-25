@@ -87,10 +87,10 @@ lr_reduction.time_resolved
    :undoc-members:
    :show-inheritance:
 
-lr_reduction.typing
+lr_reduction.types
 -------------------
 
-.. automodule:: lr_reduction.typing
+.. automodule:: lr_reduction.types
    :members:
    :undoc-members:
    :show-inheritance:

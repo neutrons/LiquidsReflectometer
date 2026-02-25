@@ -15,7 +15,7 @@ from scipy.optimize import brentq
 from lr_reduction.data_info import CoordinateSystem
 from lr_reduction.gravity_correction import GravityDirection, gravity_correction
 from lr_reduction.instrument_settings import InstrumentSettings
-from lr_reduction.typing import MantidWorkspace
+from lr_reduction.types import MantidWorkspace
 from lr_reduction.user_defined_function import UserDefinedFunction
 from lr_reduction.utils import mantid_algorithm_exec
 
