@@ -80,6 +80,7 @@ class NRReductionConfig:
 
         self.IncidentTheta = 4.0  # degrees Angle of the beamline relative to earth. Positive is downwards. Will become PV.
         self.emission_coefficients = None  # TOF emission time coefficients
+        self.use_emission_time = True # Toggles application of the emission time correction and which distance is to be used.
  
         # Dead-time parameters
         self.dead_time = 4.2

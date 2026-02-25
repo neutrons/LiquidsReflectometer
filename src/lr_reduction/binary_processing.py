@@ -168,6 +168,13 @@ def get_log_values(fname):
     # TODO: check if we need any of the other chopper parts.
     log_values["frequency"]=np.array(f['entry/DASlogs/BL4B:Det:TH:BL:Frequency/value'][0])
     log_values["lam_request"]=np.array(f['entry/DASlogs/BL4B:Det:TH:BL:Lambda/value'][0])
+    
+    try:
+        log_values["chopper_mod"]=np.array(f['entry/DASlogs/BL4B:Chop:Skf2:ChopperModerator/value'][0])
+    except:
+        print("Run missing the chopper moderator log value")
+        pass
+    log_values['emission_mod_distance'] = np.array(f['entry/DASlogs/BL4B:Det:TH:DlyDet:BasePath/value'][0]) * 1000
     off =np.array(f['entry/DASlogs/BL4B:Chop:Skf2:ChopperOffset/value'][0]) # 114.0
     mult =np.array(f['entry/DASlogs/BL4B:Chop:Skf2:ChopperMultiplier/value'][0])  # 29.5
     log_values["emission_coefficients"]=np.array([off/1000, mult/1000])

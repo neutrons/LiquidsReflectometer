@@ -174,6 +174,43 @@ def fit_peak(ypix, iY, peaktype="gauss", bkgtype="none"):
 
     return par, fit, bkg
 
+def get_edges(centers):
+        midpoints = 0.5 * (centers[1:] + centers[:-1])
+        # Extrapolate the first and last edges based on adjacent bin width
+        e0 = centers[0] - (midpoints[0] - centers[0])
+        en = centers[-1] + (centers[-1] - midpoints[-1])
+        return np.concatenate(([e0], midpoints, [en]))
+    
+def rebin_counts(x, xp, fp):
+    """
+    Count-preserving rebin from original bin centers (xp)
+    with counts per bin (fp) onto new bin centers (x).
+
+    Returns counts per new bin.
+    """
+
+    xp = np.asarray(xp, float)
+    fp = np.asarray(fp, float)
+    x  = np.asarray(x,  float)
+
+    xp_edges = get_edges(xp)
+    x_edges = get_edges(x)
+
+    # calculate cumulative counts using original bin edges
+    cumulative = np.concatenate([[0.0], np.cumsum(fp)])
+
+    cumulative_new = np.interp(
+        x_edges,
+        xp_edges,
+        cumulative,
+        left=0.0,
+        right=cumulative[-1]     
+    )
+    
+    new_counts = np.diff(cumulative_new)
+
+    return new_counts
+
 def calc_beam_geometry_from_slits(si_H, s1_H, d_s1_si, d_si_sam, d_sam_det, radians=True):
     # TODO: fix the descrepancies so the radians tag isn't needed.
     # based on slits and instrument geometry, calculate beam profile

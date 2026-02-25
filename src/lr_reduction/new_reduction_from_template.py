@@ -159,6 +159,8 @@ def config_from_template(template_data):
     config.dead_time = template_data.dead_time_value
     config.dead_time_tof_step = template_data.dead_time_tof_step
 
+    config.use_emission_time = template_data.use_emission_time
+
     # TODO: does the gravity direction part need adding? does the emission time use need adding?
     #       do the flags on instrument settings need to be added?
 
@@ -197,6 +199,7 @@ def template_to_config(config_data, template_data):
     template.use_calc_theta = config_data.useCalcTheta
     template.qline_threshold = config_data.Qline_threshold
     template.scale_factor = config_data.ScaleFactor[0]
+    template.use_emission_time = config_data.use_emission_time
 
     return template
 

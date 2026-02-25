@@ -266,7 +266,7 @@ class NR_Reduction:
         self.settings = self.apply_config_overrides(settings)
         self.settings['si_sample_distance'] = self.settings['xi_reference'] - self.log_values['xi']
         self.settings['interslit_distance'] = self.settings['s1_sample_distance'] - self.settings['si_sample_distance']    
-
+        
         # Calculate lam range if not provided - # TODO: Add smarter calculation.
         if self.config.LambdaMin is None or self.config.LambdaMax is None:
             lam_range = tools.get_lam_range(self.log_values["lam_request"], self.log_values["frequency"])
@@ -277,7 +277,7 @@ class NR_Reduction:
         if self.config.LambdaMax is None:
             self.config.LambdaMaxUse = lam_range[1]
         else:
-            self.config.LambdaMaxUse = self.config.LamdbaMax[i]
+            self.config.LambdaMaxUse = self.config.LambdaMax[i]     # fixed typo here. ebw
 
         # Flip the arrays to give detector pixel ascending.
         RB = np.flipud(nRB)
@@ -308,6 +308,19 @@ class NR_Reduction:
             t0 = self.config.emission_coefficients
         else:
             t0 = self.log_values['emission_coefficients']
+
+        # Add logic to check which distance to use, depending on whether the emission time correction is used.
+        # Check that we have the needed meta data for the emission delay calculation
+        if self.config.use_emission_time:
+            moderator_available = 'chopper_mod' in self.log_values
+            if not moderator_available:
+                print("Moderator information unavailable: skipping emission time calculation")
+                self.use_emission_time = False
+
+        # Use the emission based source-detector distance from the logs
+        if self.config.use_emission_time:
+            self.settings['source_detector_distance'] = self.log_values['emission_mod_distance']
+
         LAMBDA = 3956 * (tRB) / self.settings['source_detector_distance']
         LAMBDA = 3956 * (tRB - (t0[0] + t0[1] * LAMBDA)) / self.settings['source_detector_distance']
         LambdaBinSize = abs(LAMBDA[1] - LAMBDA[0])
@@ -318,9 +331,13 @@ class NR_Reduction:
         RB = RB[:, mask]
         RBE = RBE[:, mask]
         
-        # Interpolate DB lambda to match new RB binning
-        iDB = np.interp(LAMBDA, lDB, iDB)
-        eDB = np.interp(LAMBDA, lDB, eDB)
+        # # Interpolate DB lambda to match new RB binning
+        # iDB = np.interp(LAMBDA, lDB, iDB)
+        # eDB = np.interp(LAMBDA, lDB, eDB)
+        
+        # Rebin DB lambda to match new RB binning
+        iDB = tools.rebin_counts(LAMBDA, lDB, iDB)
+        eDB = np.sqrt(tools.rebin_counts(LAMBDA, lDB, eDB**2))
         
         # TODO: check what is stored and whether this is the best place.
         self.q = q
@@ -353,9 +370,8 @@ class NR_Reduction:
         """
         # Find pixel range to fit based on run Ymin/max values and the background parameters.
         sorted_bkgdROI = self._background_roi_sorter(self.config.BkgROI[i], self.config.RB_Ymin[i], self.config.RB_Ymax[i])
-        p1 = tools.find_pixel_index(ypix, sorted_bkgdROI[1]) + int(self.config.peak_pad)
-        p0 = tools.find_pixel_index(ypix, sorted_bkgdROI[2]) - int(self.config.peak_pad)
-        # TODO: Check the logic on p1 and p0 here? Should it be different to this? I haven't quite matched Erik's...
+        p1 = tools.find_pixel_index(ypix, sorted_bkgdROI[0]) + int(self.config.peak_pad)
+        p0 = tools.find_pixel_index(ypix, sorted_bkgdROI[3]) - int(self.config.peak_pad)
 
         Ydata = ypix[p0:p1]
         # Collapse intensity per pixel
