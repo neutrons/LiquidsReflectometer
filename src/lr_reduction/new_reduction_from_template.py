@@ -314,16 +314,38 @@ def write_template(seq_list, run_list, file_to_change, template_data_updated, se
         The sequence identifiers
     run_list : list
         The run numbers
-    template_file : str
-        Path to the template file
+    file_to_change : Path
+        Path to template to open and fill with new entry
+    template_data_updated: template object
+        updated settings to be added into the template file associated with the seq to update
+    seq_updated : float
+        seq num to be updated with the updated template settings
     output_dir : str
         Directory where the output files are saved
+    save_name : bool (optional)
+        ability to override the default template naming convention
+    prior_template : Path (optional)
+        path to prior template with greater entries in case file to change is too small. (This might need changing)
     """
     print("Reading file", file_to_change)
     with open(file_to_change, "r") as fd:
         xml_str = fd.read()
         # Read the template
         data_sets = reduction_template_reader.from_xml(xml_str)
+        # Do a check on the length of the data_sets
+        # This part should allow sequence to be handled out of order. #TODO: Needs fully checking. Small check complete.
+        # TODO: This function is messy and needs sorting out!
+        max_seq_num = np.max(seq_list)
+        if len(data_sets) >= max_seq_num:
+            data_sets = data_sets
+        elif prior_template:
+            # if prior template given, use the other entries from the prior template file
+            with open(prior_template, "r") as pt:
+                xml_str_prior = pt.read()
+                data_sets = reduction_template_reader.from_xml(xml_str_prior)
+                print("Using prior template data")
+        else:
+            print("Template might not have enough entries, will fill the ones it can.")
 
         # For each item in seq_list, store this entry from the read file.
         to_save = []
