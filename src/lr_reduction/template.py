@@ -368,13 +368,13 @@ def process_from_template_ws(
 
     # When using composite direct beam, we don't need a scaling
     # factor file if the multiplier is in the logs
-    scaling_factor_PV = "BL4B:CS:Autoreduce:ScaleMultiplier"
-    if normalize and scaling_factor_PV in ws_db.getRun():
+    scaling_factor_pv = "BL4B:CS:Autoreduce:ScaleMultiplier"
+    if normalize and scaling_factor_pv in ws_db.getRun():
         # The standard changed during early implementation...
         if int(template_data.norm_file) > 212005:
-            a = ws_db.getRun()[scaling_factor_PV].value[0] ** 2
+            a = ws_db.getRun()[scaling_factor_pv].value[0] ** 2
         else:
-            a = ws_db.getRun()[scaling_factor_PV].value[0]
+            a = ws_db.getRun()[scaling_factor_pv].value[0]
         logger.notice("Composite scaling factor: %s" % a)
         d_refl /= a
         refl /= a

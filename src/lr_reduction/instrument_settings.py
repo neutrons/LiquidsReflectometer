@@ -9,14 +9,22 @@ class InstrumentSettings:
 
     Attributes
     ----------
-    source_detector_distance : float - Distance from the source to the detector in meters
-    sample_detector_distance : float - Distance from the sample to the detector in meters
-    num_x_pixels : int - Number of pixels in the x direction
-    num_y_pixels : int - Number of pixels in the y direction
-    pixel_width : float - Width of the pixels in mm
-    xi_reference : float - Zero-position of slit relative to sample, in mm
-    s1_sample_distance : float - Distance from the sample to the s1 aperture in mm
-    wavelength_resolution_function : str - The string representation of the Mantid fit function used to evaluate the wavelength resolution
+    source_detector_distance : float
+        Distance from the source to the detector in meters
+    sample_detector_distance : float
+        Distance from the sample to the detector in meters
+    num_x_pixels : int
+        Number of pixels in the x direction
+    num_y_pixels : int
+        Number of pixels in the y direction
+    pixel_width : float
+        Width of the pixels in mm
+    xi_reference : float
+        Zero-position of slit relative to sample, in mm
+    s1_sample_distance : float
+        Distance from the sample to the s1 aperture in mm
+    wavelength_resolution_function : str
+        The string representation of the Mantid fit function used to evaluate the wavelength resolution
     """
 
     apply_instrument_settings: bool = False

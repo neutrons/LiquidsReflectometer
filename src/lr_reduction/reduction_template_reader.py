@@ -7,7 +7,7 @@ import time
 import xml.dom.minidom
 from typing import Optional
 
-from lr_reduction import __version__ as VERSION
+from lr_reduction import __version__ as version
 from lr_reduction.gravity_correction import GravityDirection
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.scaling_factors.calculate import StitchingConfiguration, StitchingType
@@ -80,7 +80,7 @@ class ReductionParameters:
         self.dead_time_value = 4.2
         self.dead_time_tof_step = 100
         self.use_dead_time_threshold = False
-        self.dead_time_threshold: Optional[Float] = 1.5
+        self.dead_time_threshold: Optional[float] = 1.5
 
         # Instrument geometry parameters
         instrument_settings = InstrumentSettings()
@@ -242,13 +242,17 @@ class ReductionParameters:
         _xml += "<use_emission_time>%s</use_emission_time>\n" % str(self.use_emission_time)
 
         # Stitching
-        _xml += "<stitching_type>%s</stitching_type>\n" % str(self.stitching_configuration.type.value)
-        _xml += "<stitching_scale_factor_qmin>%s</stitching_scale_factor_qmin>\n" % str(self.stitching_configuration.scale_factor_qmin)
-        _xml += "<stitching_scale_factor_qmax>%s</stitching_scale_factor_qmax>\n" % str(self.stitching_configuration.scale_factor_qmax)
+        _xml += ("<stitching_type>%s</stitching_type>\n"
+                 % str(self.stitching_configuration.type.value))
+        _xml += ("<stitching_scale_factor_qmin>%s</stitching_scale_factor_qmin>\n"
+                 % str(self.stitching_configuration.scale_factor_qmin))
+        _xml += ("<stitching_scale_factor_qmax>%s</stitching_scale_factor_qmax>\n"
+                 % str(self.stitching_configuration.scale_factor_qmax))
         _xml += "<stitching_normalize_first_angle>%s</stitching_normalize_first_angle>\n" % str(
             self.stitching_configuration.normalize_first_angle
         )
-        _xml += "<stitching_reflectivity_scale_factor>%s</stitching_reflectivity_scale_factor>\n" % str(self.stitching_reflectivity_scale_factor)
+        _xml += ("<stitching_reflectivity_scale_factor>%s</stitching_reflectivity_scale_factor>\n"
+                 % str(self.stitching_reflectivity_scale_factor))
 
         _xml += "</RefLData>\n"
 
@@ -396,10 +400,18 @@ class ReductionParameters:
         # Stitching
         type_str = getStringElement(instrument_dom, "stitching_type", default=self.stitching_configuration.type.value)
         self.stitching_configuration.type = StitchingType.from_value(type_str)
-        self.stitching_configuration.scale_factor_qmin = getFloatElement(instrument_dom, "stitching_scale_factor_qmin", default=self.stitching_configuration.scale_factor_qmin)
-        self.stitching_configuration.scale_factor_qmax = getFloatElement(instrument_dom, "stitching_scale_factor_qmax", default=self.stitching_configuration.scale_factor_qmax)
-        self.stitching_configuration.normalize_first_angle = getBoolElement(instrument_dom, "stitching_normalize_first_angle", default=self.stitching_configuration.normalize_first_angle)
-        self.stitching_reflectivity_scale_factor = getFloatElement(instrument_dom, "stitching_reflectivity_scale_factor", default=self.stitching_reflectivity_scale_factor)
+        self.stitching_configuration.scale_factor_qmin = getFloatElement(instrument_dom,
+                                                                         "stitching_scale_factor_qmin",
+                                                                         default=self.stitching_configuration.scale_factor_qmin)
+        self.stitching_configuration.scale_factor_qmax = getFloatElement(instrument_dom,
+                                                                         "stitching_scale_factor_qmax",
+                                                                         default=self.stitching_configuration.scale_factor_qmax)
+        self.stitching_configuration.normalize_first_angle = getBoolElement(instrument_dom,
+                                                                            "stitching_normalize_first_angle",
+                                                                            default=self.stitching_configuration.normalize_first_angle)
+        self.stitching_reflectivity_scale_factor = getFloatElement(instrument_dom,
+                                                                   "stitching_reflectivity_scale_factor",
+                                                                   default=self.stitching_reflectivity_scale_factor)
 
 
 #############################################
@@ -407,7 +419,7 @@ class ReductionParameters:
 #############################################
 
 
-def getText(nodelist):
+def getText(nodelist): # noqa: N802
     """Utility method to extract text out of an XML node"""
     rc = ""
     for node in nodelist:
@@ -416,19 +428,19 @@ def getText(nodelist):
     return rc
 
 
-def getContent(dom, tag):
+def getContent(dom, tag): # noqa: N802
     """Returns the content of a tag within a dom object"""
     element_list = dom.getElementsByTagName(tag)
     return getText(element_list[0].childNodes) if len(element_list) > 0 else None
 
 
-def getIntElement(dom, tag, default=None):
+def getIntElement(dom, tag, default=None): # noqa: N802
     """Parse an integer element from the dom object"""
     value = getContent(dom, tag)
     return int(value) if value is not None else default
 
 
-def getIntList(dom, tag, default=[]):
+def getIntList(dom, tag, default=[]): # noqa: N802
     """Parse a list of integers from the dom object"""
     value = getContent(dom, tag)
     if value is not None and len(value.strip()) > 0:
@@ -437,7 +449,7 @@ def getIntList(dom, tag, default=[]):
         return default
 
 
-def getFloatElement(dom, tag, default=None):
+def getFloatElement(dom, tag, default=None): # noqa: N802
     """
     Parse a float element from the DOM object.
 
@@ -459,7 +471,7 @@ def getFloatElement(dom, tag, default=None):
     return float(value) if value is not None else default
 
 
-def getFloatList(dom, tag, default=[]):
+def getFloatList(dom, tag, default=[]): # noqa: N802
     """Parse a list of floats from the dom object"""
     value = getContent(dom, tag)
     if value is not None and len(value.strip()) > 0:
@@ -468,13 +480,13 @@ def getFloatList(dom, tag, default=[]):
         return default
 
 
-def getStringElement(dom, tag, default=""):
+def getStringElement(dom, tag, default=""): # noqa: N802
     """Parse a string element from the dom object"""
     value = getContent(dom, tag)
     return value if value is not None else default
 
 
-def getStringList(dom, tag, _default=[]):
+def getStringList(dom, tag, _default=[]): # noqa: N802
     """Parse a list of strings from the dom object"""
     elem_list = []
     element_list = dom.getElementsByTagName(tag)
@@ -484,7 +496,7 @@ def getStringList(dom, tag, _default=[]):
     return elem_list
 
 
-def getBoolElement(dom, tag, true_tag="true", default=False):
+def getBoolElement(dom, tag, true_tag="true", default=False): # noqa: N802
     """Parse a boolean element from the dom object"""
     value = getContent(dom, tag)
     return value.lower() == true_tag.lower() if value is not None else default
@@ -512,9 +524,9 @@ def to_xml(data_sets):
     _xml = "<Reduction>\n"
     _xml += "    <instrument_name>REFL</instrument_name>\n"
     _xml += "    <timestamp>%s</timestamp>\n" % time.ctime()
-    _xml += "    <version>%s</version>\n" % VERSION
+    _xml += "    <version>%s</version>\n" % version
     _xml += "    <mantid_version>%s</mantid_version>\n" % MANTID_VERSION
-    _xml += "    <generator>lr_reduction-%s</generator>\n" % VERSION
+    _xml += "    <generator>lr_reduction-%s</generator>\n" % version
     _xml += "<DataSeries>\n"
     for item in data_sets:
         _xml += item.to_xml()

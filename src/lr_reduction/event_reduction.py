@@ -179,11 +179,11 @@ def process_attenuation(ws, thickness: float = 0):
     """
     settings = read_settings(ws)
     if settings.source_detector_distance is not None:
-        SDD = settings.source_detector_distance
+        sdd = settings.source_detector_distance
     else:
-        SDD = EventReflectivity.DEFAULT_4B_SOURCE_DET_DISTANCE
+        sdd = EventReflectivity.DEFAULT_4B_SOURCE_DET_DISTANCE
 
-    constant = 1e-4 * NEUTRON_MASS * SDD / PLANCK_CONSTANT
+    constant = 1e-4 * NEUTRON_MASS * sdd / PLANCK_CONSTANT
 
     package_dir, _ = os.path.split(__file__)
     mu_abs = np.loadtxt(os.path.join(package_dir, "Cd-abs-factors.txt")).T
@@ -475,7 +475,7 @@ class EventReflectivity:
         if self.norm_low_res is None:
             self.norm_low_res = [1, self.n_x - 1]
 
-    def extract_meta_data_4A(self):
+    def extract_meta_data_4A(self): # noqa: N802
         """
         4A-specific meta data
         """
@@ -488,7 +488,7 @@ class EventReflectivity:
             source_sample_distance /= 1000.0
         self.source_detector_distance = source_sample_distance + self.sample_detector_distance
 
-    def extract_meta_data_4B(self):
+    def extract_meta_data_4B(self): # noqa: N802
         """
         4B-specific meta data
 
@@ -1335,7 +1335,7 @@ def compute_resolution(ws, default_dq=0.027, theta=None, q_summing=False):
 ## New function for resolution, ready for testing.
 ## Check choices of returned values once ready to implement.
 ## Needs update for q-summing.
-def trapezoidal_distribution_params(ws, Theta_deg=None, FootPrint=None, SlitRatio=None):
+def trapezoidal_distribution_params(ws, Theta_deg=None, FootPrint=None, SlitRatio=None): # noqa: N803
     """
     Calculate trapezoidal parameters L, l from beam/slit geometry and
     compute equivalent normal sigma for 68% probability interval to
@@ -1355,7 +1355,7 @@ def trapezoidal_distribution_params(ws, Theta_deg=None, FootPrint=None, SlitRati
 
     Returns:
     --------
-    L_bottom : float
+    l_bottom : float
         Half-width of trapezoidal support [degrees].
     l_top : float
         Half-width of trapezoidal flat-top [degrees].
@@ -1374,66 +1374,66 @@ def trapezoidal_distribution_params(ws, Theta_deg=None, FootPrint=None, SlitRati
         xi_ref = ws.getInstrument().getNumberParameter("xi-reference")[0]
 
     # Distance between the s1 and the sample
-    dS1Samp = 1485
+    d_s1_samp = 1485
     if settings.s1_sample_distance is not None:
-        dS1Samp = settings.s1_sample_distance * 1000
+        d_s1_samp = settings.s1_sample_distance * 1000
 
     xi_pos = abs(ws.getRun().getProperty("BL4B:Mot:xi.RBV").value[0])
 
     # Derived distances
-    dSiSamp = xi_ref - xi_pos
-    dS1Si = dS1Samp - dSiSamp
+    d_si_samp = xi_ref - xi_pos
+    d_s1_si = d_s1_samp - d_si_samp
 
     if Theta_deg is None:
-        Theta_deg = abs(ws.getRun().getProperty("ths").value[0])
+        Theta_deg = abs(ws.getRun().getProperty("ths").value[0]) # noqa: N806
 
     # Slit openings - can be taken from a FootPrint and SlitRatio if provided, or the logs
     if FootPrint is not None and SlitRatio is not None:
-        SiY = FootPrint * np.sin(np.radians(Theta_deg)) / (1 + (dSiSamp / dS1Si) * (1 + SlitRatio))
-        S1Y = SiY * SlitRatio
+        si_y = FootPrint * np.sin(np.radians(Theta_deg)) / (1 + (d_si_samp / d_s1_si) * (1 + SlitRatio))
+        s1_y = si_y * SlitRatio
     else:
-        S1Y = abs(ws.getRun().getProperty("S1VHeight").value[0])
-        SiY = abs(ws.getRun().getProperty("SiVHeight").value[0])
+        s1_y = abs(ws.getRun().getProperty("S1VHeight").value[0])
+        si_y = abs(ws.getRun().getProperty("SiVHeight").value[0])
 
     # Trapezoidal half-width angles (deg)
-    L_bottom = np.degrees(np.arctan((S1Y + SiY) / (2 * dS1Si)))  # full half-width
-    l_top = np.degrees(np.arctan((S1Y - SiY) / (2 * dS1Si)))  # flat-top half-width
+    l_bottom = np.degrees(np.arctan((s1_y + si_y) / (2 * d_s1_si)))  # full half-width
+    l_top = np.degrees(np.arctan((s1_y - si_y) / (2 * d_s1_si)))  # flat-top half-width
 
-    sigma_equiv = _find_sigma_68(L_bottom, l_top)
+    sigma_equiv = _find_sigma_68(l_bottom, l_top)
     dth_over_th = sigma_equiv / Theta_deg
 
-    return L_bottom, l_top, sigma_equiv, dth_over_th
+    return l_bottom, l_top, sigma_equiv, dth_over_th
 
 
 # Analytic trapezoidal CDF for use in trapezoial_distribution_params
-def _trapezoidal_cdf_analytic(x, L_, l_):
-    h = 1 / (L_ + l_)
+def _trapezoidal_cdf_analytic(x, l_bottom, l_top):
+    h = 1 / (l_bottom + l_top)
     cdf = np.zeros_like(x)
-    left_tail = x < -L_
-    left_slope = (x >= -L_) & (x < -l_)
-    flat_top = (x >= -l_) & (x < l_)
-    right_slope = (x >= l_) & (x <= L_)
-    right_tail = x > L_
+    left_tail = x < -l_bottom
+    left_slope = (x >= -l_bottom) & (x < -l_top)
+    flat_top = (x >= -l_top) & (x < l_top)
+    right_slope = (x >= l_top) & (x <= l_bottom)
+    right_tail = x > l_bottom
 
     cdf[left_tail] = 0
-    cdf[left_slope] = (h / (L_ - l_)) * 0.5 * (x[left_slope] + L_) ** 2
-    F_neg_l = (h / (L_ - l_)) * 0.5 * (L_ - l_) ** 2
-    cdf[flat_top] = F_neg_l + h * (x[flat_top] + l_)
-    cdf[right_slope] = 1 - (h / (L_ - l_)) * 0.5 * (L_ - x[right_slope]) ** 2
+    cdf[left_slope] = (h / (l_bottom - l_top)) * 0.5 * (x[left_slope] + l_bottom) ** 2
+    f_neg_l = (h / (l_bottom - l_top)) * 0.5 * (l_bottom - l_top) ** 2
+    cdf[flat_top] = f_neg_l + h * (x[flat_top] + l_top)
+    cdf[right_slope] = 1 - (h / (l_bottom - l_top)) * 0.5 * (l_bottom - x[right_slope]) ** 2
     cdf[right_tail] = 1
     return cdf
 
 
 # Find equivalent normal sigma for 68% central interval for use in trapezoidal_distribution_params
-def _find_sigma_68(L_, l_, target_prob=0.68):
+def _find_sigma_68(l_bottom, l_top, target_prob=0.68):
     def func(x):
         return (
-            _trapezoidal_cdf_analytic(np.array([x]), L_, l_)[0]
-            - _trapezoidal_cdf_analytic(np.array([-x]), L_, l_)[0]
+            _trapezoidal_cdf_analytic(np.array([x]), l_bottom, l_top)[0]
+            - _trapezoidal_cdf_analytic(np.array([-x]), l_bottom, l_top)[0]
             - target_prob
         )
 
-    return brentq(func, 0, L_)
+    return brentq(func, 0, l_bottom)
 
 
 ## Fix the resolution to include si - Done

@@ -11,16 +11,16 @@ import mantid.simpleapi as api
 import numpy as np
 from matplotlib import pyplot as plt
 
-mantid.kernel.config.setLogLevel(3)
-
 from . import template
 from .event_reduction import apply_dead_time_correction, compute_resolution
 
+mantid.kernel.config.setLogLevel(3)
 
-def reduce_30Hz_from_ws(
-    meas_ws_30Hz,
-    ref_ws_30Hz,
-    data_60Hz,
+
+def reduce_30Hz_from_ws( # noqa: N802
+    meas_ws_30_hz,
+    ref_ws_30_hz,
+    data_60_hz,
     template_data,
     scan_index=1,  # noqa ARG001
     template_reference=None,
@@ -28,27 +28,33 @@ def reduce_30Hz_from_ws(
 ):
     """
     Perform 30Hz reduction
-    @param meas_ws_30Hz: Mantid workspace of the data we want to reduce
-    @param ref_ws_30Hz: Mantid workspace of the reference data, take with the same config
-    @param data_60Hz: reduced reference data at 60Hz
+    @param meas_ws_30_hz: Mantid workspace of the data we want to reduce
+    @param ref_ws_30_hz: Mantid workspace of the reference data, take with the same config
+    @param data_60_hz: reduced reference data at 60Hz
     @param template_data: template data object (for 30Hz)
     @param scan_index: scan index to use within the template.
     """
     # Reduce the reference at 30Hz
     if template_reference is None:
-        r_ref = template.process_from_template_ws(ref_ws_30Hz, template_data, q_summing=q_summing, normalize=False)
+        r_ref = template.process_from_template_ws(ref_ws_30_hz,
+                                                  template_data,
+                                                  q_summing=q_summing,
+                                                  normalize=False)
     else:
-        r_ref = template.process_from_template_ws(ref_ws_30Hz, template_reference, q_summing=q_summing, normalize=False)
+        r_ref = template.process_from_template_ws(ref_ws_30_hz,
+                                                  template_reference,
+                                                  q_summing=q_summing,
+                                                  normalize=False)
 
     # Reduce the sample data at 30Hz
-    r_meas = template.process_from_template_ws(meas_ws_30Hz, template_data, q_summing=q_summing, normalize=False)
+    r_meas = template.process_from_template_ws(meas_ws_30_hz, template_data, q_summing=q_summing, normalize=False)
 
     # Identify the bins we need to overlap with the 30Hz measurement
     # The assumption is that the binning is the same
     _max_q = min(r_ref[0].max(), r_meas[0].max())
     _min_q = max(r_ref[0].min(), r_meas[0].min())
 
-    _binning_60hz = (data_60Hz[0][1] - data_60Hz[0][0]) / data_60Hz[0][0]
+    _binning_60hz = (data_60_hz[0][1] - data_60_hz[0][0]) / data_60_hz[0][0]
     _binning_ref = (r_ref[0][1] - r_ref[0][0]) / r_ref[0][0]
     _binning_meas = (r_meas[0][1] - r_meas[0][0]) / r_meas[0][0]
 
@@ -59,12 +65,12 @@ def reduce_30Hz_from_ws(
     # The tolerance will be half a bin
     _tolerance = _binning_ref / 2.0
 
-    print("60Hz:      %g %g    [%g]" % (data_60Hz[0].min(), data_60Hz[0].max(), _binning_60hz))
+    print("60Hz:      %g %g    [%g]" % (data_60_hz[0].min(), data_60_hz[0].max(), _binning_60hz))
     print("Ref 30Hz:  %g %g    [%g]" % (r_meas[0].min(), r_meas[0].max(), _binning_ref))
     print("Meas 30Hz: %g %g    [%g]" % (r_ref[0].min(), r_ref[0].max(), _binning_meas))
 
     _q_idx_60 = np.asarray(
-        np.where((data_60Hz[0] > _min_q * (1 - _tolerance)) & (data_60Hz[0] < _max_q * (1 + _tolerance)))
+        np.where((data_60_hz[0] > _min_q * (1 - _tolerance)) & (data_60_hz[0] < _max_q * (1 + _tolerance)))
     )[0]
     _q_idx_meas30 = np.asarray(
         np.where((r_meas[0] > _min_q * (1 - _tolerance)) & (r_meas[0] < _max_q * (1 + _tolerance)))
@@ -73,17 +79,17 @@ def reduce_30Hz_from_ws(
         np.where((r_ref[0] > _min_q * (1 - _tolerance)) & (r_ref[0] < _max_q * (1 + _tolerance)))
     )[0]
 
-    if not data_60Hz[0][_q_idx_60].shape[0] == r_ref[0][_q_idx_ref30].shape[0]:
+    if not data_60_hz[0][_q_idx_60].shape[0] == r_ref[0][_q_idx_ref30].shape[0]:
         print("\n\n60Hz reference may have been reduced with different binning!")
         print("Array sizes: %g %g %g" % (len(_q_idx_60), len(_q_idx_meas30), len(_q_idx_ref30)))
         print("Remember to average overlapping points!\n\n")
 
-    r_q_final = r_meas[1][_q_idx_meas30] / r_ref[1][_q_idx_ref30] * data_60Hz[1][_q_idx_60]
+    r_q_final = r_meas[1][_q_idx_meas30] / r_ref[1][_q_idx_ref30] * data_60_hz[1][_q_idx_60]
 
     dr_q_final = np.sqrt(
-        (r_meas[2][_q_idx_meas30] / r_ref[1][_q_idx_ref30] * data_60Hz[1][_q_idx_60]) ** 2
-        + (r_meas[1][_q_idx_meas30] / r_ref[1][_q_idx_ref30] * data_60Hz[2][_q_idx_60]) ** 2
-        + (r_meas[1][_q_idx_meas30] / r_ref[1][_q_idx_ref30] ** 2 * data_60Hz[1][_q_idx_60] * r_ref[2][_q_idx_ref30])
+        (r_meas[2][_q_idx_meas30] / r_ref[1][_q_idx_ref30] * data_60_hz[1][_q_idx_60]) ** 2
+        + (r_meas[1][_q_idx_meas30] / r_ref[1][_q_idx_ref30] * data_60_hz[2][_q_idx_60]) ** 2
+        + (r_meas[1][_q_idx_meas30] / r_ref[1][_q_idx_ref30] ** 2 * data_60_hz[1][_q_idx_60] * r_ref[2][_q_idx_ref30])
         ** 2
     )
 
@@ -97,19 +103,19 @@ def reduce_30Hz_from_ws(
     # Q resolution
     #   Assume a constant term of 0 unless it is specified
     dq0 = 0
-    if meas_ws_30Hz.getInstrument().hasParameter("dq-constant"):
-        dq0 = meas_ws_30Hz.getInstrument().getNumberParameter("dq-constant")[0]
-    dq_slope = compute_resolution(meas_ws_30Hz)
+    if meas_ws_30_hz.getInstrument().hasParameter("dq-constant"):
+        dq0 = meas_ws_30_hz.getInstrument().getNumberParameter("dq-constant")[0]
+    dq_slope = compute_resolution(meas_ws_30_hz)
     print("Resolution: %g + %g Q" % (dq0, dq_slope))
     dq = dq0 + dq_slope * q[_idx]
     return np.asarray([q[_idx], r_q_final[_idx], dr_q_final[_idx], dq])
 
 
-def reduce_30Hz_slices(
-    meas_run_30Hz,
-    ref_run_30Hz,
-    ref_data_60Hz,
-    template_30Hz,
+def reduce_30Hz_slices( # noqa: N802
+    meas_run_30_hz,
+    ref_run_30_hz,
+    ref_data_60_hz,
+    template_30_hz,
     time_interval,
     output_dir,
     scan_index=1,
@@ -117,13 +123,13 @@ def reduce_30Hz_slices(
     template_reference=None,
     q_summing=None,
 ):
-    meas_ws_30Hz = api.LoadEventNexus("REF_L_%s" % meas_run_30Hz)
+    meas_ws_30_hz = api.LoadEventNexus("REF_L_%s" % meas_run_30_hz)
 
     return reduce_30Hz_slices_ws(
-        meas_ws_30Hz,
-        ref_run_30Hz,
-        ref_data_60Hz,
-        template_30Hz,
+        meas_ws_30_hz,
+        ref_run_30_hz,
+        ref_data_60_hz,
+        template_30_hz,
         time_interval,
         output_dir,
         scan_index=scan_index,
@@ -149,11 +155,11 @@ def reduce_slices(
     )
 
 
-def reduce_30Hz_slices_ws(
-    meas_ws_30Hz,
-    ref_run_30Hz,
-    ref_data_60Hz,
-    template_30Hz,
+def reduce_30Hz_slices_ws( # noqa: N802
+    meas_ws_30_hz,
+    ref_run_30_hz,
+    ref_data_60_hz,
+    template_30_hz,
     time_interval,
     output_dir,
     scan_index=1,
@@ -163,19 +169,19 @@ def reduce_30Hz_slices_ws(
 ):
     """
     Perform 30Hz reduction
-    @param meas_ws_30Hz: workspace of the data we want to reduce
-    @param ref_ws_30Hz: workspace of the reference data, take with the same config
-    @param ref_data_60Hz: file path of the reduce data file at 60Hz
-    @param template_30Hz: file path of the template file for 30Hz
+    @param meas_ws_30_hz: workspace of the data we want to reduce
+    @param ref_run_30_hz: workspace of the reference data, take with the same config
+    @param ref_data_60_hz: file path of the reduce data file at 60Hz
+    @param template_30_hz: file path of the template file for 30Hz
     @param time_interval: time step in seconds
     @param scan_index: scan index to use within the template.
     """
     # Save options
     options = dict(
-        meas_run_30Hz=meas_ws_30Hz.getRun()["run_number"].value,
-        ref_run_30Hz=ref_run_30Hz,
-        ref_data_60Hz=ref_data_60Hz,
-        template_30Hz=template_30Hz,
+        meas_run_30_hz=meas_ws_30_hz.getRun()["run_number"].value,
+        ref_run_30_hz=ref_run_30_hz,
+        ref_data_60_hz=ref_data_60_hz,
+        template_30_hz=template_30_hz,
         time_interval=time_interval,
         output_dir=output_dir,
         scan_index=scan_index,
@@ -186,37 +192,37 @@ def reduce_30Hz_slices_ws(
         json.dump(options, fp)
 
     # Load the template
-    print("Reading template: %s" % template_30Hz)
-    template_data = template.read_template(template_30Hz, scan_index)
+    print("Reading template: %s" % template_30_hz)
+    template_data = template.read_template(template_30_hz, scan_index)
 
     # Reduce the quartz at 30Hz
     print("Reading reference data at 30Hz")
-    if os.path.isfile(ref_run_30Hz):
-        ref_ws_30Hz = api.LoadEventNexus(ref_run_30Hz)
+    if os.path.isfile(ref_run_30_hz):
+        ref_ws_30_hz = api.LoadEventNexus(ref_run_30_hz)
     else:
-        ref_ws_30Hz = api.LoadEventNexus("REF_L_%s" % ref_run_30Hz)
+        ref_ws_30_hz = api.LoadEventNexus("REF_L_%s" % ref_run_30_hz)
 
     # Reduce the sample data at 30Hz
     print("Reading sample data at 30Hz")
-    # meas_ws_30Hz = api.LoadEventNexus("REF_L_%s" % meas_run_30Hz)
+    # meas_ws_30Hz = api.LoadEventNexus("REF_L_%s" % meas_run_30_hz)
 
     # Some meta-data are not filled in for the live data stream
     # Use dummy values for those
     try:
-        duration = meas_ws_30Hz.getRun()["duration"].value
-    except:
+        duration = meas_ws_30_hz.getRun()["duration"].value
+    except: # noqa: E722
         duration = 0
     try:
-        meas_run_30Hz = meas_ws_30Hz.getRun()["run_number"].value
-    except:
-        meas_run_30Hz = 0
+        meas_run_30_hz = meas_ws_30_hz.getRun()["run_number"].value
+    except: # noqa: E722
+        meas_run_30_hz = 0
 
     # Time slices
     print("Slicing data")
-    splitws, infows = api.GenerateEventsFilter(InputWorkspace=meas_ws_30Hz, TimeInterval=time_interval)
+    splitws, infows = api.GenerateEventsFilter(InputWorkspace=meas_ws_30_hz, TimeInterval=time_interval)
 
     api.FilterEvents(
-        InputWorkspace=meas_ws_30Hz,
+        InputWorkspace=meas_ws_30_hz,
         SplitterWorkspace=splitws,
         InformationWorkspace=infows,
         OutputWorkspaceBaseName="time_ws",
@@ -233,7 +239,7 @@ def reduce_30Hz_slices_ws(
 
     # Load the 60Hz reference data
     print("Loading reference R(Q)")
-    data_60Hz = np.loadtxt(ref_data_60Hz).T
+    data_60_hz = np.loadtxt(ref_data_60_hz).T
 
     reduced = []
     total_time = 0
@@ -243,8 +249,8 @@ def reduce_30Hz_slices_ws(
         try:
             _reduced = reduce_30Hz_from_ws(
                 tmpws,
-                ref_ws_30Hz,
-                data_60Hz,
+                ref_ws_30_hz,
+                data_60_hz,
                 template_data,
                 scan_index=scan_index,
                 template_reference=template_reference,
@@ -252,23 +258,23 @@ def reduce_30Hz_slices_ws(
             )
             # Remove first point
             reduced.append(_reduced)
-            _filename = f"r{meas_run_30Hz}_t{int(total_time):06d}.txt"
+            _filename = f"r{meas_run_30_hz}_t{int(total_time):06d}.txt"
             np.savetxt(os.path.join(output_dir, _filename), _reduced.T)
-        except:
+        except: # noqa: E722
             print("reduce_30Hz_slices_ws: %s" % sys.exc_info()[0])
         total_time += time_interval
 
     # Save output
-    output_file = os.path.join(output_dir, "r%s-time-resolved.json" % meas_run_30Hz)
+    output_file = os.path.join(output_dir, "r%s-time-resolved.json" % meas_run_30_hz)
     print("Saving t-NR to %s" % output_file)
-    package_json_data(meas_run_30Hz, output_dir, out_array=output_file)
+    package_json_data(meas_run_30_hz, output_dir, out_array=output_file)
 
     if create_plot:
         plot_slices(
             reduced,
             title="Duration: %g seconds" % duration,
             time_interval=time_interval,
-            file_path=os.path.join(output_dir, "r%s.png" % meas_run_30Hz),
+            file_path=os.path.join(output_dir, "r%s.png" % meas_run_30_hz),
         )
 
     return reduced
@@ -312,11 +318,11 @@ def reduce_slices_ws(
     # Use dummy values for those
     try:
         duration = meas_ws.getRun()["duration"].value
-    except:
+    except: # noqa: E722
         duration = 0
     try:
         meas_run = meas_ws.getRun()["run_number"].value
-    except:
+    except: # noqa: E722
         meas_run = 0
 
     # Apply dead time correction up front since we are using the error events but
@@ -371,7 +377,7 @@ def reduce_slices_ws(
             reduced.append(_reduced)
             _filename = f"r{meas_run}_t{int(total_time):06d}.txt"
             np.savetxt(os.path.join(output_dir, _filename), _reduced.T)
-        except:
+        except: # noqa: E722
             print("reduce_slices_ws: %s" % sys.exc_info()[0])
         total_time += time_interval
 

@@ -209,7 +209,8 @@ def write_template(seq_list, run_list, sf_list, template_file, output_dir):
                 data_sets[seq_list[i] - 1].stitching_reflectivity_scale_factor = sf_list[i]
                 new_data_sets.append(data_sets[seq_list[i] - 1])
             else:
-                logger.warning(f"Too few entries [{len(data_sets)}] in template for sequence number {seq_list[i]} when saving new template")
+                logger.warning(f"Too few entries [{len(data_sets)}] in template for sequence number \
+{seq_list[i]} when saving new template")
 
     # Save the template that was used
     xml_str = reduction_template_reader.to_xml(new_data_sets)

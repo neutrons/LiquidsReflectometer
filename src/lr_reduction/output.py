@@ -15,7 +15,7 @@ from lr_reduction.scaling_factors.calculate import (
     scaling_factor_critical_edge,
 )
 
-from . import __version__ as VERSION
+from . import __version__ as version
 
 
 class RunCollection:
@@ -79,7 +79,9 @@ class RunCollection:
 
             # Apply critical edge scaling if enabled
             if self.stitching_configuration.normalize_first_angle:
-                ce = scaling_factor_critical_edge(self.stitching_configuration.scale_factor_qmin, self.stitching_configuration.scale_factor_qmax, sorted_collection_reduced_data)
+                ce = scaling_factor_critical_edge(self.stitching_configuration.scale_factor_qmin,
+                                                  self.stitching_configuration.scale_factor_qmax,
+                                                  sorted_collection_reduced_data)
                 self.stitching_reflectivity_scale_factors[sorted_indices[0]] = ce
                 cumulative_scale_factor = ce
 
@@ -190,7 +192,7 @@ class RunCollection:
                 _meta = item["info"]
                 if not initial_entry_written:
                     fd.write("# Experiment %s Run %s\n" % (_meta["experiment"], _meta["run_number"]))
-                    fd.write("# Reduction %s\n" % VERSION)
+                    fd.write("# Reduction %s\n" % version)
                     fd.write("# Run title: %s\n" % _meta["run_title"])
                     fd.write("# Run start time: %s\n" % _meta["start_time"])
                     fd.write("# Reduction time: %s\n" % _meta["time"])
@@ -266,8 +268,12 @@ class RunCollection:
         run_names = []
 
         for i, item in enumerate(self.collection):
-            refl_curves.append([item["q"], item["r"] * self.stitching_reflectivity_scale_factors[i], item["dr"] * self.stitching_reflectivity_scale_factors[i], item["dq"]])
-            run_names.append(f"Run: {item['info']['run_number']}  SF: {self.stitching_reflectivity_scale_factors[i]:.3f}")
+            refl_curves.append([item["q"],
+                                item["r"] * self.stitching_reflectivity_scale_factors[i],
+                                item["dr"] * self.stitching_reflectivity_scale_factors[i],
+                                item["dq"]])
+            run_names.append(f"Run: {item['info']['run_number']}  "
+                             f"SF: {self.stitching_reflectivity_scale_factors[i]:.3f}")
 
         # run_number parameter is only used when publish=True
         return plot1d(run_number="dummy_run", data_list=refl_curves, data_names=run_names,
@@ -287,12 +293,12 @@ def read_file(file_path):
     """
     _meta = dict()
     with open(file_path, "r") as fd:
-        for l in fd:
-            if l.startswith("# Meta:"):
-                _meta = json.loads(l[len("# Meta:") : -1])
+        for line in fd:
+            if line.startswith("# Meta:"):
+                _meta = json.loads(line[len("# Meta:") : -1])
     try:
         _q, _r, _dr, _dq = np.loadtxt(file_path).T
-    except:
+    except: # noqa: E722
         print("Could not read file. It may have no points")
         _q = _r = _dr = _dq = []
     return _q, _r, _dr, _dq, _meta

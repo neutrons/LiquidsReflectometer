@@ -22,8 +22,8 @@ def test_reduce_workflow(nexus_dir):
         reduced = time_resolved.reduce_30Hz_slices(
             198413,
             198413,
-            ref_data_60Hz=reduced_path,
-            template_30Hz=template_path,
+            ref_data_60_hz=reduced_path,
+            template_30_hz=template_path,
             time_interval=300,
             output_dir=output_dir,
             scan_index=5,
