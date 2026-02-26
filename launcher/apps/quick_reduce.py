@@ -117,7 +117,7 @@ class QuickReduce(QWidget):
         try:
             int(self.run_number_ledit.text())
             int(self.db_run_number_ledit.text())
-        except: # noqa: E722
+        except ValueError:
             error = "Check your run numbers"
         # Pop up a dialog if there were invalid inputs
         if error:

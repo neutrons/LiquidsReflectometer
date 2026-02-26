@@ -75,7 +75,7 @@ class SLD(QWidget):
         density = self.density_ledit.text()
         try:
             density = float(density)
-        except: # noqa: E722
+        except ValueError:
             density = None
         wavelength = float(self.wl_ledit.text())
         composition = self.composition_ledit.text()
@@ -92,6 +92,7 @@ class SLD(QWidget):
             output_text += "%-15s %6.6f\n\n" % (" Imag SLD:", x_im_sld)
             output_text += "All units in 10^-6 A^-2"
         except: # noqa: E722
+            # TODO: add handling for specific exceptions
             output_text = str(sys.exc_info()[1])
 
         self.output.setText(output_text)

@@ -7,6 +7,7 @@ import os
 import sys
 
 import versioningit
+from packaging.version import Version
 
 sys.path.insert(0, os.path.abspath("../reduction"))
 
@@ -18,8 +19,6 @@ copyright = "2024, ORNL"  # noqa A001
 author = "ORNL"
 version = versioningit.get_version("../")
 # The full version (major.minor.patch) without pre-/post-release metadata
-from packaging.version import Version # noqa E402
-
 release = Version(version).base_version
 
 # -- General configuration ---------------------------------------------------

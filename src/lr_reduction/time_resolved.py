@@ -210,11 +210,11 @@ def reduce_30Hz_slices_ws( # noqa: N802
     # Use dummy values for those
     try:
         duration = meas_ws_30_hz.getRun()["duration"].value
-    except: # noqa: E722
+    except (RuntimeError, KeyError, ValueError):
         duration = 0
     try:
         meas_run_30_hz = meas_ws_30_hz.getRun()["run_number"].value
-    except: # noqa: E722
+    except (RuntimeError, KeyError, ValueError):
         meas_run_30_hz = 0
 
     # Time slices
