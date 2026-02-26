@@ -41,8 +41,8 @@ def make_mock_ws():
 
 def test_trapezoidal_cdf_analytic_basic():
     x = np.array([-1, 0, 1])
-    L_, l_ = 1.0, 0.5
-    cdf = event_reduction._trapezoidal_cdf_analytic(x, L_, l_)
+    l_bottom, l_top = 1.0, 0.5
+    cdf = event_reduction._trapezoidal_cdf_analytic(x, l_bottom, l_top)
     assert cdf.shape == x.shape
     assert np.all(cdf >= 0) and np.all(cdf <= 1)
     assert cdf[0] == 0
@@ -50,9 +50,9 @@ def test_trapezoidal_cdf_analytic_basic():
 
 
 def test_find_sigma_68_basic():
-    L_, l_ = 1.0, 0.5
-    sigma = event_reduction._find_sigma_68(L_, l_)
-    assert 0 < sigma < L_
+    l_bottom, l_top = 1.0, 0.5
+    sigma = event_reduction._find_sigma_68(l_bottom, l_top)
+    assert 0 < sigma < l_bottom
     assert sigma == pytest.approx(0.5101, rel=1e-3)
 
 
@@ -64,14 +64,14 @@ def test_trapezoid_gaussian_function(make_mock_ws):
 
     ws = make_mock_ws(properties=mock_run_properties)
 
-    L_bottom, l_top, sigma_equiv, dth_over_th = event_reduction.trapezoidal_distribution_params(ws)
-    print(L_bottom, l_top, sigma_equiv, dth_over_th)
+    l_bottom, l_top, sigma_equiv, dth_over_th = event_reduction.trapezoidal_distribution_params(ws)
+    print(l_bottom, l_top, sigma_equiv, dth_over_th)
     # Calculate expected values independently here or reuse logic from event_reduction
     # For simplicity, just check types and ranges:
-    assert isinstance(L_bottom, float)
+    assert isinstance(l_bottom, float)
     assert isinstance(l_top, float)
     assert isinstance(sigma_equiv, float)
     assert sigma_equiv == pytest.approx(0.00434, rel=1e-3)
     assert dth_over_th == pytest.approx(0.01176, rel=1e-3)
-    assert L_bottom == pytest.approx(0.0093, rel=1e-3)
+    assert l_bottom == pytest.approx(0.0093, rel=1e-3)
     assert l_top == pytest.approx(0.0031, rel=1e-3)

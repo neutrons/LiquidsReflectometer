@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+# ruff: noqa: N999
 import json
 import os
 import subprocess
@@ -187,11 +188,11 @@ class Dynamic30Hz(QWidget):
         return True
 
     def show_dialog(self, text):
-        msgBox = QMessageBox()
-        msgBox.setIcon(QMessageBox.Critical)
-        msgBox.setText(text)
-        msgBox.setWindowTitle("Invalid inputs")
-        msgBox.setStandardButtons(QMessageBox.Ok)
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Critical)
+        msg_box.setText(text)
+        msg_box.setWindowTitle("Invalid inputs")
+        msg_box.setStandardButtons(QMessageBox.Ok)
 
     def parse_run_list(self, text):
         """
@@ -201,7 +202,7 @@ class Dynamic30Hz(QWidget):
         for _r in text.split(","):
             try:
                 run_list.append(int(_r))
-            except:
+            except: # noqa: E722
                 sub_toks = _r.split("-")
                 if len(sub_toks) == 2:
                     run_list.extend(range(int(sub_toks[0]), int(sub_toks[1]) + 1))

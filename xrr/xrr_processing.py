@@ -38,7 +38,7 @@ def process_xrr(data_file, output_dir=None):
                     value = toks[1].replace('"', "")
                     try:
                         value = float(value)
-                    except:
+                    except: # noqa: E722
                         # keep value as a string
                         pass
                     meta_data[toks[0][1:]] = value

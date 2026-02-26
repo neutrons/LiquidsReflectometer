@@ -64,18 +64,18 @@ class SLD(QWidget):
         self.settings.setValue("sld_wavelength", self.wl_ledit.text())
 
     def show_dialog(self, text):
-        msgBox = QMessageBox()
-        msgBox.setIcon(QMessageBox.Critical)
-        msgBox.setText(text)
-        msgBox.setWindowTitle("Invalid inputs")
-        msgBox.setStandardButtons(QMessageBox.Ok)
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Critical)
+        msg_box.setText(text)
+        msg_box.setWindowTitle("Invalid inputs")
+        msg_box.setStandardButtons(QMessageBox.Ok)
 
     def compute_sld(self):
         self.save_settings()
         density = self.density_ledit.text()
         try:
             density = float(density)
-        except:
+        except: # noqa: E722
             density = None
         wavelength = float(self.wl_ledit.text())
         composition = self.composition_ledit.text()
@@ -91,7 +91,7 @@ class SLD(QWidget):
             output_text += "%-15s %6.6f\n" % ("X-ray SLD:", x_sld)
             output_text += "%-15s %6.6f\n\n" % (" Imag SLD:", x_im_sld)
             output_text += "All units in 10^-6 A^-2"
-        except:
+        except: # noqa: E722
             output_text = str(sys.exc_info()[1])
 
         self.output.setText(output_text)

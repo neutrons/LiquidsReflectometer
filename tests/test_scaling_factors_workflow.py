@@ -3,11 +3,11 @@ import os
 import mantid.simpleapi as mtd_api
 import numpy as np
 
-mtd_api.config["default.facility"] = "SNS"
-mtd_api.config["default.instrument"] = "REF_L"
-
 from lr_reduction.scaling_factors import workflow as sf_workflow
 from lr_reduction.utils import amend_config
+
+mtd_api.config["default.facility"] = "SNS"
+mtd_api.config["default.instrument"] = "REF_L"
 
 
 def check_results(data_file, reference):
@@ -18,16 +18,16 @@ def check_results(data_file, reference):
     with open(data_file, "r") as fd:
         _cfg_data = fd.readlines()
         cfg_data = []
-        for l in _cfg_data:
-            if not l.startswith("#"):
-                cfg_data.append(l)
+        for line in _cfg_data:
+            if not line.startswith("#"):
+                cfg_data.append(line)
 
     with open(reference, "r") as fd:
         _cfg_ref = fd.readlines()
         cfg_ref = []
-        for l in _cfg_ref:
-            if not l.startswith("#"):
-                cfg_ref.append(l)
+        for line in _cfg_ref:
+            if not line.startswith("#"):
+                cfg_ref.append(line)
 
     for i in range(len(cfg_ref)):
         # Newly generated data

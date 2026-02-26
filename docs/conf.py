@@ -18,7 +18,7 @@ copyright = "2024, ORNL"  # noqa A001
 author = "ORNL"
 version = versioningit.get_version("../")
 # The full version (major.minor.patch) without pre-/post-release metadata
-from packaging.version import Version
+from packaging.version import Version # noqa E402
 
 release = Version(version).base_version
 
