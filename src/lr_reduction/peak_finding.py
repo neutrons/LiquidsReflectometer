@@ -1,12 +1,11 @@
 import warnings
 
+import mantid.simpleapi as api
 import numpy as np
+from lmfit.models import GaussianModel
 
 warnings.filterwarnings("ignore", module="numpy")
 warnings.filterwarnings("ignore")
-
-import mantid.simpleapi as api
-from lmfit.models import GaussianModel
 
 
 def process_data(workspace, summed=True, tof_step=200):

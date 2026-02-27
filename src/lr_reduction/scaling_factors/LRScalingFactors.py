@@ -1,3 +1,4 @@
+
 # Mantid Repository : https://github.com/mantidproject/mantid
 #
 # Copyright &copy; 2018 ISIS Rutherford Appleton Laboratory UKRI,
@@ -5,6 +6,7 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=invalid-name, no-init
+# ruff: noqa: N999 - Invalid module name
 import os
 import re
 import time
@@ -77,7 +79,7 @@ class LRScalingFactors(PythonAlgorithm):
     def summary(self):
         return "Liquids Reflectometer (REFL) scaling factor calculation"
 
-    def PyInit(self):
+    def PyInit(self): # noqa: N802
         self.declareProperty(IntArrayProperty("DirectBeamRuns", []), "Run number of the signal run to use")
         self.declareProperty(IntArrayProperty("Attenuators", []), "Number of attenuators for each run")
         self.declareProperty(
@@ -108,7 +110,7 @@ class LRScalingFactors(PythonAlgorithm):
         self.declareProperty(FileProperty("ScalingFactorFile", "", action=FileAction.Save, extensions=["cfg"]))
 
     # pylint: disable=too-many-locals,too-many-branches
-    def PyExec(self):
+    def PyExec(self): # noqa: N802
         # Verify whether we have a sorted list of runs.
         data_runs = self.getProperty("DirectBeamRuns").value
 
@@ -279,13 +281,13 @@ class LRScalingFactors(PythonAlgorithm):
         else:
             self.have_attenuator_info = True
 
-    def get_attenuators(self, workspace, expInfoIndex):
+    def get_attenuators(self, workspace, exp_info_index):
         """
         @param workspace: workspace we are determining the number of attenuators for
         @param expInfoIndex: index of the run in case we are getting the attenuators from the input properties
         """
         if self.have_attenuator_info:
-            return self.attenuators[expInfoIndex]
+            return self.attenuators[exp_info_index]
         else:
             return int(workspace.getRun().getProperty("vAtt").value[0] - 1)
 

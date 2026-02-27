@@ -23,7 +23,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
     def summary(self):
         return "Single read-out dead time correction calculation"
 
-    def PyInit(self):
+    def PyInit(self): # noqa: N802
         self.declareProperty(
             IEventWorkspaceProperty("InputWorkspace", "", Direction.Input),
             "Input workspace use to compute dead time correction",
@@ -54,7 +54,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         )
         self.declareProperty(MatrixWorkspaceProperty("OutputWorkspace", "", Direction.Output), "Output workspace")
 
-    def PyExec(self):
+    def PyExec(self): # noqa: N802
         # Event data must include error events (all triggers on the detector)
         ws_event_data = self.getProperty("InputWorkspace").value
         ws_error_events = self.getProperty("InputErrorEventsWorkspace").value

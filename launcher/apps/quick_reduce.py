@@ -117,7 +117,7 @@ class QuickReduce(QWidget):
         try:
             int(self.run_number_ledit.text())
             int(self.db_run_number_ledit.text())
-        except:
+        except ValueError:
             error = "Check your run numbers"
         # Pop up a dialog if there were invalid inputs
         if error:
@@ -126,11 +126,11 @@ class QuickReduce(QWidget):
         return True
 
     def show_dialog(self, text):
-        msgBox = QMessageBox()
-        msgBox.setIcon(QMessageBox.Critical)
-        msgBox.setText(text)
-        msgBox.setWindowTitle("Invalid inputs")
-        msgBox.setStandardButtons(QMessageBox.Ok)
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Critical)
+        msg_box.setText(text)
+        msg_box.setWindowTitle("Invalid inputs")
+        msg_box.setStandardButtons(QMessageBox.Ok)
 
     def reduce(self):
         if not self.check_inputs():

@@ -264,7 +264,9 @@ def generate_report_section_run_meta_data(workspace: MantidWorkspace) -> str:
     return meta
 
 
-def generate_report_section_reduction_parameters(workspace: MantidWorkspace, template_data: ReductionParameters, meta_data: dict) -> str:
+def generate_report_section_reduction_parameters(workspace: MantidWorkspace,
+                                                 template_data: ReductionParameters,
+                                                 meta_data: dict) -> str:
     """Generate HTML report from a reduced workspace and template data
 
     Parameters
@@ -340,8 +342,20 @@ def generate_report_section_reduction_parameters(workspace: MantidWorkspace, tem
     meta += "</table>\n"
 
     meta += "<table style='width:100%'>"
-    meta += "<tr><th>Wavelength</th><th>Q</th><th>Thi</th><th>Ths</th><th>Offset</th><th>Theta used</th></tr>"  # noqa E501
-    meta += "<tr><td>%6.4g - %6.4g</td><td>%6.4g - %6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td></tr>\n" % (
+
+    meta += ("<tr><th>Wavelength</th>"
+             "<th>Q</th>"
+             "<th>Thi</th>"
+             "<th>Ths</th>"
+             "<th>Offset</th>"
+             "<th>Theta used</th></tr>")
+
+    meta += ("<tr><td>%6.4g - %6.4g</td>" +
+             "<td>%6.4g - %6.4g</td>" +
+             "<td>%6.4g</td>" +
+             "<td>%6.4g</td>" +
+             "<td>%6.4g</td>" +
+             "<td>%6.4g</td></tr>\n") % (
         meta_data["wl_min"],
         meta_data["wl_max"],
         meta_data["q_min"],
@@ -387,7 +401,9 @@ def generate_report_section_direct_beam_parameters(workspace: MantidWorkspace) -
     return meta
 
 
-def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionParameters, data_type: DataType) -> list[str]:
+def generate_report_plots(workspace: MantidWorkspace,
+                          template_data: ReductionParameters,
+                          data_type: DataType) -> list[str]:
     """
     Generate diagnostic plots from the event workspace
 
@@ -448,7 +464,7 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
         )
     except Exception:  # noqa E722
         logger.warning("  - Could not generate XY plot")
-        xy_plot = _plotText("Could not generate XY plot")
+        xy_plot = _plot_text("Could not generate XY plot")
 
     logger.notice("  - generating X-TOF plot")
     # Y-TOF plot
@@ -486,7 +502,7 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
         )
     except Exception:  # noqa E722
         logger.warning("  - Could not generate X-TOF plot")
-        y_tof_plot = _plotText("Could not generate X-TOF plot")
+        y_tof_plot = _plot_text("Could not generate X-TOF plot")
 
     logger.notice("  - generating Y count distribution")
     # Count per Y pixel
@@ -514,7 +530,7 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
         )
     except Exception:  # noqa E722
         logger.warning("  - Could not generate Y count distribution")
-        peak_pixels = _plotText(
+        peak_pixels = _plot_text(
             "Could not generate Y count distribution"
         )
 
@@ -543,7 +559,7 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
         )
     except Exception:  # noqa E722
         logger.warning("  - Could not generate X count distribution")
-        low_res_profile = _plotText("Could not generate X count distribution")
+        low_res_profile = _plot_text("Could not generate X count distribution")
 
     # TOF distribution
     tof_dist = None
@@ -561,7 +577,7 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
         )
     except Exception:  # noqa E722
         logger.warning("  - Could not generate TOF distribution")
-        tof_dist = _plotText(
+        tof_dist = _plot_text(
             "Could not generate TOF distribution"
         )
 
@@ -932,7 +948,7 @@ def _plot1d(
     return pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
 
 
-def _plotText(text, title=""):
+def _plot_text(text, title=""):
     """
     Displays an informative message as a plot
 

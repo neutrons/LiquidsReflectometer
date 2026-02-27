@@ -1,10 +1,12 @@
-# Mantid Repository : https://github.com/mantidproject/mantid
+# Mantid Repository : https://github.com/mantid
+# project/mantid
 #
 # Copyright &copy; 2018 ISIS Rutherford Appleton Laboratory UKRI,
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init,invalid-name
+# ruff: noqa: N999 - Invalid module name
 import datetime
 import functools
 from math import ceil
@@ -16,10 +18,10 @@ from mantid.api import AlgorithmFactory, FileAction, FileProperty, PythonAlgorit
 from mantid.kernel import Direction, IntArrayProperty, StringArrayProperty
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, FitPeaks, LoadEventNexus, logger, mtd
 
-THI_TOLERANCE = 0.002
-
 from lr_reduction.scaling_factors import LRScalingFactors
 from lr_reduction.utils import mantid_algorithm_exec
+
+THI_TOLERANCE = 0.002
 
 
 class CompareTwoNXSDataForSFcalculator(object):
@@ -33,18 +35,18 @@ class CompareTwoNXSDataForSFcalculator(object):
     #5 if everything up to this point is identical, return 0
     """
 
-    nexusToCompareWithRun = None
-    nexusToPositionRun = None
-    resultComparison = 0
+    nexusToCompareWithRun = None # noqa: N815
+    nexusToPositionRun = None # noqa: N815
+    resultComparison = 0 # noqa: N815
 
-    def __init__(self, nxsdataToCompareWith, nxsdataToPosition):
+    def __init__(self, nxs_data_to_compare_with, nxs_data_to_position):
         """
         Compare two runs to decide in which order they should be processed
-        :param workspace nxsdataToCompareWith: new run to compare with
-        :param workspace nxsdataToPosition: second run to compare with
+        :param workspace nxs_data_to_compare_with: new run to compare with
+        :param workspace nxs_data_to_position: second run to compare with
         """
-        self.nexusToCompareWithRun = nxsdataToCompareWith.getRun()
-        self.nexusToPositionRun = nxsdataToPosition.getRun()
+        self.nexusToCompareWithRun = nxs_data_to_compare_with.getRun()
+        self.nexusToPositionRun = nxs_data_to_position.getRun()
 
         compare = self.compareParameter("LambdaRequest", "descending")
         if compare != 0:
@@ -61,38 +63,38 @@ class CompareTwoNXSDataForSFcalculator(object):
             self.resultComparison = compare
             return
 
-        pcharge1 = self.nexusToCompareWithRun.getProperty("gd_prtn_chrg").value / nxsdataToCompareWith.getNEvents()
-        pcharge2 = self.nexusToPositionRun.getProperty("gd_prtn_chrg").value / nxsdataToPosition.getNEvents()
+        pcharge1 = self.nexusToCompareWithRun.getProperty("gd_prtn_chrg").value / nxs_data_to_compare_with.getNEvents()
+        pcharge2 = self.nexusToPositionRun.getProperty("gd_prtn_chrg").value / nxs_data_to_position.getNEvents()
 
         self.resultComparison = -1 if pcharge1 < pcharge2 else 1
 
-    def compareParameter(self, param, order, tolerance=0.0):
+    def compareParameter(self, param, order, tolerance=0.0): # noqa: N802
         """
         Compare parameters for the two runs
         :param string param: name of the parameter to compare
         :param string order: ascending or descending
         :param float tolerance: tolerance to apply to the comparison [optional]
         """
-        _nexusToCompareWithRun = self.nexusToCompareWithRun
-        _nexusToPositionRun = self.nexusToPositionRun
+        _nexus_to_compare_with_run = self.nexusToCompareWithRun
+        _nexus_to_position_run = self.nexusToPositionRun
 
-        _paramNexusToCompareWith = float(_nexusToCompareWithRun.getProperty(param).value[0])
-        _paramNexusToPosition = float(_nexusToPositionRun.getProperty(param).value[0])
+        _param_nexus_to_compare_with = float(_nexus_to_compare_with_run.getProperty(param).value[0])
+        _param_nexus_to_position = float(_nexus_to_position_run.getProperty(param).value[0])
 
-        if abs(_paramNexusToPosition - _paramNexusToCompareWith) <= tolerance:
+        if abs(_param_nexus_to_position - _param_nexus_to_compare_with) <= tolerance:
             return 0
 
         if order == "ascending":
-            resultLessThan = -1
-            resultMoreThan = 1
+            result_less_than = -1
+            result_more_than = 1
         else:
-            resultLessThan = 1
-            resultMoreThan = -1
+            result_less_than = 1
+            result_more_than = -1
 
-        if _paramNexusToPosition < _paramNexusToCompareWith:
-            return resultLessThan
-        elif _paramNexusToPosition > _paramNexusToCompareWith:
-            return resultMoreThan
+        if _param_nexus_to_position < _param_nexus_to_compare_with:
+            return result_less_than
+        elif _param_nexus_to_position > _param_nexus_to_compare_with:
+            return result_more_than
         else:
             return 0
 
@@ -124,7 +126,7 @@ class LRDirectBeamSort(PythonAlgorithm):
     def summary(self):
         return "Sort a set of direct beams for the purpose of calculating scaling factors."
 
-    def PyInit(self):
+    def PyInit(self): # noqa: N802
         self.declareProperty(
             IntArrayProperty("RunList", [], direction=Direction.Input),
             "List of run numbers (integers) to be sorted - takes precedence over WorkspaceList",
@@ -167,7 +169,7 @@ class LRDirectBeamSort(PythonAlgorithm):
         self.declareProperty("DeadTime", 4.2, doc="Dead time value")
         self.declareProperty("DeadTimeTOFStep", 200.0, doc="TOF step to bin into for dead time")
 
-    def PyExec(self):
+    def PyExec(self): # noqa: N802
         compute = self.getProperty("ComputeScalingFactors").value
         lr_data = []
         run_list = self.getProperty("RunList").value

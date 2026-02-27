@@ -32,6 +32,7 @@ Usage
 [--no_publish]
 
 """
+# ruff: noqa: N999 - Invalid module name
 
 import argparse
 import os

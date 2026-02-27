@@ -61,12 +61,12 @@ def amend_config(
     backup = dict()
     config = ConfigService.Instance()
     if new_config is not None:
-        SEARCH_ARCHIVE = "datasearch.searcharchive"
-        if SEARCH_ARCHIVE not in new_config:
-            new_config[SEARCH_ARCHIVE] = "hfir, sns"
-        DEFAULT_FACILITY = "default.facility"
-        if DEFAULT_FACILITY not in new_config:
-            new_config[DEFAULT_FACILITY] = "SNS"
+        search_archive = "datasearch.searcharchive"
+        if search_archive not in new_config:
+            new_config[search_archive] = "hfir, sns"
+        default_facility = "default.facility"
+        if default_facility not in new_config:
+            new_config[default_facility] = "SNS"
         for key, val in new_config.items():
             backup[key] = config[key]
             config[key] = val  # config does not have an 'update' method
