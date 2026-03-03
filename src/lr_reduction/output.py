@@ -7,7 +7,7 @@ import json
 import numpy as np
 from plot_publisher import plot1d
 
-from lr_reduction.scaling_factors.calculate import (
+from lr_reduction.stitching import (
     OverlapScalingFactor,
     ReducedData,
     StitchingConfiguration,

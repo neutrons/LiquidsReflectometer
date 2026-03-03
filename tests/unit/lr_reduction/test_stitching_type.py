@@ -1,7 +1,7 @@
 """Unit tests for the StitchingType enum"""
 import pytest
 
-from lr_reduction.scaling_factors.calculate import StitchingType
+from lr_reduction.stitching import StitchingType
 
 
 class TestStitchingType:
