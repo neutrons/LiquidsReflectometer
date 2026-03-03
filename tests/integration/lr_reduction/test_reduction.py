@@ -11,7 +11,7 @@ import pytest
 
 # lr_reduction imports
 from lr_reduction import event_reduction, template, workflow
-from lr_reduction.scaling_factors.calculate import StitchingType
+from lr_reduction.stitching import StitchingType
 from lr_reduction.template import read_template
 from lr_reduction.utils import amend_config
 

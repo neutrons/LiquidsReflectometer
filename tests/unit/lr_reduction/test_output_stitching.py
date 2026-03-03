@@ -4,7 +4,7 @@ import pytest
 from pytest import approx
 
 from lr_reduction.output import RunCollection
-from lr_reduction.scaling_factors.calculate import StitchingConfiguration, StitchingType
+from lr_reduction.stitching import StitchingConfiguration, StitchingType
 
 
 @pytest.fixture
