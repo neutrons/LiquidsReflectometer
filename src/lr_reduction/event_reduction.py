@@ -1500,8 +1500,8 @@ def compute_wavelength_resolution(wl_list: np.ndarray, resolution_function_str: 
     -------
     tuple of np.ndarray
         (wavelength, d_lambda):
-            wavelength: the fitted wavelength values
-            d_lambda: the difference between wavelength and the fit
+            wavelength: the wavelength values
+            d_lambda: the wavelength resolution values
     """
     # Parse user-defined resolution function
     resolution_function = UserDefinedFunction(resolution_function_str)
