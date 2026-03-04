@@ -2,78 +2,153 @@
 
 ## Context
 
-When the lr_reduction project is deployed to a shared analysis system (e.g.,
-`/SNS/REF_L/shared/launcher/`), running `pixi install` as one user creates
-`.pixi/envs/` with that user's ownership/permissions. Subsequent `pixi run
-{command}` calls by other users fail because pixi attempts to write to the
-project's `.pixi/` directory (lock state, cache timestamps, etc.) and is
-denied.
+When multiple developers share a single project clone on a shared analysis
+system (e.g., one group checkout at `/SNS/REF_L/shared/dev/lr_reduction/`),
+running `pixi install` as one user creates `.pixi/envs/` and
+`.pixi/solve-group-envs/` with that user's ownership. Other users then get
+permission errors on `pixi run {command}` because pixi writes to those
+directories even when the environment is already installed.
 
-The nsd-app-wrap project (used system-wide at analysis.sns.gov) has solved this
-via two complementary mechanisms drawn from the pattern in
-`nsd-app-wrap/src/nsd-app-wrap.sh`:
+The nsd-app-wrap project shows two complementary mechanisms:
+1. **`--frozen --manifest-path`** on `pixi run` (used in `pixi_launch()`) —
+   prevents lock-file updates; bypasses local `.pixi/` discovery entirely.
+2. **`detached-environments` in `.pixi/config.toml`** — moves the conda
+   environment out of the project's `.pixi/envs/` into a managed location so
+   pixi never needs to write to the project directory during normal use.
 
-1. **`detached-environments` in `.pixi/config.toml`**: moves the conda
-   environment out of the project's `.pixi/envs/` into an admin-managed system
-   path (e.g., `/usr/local/pixi/lr_reduction_next/`). Pixi no longer needs to
-   write into the project directory at all.
-
-2. **`--frozen --manifest-path /central/path/`**: the key flags on every
-   `pixi run` call via `pixi_launch()` in `nsd-app-wrap.sh`. `--frozen`
-   prevents lock-file updates; `--manifest-path` bypasses local `.pixi/`
-   discovery and points straight to the pre-installed central environment.
-
-Together, these mean a user running `pixi run {task}` (via a wrapper or
-directly) never writes to the project checkout's `.pixi/`.
-
-nsd-app-wrap's `.gitignore` reflects the intent:
+The `.pixi/.gitignore` that pixi auto-generates already contains:
 ```
-.pixi/*
-!.pixi/config.toml
+*
+!config.toml
 ```
-— gitignore everything in `.pixi/` *except* the config, so a deployment-site
-`config.toml` can be tracked or preserved without polluting git history.
+meaning `.pixi/config.toml` IS tracked by git if it exists; everything else in
+`.pixi/` is ignored. So committing a `config.toml` requires no root-`.gitignore`
+changes (though adding a root-level pattern mirrors nsd-app-wrap best practice).
 
 ---
 
-## Proposed Changes
+## Scenario Breakdown
 
-### 1. Update `.gitignore` (lr_reduction root)
+### A. Individual developer on their own machine
+**Status: no problem.** `pixi install` → `.pixi/envs/` owned by that one user.
+`pixi run {task}` works fine. No changes needed.
 
-Add the nsd-app-wrap pattern so `.pixi/config.toml` is not swallowed by the
-auto-generated `.pixi/.gitignore`:
+### B. Shared team clone (collaborative development) ← _the question_
+Multiple users share one checkout directory. One user's `pixi install`
+breaks others. **Three options; see below.**
 
-```
-# pixi environments
-.pixi/*
-!.pixi/config.toml
-```
+### C. Shared system deployment (production/QA)
+Already solved by nsd-app-wrap's `pixi_launch` pattern in the existing
+`nr_launcher.sh` / `nr_launcher_qa.sh` scripts. Environments live at
+`/usr/local/pixi/{env}/`, managed by admins.
 
-File: `lr_reduction/.gitignore`
+---
 
-### 2. Create `.pixi/config.toml` template (NOT committed to repo)
+## Options for Scenario B (Shared Team Clone)
 
-Document (in CLAUDE.md, step 3) that the deployment admin creates this file
-**at the deployment site only**:
+### Option 1 — `detached-environments = true` (per-user home)  ✅ RECOMMENDED
+
+Commit `.pixi/config.toml` to the project:
 
 ```toml
-# .pixi/config.toml — created by admin at deployment time; NOT in git
+# .pixi/config.toml
 [workspace]
-detached-environments = "/usr/local/pixi/lr_reduction_<tier>"
+detached-environments = true
 ```
 
-Where `<tier>` is `next`, `qa`, or `prod` (matching the environment naming
-already used by the launch scripts).
+**Effect:** When any user runs `pixi install`, their conda environment is stored
+in their own `~/.pixi/envs/{hash}/` (where the hash is derived from the
+project manifest path). Each user has an **independent private copy** of the
+environment. The shared project clone's `.pixi/` directory contains only this
+`config.toml` and the auto-generated housekeeping files — nothing user-owned.
 
-**Why not commit this?** Committing a hard-coded system path would break
-developer machines where `/usr/local/pixi/` may not exist or be writable.
-The `.gitignore` exception allows the deployment site to maintain this file
-locally without accidentally committing it.
+**Workflow:**
+```bash
+# Each developer, once after cloning or after pixi.lock changes:
+pixi install
+# Then normal usage — no flags needed:
+pixi run test-reduction
+pixi run docs-build
+```
 
-### 3. Add `launcher/nr_launcher_next.sh`
+**Is it feasible?** Yes — completely. Pixi handles it transparently.
+**Is it recommended?** Yes — it's the simplest fix with the widest benefit.
+No admin involvement, no discipline required, works identically on any machine
+(shared cluster or personal laptop).
 
-The production and QA launchers already use the correct nsd-app-wrap pattern.
-A `next`/development launcher is missing. Create it:
+**Trade-offs:**
+- Each user needs ~2–3 GB of disk in their home directory for the extracted
+  environment (large due to Mantid). However, the **conda package cache**
+  (tarballs) lives at `~/.pixi/cache/` by default and can be pointed at a
+  shared location via `PIXI_CACHE_DIR=/shared/pixi-cache` to avoid
+  re-downloading packages.
+- When `pixi.lock` is updated by one developer and pushed, all others must
+  re-run `pixi install`. This is normal git workflow behavior.
+- `pixi.lock` itself is still at the project root (version-controlled); only
+  one person should run `pixi update`/`pixi add` at a time.
+
+---
+
+### Option 2 — Group-writable `.pixi/` + `--frozen` discipline
+
+Admin sets up `.pixi/` once with group permissions:
+```bash
+pixi install                         # as admin/owner
+chgrp -R <devgroup> .pixi/
+chmod -R 2775 .pixi/                 # setgid bit preserves group on new files
+```
+
+All developers then use `--frozen` on every run:
+```bash
+pixi run --frozen test-reduction
+```
+
+**Is it feasible?** Yes, technically.
+**Is it recommended?** No — it is fragile. A single user running `pixi run`
+*without* `--frozen` (habit, CI script, IDE integration) will attempt to
+rewrite solver state and may corrupt `.pixi/` for everyone. It requires
+ongoing discipline and re-setup after every `pixi.lock` update.
+
+---
+
+### Option 3 — Shared group path (`detached-environments = "/shared/path/"`)
+
+Create a LOCAL (not committed) `.pixi/config.toml` at the shared checkout:
+```toml
+[workspace]
+detached-environments = "/SNS/REF_L/shared/pixi-envs/lr_reduction_dev"
+```
+Admin installs once; all users share one environment via that group-writable
+path.
+
+**Is it feasible?** Yes, but this is essentially the same model as Scenario C
+(deployment) applied to development.
+**Is it recommended?** Only if the team explicitly wants a single shared
+environment under admin control. For development it creates coordination
+overhead (one bad `pixi add` affects everyone).
+
+---
+
+## Recommended Implementation (Options 1 + C)
+
+### Step 1: Commit `.pixi/config.toml` with `detached-environments = true`
+
+File: `lr_reduction/.pixi/config.toml` (new — pixi's auto `.pixi/.gitignore`
+already allows this file to be tracked)
+
+```toml
+[workspace]
+detached-environments = true
+```
+
+This fixes Scenario B immediately and is invisible to developers on personal
+machines (their environment just lands in `~/.pixi/envs/` instead of the
+project's `.pixi/`).
+
+### Step 2: Add `launcher/nr_launcher_next.sh`
+
+Completes the environment-naming coverage (prod=`refred`, qa=`lr_reduction_qa`,
+next=missing):
 
 ```bash
 #!/usr/bin/bash
@@ -88,53 +163,39 @@ args=("lr_reduction_next" "python /SNS/REF_L/shared/launcher/launcher.py" "$@")
 ( cd /SNS/REF_L/shared/launcher && pixi_launch "${args[@]}" )
 ```
 
-This mirrors `nr_launcher_qa.sh` (which uses `lr_reduction_qa`) for the
-`next` branch deployment at `/usr/local/pixi/lr_reduction_next/`.
-
-### 4. Update `CLAUDE.md` — add Deployment section
-
-Add a section documenting the complete multi-user deployment workflow:
+### Step 3: Update `CLAUDE.md` — add Shared Development and Deployment sections
 
 ```markdown
-## Shared-System Deployment (analysis.sns.gov)
+## Pixi Environment Management
 
-Pixi environments on shared analysis systems are managed centrally at
-`/usr/local/pixi/` to avoid permission conflicts between users.
+### Shared development clone (multi-user)
+`.pixi/config.toml` is committed with `detached-environments = true`. This
+means each developer's conda environment is installed to their own
+`~/.pixi/envs/{hash}/` — never into the shared project directory. Normal
+`pixi run {task}` works for all users without permission conflicts.
 
-### Environment naming convention
-| Branch | Pixi environment path                      |
-|--------|--------------------------------------------|
-| next   | `/usr/local/pixi/lr_reduction_next/`       |
-| qa     | `/usr/local/pixi/lr_reduction_qa/`         |
-| prod   | `/usr/local/pixi/refred/` (shared w/ REFL)|
+Each developer runs `pixi install` once after cloning, and again after any
+`pixi.lock` update is pulled.
 
-### Admin-only: initial deployment
-1. Deploy the project checkout to `/usr/local/pixi/lr_reduction_<tier>/`
-2. Create `.pixi/config.toml` there:
-   ```toml
-   [workspace]
-   detached-environments = "/usr/local/pixi/lr_reduction_<tier>"
-   ```
-3. Run `pixi install` as admin → environment installs into the detached path
-   with admin-controlled permissions (e.g., group-readable).
-4. Set permissions: `chmod -R 755 /usr/local/pixi/lr_reduction_<tier>/.pixi/`
-
-### User access — run pixi tasks without write access
+To share the conda *package cache* (tarballs, ~several GB) and avoid
+re-downloading for each user, set in your shell profile:
 ```bash
-pixi run --frozen --manifest-path /usr/local/pixi/lr_reduction_<tier>/ test-reduction
-```
-Or via the launcher scripts (which use `nsd-app-wrap`'s `pixi_launch`
-automatically):
-```bash
-./launcher/nr_launcher_next.sh       # next
-./launcher/nr_launcher_qa.sh         # qa
-./launcher/nr_launcher.sh            # prod (refred env)
+export PIXI_CACHE_DIR=/SNS/REF_L/shared/pixi-cache   # or any shared path
 ```
 
-### Rule: never run bare `pixi install` in the shared checkout
-Always use the `--frozen --manifest-path` pattern or go through the launcher
-wrappers. Plain `pixi install` creates/modifies `.pixi/` with the current
-user's ownership and breaks other users.
+### Deployment (analysis.sns.gov)
+Production and QA environments are centrally managed at `/usr/local/pixi/`:
+
+| Branch | Environment path                      | Launcher script          |
+|--------|---------------------------------------|--------------------------|
+| next   | `/usr/local/pixi/lr_reduction_next/`  | `nr_launcher_next.sh`    |
+| qa     | `/usr/local/pixi/lr_reduction_qa/`    | `nr_launcher_qa.sh`      |
+| prod   | `/usr/local/pixi/refred/`             | `nr_launcher.sh`         |
+
+Admin deploys a deployment `.pixi/config.toml` (not in git) pointing to the
+system path, installs once with proper group permissions, then users access
+the environment read-only via the launcher scripts (which use nsd-app-wrap's
+`pixi_launch --frozen --manifest-path`).
 ```
 
 ---
@@ -143,19 +204,20 @@ user's ownership and breaks other users.
 
 | File | Action |
 |------|--------|
-| `lr_reduction/.gitignore` | Add `.pixi/*` + `!.pixi/config.toml` |
-| `lr_reduction/CLAUDE.md` | Add Deployment section |
-| `lr_reduction/launcher/nr_launcher_next.sh` | Create (new file) |
+| `lr_reduction/.pixi/config.toml` | Create (new, will be tracked by git) |
+| `lr_reduction/CLAUDE.md` | Add Pixi Environment Management section |
+| `lr_reduction/launcher/nr_launcher_next.sh` | Create (new) |
+
+---
 
 ## Verification
 
-1. On the shared deployment system:
-   - Admin creates `.pixi/config.toml` with `detached-environments`
-   - Admin runs `pixi install` — confirm environment appears at central path,
-     NOT in project `.pixi/envs/`
-   - Second user runs `pixi run --frozen --manifest-path /central/path/ test-reduction`
-     — should succeed without write errors
-2. Locally (developer machine): confirm `pixi run test-reduction` still works
-   normally (no `.pixi/config.toml` → default local behavior unchanged)
-3. `nr_launcher_next.sh` smoke test: source it and verify it calls
+1. **Scenario B (shared clone)**: Two users on the same machine share a clone.
+   - User A: `pixi install` — confirm env appears in `~/.pixi/envs/`, NOT in
+     project `.pixi/envs/`
+   - User B: `pixi install` — confirm env appears in User B's `~/.pixi/envs/`
+   - User B: `pixi run test-reduction` — should succeed with no permission error
+2. **Scenario A (local dev)**: `pixi install` on a personal machine — confirm
+   env goes to `~/.pixi/envs/` (same behavior, no regression)
+3. **nr_launcher_next.sh**: source it, verify it calls
    `pixi_launch lr_reduction_next python ...`

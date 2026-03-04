@@ -153,3 +153,9 @@ The explanation and plan that Claude came up with is [fix-shared-user-pixi-permi
 
 Regarding steps 2 thru 4, these steps are done when the project is deployed. My concern is when multiple developers are working in a shared space prior to deployment. I would like the instructions modified to detail the way that users can interact collaboratively with a common shared clone of the project. Is it possible? Feasible? Recommended? Help me to understand my options here.
 
+Claude made changes to the above plan
+
+### Prompt 2.2
+
+Ok, one more edit: In step 3, the 'next' Branch entry should refer to Environment Path /usr/local/pixi/lr_reduction_dev and please name the launcher script nr_launcher_dev.sh. This matches the way the analysis deployment paths are labeled.
+
