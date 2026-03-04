@@ -143,3 +143,6 @@ Saving to file REFL_211029_template_new.xml
 [Worker] All 3 run(s) completed successfully
 ```
 
+## Prompt 2
+
+You are working in the lr_reduction project, in the bvacaliuc/new_workflow_ui_plan branch. There is a deficiency in the way that pixi is handled when the work is shared among multiple users. If one user runs pixi install, other users are prevented from using pixi run the folder due to permissions problems on the pixi state. Examine the nsd-app-wrap project for a key step with respect to pixi deployments that has the necessary syntax the developers have worked out to solve this problem on analysis.sns.gov and the deployments made to /usr/local/pixi/. The goal of this task is to understand the needed adjustments to managing the pixi environment properly to avoid the need of writing to shared files in the .pixi/ of the project when doing 'pixi run {command} ...'. I would like to see your plan before you implement it.
