@@ -8,7 +8,7 @@
 
 
 # put together arguments - env, application, argv
-args=("refred" "python /SNS/REF_L/shared/launcher/launcher.py" "$@")
+args=("lr_reduction_qa" "python /SNS/REF_L/shared/launcher/launcher.py" "$@")
 # launch the tool
 # BUG: needs to be in the /SNS/REF_L/shared/launcher/ when starting
 ( cd /SNS/REF_L/shared/launcher && pixi_launch "${args[@]}" )
