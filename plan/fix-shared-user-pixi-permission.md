@@ -145,10 +145,10 @@ This fixes Scenario B immediately and is invisible to developers on personal
 machines (their environment just lands in `~/.pixi/envs/` instead of the
 project's `.pixi/`).
 
-### Step 2: Add `launcher/nr_launcher_next.sh`
+### Step 2: Add `launcher/nr_launcher_dev.sh`
 
 Completes the environment-naming coverage (prod=`refred`, qa=`lr_reduction_qa`,
-next=missing):
+dev=missing):
 
 ```bash
 #!/usr/bin/bash
@@ -158,7 +158,7 @@ next=missing):
 . /bin/nsd-app-wrap.sh
 
 # put together arguments - env, application, argv
-args=("lr_reduction_next" "python /SNS/REF_L/shared/launcher/launcher.py" "$@")
+args=("lr_reduction_dev" "python /SNS/REF_L/shared/launcher/launcher.py" "$@")
 # launch the tool
 ( cd /SNS/REF_L/shared/launcher && pixi_launch "${args[@]}" )
 ```
@@ -188,7 +188,7 @@ Production and QA environments are centrally managed at `/usr/local/pixi/`:
 
 | Branch | Environment path                      | Launcher script          |
 |--------|---------------------------------------|--------------------------|
-| next   | `/usr/local/pixi/lr_reduction_next/`  | `nr_launcher_next.sh`    |
+| next   | `/usr/local/pixi/lr_reduction_dev/`   | `nr_launcher_dev.sh`     |
 | qa     | `/usr/local/pixi/lr_reduction_qa/`    | `nr_launcher_qa.sh`      |
 | prod   | `/usr/local/pixi/refred/`             | `nr_launcher.sh`         |
 
@@ -206,7 +206,7 @@ the environment read-only via the launcher scripts (which use nsd-app-wrap's
 |------|--------|
 | `lr_reduction/.pixi/config.toml` | Create (new, will be tracked by git) |
 | `lr_reduction/CLAUDE.md` | Add Pixi Environment Management section |
-| `lr_reduction/launcher/nr_launcher_next.sh` | Create (new) |
+| `lr_reduction/launcher/nr_launcher_dev.sh` | Create (new) |
 
 ---
 
@@ -219,5 +219,5 @@ the environment read-only via the launcher scripts (which use nsd-app-wrap's
    - User B: `pixi run test-reduction` — should succeed with no permission error
 2. **Scenario A (local dev)**: `pixi install` on a personal machine — confirm
    env goes to `~/.pixi/envs/` (same behavior, no regression)
-3. **nr_launcher_next.sh**: source it, verify it calls
-   `pixi_launch lr_reduction_next python ...`
+3. **nr_launcher_dev.sh**: source it, verify it calls
+   `pixi_launch lr_reduction_dev python ...`

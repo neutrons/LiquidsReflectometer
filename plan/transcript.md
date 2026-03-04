@@ -147,15 +147,14 @@ Saving to file REFL_211029_template_new.xml
 
 You are working in the lr_reduction project, in the bvacaliuc/new_workflow_ui_plan branch. There is a deficiency in the way that pixi is handled when the work is shared among multiple users. If one user runs pixi install, other users are prevented from using pixi run the folder due to permissions problems on the pixi state. Examine the nsd-app-wrap project for a key step with respect to pixi deployments that has the necessary syntax the developers have worked out to solve this problem on analysis.sns.gov and the deployments made to /usr/local/pixi/. The goal of this task is to understand the needed adjustments to managing the pixi environment properly to avoid the need of writing to shared files in the .pixi/ of the project when doing 'pixi run {command} ...'. I would like to see your plan before you implement it.
 
-The explanation and plan that Claude came up with is [fix-shared-user-pixi-permission.md](fix-shared-user-pixi-permission.md)
-
 ### Prompt 2.1
 
 Regarding steps 2 thru 4, these steps are done when the project is deployed. My concern is when multiple developers are working in a shared space prior to deployment. I would like the instructions modified to detail the way that users can interact collaboratively with a common shared clone of the project. Is it possible? Feasible? Recommended? Help me to understand my options here.
-
-Claude made changes to the above plan
 
 ### Prompt 2.2
 
 Ok, one more edit: In step 3, the 'next' Branch entry should refer to Environment Path /usr/local/pixi/lr_reduction_dev and please name the launcher script nr_launcher_dev.sh. This matches the way the analysis deployment paths are labeled.
 
+### Plan
+
+The explanation and plan that Claude came up with is [fix-shared-user-pixi-permission.md](fix-shared-user-pixi-permission.md)
