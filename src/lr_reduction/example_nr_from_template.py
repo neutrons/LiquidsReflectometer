@@ -93,7 +93,8 @@ def example_template_reduction_new():
             'DBpath': DBpath
         }
 
-        results = new_template.reduce_from_template(run, template_path / "REFL_211029_template_new.xml", "IPTS-36119", datapath=datapath, template_path=template_path, override_params=override_params, plot=True)
+        results = new_template.reduce_from_template(run, template_path / "REFL_211029_template_new.xml", "IPTS-36119", 
+                                                    datapath=datapath, template_path=template_path, override_params=override_params, plot=True)
    
         #print(f"\nReduced {len(config.RBnum)} runs")
         print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
@@ -104,5 +105,5 @@ def example_template_reduction_new():
 if __name__ == '__main__':
     # Run examples
     #example_template_reduction()
-    example_template_reduction_3ang()
+    #example_template_reduction_3ang()
     example_template_reduction_new()
