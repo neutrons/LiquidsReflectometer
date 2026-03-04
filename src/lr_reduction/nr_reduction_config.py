@@ -46,6 +46,7 @@ class NRReductionConfig:
         self.useCalcTheta = False   # Toggle to use a fitted specular peak position (relative to the DB position) for theta which overwrites the THS/THI values
         self.plotON = True  # Toggle for plots to show during the reduction steps. Turn off for batch processing etc.
         self.plotQ4 = False # Toggle for the NR plots to be RQ4 vs RQ.
+        self.plot_save_dir = None  # Directory to save diagnostic plots (None = don't save)
         
         # Background configuration
         self.BkgROI = []    # Need to work out a default...and explain the format here.

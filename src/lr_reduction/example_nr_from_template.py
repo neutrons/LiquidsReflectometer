@@ -6,6 +6,14 @@ import numpy as np
 import new_reduction_from_template as new_template
 from pathlib import Path
 
+# environment injection to silently get plots to save
+import os
+PLOT=os.environ.get('PLOT','True').lower().startswith('t')
+SAVE_PLOTS=os.environ.get('SAVE_PLOTS','False').lower().startswith('t')
+# environment injection to silently choose the paths
+TEMPLATE_PATH = os.environ.get('TEMPLATE_PATH','/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs')
+SPATH = os.environ.get('SPATH','/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs')
+
 def example_template_reduction():
     # Example for just a single angle.
     
@@ -16,8 +24,8 @@ def example_template_reduction():
     # These shouldn't be needed in the longer term.
     datapath = Path('/SNS/REF_L/IPTS-30101/nexus')
     DBpath = Path('/SNS/REF_L/shared/Cd_DB_processing/DBs/')
-    template_path = Path('/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/')
-    Spath = Path('/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/')
+    template_path = Path(TEMPLATE_PATH)
+    Spath = Path(SPATH)
 
     # This needs to include anything you want to set that isn't in the template file or you want to deviate from the template file.
     override_params = {
@@ -29,7 +37,7 @@ def example_template_reduction():
         'AutoScale': False
     }
 
-    results = new_template.reduce_from_template(211029, template_path / "test_template.xml", "IPTS-36119", datapath=datapath, template_path=template_path, override_params=override_params, plot=True)
+    results = new_template.reduce_from_template(211029, template_path / "test_template.xml", "IPTS-36119", datapath=datapath, template_path=template_path, override_params=override_params, plot=PLOT, save_plots=SAVE_PLOTS)
    
     #print(f"\nReduced {len(config.RBnum)} runs")
     print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
@@ -45,8 +53,8 @@ def example_template_reduction_3ang():
     
     datapath = Path('/SNS/REF_L/IPTS-30101/nexus')
     DBpath = Path('/SNS/REF_L/shared/Cd_DB_processing/DBs/')
-    template_path = Path('/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/')
-    Spath = Path('/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/')
+    template_path = Path(TEMPLATE_PATH)
+    Spath = Path(SPATH)
 
     DB_list = ['A1_air_div1_Cd_DB.dat','A1_air_div1_Cd_DB.dat','A1_air_div1_Cd_DB.dat']
 
@@ -62,7 +70,7 @@ def example_template_reduction_3ang():
             'AutoScale': True
         }
 
-        results = new_template.reduce_from_template(run, template_path / "test_template_3ang.xml", "IPTS-36119", datapath=datapath,template_path=template_path,override_params=override_params, plot=True)
+        results = new_template.reduce_from_template(run, template_path / "test_template_3ang.xml", "IPTS-36119", datapath=datapath,template_path=template_path,override_params=override_params, plot=PLOT, save_plots=SAVE_PLOTS)
    
         #print(f"\nReduced {len(config.RBnum)} runs")
         print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
@@ -78,9 +86,9 @@ def example_template_reduction_new():
     print("="*60)
     
     datapath = Path('/SNS/REF_L/IPTS-30101/nexus')
-    Spath = Path('/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/')
+    Spath = Path(SPATH)
     DBpath = Path('/SNS/REF_L/shared/Cd_DB_processing/DBs/')
-    template_path = Path('/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/')
+    template_path = Path(TEMPLATE_PATH)
 
     #DB_list = ['A1_air_div1_Cd_DB.dat','A1_air_div1_Cd_DB.dat','A1_air_div1_Cd_DB.dat']
 
@@ -94,7 +102,7 @@ def example_template_reduction_new():
         }
 
         results = new_template.reduce_from_template(run, template_path / "REFL_211029_template_new.xml", "IPTS-36119", 
-                                                    datapath=datapath, template_path=template_path, override_params=override_params, plot=True)
+                                                    datapath=datapath, template_path=template_path, override_params=override_params, plot=PLOT, save_plots=SAVE_PLOTS)
    
         #print(f"\nReduced {len(config.RBnum)} runs")
         print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")

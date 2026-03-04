@@ -26,7 +26,7 @@ from typing import Optional
 
 from lr_reduction import __version__ as VERSION
 #from lr_reduction.gravity_correction import GravityDirection
-from instrument_settings import InstrumentSettings
+from lr_reduction.instrument_settings import InstrumentSettings
 
 # Get the mantid version being used, if available
 #try:

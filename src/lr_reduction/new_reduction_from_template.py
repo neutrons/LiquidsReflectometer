@@ -1,17 +1,18 @@
 import h5py
-#import template
-from nr_reduction_calc import NR_Reduction  # TODO: Fix names of files!!
-from nr_reduction_config import NRReductionConfig
+from lr_reduction.nr_reduction_calc import NR_Reduction
+from lr_reduction.nr_reduction_config import NRReductionConfig
 from pathlib import Path
 import os
 import numpy as np
-import nr_tools as tools
-from new_reduction_template_reader import ReductionParameters
-import new_reduction_template_reader as reduction_template_reader
+from lr_reduction import nr_tools as tools
+from lr_reduction.new_reduction_template_reader import ReductionParameters
+from lr_reduction import new_reduction_template_reader as reduction_template_reader
 from matplotlib import pyplot as plt
 
 
-def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True):
+def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None,
+                         override_params: dict = None, plot=True,
+                         progress_callback=None, save_plots=False, plot_dir=None):
     """
     Wrapper function to reduce a single run with reading of parameters from an xml template of the lr_reduction format.
     Then collect like results within the save folder and combine them together.
@@ -35,18 +36,32 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     override_params: dict  Dictionary of config settings to override the defaults in either the template reader or the NRReduction config defaults.
     plot: bool Toggle to plot outputs during reduction steps.
 
-    returns 
+    progress_callback: callable optional callback(phase, total, description) for progress reporting
+    save_plots: bool Toggle to save plots to disk
+    plot_dir: Path optional directory for saved plots (defaults to output_dir)
+
+    returns
         combined_results: dict of Q, R, dR, dQ. This is assembled with anything else on same seq num. #TODO: check if need individual one returned too.
     """
+
+    def _report(phase, total, desc):
+        if progress_callback:
+            progress_callback(phase, total, desc)
+
+    _report(0, 5, "Reading NEXUS metadata")
 
     # Get sequence number from file
     if not datapath:
         datapath = Path("/SNS/REF_L") / experiment_id
+    else:
+        datapath = Path(datapath)
     fname = datapath / f"REF_L_{runno}.nxs.h5"
     f = h5py.File(fname, 'r')
     seq_num = f['entry/DASlogs/BL4B:CS:Autoreduce:Sequence:Num/value'][0]
     seq_id = f['entry/DASlogs/BL4B:CS:Autoreduce:Sequence:Id/value'][0]
     f.close()
+
+    _report(1, 5, "Configuring reduction")
 
     # Read the template file
     template_data = read_template(template_file, seq_num)
@@ -75,6 +90,12 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     #print(vars(config)) # Print to check the changes.
     #print(vars(template_data))
 
+    # Set plot save directory on config if requested
+    if save_plots:
+        config.plot_save_dir = plot_dir if plot_dir else str(config.Spath)
+
+    _report(2, 5, "Running reduction")
+
     # Run reduction
     reduce_calc = NR_Reduction(config)
     results = reduce_calc._reduce_single_run(i=0, rb_num=config.RBnum[0], save=True)
@@ -83,8 +104,13 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     result = {'Q': results['q'], 'R': results['r'], 'dR': results['dr'], 'dQ': results['dq']}
     reduce_calc.save_results(result, sname=f"{config.Sname}_partial")
 
-    # Collect "like" runs together 
-    seq_list, run_list, combined_results, scaling_factors = assemble_results(seq_id, config.Spath, autoscale=config.AutoScale, plot=plot, RQ4=config.plotQ4)
+    _report(3, 5, "Assembling results")
+
+    # Collect "like" runs together
+    _plot_dir = plot_dir if plot_dir else str(config.Spath)
+    seq_list, run_list, combined_results, scaling_factors = assemble_results(
+        seq_id, config.Spath, autoscale=config.AutoScale, plot=plot, RQ4=config.plotQ4,
+        save_plots=save_plots, plot_dir=_plot_dir, show_plots=plot)
     # Add scaling factor to output
     scale_list = np.array([np.float64(1)] + scaling_factors)
     config.ScaleFactor *= scale_list
@@ -92,12 +118,17 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     reduce_calc.save_results(combined_results, sname=f"REFL_{seq_id}_combined_data")
 
     # plot
-    if plot:
-        plot_reflectivity([combined_results], RQ4 = config.plotQ4)
+    _combined_save = os.path.join(_plot_dir, f"REFL_{seq_id}_combined.png") if save_plots else None
+    if plot or save_plots:
+        plot_reflectivity([combined_results], RQ4=config.plotQ4, save_path=_combined_save, show=plot)
+
+    _report(4, 5, "Saving template")
 
     # Save new template. Including new flags for other aspects. #TODO: check if it covers all we need.
     if template_path is None:
         template_path = Path("/SNS/REF_L") / experiment_id / "shared"
+    else:
+        template_path = Path(template_path)
 
     template_updated = template_to_config(config, template_data)
     # For now is set to save with a "new" appended file name to be separate from refred but this can be changed moving forward.
@@ -204,7 +235,8 @@ def template_to_config(config_data, template_data):
     return template
 
 
-def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False):
+def assemble_results(seq_id, output_dir, autoscale=True, plot=True, RQ4=False,
+                     save_plots=False, plot_dir=None, show_plots=True):
     """
     Assemble the results for any files in the saved directory that have the same sequence number.
     Finds files saved witht the "partial.dat" ending, sorts the data , autoscales if the flag applied,
@@ -271,10 +303,17 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
 
             scale, sigma_scale = tools.weighted_mean(y1, y2, e1, e2)
 
-            result[1, :] *= scale
-            result[2, :] *= scale
-
-            print('Scaling factor:', np.round(scale, 3))
+            if np.isfinite(scale):
+                result[1, :] *= scale
+                result[2, :] *= scale
+                print('Scaling factor:', np.round(scale, 3))
+            else:
+                import warnings
+                warnings.warn(
+                    f"AutoScale: no valid overlap between angle settings "
+                    f"{run-1} and {run}; skipping scaling.",
+                    stacklevel=2,
+                )
             scaling_factors.append(scale)
 
         Q.append(result[0, :])
@@ -288,8 +327,9 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
     if len(Q) == 0:
         raise ValueError(f"No valid runs found for sequence {seq_id}")
     
-    if plot:
-        plot_reflectivity(dict_output, RQ4)
+    _save_path = os.path.join(plot_dir, f"REFL_{seq_id}_individual_settings.png") if save_plots and plot_dir else None
+    if plot or save_plots:
+        plot_reflectivity(dict_output, RQ4, save_path=_save_path, show=show_plots)
 
     # Combine results for all settings
     Q_combined = np.concatenate(Q)
@@ -403,14 +443,15 @@ def read_template(template_file: str, sequence_number: int) -> ReductionParamete
         raise RuntimeError("Invalid reduction template")
     return data_set
 
-def plot_reflectivity(data_array, RQ4=False, log_x = True):
+def plot_reflectivity(data_array, RQ4=False, log_x=True, save_path=None, show=True):
     """
     Plot reflectivity assuming data_array is an array of dictionaries with keys of Q, R, dQ and dR.
-    # TODO: Add error handling for not being an array or a proper dictionary.
-    
-    :param data_array: Description
-    :param RQ4: Description
-    :param log_x: Description
+
+    :param data_array: list of dicts with Q, R, dR, dQ arrays
+    :param RQ4: plot as RQ4 instead of R
+    :param log_x: use log scale on x axis
+    :param save_path: path to save plot image (None = don't save)
+    :param show: whether to call plt.show() for interactive display
     """
     fig, ax = plt.subplots()
 
@@ -420,16 +461,21 @@ def plot_reflectivity(data_array, RQ4=False, log_x = True):
         dQ = vals["dQ"]
         dR = vals["dR"]
         if RQ4:
-            ax.errorbar(Q,R*Q**4, yerr=dR*Q**4, xerr=dQ,  fmt='o', markersize=1)
+            ax.errorbar(Q, R * Q**4, yerr=dR * Q**4, xerr=dQ, fmt='o', markersize=1)
             ax.set_ylabel(r'$R \cdot Q^4$', fontsize=14)
         else:
-            ax.errorbar(Q,R, yerr=dR, xerr=dQ,  fmt='o', markersize=1)
+            ax.errorbar(Q, R, yerr=dR, xerr=dQ, fmt='o', markersize=1)
             ax.set_ylabel('R', fontsize=14)
         if log_x:
             ax.set_xscale('log')
         ax.set_yscale('log')
     Angstrom = '\u212B'
-    ax.set_xlabel('Q [1/'+Angstrom+']', fontsize=14)
-    ax.set_title('NR data') # TODO: add better title handling
-    plt.show()
+    ax.set_xlabel('Q [1/' + Angstrom + ']', fontsize=14)
+    ax.set_title('NR data')  # TODO: add better title handling
+    if save_path is not None:
+        fig.savefig(save_path, dpi=150, bbox_inches='tight')
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
 

@@ -67,24 +67,47 @@ def log_qvector(qmin, qmax, dqbin):
     n = int(np.floor(np.log(qmax/qmin) / np.log(1 + dqbin))) + 1
     return qmin * (1 + dqbin) ** np.arange(n + 1)
 
-def weighted_mean(y1,y2,e1,e2, sigma_mask=3):       
-    #find the weighted average
-    v=y1/y2
-    sigma_v = np.sqrt((e1 / y2)**2 + (e2 * y1 / y2**2)**2)
-    w=1/sigma_v**2
-    # initial weighted mean
-    mean=np.sum(v*w)/np.sum(w)
+def weighted_mean(y1, y2, e1, e2, sigma_mask=3):
+    """Compute weighted mean ratio y1/y2 with outlier rejection.
 
-    # identify outlier
+    Returns (mean, sigma_mean).  If the inputs are empty or all points are
+    invalid (zero denominator, zero uncertainty, or rejected as outliers),
+    returns (np.nan, np.nan) without emitting RuntimeWarnings.
+    """
+    if len(y1) == 0 or len(y2) == 0:
+        return np.nan, np.nan
+
+    # Mask out points where the denominator or uncertainty would cause inf/nan
+    with np.errstate(divide='ignore', invalid='ignore'):
+        v = y1 / y2
+        sigma_v = np.sqrt((e1 / y2)**2 + (e2 * y1 / y2**2)**2)
+
+    # Keep only finite ratios with finite, positive uncertainty
+    valid = np.isfinite(v) & np.isfinite(sigma_v) & (sigma_v > 0)
+    v = v[valid]
+    sigma_v = sigma_v[valid]
+
+    if len(v) == 0:
+        return np.nan, np.nan
+
+    w = 1 / sigma_v**2
+
+    # Initial weighted mean
+    mean = np.sum(v * w) / np.sum(w)
+
+    # Identify outliers
     mask = np.abs(v - mean) < sigma_mask * sigma_v
     v = v[mask]
     w = w[mask]
+
+    if len(v) == 0:
+        return np.nan, np.nan
 
     # Recompute
     mean = np.sum(v * w) / np.sum(w)
     sigma_mean = np.sqrt(1 / np.sum(w))
 
-    return mean, sigma_mean 
+    return mean, sigma_mean
 
 # Define functions for peak_fitting:
 def gaussian(x,a,x0,sig):

@@ -7,6 +7,7 @@ from apps.off_spec import OffSpec
 from apps.quick_reduce import QuickReduce
 from apps.reduction import Reduction
 from apps.sld_calculator import SLD
+from apps.template_reduce import TemplateReduce
 from apps.xrr import XRR
 from qtpy import QtCore
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
@@ -66,6 +67,12 @@ class ReductionInterface(QTabWidget):
         self.sld_tab = SLD()
         self.addTab(self.sld_tab, "SLD calculator")
         self.setTabText(tab_id, "SLD calculator")
+
+        # Template reduction
+        tab_id += 1
+        self.template_tab = TemplateReduce()
+        self.addTab(self.template_tab, "Template reduction")
+        self.setTabText(tab_id, "Template reduction")
 
         # Refracted beam analysis
         # tab_id += 1

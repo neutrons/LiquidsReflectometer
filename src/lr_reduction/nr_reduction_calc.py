@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from scipy.ndimage import gaussian_filter1d, uniform_filter1d
 import os
-import binary_processing as BP
-import nr_tools as tools
+from lr_reduction import binary_processing as BP
+from lr_reduction import nr_tools as tools
 import datetime
 import json
 
@@ -70,6 +70,17 @@ class NR_Reduction:
         if not self.config.tof_max:
             self.config.tof_max = [50000] * n_settings 
             
+    def _show_or_save_plot(self, fig, name_hint):
+        """Save and/or show a diagnostic plot based on config settings."""
+        if getattr(self.config, 'plot_save_dir', None) is not None:
+            from pathlib import Path
+            save_path = Path(self.config.plot_save_dir) / f"{name_hint}.png"
+            fig.savefig(save_path, dpi=150, bbox_inches='tight')
+        if self.config.plotON:
+            plt.show()
+        else:
+            plt.close(fig)
+
     def reduce(self, save=True, save_all=True, plot=True):
         """
         Perform the reduction of all angle settings and combine into an output.
@@ -98,9 +109,17 @@ class NR_Reduction:
                 e2=result['dr'][np.where(result['q'] <= max(Q[i-1]))]   
         
                 scale, sigma_scale = tools.weighted_mean(y1,y2,e1,e2)
-                result['r'] = result['r'] * scale
-                result['dr'] = result['dr'] * scale
-                print('Scaling factor: ', np.round(scale,3))
+                if np.isfinite(scale):
+                    result['r'] = result['r'] * scale
+                    result['dr'] = result['dr'] * scale
+                    print('Scaling factor: ', np.round(scale,3))
+                else:
+                    import warnings
+                    warnings.warn(
+                        f"AutoScale: no valid overlap between angle settings "
+                        f"{i-1} and {i}; skipping scaling for run {rb_num}.",
+                        stacklevel=2,
+                    )
 
             Q.append(result['q'])
             R.append(result['r'])
@@ -126,20 +145,21 @@ class NR_Reduction:
             self.save_results(combine_results)
         # TODO: Decide whether to keep in here or have as a separate part after the reduciton....?
         if plot:
+            fig, ax = plt.subplots()
             for i, rb_num in enumerate(self.config.RBnum):
-                if self.config.plotQ4: 
-                    plt.errorbar(Q[i],R[i]*Q[i]**4, yerr=dR[i]*Q[i]**4, xerr=dQ[i],  fmt='o', markersize=1)
-                    plt.ylabel(r'$R \cdot Q^4$', fontsize=14)
-                    plt.xscale('linear')
-                else: 
-                    plt.errorbar(Q[i],R[i], yerr=dR[i], xerr=dQ[i],  fmt='o', markersize=1)
-                    plt.ylabel('R')
-                    plt.xscale('log')
-            plt.title('NR data: '+str(rb_num), fontsize=16)
-            plt.yscale('log')   # Do we need a toggle on this?
+                if self.config.plotQ4:
+                    ax.errorbar(Q[i], R[i] * Q[i]**4, yerr=dR[i] * Q[i]**4, xerr=dQ[i], fmt='o', markersize=1)
+                    ax.set_ylabel(r'$R \cdot Q^4$', fontsize=14)
+                    ax.set_xscale('linear')
+                else:
+                    ax.errorbar(Q[i], R[i], yerr=dR[i], xerr=dQ[i], fmt='o', markersize=1)
+                    ax.set_ylabel('R')
+                    ax.set_xscale('log')
+            ax.set_title('NR data: ' + str(rb_num), fontsize=16)
+            ax.set_yscale('log')
             Angstrom = '\u212B'
-            plt.xlabel('Q [1/'+Angstrom+']', fontsize=14)
-            plt.show()
+            ax.set_xlabel('Q [1/' + Angstrom + ']', fontsize=14)
+            self._show_or_save_plot(fig, "reduce_combined")
 
         return {
             'Q': Q_combined[idx],
@@ -404,7 +424,7 @@ class NR_Reduction:
         Icalc = (Icalc * par[0]) + bkg
         
         # Plot beam profile if requested - compares to calculated profile from instrument geometry.
-        if self.config.plotON:
+        if self.config.plotON or getattr(self.config, 'plot_save_dir', None):
             fig, ax = plt.subplots()
             ax.plot(Ydata, Idata, 'ok')
             ax.plot(Yfit, Ifit, '-r', label=f'{self.config.peak_type} fit')
@@ -417,7 +437,7 @@ class NR_Reduction:
             ax.set_title('Vertical beam distribution', fontsize=16)
             ax.set_xlabel('Detector Pixel', fontsize=14)
             ax.legend()
-            plt.show()
+            self._show_or_save_plot(fig, "beam_profile")
         
         return Yfit, Ifit, RBpixel, Icalc, ThCen, bkg
 
@@ -559,14 +579,14 @@ class NR_Reduction:
         smear = smear[mask]
         yvec = yvec[mask]
             
-        if plotON:
+        if plotON or getattr(self.config, 'plot_save_dir', None):
             fig, ax = plt.subplots()
             ax.imshow(smear, origin='lower', aspect='auto', extent=[min(tvec),max(tvec),min(yvec),max(yvec)], cmap='magma')
             ax.plot(Det_corners[:,0], Det_corners[:,1], '--k', linewidth=1)
             ax.set_xlabel('dTheta [deg]', fontsize=14)
             ax.set_ylabel('Detector position [mm]', fontsize=14)
             ax.set_title('Angular beam distribution', fontsize=16)
-            plt.show()
+            self._show_or_save_plot(fig, "angular_beam_distribution")
         return yvec, smear, tvec
 
     def calc_mean_theta(self, yvalues, si_H, s1_H, d_sam_det, d_si_sam, d_s1_si, sigma, ResFn, plotON):
@@ -641,7 +661,7 @@ class NR_Reduction:
             ax.set_title('Q integration lines', fontsize=16)
             ax.set_xlabel('Lambda [Å]', fontsize=14)
             ax.set_ylabel('Theta [deg]', fontsize=14)
-            plt.show()
+            self._show_or_save_plot(fig, "theta_lambda")
     
     def _background_roi_sorter(self, BkgROI, ymin, ymax):
         # Wrapper to handle the background region when set by the template.
@@ -714,11 +734,11 @@ class NR_Reduction:
             ax.axhline(y=background_idx[0], color='red', linestyle='--', linewidth=1)
             ax.axhline(y=background_idx[1], color='red', linestyle='--', linewidth=1)
             ax.axhline(y=background_idx[2], color='red', linestyle='--', linewidth=1)
-            ax.axhline(y=background_idx[3], color='red', linestyle='--', linewidth=1) 
+            ax.axhline(y=background_idx[3], color='red', linestyle='--', linewidth=1)
             ax.set_title('Background subtraction ROIs', fontsize=16)
             ax.set_xlabel('Lambda [Å]', fontsize=14)
             ax.set_ylabel('Detector Pixel', fontsize=14)
-            plt.show()
+            self._show_or_save_plot(fig, "background_rois")
             
         # subtract background
         for i in range(R.shape[1]):
@@ -925,10 +945,29 @@ class NR_Reduction:
 
         # Normalize to critical edge region if flag applied.
         if self.config.Normalize and i == 0:
-            NormV = np.mean(r[np.where(q_vals <= self.config.Qnorm)])
-            r = r / NormV
-            dr = dr / NormV
-            print(f'Normalization factor: {np.round(1/NormV, 3)}')
+            norm_mask = q_vals <= self.config.Qnorm
+            norm_region = r[norm_mask]
+            if len(norm_region) > 0:
+                NormV = np.mean(norm_region)
+                if np.isfinite(NormV) and NormV != 0:
+                    r = r / NormV
+                    dr = dr / NormV
+                    print(f'Normalization factor: {np.round(1/NormV, 3)}')
+                else:
+                    import warnings
+                    warnings.warn(
+                        f"Normalization region (q <= {self.config.Qnorm}) has "
+                        f"non-finite or zero mean ({NormV}); skipping normalization.",
+                        stacklevel=2,
+                    )
+            else:
+                import warnings
+                warnings.warn(
+                    f"No data points found in normalization region "
+                    f"(q <= {self.config.Qnorm}, min q = {q_vals.min():.4f}); "
+                    f"skipping normalization.",
+                    stacklevel=2,
+                )
 
         return {'q': q_vals, 'r': r, 'dr': dr, 'dq': dq}
 
