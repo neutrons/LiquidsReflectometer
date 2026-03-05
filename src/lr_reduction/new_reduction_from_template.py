@@ -9,6 +9,7 @@ import nr_tools as tools
 from new_reduction_template_reader import ReductionParameters
 import new_reduction_template_reader as reduction_template_reader
 from matplotlib import pyplot as plt
+import copy
 
 
 def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True):
@@ -322,36 +323,34 @@ def write_template(seq_list, run_list, file_to_change, template_data_updated, se
         # Read the template
         data_sets = reduction_template_reader.from_xml(xml_str)
 
-        # For each item in seq_list, store this entry from the read file.
+        # For each requested sequence number, produce an entry to save.
+        # Only the sequence matching `seq_updated` should receive the full `template_data_updated`.
         to_save = []
         for i in range(len(seq_list)):
-            if len(data_sets) >= seq_list[i]:
-                if seq_list[i] == seq_updated:
-                    # Change the run number and all entries
-                    for attr, value in vars(template_data_updated).items():
-                        setattr(data_sets[seq_list[i] - 1], attr, value)
-                    #data_sets[seq_list[i] - 1] = template_data_updated
-                    data_sets[seq_list[i] - 1].data_files = [run_list[i]]
-                    to_save.append(data_sets[seq_list[i] - 1])
+            seq_i = seq_list[i]
+            run_i = run_list[i]
+            if len(data_sets) >= seq_i:
+                if seq_i == seq_updated:
+                    # Use the updated template for this sequence
+                    new_entry = copy.deepcopy(template_data_updated)
+                    new_entry.data_files = [run_i]
                 else:
-                    data_sets[seq_list[i] - 1] = template_data_updated
-                    to_save.append(data_sets[seq_list[i] - 1])
-            elif len(data_sets) == seq_list[i] - 1:
-                # duplicate the previous entry. Allows it to add into the next sequence spot. #TODO: this logic needs attention!
-                data_sets.append(data_sets[-1])
-                # repeat above for now
-                if seq_list[i] == seq_updated:
-                    # Change the run number and all entries
-                    for attr, value in vars(template_data_updated).items():
-                        setattr(data_sets[seq_list[i] - 1], attr, value)
-                    #data_sets[seq_list[i] - 1] = template_data_updated
-                    data_sets[seq_list[i] - 1].data_files = [run_list[i]]
-                    to_save.append(data_sets[seq_list[i] - 1])
+                    # Preserve the original entry for this sequence but set the run number
+                    new_entry = copy.deepcopy(data_sets[seq_i - 1])
+                    new_entry.data_files = [run_i]
+                to_save.append(new_entry)
+            elif len(data_sets) == seq_i - 1:
+                # extend the list by duplicating the last existing entry, then behave as above
+                data_sets.append(copy.deepcopy(data_sets[-1]))
+                if seq_i == seq_updated:
+                    new_entry = copy.deepcopy(template_data_updated)
+                    new_entry.data_files = [run_i]
                 else:
-                    data_sets[seq_list[i] - 1] = template_data_updated
-                    to_save.append(data_sets[seq_list[i] - 1])
+                    new_entry = copy.deepcopy(data_sets[seq_i - 1])
+                    new_entry.data_files = [run_i]
+                to_save.append(new_entry)
             else:
-                print("Too few entries [%s] in template for sequence number %s" % (len(data_sets), seq_list[i]))
+                print("Too few entries [%s] in template for sequence number %s" % (len(data_sets), seq_i))
 
     if not save_name:
         save_name = "REF_L_%s_auto_template.xml" % run_list[0]
