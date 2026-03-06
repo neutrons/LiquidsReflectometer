@@ -90,7 +90,7 @@ class ReductionParameters:
             setattr(self, key, value)
 
         # Calculate emission time delay instead of using an effective distance for all wavelengths
-        #self.use_emission_time: bool = True
+        self.use_emission_time: bool = True
 
         # Gravity correction
         #self.gravity_direction = None
@@ -178,7 +178,7 @@ class ReductionParameters:
         #    _xml += "<gravity_direction>%s</gravity_direction>\n" % str(self.gravity_direction)  # -1, 0, 1
 
         # Emission time correction
-        #_xml += "<use_emission_time>%s</use_emission_time>\n" % str(self.use_emission_time)
+        _xml += "<use_emission_time>%s</use_emission_time>\n" % str(self.use_emission_time)
 
         # New parts added from new reduction config scheme
         _xml += "<norm_scale>%s</norm_scale>\n" % str(self.norm_scale)
@@ -289,7 +289,7 @@ class ReductionParameters:
 
         # Emission time
         # Defaults to True, but will be skipped if the necessary meta data is not found
-        #self.use_emission_time = getBoolElement(instrument_dom, "use_emission_time", default=True)
+        self.use_emission_time = getBoolElement(instrument_dom, "use_emission_time", default=True)
 
 
 #############################################
