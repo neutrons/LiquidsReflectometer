@@ -273,11 +273,11 @@ class NR_Reduction:
         if self.config.LambdaMin is None:
             self.config.LambdaMinUse = lam_range[0]
         else:
-            self.config.LambdaMinUse = self.config.LambdaMin[i] # TODO: check a better way to do this. Might need different lam per settings.
+            self.config.LambdaMinUse = self.config.LambdaMin[i]
         if self.config.LambdaMax is None:
             self.config.LambdaMaxUse = lam_range[1]
         else:
-            self.config.LambdaMaxUse = self.config.LambdaMax[i]     # fixed typo here. ebw
+            self.config.LambdaMaxUse = self.config.LambdaMax[i]
 
         # Flip the arrays to give detector pixel ascending.
         RB = np.flipud(nRB)
@@ -702,9 +702,10 @@ class NR_Reduction:
         var_bkg = (eb1**2 + eb2**2) / 2
         
         if ploton:
+            self.roi_plot(R, ypix, y_roi, LAMBDA, ymin, ymax, bkgd=True, background_idx=background_idx)
+            '''
             ll=np.where((ypix > min(background_idx[0]-5,background_idx[1]-5)) & (ypix < max(background_idx[2]+5,background_idx[3]+5)))
             fig, ax = plt.subplots()
-            # TODO: Need to look at the plot settings here. Think the vmin, vmax should allow for varying signals to stay visible.
             log_data = np.log(R[ll[0],:]+0.00001)
             ax.imshow(log_data, vmin=np.percentile(log_data,0.5), vmax=np.percentile(log_data, 99.5), aspect='auto', extent=[LAMBDA.min(), LAMBDA.max(),
                                                         min(background_idx[0]-5,background_idx[1]-5),
@@ -719,7 +720,8 @@ class NR_Reduction:
             ax.set_xlabel('Lambda [Å]', fontsize=14)
             ax.set_ylabel('Detector Pixel', fontsize=14)
             plt.show()
-            
+            '''
+
         # subtract background
         for i in range(R.shape[1]):
             bkg = a[i] * y_roi + c[i]
@@ -728,6 +730,29 @@ class NR_Reduction:
             E_crop[:, i] = np.sqrt(E_crop[:, i]**2 + var_bkg[i])
 
         return R_crop, E_crop
+
+    def roi_plot(self,R, ypix, y_roi, LAMBDA, ymin, ymax, bkgd=True, background_idx=None):
+        if not bkgd:
+            background_idx = [min(y_roi), min(y_roi), max(y_roi), max(y_roi)]
+        else:
+            background_idx = background_idx
+        ll=np.where((ypix > min(background_idx[0]-5,background_idx[1]-5)) & (ypix < max(background_idx[2]+5,background_idx[3]+5)))
+        fig, ax = plt.subplots()
+        log_data = np.log(R[ll[0],:]+0.00001)
+        ax.imshow(log_data, vmin=np.percentile(log_data,0.5), vmax=np.percentile(log_data, 99.5), aspect='auto', extent=[LAMBDA.min(), LAMBDA.max(),
+                                                    min(background_idx[0]-5,background_idx[1]-5),
+                                                    max(background_idx[2]+5,background_idx[3]+5)], cmap='magma')
+        ax.axhline(y=ymin, color='green', linestyle='--')
+        ax.axhline(y=ymax, color='green', linestyle='--')
+        if bkgd:
+            ax.axhline(y=background_idx[0], color='red', linestyle='--', linewidth=1)
+            ax.axhline(y=background_idx[1], color='red', linestyle='--', linewidth=1)
+            ax.axhline(y=background_idx[2], color='red', linestyle='--', linewidth=1)
+            ax.axhline(y=background_idx[3], color='red', linestyle='--', linewidth=1) 
+        ax.set_title('Y-pixel ROIs', fontsize=16)
+        ax.set_xlabel('Lambda [Å]', fontsize=14)
+        ax.set_ylabel('Detector Pixel', fontsize=14)
+        plt.show()
 
     def _choose_theta_log(self):
         """
@@ -788,9 +813,10 @@ class NR_Reduction:
             Rarr, REarr = self.background_subtract(LAMBDA, RB, RBE, R_mask, E_mask, y_roi, ypix, self.config.RB_Ymin[i],
                                              self.config.RB_Ymax[i], self.config.BkgROI[i], self.config.plotON)
         else:
+            if self.config.plotON:
+                self.roi_plot(RB, ypix, y_roi, LAMBDA, self.config.RB_Ymin[i], self.config.RB_Ymax[i], bkgd=False)
             Rarr = R_mask
             REarr = E_mask
-        #TODO: pull the plotting out from the BS part?!
 
         # For constantTOF, use 1D TOF binning
         if self.config.method == "constanttof":

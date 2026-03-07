@@ -48,18 +48,21 @@ def example_template_reduction_3ang():
     template_path = Path('/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/')
     Spath = Path('/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/')
 
-    DB_list = ['A1_air_div1_Cd_DB.dat','A1_air_div1_Cd_DB.dat','A1_air_div1_Cd_DB.dat']
+    DB_list = ['A1_air_div1_Cd_DB.dat','A2_air_div1_Cd_DB.dat','A3_air_div1_Cd_DB.dat']
 
     runs = [211029, 211030, 211031]
+    use_BS = [0,1,1]
     for idx, run in enumerate(runs):
         # This needs to include anything you want to set that isn't in the template file or you want to deviate from the template file.
+        print(use_BS[idx])
         override_params = {
             'DBname': [DB_list[idx]],
             'Spath': Spath,
             'NEXUSpathRB': datapath,
             'DBpath': DBpath,
             'useCalcTheta': True,
-            'AutoScale': True
+            'AutoScale': True,
+            'useBS': [use_BS[idx]]
         }
 
         results = new_template.reduce_from_template(run, template_path / "test_template_3ang.xml", "IPTS-36119", datapath=datapath,template_path=template_path,override_params=override_params, plot=True)
@@ -105,5 +108,5 @@ def example_template_reduction_new():
 if __name__ == '__main__':
     # Run examples
     #example_template_reduction()
-    #example_template_reduction_3ang()
-    example_template_reduction_new()
+    example_template_reduction_3ang()
+    #example_template_reduction_new()
