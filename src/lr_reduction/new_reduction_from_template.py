@@ -90,7 +90,7 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     scale_list = np.array([np.float64(1)] + scaling_factors)
     config.ScaleFactor *= scale_list
     # Save combined data
-    reduce_calc.save_results(combined_results, sname=f"REFL_{seq_id}_combined_data")
+    reduce_calc.save_results(combined_results, sname=f"REFL_{seq_id}_combined_data", full=False)
 
     # plot
     if plot:

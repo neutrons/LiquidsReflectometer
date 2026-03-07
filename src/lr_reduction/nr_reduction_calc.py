@@ -932,7 +932,7 @@ class NR_Reduction:
 
         return {'q': q_vals, 'r': r, 'dr': dr, 'dq': dq}
 
-    def save_results(self, results, sname = None):
+    def save_results(self, results, sname = None, full=True):
         """
         Save results as .dat file with header
         
@@ -943,19 +943,37 @@ class NR_Reduction:
         """
         array = np.column_stack((results['Q'], results['R'], results['dR'], results['dQ']))
         
-        # TODO: Sort out the header to include extra information...
-        head = (
-            f"NR_runs = {self.config.RBnum}\n"
-            f"DB = {self.config.DBname}\n"
-            f"Method = {self.config.method}\n"
-            f"Normalize = {self.config.Normalize}\n"
-            f"Autoscale = {self.config.AutoScale}\n"
-            f"Scaling factors = {self.config.ScaleFactor}\n"
-            f"Lambda Range = {self.config.LambdaMinUse}\u212B to {self.config.LambdaMaxUse}\u212B\n"
-            f"THS = {self.log_values['ths']}, THI = {self.log_values['thi']}, ThCen = {self.log_values['ThCen']}\n"
-            f"columns = Q, R, dR, dQ (sigma)\n"
-            f"{'---' * 20}"
-        )
+        # TODO: Sort out the header to include best information...
+        if full:
+            head = (
+                f"NR_runs = {self.config.RBnum}\n"
+                f"DB = {self.config.DBname}\n"
+                f"Method = {self.config.method}\n"
+                f"Normalize = {self.config.Normalize}\n"
+                f"Autoscale = {self.config.AutoScale}\n"
+                f"Scaling factors = {self.config.ScaleFactor}\n"
+                f"Lambda Range = {self.config.LambdaMinUse}\u212B to {self.config.LambdaMaxUse}\u212B\n"
+                f"THS = {self.log_values['ths']}, THI = {self.log_values['thi']}, ThCen = {self.log_values['ThCen']}\n"
+                f"{'---' * 20}\n"
+                f"Config: {vars(self.config)}\n"
+                f"{'---' * 20}\n"
+                f"columns = Q, R, dR, dQ (sigma)\n"
+                f"{'---' * 20}"
+            )
+        else:   # Not sure how best to output the config for combined settings so don't include for now.
+            head = (
+                f"NR_runs = {self.config.RBnum}\n"
+                f"DB = {self.config.DBname}\n"
+                f"Method = {self.config.method}\n"
+                f"Normalize = {self.config.Normalize}\n"
+                f"Autoscale = {self.config.AutoScale}\n"
+                f"Scaling factors = {self.config.ScaleFactor}\n"
+                f"Lambda Range = {self.config.LambdaMinUse}\u212B to {self.config.LambdaMaxUse}\u212B\n"
+                f"THS = {self.log_values['ths']}, THI = {self.log_values['thi']}, ThCen = {self.log_values['ThCen']}\n"
+                f"{'---' * 20}\n"
+                f"columns = Q, R, dR, dQ (sigma)\n"
+                f"{'---' * 20}"
+            )
         if not sname:
             output_file = self.config.Spath / f"{self.config.Sname}.dat"
         else:
