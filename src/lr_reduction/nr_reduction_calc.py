@@ -389,19 +389,28 @@ class NR_Reduction:
         ThetaCalc = ThetaCalc + (self.log_values['tthd'] - DBtthd) / 2
         print(f'Calculated theta: {np.round(ThetaCalc, 3)}, dTheta: {np.round(ThetaCalc - ThCen, 3)}')
         
+        # TODO: Alter the function to do the calculation once and apply different angle offsets
+        # Calculate expected beam profile on detector using logs
+        Icalc_nonfit = tools.calc_beam_on_detector(Yfit, DBpixel, self.log_values['siY'], self.log_values['s1Y'],
+                                            self.settings['interslit_distance'], self.settings['si_sample_distance'], 
+                                         self.settings['sample_detector_distance'], self.settings['pixel_width'],
+                                         self.config.DetSigma, self.config.DetResFn)
+
         # Use calculated value if flag
         if self.config.useCalcTheta:
             ThCen = ThetaCalc
             self.log_values['ThCen'] = ThCen
+            # Calculate expected beam profile on detector using logs
+            Icalc = tools.calc_beam_on_detector(Yfit, RBpixel, self.log_values['siY'], self.log_values['s1Y'],
+                                        self.settings['interslit_distance'], self.settings['si_sample_distance'], 
+                                        self.settings['sample_detector_distance'], self.settings['pixel_width'],
+                                        self.config.DetSigma, self.config.DetResFn)
         else:
             RBpixel = DBpixel
+            Icalc = Icalc_nonfit
         
-        # Calculate expected beam profile on detector using logs
-        Icalc = tools.calc_beam_on_detector(Yfit, RBpixel, self.log_values['siY'], self.log_values['s1Y'],
-                                            self.settings['interslit_distance'], self.settings['si_sample_distance'], 
-                                         self.settings['sample_detector_distance'], self.settings['pixel_width'],
-                                         self.config.DetSigma, self.config.DetResFn)
         Icalc = (Icalc * par[0]) + bkg
+        Icalc_nonfit = (Icalc_nonfit * par[0]) + bkg
         
         # Plot beam profile if requested - compares to calculated profile from instrument geometry.
         if self.config.plotON:
@@ -409,7 +418,9 @@ class NR_Reduction:
             ax.plot(Ydata, Idata, 'ok')
             ax.plot(Yfit, Ifit, '-r', label=f'{self.config.peak_type} fit')
             ax.plot(Yfit, bkg, '--r', label='background')
-            ax.plot(Yfit, Icalc, '-b', label='Calculated')
+            ax.plot(Yfit, Icalc_nonfit, '--g', label='Center from log')
+            if self.config.useCalcTheta:
+                ax.plot(Yfit, Icalc, '-b', label='Calculated')
             ax.plot([self.config.RB_Ymin[i], self.config.RB_Ymin[i]], [min(Idata), max(Idata)],
                     '--k', linewidth=1, label='Data ROI')
             ax.plot([self.config.RB_Ymax[i], self.config.RB_Ymax[i]], [min(Idata), max(Idata)],
