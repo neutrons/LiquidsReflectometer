@@ -35,6 +35,7 @@ class NR_Reduction:
             Configuration object
         """
         self.config = config
+        self.config.method = self.config.method.lower() # TODO: work out if this is the best place for this.
         self._validate_config()
         
     def _validate_config(self):
@@ -68,7 +69,7 @@ class NR_Reduction:
         if not self.config.tof_min:
             self.config.tof_min = [0] * n_settings  
         if not self.config.tof_max:
-            self.config.tof_max = [50000] * n_settings 
+            self.config.tof_max = [100000] * n_settings # TODO: Work out where to set this up properly!
             
     def reduce(self, save=True, save_all=True, plot=True):
         """
@@ -387,8 +388,10 @@ class NR_Reduction:
         dMM = dPix * self.settings['pixel_width']
         ThetaCalc = np.arcsin(dMM / self.settings['sample_detector_distance']) * 180 / np.pi
         ThetaCalc = ThetaCalc + (self.log_values['tthd'] - DBtthd) / 2
-        print(f'Calculated theta: {np.round(ThetaCalc, 3)}, dTheta: {np.round(ThetaCalc - ThCen, 3)}')
-        
+        if self.config.useCalcTheta:
+            print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta correction applied: {np.round(ThetaCalc - ThCen, 3)}')
+        else:
+            print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta difference: {np.round(ThetaCalc - ThCen, 3)} (not applied)')
         # TODO: Alter the function to do the calculation once and apply different angle offsets
         # Calculate expected beam profile on detector using logs
         Icalc_nonfit = tools.calc_beam_on_detector(Yfit, DBpixel, self.log_values['siY'], self.log_values['s1Y'],
@@ -507,7 +510,7 @@ class NR_Reduction:
             dTheta_val = np.degrees(np.arctan((sigma_y/self.settings['sample_detector_distance'])))
             dTheta = np.full(len(Theta), dTheta_val)
         else:
-            raise ValueError(f"Theta calculation only defined for config.method 'constantQ' or 'meanTheta'")
+            raise ValueError("Theta calculation only defined for config.method 'constantQ' or 'meanTheta'")
             
         # Store theta bins for next calculation.
         ThetaBinSize = abs(np.diff(Theta))
@@ -858,6 +861,7 @@ class NR_Reduction:
         _, _, RBpixel, _, _, _ = self._fit_and_calculate_theta(
             i, ypix, RB, self.log_values['DBpixel'], self.log_values['DBtthd'], self.log_values['ThCen'])
 
+        print(self.config.method)
         if self.config.method != "constanttof":
             # Calculate theta for each pixel over ROI
             ypixRB = ypix[(ypix >= self.config.RB_Ymin[i]) & (ypix <= self.config.RB_Ymax[i])] - RBpixel
@@ -916,7 +920,12 @@ class NR_Reduction:
 
         for T in range(Rarr.shape[0]):
             # Apply gravity correction
-            Thv = abs(Theta[T] + ThetaGC)
+            if self.config.useGravity == True: # TODO: Implementation needs checking/deciding whether to keep!
+                Thv = abs(Theta[T] + ThetaGC)
+            else:
+                ThetaGC.fill(0)
+                Thv = abs(Theta[T] + ThetaGC) # Crude implementation to test...
+                print("Warning: Gravity Correction has been turned off!")
             
             if self.config.method == "constanttof":
                 # Jacobian determinant
