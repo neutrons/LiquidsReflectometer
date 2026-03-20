@@ -61,7 +61,8 @@ class RunCollection:
         Calculate scale factors for each run in the collection
         """
 
-        if self.stitching_configuration.type == StitchingType.NONE:
+        if (self.stitching_configuration.type == StitchingType.NONE
+                or self.stitching_configuration.type == StitchingType.ABSOLUTE_NORMALIZATION):
             return
         elif self.stitching_configuration.type == StitchingType.AUTOMATIC_AVERAGE:
 

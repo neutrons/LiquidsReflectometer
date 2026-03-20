@@ -9,8 +9,9 @@ from mantid.simpleapi import CreateWorkspace, Fit, ReplaceSpecialValues, logger
 
 class StitchingType(Enum):
     """Enum for stitching types"""
-    NONE = "None"
+    NONE = "None" # Maps to 'manual'
     AUTOMATIC_AVERAGE = "AutomaticAverage"
+    ABSOLUTE_NORMALIZATION = "AbsoluteNormalization"
 
     @classmethod
     def from_value(cls, value: str):
