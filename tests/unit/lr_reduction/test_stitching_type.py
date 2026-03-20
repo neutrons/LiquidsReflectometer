@@ -39,7 +39,7 @@ class TestStitchingType:
         assert StitchingType.from_value("None") == StitchingType.NONE
         assert StitchingType.from_value("AutomaticAverage") == StitchingType.AUTOMATIC_AVERAGE
         assert StitchingType.from_value("AUTOMATICAVERAGE") == StitchingType.AUTOMATIC_AVERAGE
-        assert StitchingType.from_value("absolutenormalization") == StitchingType.AUTOMATIC_AVERAGE
+        assert StitchingType.from_value("absolutenormalization") == StitchingType.ABSOLUTE_NORMALIZATION
         assert StitchingType.from_value("ABSOLUTENORMALIZATION") == StitchingType.ABSOLUTE_NORMALIZATION
 
     def test_from_value_invalid(self):
