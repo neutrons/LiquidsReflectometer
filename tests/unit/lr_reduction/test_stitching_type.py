@@ -11,6 +11,7 @@ class TestStitchingType:
         """Test that StitchingType enum has correct values"""
         assert StitchingType.NONE.value == "None"
         assert StitchingType.AUTOMATIC_AVERAGE.value == "AutomaticAverage"
+        assert StitchingType.ABSOLUTE_NORMALIZATION.value == "AbsoluteNormalization"
 
     def test_from_value_none(self):
         """Test from_value with None input"""
@@ -27,12 +28,19 @@ class TestStitchingType:
         result = StitchingType.from_value("automaticaverage")
         assert result == StitchingType.AUTOMATIC_AVERAGE
 
+    def test_from_value_absolute_normalization(self):
+        """Test from_value with 'automaticaverage' string"""
+        result = StitchingType.from_value("AbsoluteNormalization")
+        assert result == StitchingType.ABSOLUTE_NORMALIZATION
+
     def test_from_value_case_insensitive(self):
         """Test that from_value is case insensitive"""
         assert StitchingType.from_value("NONE") == StitchingType.NONE
         assert StitchingType.from_value("None") == StitchingType.NONE
         assert StitchingType.from_value("AutomaticAverage") == StitchingType.AUTOMATIC_AVERAGE
         assert StitchingType.from_value("AUTOMATICAVERAGE") == StitchingType.AUTOMATIC_AVERAGE
+        assert StitchingType.from_value("absolutenormalization") == StitchingType.AUTOMATIC_AVERAGE
+        assert StitchingType.from_value("ABSOLUTENORMALIZATION") == StitchingType.ABSOLUTE_NORMALIZATION
 
     def test_from_value_invalid(self):
         """Test that from_value raises ValueError for invalid input"""
