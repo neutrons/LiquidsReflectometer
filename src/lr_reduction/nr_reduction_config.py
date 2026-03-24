@@ -51,6 +51,8 @@ class NRReductionConfig:
         # Background configuration
         self.BkgROI = []    # Need to work out a default...and explain the format here.
         self.useBS = []  # Toggle to use background subtraction per angle
+        self.useGravity = True # Toggle to use gravity correction 
+        # TODO: After testing, decide how/if to toggle gravity and if it should be in the template.
         
         # Q-space configuration #TODO: make better defaults here!!
         # These should be specified within the templates but enable ranges for lambda and q. #TODO: check if zeros are removed?

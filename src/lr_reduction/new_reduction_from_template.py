@@ -8,6 +8,7 @@ from lr_reduction import nr_tools as tools
 from lr_reduction.new_reduction_template_reader import ReductionParameters
 from lr_reduction import new_reduction_template_reader as reduction_template_reader
 from matplotlib import pyplot as plt
+import copy
 
 
 def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None,
@@ -115,7 +116,7 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     scale_list = np.array([np.float64(1)] + scaling_factors)
     config.ScaleFactor *= scale_list
     # Save combined data
-    reduce_calc.save_results(combined_results, sname=f"REFL_{seq_id}_combined_data")
+    reduce_calc.save_results(combined_results, sname=f"REFL_{seq_id}_combined_data", full=False)
 
     # plot
     _combined_save = os.path.join(_plot_dir, f"REFL_{seq_id}_combined.png") if save_plots else None
@@ -387,36 +388,34 @@ def write_template(seq_list, run_list, file_to_change, template_data_updated, se
         else:
             print("Template might not have enough entries, will fill the ones it can.")
 
-        # For each item in seq_list, store this entry from the read file.
+        # For each requested sequence number, produce an entry to save.
+        # Only the sequence matching `seq_updated` should receive the full `template_data_updated`.
         to_save = []
         for i in range(len(seq_list)):
-            if len(data_sets) >= seq_list[i]:
-                if seq_list[i] == seq_updated:
-                    # Change the run number and all entries
-                    for attr, value in vars(template_data_updated).items():
-                        setattr(data_sets[seq_list[i] - 1], attr, value)
-                    #data_sets[seq_list[i] - 1] = template_data_updated
-                    data_sets[seq_list[i] - 1].data_files = [run_list[i]]
-                    to_save.append(data_sets[seq_list[i] - 1])
+            seq_i = seq_list[i]
+            run_i = run_list[i]
+            if len(data_sets) >= seq_i:
+                if seq_i == seq_updated:
+                    # Use the updated template for this sequence
+                    new_entry = copy.deepcopy(template_data_updated)
+                    new_entry.data_files = [run_i]
                 else:
-                    data_sets[seq_list[i] - 1] = template_data_updated
-                    to_save.append(data_sets[seq_list[i] - 1])
-            elif len(data_sets) == seq_list[i] - 1:
-                # duplicate the previous entry. Allows it to add into the next sequence spot. #TODO: this logic needs attention!
-                data_sets.append(data_sets[-1])
-                # repeat above for now
-                if seq_list[i] == seq_updated:
-                    # Change the run number and all entries
-                    for attr, value in vars(template_data_updated).items():
-                        setattr(data_sets[seq_list[i] - 1], attr, value)
-                    #data_sets[seq_list[i] - 1] = template_data_updated
-                    data_sets[seq_list[i] - 1].data_files = [run_list[i]]
-                    to_save.append(data_sets[seq_list[i] - 1])
+                    # Preserve the original entry for this sequence but set the run number
+                    new_entry = copy.deepcopy(data_sets[seq_i - 1])
+                    new_entry.data_files = [run_i]
+                to_save.append(new_entry)
+            elif len(data_sets) == seq_i - 1:
+                # extend the list by duplicating the last existing entry, then behave as above
+                data_sets.append(copy.deepcopy(data_sets[-1]))
+                if seq_i == seq_updated:
+                    new_entry = copy.deepcopy(template_data_updated)
+                    new_entry.data_files = [run_i]
                 else:
-                    data_sets[seq_list[i] - 1] = template_data_updated
-                    to_save.append(data_sets[seq_list[i] - 1])
+                    new_entry = copy.deepcopy(data_sets[seq_i - 1])
+                    new_entry.data_files = [run_i]
+                to_save.append(new_entry)
             else:
-                print("Too few entries [%s] in template for sequence number %s" % (len(data_sets), seq_list[i]))
+                print("Too few entries [%s] in template for sequence number %s" % (len(data_sets), seq_i))
 
     if not save_name:
         save_name = "REF_L_%s_auto_template.xml" % run_list[0]

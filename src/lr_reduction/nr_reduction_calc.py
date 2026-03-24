@@ -35,6 +35,7 @@ class NR_Reduction:
             Configuration object
         """
         self.config = config
+        self.config.method = self.config.method.lower() # TODO: work out if this is the best place for this.
         self._validate_config()
         
     def _validate_config(self):
@@ -68,7 +69,7 @@ class NR_Reduction:
         if not self.config.tof_min:
             self.config.tof_min = [0] * n_settings  
         if not self.config.tof_max:
-            self.config.tof_max = [50000] * n_settings 
+            self.config.tof_max = [100000] * n_settings # TODO: Work out where to set this up properly!
             
     def _show_or_save_plot(self, fig, name_hint):
         """Save and/or show a diagnostic plot based on config settings."""
@@ -293,11 +294,11 @@ class NR_Reduction:
         if self.config.LambdaMin is None:
             self.config.LambdaMinUse = lam_range[0]
         else:
-            self.config.LambdaMinUse = self.config.LambdaMin[i] # TODO: check a better way to do this. Might need different lam per settings.
+            self.config.LambdaMinUse = self.config.LambdaMin[i]
         if self.config.LambdaMax is None:
             self.config.LambdaMaxUse = lam_range[1]
         else:
-            self.config.LambdaMaxUse = self.config.LambdaMax[i]     # fixed typo here. ebw
+            self.config.LambdaMaxUse = self.config.LambdaMax[i]
 
         # Flip the arrays to give detector pixel ascending.
         RB = np.flipud(nRB)
@@ -407,21 +408,32 @@ class NR_Reduction:
         dMM = dPix * self.settings['pixel_width']
         ThetaCalc = np.arcsin(dMM / self.settings['sample_detector_distance']) * 180 / np.pi
         ThetaCalc = ThetaCalc + (self.log_values['tthd'] - DBtthd) / 2
-        print(f'Calculated theta: {np.round(ThetaCalc, 3)}, dTheta: {np.round(ThetaCalc - ThCen, 3)}')
-        
+        if self.config.useCalcTheta:
+            print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta correction applied: {np.round(ThetaCalc - ThCen, 3)}')
+        else:
+            print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta difference: {np.round(ThetaCalc - ThCen, 3)} (not applied)')
+        # TODO: Alter the function to do the calculation once and apply different angle offsets
+        # Calculate expected beam profile on detector using logs
+        Icalc_nonfit = tools.calc_beam_on_detector(Yfit, DBpixel, self.log_values['siY'], self.log_values['s1Y'],
+                                            self.settings['interslit_distance'], self.settings['si_sample_distance'], 
+                                         self.settings['sample_detector_distance'], self.settings['pixel_width'],
+                                         self.config.DetSigma, self.config.DetResFn)
+
         # Use calculated value if flag
         if self.config.useCalcTheta:
             ThCen = ThetaCalc
             self.log_values['ThCen'] = ThCen
+            # Calculate expected beam profile on detector using logs
+            Icalc = tools.calc_beam_on_detector(Yfit, RBpixel, self.log_values['siY'], self.log_values['s1Y'],
+                                        self.settings['interslit_distance'], self.settings['si_sample_distance'], 
+                                        self.settings['sample_detector_distance'], self.settings['pixel_width'],
+                                        self.config.DetSigma, self.config.DetResFn)
         else:
             RBpixel = DBpixel
+            Icalc = Icalc_nonfit
         
-        # Calculate expected beam profile on detector using logs
-        Icalc = tools.calc_beam_on_detector(Yfit, RBpixel, self.log_values['siY'], self.log_values['s1Y'],
-                                            self.settings['interslit_distance'], self.settings['si_sample_distance'], 
-                                         self.settings['sample_detector_distance'], self.settings['pixel_width'],
-                                         self.config.DetSigma, self.config.DetResFn)
         Icalc = (Icalc * par[0]) + bkg
+        Icalc_nonfit = (Icalc_nonfit * par[0]) + bkg
         
         # Plot beam profile if requested - compares to calculated profile from instrument geometry.
         if self.config.plotON or getattr(self.config, 'plot_save_dir', None):
@@ -429,7 +441,9 @@ class NR_Reduction:
             ax.plot(Ydata, Idata, 'ok')
             ax.plot(Yfit, Ifit, '-r', label=f'{self.config.peak_type} fit')
             ax.plot(Yfit, bkg, '--r', label='background')
-            ax.plot(Yfit, Icalc, '-b', label='Calculated')
+            ax.plot(Yfit, Icalc_nonfit, '--g', label='Center from log')
+            if self.config.useCalcTheta:
+                ax.plot(Yfit, Icalc, '-b', label='Calculated')
             ax.plot([self.config.RB_Ymin[i], self.config.RB_Ymin[i]], [min(Idata), max(Idata)],
                     '--k', linewidth=1, label='Data ROI')
             ax.plot([self.config.RB_Ymax[i], self.config.RB_Ymax[i]], [min(Idata), max(Idata)],
@@ -516,7 +530,7 @@ class NR_Reduction:
             dTheta_val = np.degrees(np.arctan((sigma_y/self.settings['sample_detector_distance'])))
             dTheta = np.full(len(Theta), dTheta_val)
         else:
-            raise ValueError(f"Theta calculation only defined for config.method 'constantQ' or 'meanTheta'")
+            raise ValueError("Theta calculation only defined for config.method 'constantQ' or 'meanTheta'")
             
         # Store theta bins for next calculation.
         ThetaBinSize = abs(np.diff(Theta))
@@ -722,9 +736,10 @@ class NR_Reduction:
         var_bkg = (eb1**2 + eb2**2) / 2
         
         if ploton:
+            self.roi_plot(R, ypix, y_roi, LAMBDA, ymin, ymax, bkgd=True, background_idx=background_idx)
+            '''
             ll=np.where((ypix > min(background_idx[0]-5,background_idx[1]-5)) & (ypix < max(background_idx[2]+5,background_idx[3]+5)))
             fig, ax = plt.subplots()
-            # TODO: Need to look at the plot settings here. Think the vmin, vmax should allow for varying signals to stay visible.
             log_data = np.log(R[ll[0],:]+0.00001)
             ax.imshow(log_data, vmin=np.percentile(log_data,0.5), vmax=np.percentile(log_data, 99.5), aspect='auto', extent=[LAMBDA.min(), LAMBDA.max(),
                                                         min(background_idx[0]-5,background_idx[1]-5),
@@ -739,7 +754,8 @@ class NR_Reduction:
             ax.set_xlabel('Lambda [Å]', fontsize=14)
             ax.set_ylabel('Detector Pixel', fontsize=14)
             self._show_or_save_plot(fig, "background_rois")
-            
+            '''
+
         # subtract background
         for i in range(R.shape[1]):
             bkg = a[i] * y_roi + c[i]
@@ -748,6 +764,29 @@ class NR_Reduction:
             E_crop[:, i] = np.sqrt(E_crop[:, i]**2 + var_bkg[i])
 
         return R_crop, E_crop
+
+    def roi_plot(self,R, ypix, y_roi, LAMBDA, ymin, ymax, bkgd=True, background_idx=None):
+        if not bkgd:
+            background_idx = [min(y_roi), min(y_roi), max(y_roi), max(y_roi)]
+        else:
+            background_idx = background_idx
+        ll=np.where((ypix > min(background_idx[0]-5,background_idx[1]-5)) & (ypix < max(background_idx[2]+5,background_idx[3]+5)))
+        fig, ax = plt.subplots()
+        log_data = np.log(R[ll[0],:]+0.00001)
+        ax.imshow(log_data, vmin=np.percentile(log_data,0.5), vmax=np.percentile(log_data, 99.5), aspect='auto', extent=[LAMBDA.min(), LAMBDA.max(),
+                                                    min(background_idx[0]-5,background_idx[1]-5),
+                                                    max(background_idx[2]+5,background_idx[3]+5)], cmap='magma')
+        ax.axhline(y=ymin, color='green', linestyle='--')
+        ax.axhline(y=ymax, color='green', linestyle='--')
+        if bkgd:
+            ax.axhline(y=background_idx[0], color='red', linestyle='--', linewidth=1)
+            ax.axhline(y=background_idx[1], color='red', linestyle='--', linewidth=1)
+            ax.axhline(y=background_idx[2], color='red', linestyle='--', linewidth=1)
+            ax.axhline(y=background_idx[3], color='red', linestyle='--', linewidth=1) 
+        ax.set_title('Y-pixel ROIs', fontsize=16)
+        ax.set_xlabel('Lambda [Å]', fontsize=14)
+        ax.set_ylabel('Detector Pixel', fontsize=14)
+        plt.show()
 
     def _choose_theta_log(self):
         """
@@ -808,9 +847,10 @@ class NR_Reduction:
             Rarr, REarr = self.background_subtract(LAMBDA, RB, RBE, R_mask, E_mask, y_roi, ypix, self.config.RB_Ymin[i],
                                              self.config.RB_Ymax[i], self.config.BkgROI[i], self.config.plotON)
         else:
+            if self.config.plotON:
+                self.roi_plot(RB, ypix, y_roi, LAMBDA, self.config.RB_Ymin[i], self.config.RB_Ymax[i], bkgd=False)
             Rarr = R_mask
             REarr = E_mask
-        #TODO: pull the plotting out from the BS part?!
 
         # For constantTOF, use 1D TOF binning
         if self.config.method == "constanttof":
@@ -841,6 +881,7 @@ class NR_Reduction:
         _, _, RBpixel, _, _, _ = self._fit_and_calculate_theta(
             i, ypix, RB, self.log_values['DBpixel'], self.log_values['DBtthd'], self.log_values['ThCen'])
 
+        print(self.config.method)
         if self.config.method != "constanttof":
             # Calculate theta for each pixel over ROI
             ypixRB = ypix[(ypix >= self.config.RB_Ymin[i]) & (ypix <= self.config.RB_Ymax[i])] - RBpixel
@@ -899,7 +940,12 @@ class NR_Reduction:
 
         for T in range(Rarr.shape[0]):
             # Apply gravity correction
-            Thv = abs(Theta[T] + ThetaGC)
+            if self.config.useGravity == True: # TODO: Implementation needs checking/deciding whether to keep!
+                Thv = abs(Theta[T] + ThetaGC)
+            else:
+                ThetaGC.fill(0)
+                Thv = abs(Theta[T] + ThetaGC) # Crude implementation to test...
+                print("Warning: Gravity Correction has been turned off!")
             
             if self.config.method == "constanttof":
                 # Jacobian determinant
@@ -971,7 +1017,7 @@ class NR_Reduction:
 
         return {'q': q_vals, 'r': r, 'dr': dr, 'dq': dq}
 
-    def save_results(self, results, sname = None):
+    def save_results(self, results, sname = None, full=True):
         """
         Save results as .dat file with header
         
@@ -982,19 +1028,37 @@ class NR_Reduction:
         """
         array = np.column_stack((results['Q'], results['R'], results['dR'], results['dQ']))
         
-        # TODO: Sort out the header to include extra information...
-        head = (
-            f"NR_runs = {self.config.RBnum}\n"
-            f"DB = {self.config.DBname}\n"
-            f"Method = {self.config.method}\n"
-            f"Normalize = {self.config.Normalize}\n"
-            f"Autoscale = {self.config.AutoScale}\n"
-            f"Scaling factors = {self.config.ScaleFactor}\n"
-            f"Lambda Range = {self.config.LambdaMinUse}\u212B to {self.config.LambdaMaxUse}\u212B\n"
-            f"THS = {self.log_values['ths']}, THI = {self.log_values['thi']}, ThCen = {self.log_values['ThCen']}\n"
-            f"columns = Q, R, dR, dQ (sigma)\n"
-            f"{'---' * 20}"
-        )
+        # TODO: Sort out the header to include best information...
+        if full:
+            head = (
+                f"NR_runs = {self.config.RBnum}\n"
+                f"DB = {self.config.DBname}\n"
+                f"Method = {self.config.method}\n"
+                f"Normalize = {self.config.Normalize}\n"
+                f"Autoscale = {self.config.AutoScale}\n"
+                f"Scaling factors = {self.config.ScaleFactor}\n"
+                f"Lambda Range = {self.config.LambdaMinUse}\u212B to {self.config.LambdaMaxUse}\u212B\n"
+                f"THS = {self.log_values['ths']}, THI = {self.log_values['thi']}, ThCen = {self.log_values['ThCen']}\n"
+                f"{'---' * 20}\n"
+                f"Config: {vars(self.config)}\n"
+                f"{'---' * 20}\n"
+                f"columns = Q, R, dR, dQ (sigma)\n"
+                f"{'---' * 20}"
+            )
+        else:   # Not sure how best to output the config for combined settings so don't include for now.
+            head = (
+                f"NR_runs = {self.config.RBnum}\n"
+                f"DB = {self.config.DBname}\n"
+                f"Method = {self.config.method}\n"
+                f"Normalize = {self.config.Normalize}\n"
+                f"Autoscale = {self.config.AutoScale}\n"
+                f"Scaling factors = {self.config.ScaleFactor}\n"
+                f"Lambda Range = {self.config.LambdaMinUse}\u212B to {self.config.LambdaMaxUse}\u212B\n"
+                f"THS = {self.log_values['ths']}, THI = {self.log_values['thi']}, ThCen = {self.log_values['ThCen']}\n"
+                f"{'---' * 20}\n"
+                f"columns = Q, R, dR, dQ (sigma)\n"
+                f"{'---' * 20}"
+            )
         if not sname:
             output_file = self.config.Spath / f"{self.config.Sname}.dat"
         else:
