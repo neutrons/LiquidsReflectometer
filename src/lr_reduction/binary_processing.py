@@ -179,7 +179,34 @@ def get_log_values(fname):
     mult =np.array(f['entry/DASlogs/BL4B:Chop:Skf2:ChopperMultiplier/value'][0])  # 29.5
     log_values["emission_coefficients"]=np.array([off/1000, mult/1000])
 
+    log_values["chop2_PD"] = np.array(f['entry/DASlogs/BL4B:Chop:Skf2:PhaseAccuracy/average_value'][0])
         
+    # TODO: Test these!!`
+    try:
+        log_values["Att1"] = np.array(f['entry/DASlogs/BL4B:Actuator:50M_RBV/average_value'][0])
+    except:
+        log_values["Att1"] = np.array(f['entry/DASlogs/BL4B:Actuator:50MRb/average_value'][0])
+        log_values["Att1"] = np.floor(1 - log_values["Att1"])
+
+    try:
+        log_values["Att2"] = np.array(f['entry/DASlogs/BL4B:Actuator:100M_RBV/average_value'][0])
+    except:
+        log_values["Att2"] = np.array(f['entry/DASlogs/BL4B:Actuator:100MRb/average_value'][0])
+        log_values["Att2"] = np.floor(1 - log_values["Att2"])
+
+    try:
+        log_values["Att3"] = np.array(f['entry/DASlogs/BL4B:Actuator:200M_RBV/average_value'][0])
+    except:
+        log_values["Att3"] = np.array(f['entry/DASlogs/BL4B:Actuator:200MRb/average_value'][0])
+        log_values["Att3"] = np.floor(1 - log_values["Att3"])
+
+    try:
+        log_values["Att4"] = np.array(f['entry/DASlogs/BL4B:Actuator:400M_RBV/average_value'][0])   
+    except:
+        log_values["Att4"] = np.array(f['entry/DASlogs/BL4B:Actuator:400MRb/average_value'][0])  
+        log_values["Att4"] = np.floor(1 - log_values["Att4"])
+
+
     f.close()
     return log_values
 
