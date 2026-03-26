@@ -8,6 +8,7 @@ from apps.quick_reduce import QuickReduce
 from apps.reduction import Reduction
 from apps.sld_calculator import SLD
 from apps.xrr import XRR
+from apps.overplot import Overplot
 from qtpy import QtCore
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 
@@ -66,7 +67,11 @@ class ReductionInterface(QTabWidget):
         self.sld_tab = SLD()
         self.addTab(self.sld_tab, "SLD calculator")
         self.setTabText(tab_id, "SLD calculator")
-
+        # Overplot tab
+        tab_id += 1
+        self.overplot_tab = Overplot()
+        self.addTab(self.overplot_tab, "Overplot")
+        self.setTabText(tab_id, "Overplot")
         # Refracted beam analysis
         # tab_id += 1
         # self.refracted_tab = Refracted()
