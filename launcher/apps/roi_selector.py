@@ -11,6 +11,7 @@ except Exception:
     curve_fit = None
     HAS_SCIPY = False
 from qtpy import QtCore
+from qtpy.QtGui import QBrush, QColor, QFont
 from qtpy.QtWidgets import (
     QWidget,
     QGridLayout,
@@ -28,6 +29,9 @@ from qtpy.QtWidgets import (
     QDialogButtonBox,
     QMessageBox,
     QComboBox,
+    QTableWidget,
+    QTableWidgetItem,
+    QListWidget,
 )
 
 from matplotlib.figure import Figure
@@ -54,25 +58,38 @@ except Exception:
 
 
 class DBPerRunDialog(QDialog):
+    """Table-based DB_file per-run editor.
+
+    Shows a two-column table with Run (read-only) and DB_file (editable).
+    Returns a list of DB_file strings in the same order as runs.
+    """
     def __init__(self, parent=None, runs=None, initial=None):
         super().__init__(parent)
         self.setWindowTitle("Edit DB_file per run")
         self.runs = runs or []
         self.initial = initial or []
         layout = QVBoxLayout()
-        self.edits = []
+
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(2)
+        self.table.setHorizontalHeaderLabels(["Run", "DB_file"])
+        self.table.setRowCount(len(self.runs))
         for i, run in enumerate(self.runs):
-            h = QHBoxLayout()
-            lbl = QLabel(str(run))
-            le = QLineEdit(self)
+            # Run column (non-editable)
+            item_run = QTableWidgetItem(str(run))
+            item_run.setFlags(item_run.flags() & ~QtCore.Qt.ItemIsEditable)
+            self.table.setItem(i, 0, item_run)
+            # DB file column (editable)
+            val = ''
             try:
-                le.setText(self.initial[i])
+                val = self.initial[i]
             except Exception:
-                pass
-            h.addWidget(lbl)
-            h.addWidget(le)
-            layout.addLayout(h)
-            self.edits.append(le)
+                val = ''
+            item_db = QTableWidgetItem(val)
+            self.table.setItem(i, 1, item_db)
+
+        layout.addWidget(self.table)
+
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -80,7 +97,11 @@ class DBPerRunDialog(QDialog):
         self.setLayout(layout)
 
     def get_values(self):
-        return [e.text().strip() for e in self.edits]
+        vals = []
+        for i in range(self.table.rowCount()):
+            it = self.table.item(i, 1)
+            vals.append(it.text().strip() if it is not None else '')
+        return vals
 
 
 class SaveTemplateDialog(QDialog):
@@ -239,7 +260,7 @@ class ROISelector(QWidget):
         c_layout.addRow("Run list:", h_runs)
 
         # list widget showing runs loaded
-        from qtpy.QtWidgets import QListWidget
+        # QListWidget already imported at module top
         self.run_list_widget = QListWidget(self)
         self.run_list_widget.setMaximumHeight(100)
         c_layout.addRow(self.run_list_widget)
@@ -260,8 +281,10 @@ class ROISelector(QWidget):
         # buttons to store ROIs for the current run and to save combined template
         self.store_run_rois_btn = QPushButton("Store ROIs for run")
         self.save_combined_btn = QPushButton("Save combined template")
+        self.reset_btn = QPushButton("Reset")
         c_layout.addRow(self.store_run_rois_btn)
         c_layout.addRow(self.save_combined_btn)
+        c_layout.addRow(self.reset_btn)
 
         # optional log color scale for heatmaps
         self.log_color_cb = QCheckBox("Log color scale", self)
@@ -403,6 +426,7 @@ class ROISelector(QWidget):
         self.run_list_widget.itemClicked.connect(self._on_run_selected)
         self.store_run_rois_btn.clicked.connect(self.save_rois_for_current_run)
         self.save_combined_btn.clicked.connect(self.save_combined_template)
+        self.reset_btn.clicked.connect(self.reset_session)
         # update and browse
         self.update_btn.clicked.connect(self.update_rois)
         self.template_browse_btn.clicked.connect(self._browse_template)
@@ -1395,6 +1419,9 @@ class ROISelector(QWidget):
             QMessageBox.warning(self, "No valid runs", "No valid run numbers found in input")
             return
 
+        # store the loaded runs for later validation and DB editing
+        self.runs = runs
+
         self.run_list_widget.clear()
         for r in runs:
             self.run_list_widget.addItem(str(r))
@@ -1403,6 +1430,11 @@ class ROISelector(QWidget):
         self.run_list_widget.setCurrentRow(0)
         self.run_edit.setText(str(runs[0]))
         self.load_file()
+        # refresh visual marks for stored ROIs (none initially)
+        try:
+            self._refresh_run_list_marks()
+        except Exception:
+            pass
 
     def _on_run_selected(self, item):
         try:
@@ -1414,6 +1446,35 @@ class ROISelector(QWidget):
         # if ROIs stored for this run, apply them
         if runnum in self.per_run_rois:
             self._apply_stored_rois(runnum)
+
+    def _refresh_run_list_marks(self):
+        """Visually mark runs in the run list which have stored ROIs.
+
+        Stored runs are shown with a green foreground and a bold font.
+        """
+        try:
+            font_stored = QFont()
+            font_stored.setBold(True)
+            for i in range(self.run_list_widget.count()):
+                it = self.run_list_widget.item(i)
+                try:
+                    rnum = int(it.text())
+                except Exception:
+                    # try strip trailing markers like ' (stored)'
+                    try:
+                        rnum = int(it.text().split()[0])
+                    except Exception:
+                        rnum = None
+                if rnum is not None and rnum in self.per_run_rois:
+                    it.setForeground(QBrush(QColor('darkgreen')))
+                    it.setFont(font_stored)
+                else:
+                    it.setForeground(QBrush(QColor('black')))
+                    f = it.font()
+                    f.setBold(False)
+                    it.setFont(f)
+        except Exception:
+            pass
 
     def save_rois_for_current_run(self):
         try:
@@ -1435,6 +1496,10 @@ class ROISelector(QWidget):
         }
         self.per_run_rois[runnum] = roi
         QMessageBox.information(self, "Stored", f"Stored ROIs for run {runnum}")
+        try:
+            self._refresh_run_list_marks()
+        except Exception:
+            pass
 
     def _apply_stored_rois(self, runnum):
         r = self.per_run_rois.get(runnum)
@@ -1459,6 +1524,102 @@ class ROISelector(QWidget):
         except Exception:
             pass
 
+    def reset_session(self):
+        """Clear all stored inputs and start a fresh session.
+
+        This clears stored per-run ROIs, clears the template path, resets spinboxes
+        to sensible defaults, and refreshes the run list visual markers.
+        """
+        try:
+            # clear stored ROI data
+            self.per_run_rois = {}
+            # clear loaded runs and run list widgets
+            try:
+                self.runs = []
+            except Exception:
+                pass
+            try:
+                self.run_list_widget.clear()
+            except Exception:
+                pass
+            try:
+                self.run_list_edit.setText("")
+            except Exception:
+                pass
+            try:
+                self.run_edit.setText("")
+            except Exception:
+                pass
+
+            # clear template path and sequence/title/status markers
+            try:
+                self.template_path_edit.setText("")
+            except Exception:
+                pass
+            try:
+                self.seq_num = None
+            except Exception:
+                pass
+            try:
+                self.title_label.setText("")
+            except Exception:
+                pass
+            try:
+                self.status_label.setText("")
+            except Exception:
+                pass
+
+            # reset ROI spinboxes to defaults
+            try:
+                self.ymin_spin.setValue(0)
+                self.ymax_spin.setValue(min(self.n_y - 1, 20))
+                self.xmin_spin.setValue(0)
+                self.xmax_spin.setValue(min(self.n_x - 1, 100))
+                self.tofmin_spin.setValue(0)
+                self.tofmax_spin.setValue(20000)
+                self.bkg1_min.setValue(0)
+                self.bkg1_max.setValue(0)
+                self.bkg2_min.setValue(0)
+                self.bkg2_max.setValue(0)
+            except Exception:
+                pass
+
+            # clear any loaded data arrays used for plotting
+            try:
+                self.counts_xy = None
+            except Exception:
+                pass
+            try:
+                self.counts = None
+            except Exception:
+                pass
+            try:
+                self.y_vs_tof = None
+            except Exception:
+                pass
+            try:
+                self.tof_edges = None
+            except Exception:
+                pass
+
+            # clear figure/canvas
+            try:
+                if getattr(self, 'figure', None) is not None:
+                    self.figure.clf()
+                if getattr(self, 'canvas', None) is not None:
+                    self.canvas.draw_idle()
+            except Exception:
+                pass
+
+            # refresh visual marks
+            try:
+                self._refresh_run_list_marks()
+            except Exception:
+                pass
+
+        except Exception:
+            QMessageBox.warning(self, "Reset failed", "Failed to reset session")
+
     def save_combined_template(self):
         if not self.per_run_rois:
             QMessageBox.warning(self, "No ROIs", "No per-run ROIs stored. Use 'Store ROIs for run' first.")
@@ -1478,6 +1639,19 @@ class ROISelector(QWidget):
         except Exception:
             pass
         dlg = SaveTemplateDialog(self, defaults=defaults)
+        # ensure we pass the loaded runs so the DB editor can show the correct rows
+        try:
+            loaded_runs = getattr(self, 'runs', None) or []
+        except Exception:
+            loaded_runs = []
+        dlg = SaveTemplateDialog(self, defaults=defaults, runs=loaded_runs)
+        # validate that all loaded runs have stored ROIs
+        if loaded_runs:
+            missing = [r for r in loaded_runs if r not in self.per_run_rois]
+            if missing:
+                QMessageBox.warning(self, "Missing ROIs", f"Not all runs have stored ROIs. Missing: {missing}")
+                return
+
         if dlg.exec_() != QDialog.Accepted:
             return
         vals = dlg.get_values()

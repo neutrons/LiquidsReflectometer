@@ -339,8 +339,8 @@ class Overplot(QWidget):
                 ax.set_xscale('linear')
 
             ax.legend()
-            ax.set_xlabel('x')
-            ax.set_ylabel('y')
+            ax.set_xlabel('Q')
+            ax.set_ylabel('R' if transform == "None" else 'R*Q^4')
             self.figure.tight_layout()
             self.canvas.draw()
             self.save_settings()
