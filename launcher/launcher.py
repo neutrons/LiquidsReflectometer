@@ -10,6 +10,7 @@ from apps.sld_calculator import SLD
 from apps.xrr import XRR
 from apps.overplot import Overplot
 from apps.roi_selector import ROISelector
+from apps.direct_beam import DirectBeamTab
 from qtpy import QtCore
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 
@@ -73,6 +74,12 @@ class ReductionInterface(QTabWidget):
         self.overplot_tab = Overplot()
         self.addTab(self.overplot_tab, "Overplot")
         self.setTabText(tab_id, "Overplot")
+
+        # Direct beam processing tab
+        tab_id += 1
+        self.direct_beam_tab = DirectBeamTab()
+        self.addTab(self.direct_beam_tab, "Direct beam")
+        self.setTabText(tab_id, "Direct beam")
 
         # ROI selector
         tab_id += 1
