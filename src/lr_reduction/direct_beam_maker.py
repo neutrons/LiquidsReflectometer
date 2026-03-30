@@ -26,15 +26,15 @@ class Direct_Beam:
         self.y_ROI = [130,170]            # y pixels to include in the direct beam spectrum
         self.low_res = [75,190]           # low res TOF range to include in the direct beam spectrum
 
-    def create_db(self, run_list, save_name, plot=True, mu_file = 'Cd_mu_2025.dat', flip_atten=False):
+    def create_db(self, run_list, save_name, plot=True, mu_file = 'Cd_mu_2025.dat', flip_atten=False, return_traces=False):
         # read in Cd linear attenuation coefficient data obtained from ENDf
         L_ENDF, mu_ENDF = np.loadtxt(self.MUpath+mu_file, unpack=True, skiprows=1)
-
 
         # loop over the Cd spectra measurements
         LAM = []
         INT = []
         ERR = []
+        traces = []
 
         if plot:
             plt.figure()
@@ -44,7 +44,7 @@ class Direct_Beam:
 
             e_offset, event_id, error_event_offset, pcharge, cPc, log_values = BP.load_and_extract(fname)
             tof_array, DTC, error_counts = BP.get_deadtime_correction(error_event_offset, e_offset, cPc, 
-                                                                      tofbin=50, tofmax=100000, tofmin=0, deadtime=4.2, tof_step=100)
+                                                                        tofbin=50, tofmax=100000, tofmin=0, deadtime=4.2, tof_step=100)
             # Convert to other nomenclature for testing
             tDTC = tof_array
             DTC = DTC
@@ -77,10 +77,13 @@ class Direct_Beam:
             mu = np.interp(L, L_ENDF, mu_ENDF)
             trans = np.exp(-mu*Cd_thickness)
 
+            I_trans = I / trans
             if plot:
-                plt.plot(L, I/trans, 'o', markersize=1)
+                plt.plot(L, I_trans, 'o', markersize=1)
+            # store trace for optional return
+            traces.append((L, I_trans, run))
             LAM.extend(L)
-            INT.extend(I/trans)
+            INT.extend(I_trans)
             ERR.extend(E/trans)
 
         LAM = np.array(LAM)
@@ -103,6 +106,8 @@ class Direct_Beam:
 
         array = np.column_stack((lam_out,int_out,err_out))
         np.savetxt(self.savepath+save_name, array, header = 'Lambda\tIntensity\tError', delimiter='\t')
+        if return_traces:
+            return lam_out, int_out, err_out, traces
         return lam_out, int_out, err_out
 
     def _lam_error_sort(self, LAM, INT, ERR):
