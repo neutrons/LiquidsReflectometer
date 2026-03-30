@@ -181,31 +181,34 @@ def get_log_values(fname):
 
     log_values["chop2_PD"] = np.array(f['entry/DASlogs/BL4B:Chop:Skf2:PhaseAccuracy/average_value'][0])
         
-    # TODO: Test these!!`
+    # TODO: Test these!!
     try:
-        log_values["Att1"] = np.array(f['entry/DASlogs/BL4B:Actuator:50M_RBV/average_value'][0])
-    except:
-        log_values["Att1"] = np.array(f['entry/DASlogs/BL4B:Actuator:50MRb/average_value'][0])
-        log_values["Att1"] = np.floor(1 - log_values["Att1"])
+        atten_menu = np.array(f['entry/DASlogs/BL4B:Actuator:Menu/value'][0])
+        atten_lookup = {0: [0,0,0,0],
+                        1: [1,0,0,0],
+                        2: [0,1,0,0],
+                        3: [1,1,0,0],
+                        4: [0,0,1,0],
+                        5: [1,0,1,0],
+                        6: [0,1,1,0],
+                        7: [1,1,1,0],
+                        8: [0,0,0,1],
+                        9: [1,0,0,1],
+                        10: [0,1,0,1],
+                        11: [1,1,0,1],
+                        12: [0,0,1,1],
+                        13: [1,0,1,1],
+                        14: [0,1,1,1],
+                        15: [1,1,1,1]
+                        }
+        log_values['Atten'] = np.array(atten_lookup.get(float(atten_menu)))
 
-    try:
-        log_values["Att2"] = np.array(f['entry/DASlogs/BL4B:Actuator:100M_RBV/average_value'][0])
     except:
-        log_values["Att2"] = np.array(f['entry/DASlogs/BL4B:Actuator:100MRb/average_value'][0])
-        log_values["Att2"] = np.floor(1 - log_values["Att2"])
-
-    try:
-        log_values["Att3"] = np.array(f['entry/DASlogs/BL4B:Actuator:200M_RBV/average_value'][0])
-    except:
-        log_values["Att3"] = np.array(f['entry/DASlogs/BL4B:Actuator:200MRb/average_value'][0])
-        log_values["Att3"] = np.floor(1 - log_values["Att3"])
-
-    try:
-        log_values["Att4"] = np.array(f['entry/DASlogs/BL4B:Actuator:400M_RBV/average_value'][0])   
-    except:
-        log_values["Att4"] = np.array(f['entry/DASlogs/BL4B:Actuator:400MRb/average_value'][0])  
-        log_values["Att4"] = np.floor(1 - log_values["Att4"])
-
+        Att1 = np.array(f['entry/DASlogs/BL4B:Actuator:50MRb/average_value'][0])
+        Att2 = np.array(f['entry/DASlogs/BL4B:Actuator:100MRb/average_value'][0])
+        Att3 = np.array(f['entry/DASlogs/BL4B:Actuator:200MRb/average_value'][0])
+        Att4 = np.array(f['entry/DASlogs/BL4B:Actuator:400MRb/average_value'][0])       
+        log_values['Atten'] = np.array([Att1,Att2,Att3,Att4])
 
     f.close()
     return log_values
