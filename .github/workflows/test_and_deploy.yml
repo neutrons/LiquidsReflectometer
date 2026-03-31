@@ -89,7 +89,6 @@ jobs:
         with:
           python-version: "3.11"
           local-channel: /tmp/local-channel
-          module-name: ${{ env.PKG_NAME }}
           package-name: ${{ env.PKG_NAME }}=${{ env.PKG_VERSION }} # install exact version
           extra-channels: neutrons mantid
           extra-commands: |
