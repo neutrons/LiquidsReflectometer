@@ -464,7 +464,7 @@ class ROISelector(QWidget):
                 # collapse bkg2 to Y ROI
                 y0 = self.ymin_spin.value()
                 y1 = self.ymax_spin.value()
-                self.bkg2_min.setValue(y1)
+                self.bkg2_min.setValue(y0)
                 self.bkg2_max.setValue(y1)
             except Exception:
                 pass
@@ -476,8 +476,8 @@ class ROISelector(QWidget):
                 y0 = self.ymin_spin.value()
                 y1 = self.ymax_spin.value()
                 self.bkg1_min.setValue(y0)
-                self.bkg1_max.setValue(y0)
-                self.bkg2_min.setValue(y1)
+                self.bkg1_max.setValue(y1)
+                self.bkg2_min.setValue(y0)
                 self.bkg2_max.setValue(y1)
             except Exception:
                 pass
@@ -561,6 +561,7 @@ class ROISelector(QWidget):
                 try:
                     ch_val = self._get_chopper_estimate(f)
                     self._chopper_val = ch_val
+                    print(f"Estimated value from chopper: {ch_val}") #TODO: this function needs to be written properly.
                 except Exception:
                     self._chopper_val = None
                 # try to find more specific numeric values we can use: lambda request, chopper speed, flight path length
@@ -801,10 +802,12 @@ class ROISelector(QWidget):
         # Bkg1 default: just below the Y ROI by 5 pixels
         if use_background:
             b1min = max(0, ymin - 5)
-            b1max = max(b1min, ymin - 1)
+            #b1max = max(b1min, ymin - 1)
+            b2min = max(0, b1min - 8)
             # Bkg2 default: above the Y ROI by 8 pixels
-            b2min = min(self.n_y - 1, ymax + 1)
-            b2max = min(self.n_y - 1, ymax + 8)
+            #b2min = min(self.n_y - 1, ymax + 1)
+            b1max = min(self.n_y - 1, ymax + 5)
+            b2max = min(self.n_y - 1, b1max + 8)
         else:
             b1min = ymin
             b1max = ymin
@@ -1068,15 +1071,19 @@ class ROISelector(QWidget):
             outer_left = self.bkg1_min.value()
             outer_right = self.bkg1_max.value()
             # clamp relative to main ROI
+            #b1min = outer_left
+            #b1max = max(0, ymin - 1)
+            #b2min = min(self.n_y - 1, ymax + 1)
+            #b2max = outer_right
             b1min = outer_left
-            b1max = max(0, ymin - 1)
-            b2min = min(self.n_y - 1, ymax + 1)
-            b2max = outer_right
+            b1max = outer_right
+            b2min = ymin
+            b2max = ymax
         else:
             # No background: collapse to main ROI so no background pixels selected
             b1min = ymin
-            b1max = ymin
-            b2min = ymax
+            b1max = ymax
+            b2min = ymin
             b2max = ymax
         # mark on heatmaps (visual only)
         for ax in (ax1, ax2):
