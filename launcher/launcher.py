@@ -69,6 +69,7 @@ class ReductionInterface(QTabWidget):
         self.sld_tab = SLD()
         self.addTab(self.sld_tab, "SLD calculator")
         self.setTabText(tab_id, "SLD calculator")
+        '''
         # Overplot tab
         tab_id += 1
         self.overplot_tab = Overplot()
@@ -91,6 +92,7 @@ class ReductionInterface(QTabWidget):
         # self.refracted_tab = Refracted()
         # self.addTab(self.refracted_tab, "Refraction analysis")
         # self.setTabText(tab_id, "Refraction analysis")
+        '''
 
 
 if __name__ == "__main__":

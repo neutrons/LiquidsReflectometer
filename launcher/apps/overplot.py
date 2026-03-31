@@ -197,7 +197,7 @@ class Overplot(QWidget):
             QMessageBox.critical(self, "Error", f"Could not list directory: {e}")
             return
         for f in files:
-            if f.lower().endswith(".dat"):
+            if (f.lower().endswith(".dat")) | (f.lower().endswith(".txt")):
                 self._files.append(f)
 
         # show all initially
