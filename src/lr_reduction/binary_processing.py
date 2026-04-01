@@ -36,7 +36,7 @@ def convert_to_binary(fname, lowres, collapse_x = True, tofbin=50, tofmax=100000
     error_array_corr = np.nan_to_num(error_array_corr, nan=0)
 
     tof_array = tof_array / 1000
-    return tof_array, y_tof_corr, error_array_corr, log_values
+    return tof_array, y_tof_corr, error_array_corr, log_values, DTC
 
 def load_and_extract(fname):
     '''

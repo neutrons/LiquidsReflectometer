@@ -221,7 +221,7 @@ class NR_Reduction:
         
         # Convert to binary
         try:
-            tof_array, y_tof_corr, error_array_corr, log_values = BP.convert_to_binary(
+            tof_array, y_tof_corr, error_array_corr, log_values, _ = BP.convert_to_binary(
                 nNxRB,
                 lowres=lowres,
                 collapse_x=True,
