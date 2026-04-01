@@ -656,7 +656,7 @@ class ROISelector(QWidget):
             try:
                 # Prefer the project's reduction_template_reader if available
                 try:
-                    from lr_reduction import reduction_template_reader as rtr
+                    from lr_reduction import new_reduction_template_reader as rtr
                 except Exception:
                     rtr = None
 
@@ -1499,6 +1499,7 @@ class ROISelector(QWidget):
             'bkg1': (int(self.bkg1_min.value()), int(self.bkg1_max.value())),
             'bkg2': (int(self.bkg2_min.value()), int(self.bkg2_max.value())),
             'template_path': self.template_path_edit.text().strip(),
+            'bkg_mode': self.bkg_mode_cb.currentText(),
             'seq': getattr(self, 'seq_num', None),
         }
         self.per_run_rois[runnum] = roi
@@ -1634,9 +1635,14 @@ class ROISelector(QWidget):
         # compute sensible defaults for save dialog: IPTS-aware folder and filename based on lowest run
         defaults = {"q_method": "meanTheta", "DB_file": "", "autoscale": True, "use_calc_theta": True}
         try:
-            ipts = self.ipts_edit.text().strip()
-            if ipts:
-                defaults['default_dir'] = f"/SNS/REF_L/IPTS-{ipts}/shared"
+            # prefer last saved folder in this session if available
+            last = getattr(self, '_last_saved_template_dir', None)
+            if last:
+                defaults['default_dir'] = last
+            else:
+                ipts = self.ipts_edit.text().strip()
+                if ipts:
+                    defaults['default_dir'] = f"/SNS/REF_L/IPTS-{ipts}/shared"
         except Exception:
             pass
         try:
@@ -1676,7 +1682,7 @@ class ROISelector(QWidget):
 
         # Try to use reduction_template_reader if available
         try:
-            from lr_reduction import reduction_template_reader as rtr
+            from lr_reduction import new_reduction_template_reader as rtr
         except Exception:
             rtr = None
 
@@ -1701,9 +1707,9 @@ class ROISelector(QWidget):
                 try:
                     ent = rtr.ReductionParameters()
                     ent.data_peak_range = [r['ymin'], r['ymax']]
-                    # compute background_roi according to selected background mode
+                    # compute background_roi according to the per-run background mode
                     try:
-                        mode_val = self.bkg_mode_cb.currentText().lower()
+                        mode_val = (r.get('bkg_mode') or '').lower()
                     except Exception:
                         mode_val = ''
                     if mode_val.startswith('no'):
@@ -1718,11 +1724,11 @@ class ROISelector(QWidget):
                         outer_right = r['bkg1'][1]
                         n_y = getattr(self, 'n_y', None)
                         b1min = outer_left
-                        b1max = max(0, r['ymin'] - 1)
+                        b1max = max(0, r['ymin'])
                         if n_y is not None:
-                            b2min = min(n_y - 1, r['ymax'] + 1)
+                            b2min = min(n_y - 1, r['ymax'])
                         else:
-                            b2min = r['ymax'] + 1
+                            b2min = r['ymax']
                         b2max = outer_right
                         ent.background_roi = [b1min, b1max, b2min, b2max]
                         ent.subtract_background = True
@@ -1745,9 +1751,10 @@ class ROISelector(QWidget):
                     ent.autoscale = vals.get('autoscale')
                     ent.use_calc_theta = vals.get('use_calc_theta')
                     # set background flags from UI mode
+                    # set background flags from per-run stored mode
                     try:
-                        mode = self.bkg_mode_cb.currentText()
-                        if mode is not None and mode.lower().startswith('no'):
+                        mode = r.get('bkg_mode') or self.bkg_mode_cb.currentText()
+                        if mode is not None and str(mode).lower().startswith('no'):
                             ent.subtract_background = False
                             ent.two_backgrounds = False
                         else:
@@ -1775,6 +1782,11 @@ class ROISelector(QWidget):
                 out_xml = rtr.to_xml(data_sets)
                 with open(path, 'w') as fh:
                     fh.write(out_xml)
+                # remember last saved folder for this session
+                try:
+                    self._last_saved_template_dir = os.path.dirname(path)
+                except Exception:
+                    pass
                 QMessageBox.information(self, "Saved", f"Combined template saved to {path}")
                 return
             except Exception as e:
@@ -1785,14 +1797,13 @@ class ROISelector(QWidget):
             xml = '<Reductions>\n'
             for idx, runnum in enumerate(runs_sorted):
                 r = self.per_run_rois[runnum]
-                # determine background flags from UI (best-effort)
-                mode = None
+                # determine background flags from per-run stored mode (best-effort)
                 try:
-                    mode = self.bkg_mode_cb.currentText()
+                    mode = r.get('bkg_mode') or self.bkg_mode_cb.currentText()
                 except Exception:
                     mode = None
                 m = str(mode).lower() if mode is not None else ''
-                bg_flag = 'True' if m and not m.startswith('no') or mode is None else 'False'
+                bg_flag = 'True' if (m and not m.startswith('no')) or mode is None else 'False'
                 # two_backgrounds is False for 'Use 1 background'
                 if '1' in m or 'one' in m:
                     two_bg = 'False'
@@ -1843,6 +1854,11 @@ class ROISelector(QWidget):
             xml += '</Reductions>\n'
             with open(path, 'w') as fh:
                 fh.write(xml)
+            # remember last saved folder for this session
+            try:
+                self._last_saved_template_dir = os.path.dirname(path)
+            except Exception:
+                pass
             QMessageBox.information(self, "Saved", f"Combined template saved to {path}")
         except Exception as e:
             QMessageBox.critical(self, "Save error", f"Failed to save combined template: {e}")
