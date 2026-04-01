@@ -18,18 +18,35 @@ class Direct_Beam:
             self.Cd_foils[1]+self.Cd_foils[2], 
             2*self.Cd_foils[1]+2*self.Cd_foils[2]] #microns Cd for each attenuator
         self.Chop2_cut_fn = [2.077, -16818.0]        # linear fit to chopper cut time
-        self.Icut = 1e-10                 # cut off any data below Icut (noisy)
-        self.DTCcut = 1.25                # cut off any data above DTCcut (artifact-y)
-        self.DTCcut_config1 = 1.5         # cut off any data above DTCcut_config1 for the first run
-        self.CutOffset = 1                # cut off TOF below the chopper cut (chop-y)
+        self.Icut = 1e-10                 # threshold cut off any data below Icut (noisy)
+        self.DTCcut = 1.25                # threshold to cut off any data above DTCcut
+        self.DTCcut_config1 = 1.5         # threshold to cut off any data above DTCcut_config1 for the lowest lambda run
+        self.CutOffset = 1                # offset to adjust the chopper cut position
         self.dMod=15500                   # moderator-to-detector distance
         self.t0=[0.114,0.0295]            # for a linear fit to emission time as a function of lambda: t0[0]+t0[1]*Lambda=emission time
         self.y_ROI = [130,170]            # y pixels to include in the direct beam spectrum
-        self.low_res = [75,190]           # low res TOF range to include in the direct beam spectrum
+        self.low_res = [75,190]           # x pixels to include in the direct beam spectrum
         self.n_y = 304
         self.n_x = 256
 
     def create_db(self, run_list, save_name, plot=True, mu_file = 'Cd_mu_2025.dat', flip_atten=False, return_traces=False):
+        """
+        Create a direct beam spectrum from the given run list including an attenuation correction for Cd foils (if used).
+        Saves the file to the specified location, with header information of the DB pixel position.
+
+        Parameters:
+        run_list: list of run numbers to include in the direct beam spectrum
+        save_name: name of the output file to save the direct beam spectrum to
+        plot: whether to plot the direct beam spectrum
+        mu_file: name of the file containing the Cd linear attenuation coefficient data
+        flip_atten: whether to flip the attenuator values (earlier runs had an issue in the log files)
+        return_traces: whether to return the individual traces for each run in addition to the combined spectrum
+
+        Returns:
+        lam_out: array of wavelength values for the direct beam spectrum
+        int_out: array of intensity values for the direct beam spectrum
+        err_out: array of error values for the direct beam spectrum
+        """
         # read in Cd linear attenuation coefficient data obtained from ENDf
         L_ENDF, mu_ENDF = np.loadtxt(self.MUpath+mu_file, unpack=True, skiprows=1)
 
@@ -67,18 +84,13 @@ class Direct_Beam:
 
             # Need to split some parts out into separate functions if the logic is correct.
             Cd_thickness = self._extract_cd_values(log_values, flip_atten)
-
-            #print some info for debugging
             print(f'Run {run}: Cd thickness = {Cd_thickness:.2f} cm')
             Cd_values.append(Cd_thickness)
 
-            ## This is the wrong shape. The I and E are 2 dimensional. Need to fix the output used above.
             if run == run_list[-1]: low_tag = True
             else: low_tag = False
             T, I, E, DTC = self._trim_and_chop(T, I, E, DTC, log_values["chop2_PD"], lowest = low_tag)
-
-            T = T * 1e-3 # convert to ms for easier handling
-            #print some info for debugging
+            T = T * 1e-3 # convert to ms
             print(f'Run {run}: After trimming and chopping, {len(T)} points remain')
     
             # TODO: use logic from nr_reduction_calc
@@ -104,10 +116,6 @@ class Direct_Beam:
 
         lam_out, int_out, err_out = self._lam_error_sort(LAM, INT, ERR)
 
-        #LAM = lam_out
-        #INT = int_out
-        #ERR = err_out
-
         if plot:
             plt.plot(lam_out,int_out, '-k')
             plt.ylim(min(int_out), max(int_out)*1.5)
@@ -130,12 +138,16 @@ class Direct_Beam:
         )
 
         array = np.column_stack((lam_out,int_out,err_out))
-        np.savetxt(self.savepath+save_name, array, header = header, delimiter='\t')
+        np.savetxt(Path(self.savepath, save_name), array, header = header, delimiter='\t')
         if return_traces:
             return lam_out, int_out, err_out, traces
         return lam_out, int_out, err_out
 
     def _calc_average_db_pixel(self, db_pixel_list, tthd):
+        """
+        Wrapper to calculate the average DB pixel position and its standard deviation, 
+        as well as the average tthd and its standard deviation for use in header.
+        """
         MeanPos = np.round(np.mean(db_pixel_list),2)
         SigmaPos = np.round(np.std(db_pixel_list),2)
         MeanTTHD = np.round(np.mean(tthd),2)
@@ -144,6 +156,9 @@ class Direct_Beam:
         return MeanPos, SigmaPos, MeanTTHD, SigmaTTHD
 
     def _lam_error_sort(self, LAM, INT, ERR):
+        """
+        Wrapper to sort the lambda arrays and handle duplicates in overlap regions, alongside errors.
+        """
         idx = np.argsort(LAM)
         LAM = LAM[idx]
         INT = INT[idx]
@@ -171,18 +186,7 @@ class Direct_Beam:
 
         return lam_out, int_out, err_out
 
-    def plot_db(self, filename):
-        data = np.loadtxt(self.savepath+filename, unpack=True, skiprows=1)
-        LAM = data[0]
-        INT = data[1]
-        ERR = data[2]
 
-        plt.errorbar(LAM, INT, yerr=ERR, fmt='o', markersize=1)
-        plt.yscale('log')
-        plt.xlabel('Lambda [A]')
-        plt.ylabel('Intensity')
-        plt.title('Direct beam spectrum')
-        plt.show()
 
     def _get_chop2_cut(self, chop2_phase):
         return (chop2_phase * self.Chop2_cut_fn[0] + self.Chop2_cut_fn[1])/1000 + self.CutOffset
@@ -220,10 +224,8 @@ class Direct_Beam:
         DTC=DTC[p]
 
         # trim off parts above the DTC threshold
-        if lowest:
-            DTC_threshold = self.DTCcut_config1
-        else:
-            DTC_threshold = self.DTCcut
+        if lowest: DTC_threshold = self.DTCcut_config1
+        else: DTC_threshold = self.DTCcut
 
         above = np.where(DTC > DTC_threshold)[0]
         if above.size == 0:
@@ -238,3 +240,16 @@ class Direct_Beam:
         DTC=DTC[p]
 
         return T, I, E, DTC
+
+def plot_db(filename):
+    data = np.loadtxt(filename, unpack=True, skiprows=1)
+    LAM = data[0]
+    INT = data[1]
+    ERR = data[2]
+
+    plt.errorbar(LAM, INT, yerr=ERR, fmt='o', markersize=1)
+    plt.yscale('log')
+    plt.xlabel('Lambda [A]')
+    plt.ylabel('Intensity')
+    plt.title('Direct beam spectrum')
+    plt.show()
