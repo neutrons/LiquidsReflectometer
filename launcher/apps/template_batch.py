@@ -115,50 +115,85 @@ class TemplateBatchTab(QWidget):
         self.spath_btn = QPushButton("Browse")
         layout.addWidget(self.spath_btn, 3, 2)
 
-        # Template path
-        layout.addWidget(QLabel("Template file:"), 4, 0)
-        self.template_edit = QLineEdit()
-        layout.addWidget(self.template_edit, 4, 1)
-        self.template_btn = QPushButton("Browse")
-        layout.addWidget(self.template_btn, 4, 2)
+        # Template directory and file
+        layout.addWidget(QLabel("Template directory (where templates live):"), 4, 0)
+        self.template_dir_edit = QLineEdit()
+        layout.addWidget(self.template_dir_edit, 4, 1)
+        self.template_dir_btn = QPushButton("Browse")
+        layout.addWidget(self.template_dir_btn, 4, 2)
+
+        layout.addWidget(QLabel("Template file name (xml):"), 5, 0)
+        self.template_file_edit = QLineEdit()
+        layout.addWidget(self.template_file_edit, 5, 1)
+        # file browse is optional and can be disabled if causes hangs
+        self.template_file_btn = QPushButton("Browse")
+        layout.addWidget(self.template_file_btn, 5, 2)
 
         # Runs input
-        layout.addWidget(QLabel("Runs (e.g. 1234-1236,1240,1250:1252):"), 5, 0)
+        layout.addWidget(QLabel("Runs (e.g. 1234-1236,1240,1250:1252):"), 6, 0)
         self.runs_edit = QLineEdit()
-        layout.addWidget(self.runs_edit, 5, 1)
+        layout.addWidget(self.runs_edit, 6, 1)
 
-        # Plot checkbox
+        # Plot checkbox (separate row to avoid overlap)
         self.plot_checkbox = QCheckBox("Plot results")
         self.plot_checkbox.setChecked(False)
-        layout.addWidget(self.plot_checkbox, 6, 1)
+        layout.addWidget(self.plot_checkbox, 7, 1)
+
+        # Enable browse buttons toggle (default disabled to avoid hangs)
+        self.enable_browse_chk = QCheckBox("Enable Browse buttons")
+        self.enable_browse_chk.setChecked(False)
+        layout.addWidget(self.enable_browse_chk, 7, 2)
 
         # Process button
         self.process_btn = QPushButton("Process")
         self.process_btn.setStyleSheet("background-color : green")
-        layout.addWidget(self.process_btn, 7, 1)
+        layout.addWidget(self.process_btn, 8, 1)
 
         # Log area
         self.log_edit = QtWidgets.QTextEdit()
         self.log_edit.setReadOnly(True)
-        layout.addWidget(self.log_edit, 8, 0, 1, 3)
+        layout.addWidget(self.log_edit, 9, 0, 1, 3)
 
         # Connections
-        self.template_btn.clicked.connect(self._browse_template)
+        self.template_dir_btn.clicked.connect(self._browse_template_dir)
+        self.template_file_btn.clicked.connect(self._browse_template_file)
         self.datapath_btn.clicked.connect(self._browse_datapath)
         self.dbpath_btn.clicked.connect(self._browse_dbpath)
         self.spath_btn.clicked.connect(self._browse_spath)
         self.update_defaults_btn.clicked.connect(self.update_defaults_from_experiment)
         self.process_btn.clicked.connect(self._on_process_clicked)
+        self.enable_browse_chk.toggled.connect(self._toggle_browse_buttons)
 
         # Load settings
         self.read_settings()
 
     def _browse_template(self):
+        # kept for backward compatibility; prefer using the separate template dir + file fields
         opts = QFileDialog.Options()
         opts |= QFileDialog.DontUseNativeDialog
-        _file, _ = QFileDialog.getOpenFileName(self, "Select template file:", self.template_edit.text(), "", options=opts)
+        _file, _ = QFileDialog.getOpenFileName(self, "Select template file:", self.template_file_edit.text(), "", options=opts)
         if _file:
-            self.template_edit.setText(_file)
+            p = Path(_file)
+            self.template_dir_edit.setText(str(p.parent))
+            self.template_file_edit.setText(str(p.name))
+
+    def _browse_template_dir(self):
+        opts = QFileDialog.Options()
+        opts |= QFileDialog.DontUseNativeDialog
+        _dir = QFileDialog.getExistingDirectory(self, "Select template directory:", self.template_dir_edit.text(), options=opts)
+        if os.path.isdir(_dir):
+            self.template_dir_edit.setText(_dir)
+
+    def _browse_template_file(self):
+        # Opens file dialog rooted at template_dir if available
+        start = self.template_dir_edit.text() or os.path.expanduser("~")
+        opts = QFileDialog.Options()
+        opts |= QFileDialog.DontUseNativeDialog
+        _file, _ = QFileDialog.getOpenFileName(self, "Select template file:", start, "", options=opts)
+        if _file:
+            p = Path(_file)
+            self.template_dir_edit.setText(str(p.parent))
+            self.template_file_edit.setText(str(p.name))
 
     def _browse_datapath(self):
         opts = QFileDialog.Options()
@@ -186,6 +221,10 @@ class TemplateBatchTab(QWidget):
         if not expt:
             QMessageBox.warning(self, "No experiment id", "Please enter an experiment id (e.g. IPTS-36119) before updating defaults")
             return
+        # normalize experiment id to start with IPTS-
+        if not expt.upper().startswith("IPTS-"):
+            expt = f"IPTS-{expt}"
+            self.experiment_edit.setText(expt)
         try:
             from lr_reduction.nr_reduction_config import NRReductionConfig
 
@@ -202,6 +241,11 @@ class TemplateBatchTab(QWidget):
                 pass
             try:
                 self.spath_edit.setText(str(cfg.Spath))
+            except Exception:
+                pass
+            # template directory default
+            try:
+                self.template_dir_edit.setText(str(Path("/SNS/REF_L") / expt / "shared"))
             except Exception:
                 pass
         except Exception as e:
@@ -222,8 +266,13 @@ class TemplateBatchTab(QWidget):
         _expt = self.settings.value("template_experiment_id", "")
         self.experiment_edit.setText(_expt)
 
-        _template = self.settings.value("template_template_path", "")
-        self.template_edit.setText(_template)
+        # template dir/file
+        _template_dir = self.settings.value("template_dir", "")
+        _template_file = self.settings.value("template_file", "")
+        if _template_dir:
+            self.template_dir_edit.setText(_template_dir)
+        if _template_file:
+            self.template_file_edit.setText(_template_file)
 
         _plot = self.settings.value("template_plot", False)
         self.plot_checkbox.setChecked(bool(_plot))
@@ -237,16 +286,23 @@ class TemplateBatchTab(QWidget):
             self.dbpath_edit.setText(_DBpath)
         if _Spath:
             self.spath_edit.setText(_Spath)
+        # browse enable
+        _browse = self.settings.value("template_enable_browse", True)
+        self.enable_browse_chk.setChecked(bool(_browse))
+        self._toggle_browse_buttons(bool(_browse))
 
     def save_settings(self):
         self.settings.setValue("template_runs", self.runs_edit.text())
         self.settings.setValue("template_experiment_id", self.experiment_edit.text())
-        self.settings.setValue("template_template_path", self.template_edit.text())
+        # persist template dir and file separately
+        self.settings.setValue("template_dir", self.template_dir_edit.text())
+        self.settings.setValue("template_file", self.template_file_edit.text())
         self.settings.setValue("template_plot", bool(self.plot_checkbox.isChecked()))
         # persist inline overrides
         self.settings.setValue("template_datapath", self.datapath_edit.text())
         self.settings.setValue("template_DBpath", self.dbpath_edit.text())
         self.settings.setValue("template_Spath", self.spath_edit.text())
+        self.settings.setValue("template_enable_browse", bool(self.enable_browse_chk.isChecked()))
 
     def _on_process_clicked(self):
         # persist settings on main thread (avoids invokeMethod/slot lookup issues)
@@ -295,6 +351,17 @@ class TemplateBatchTab(QWidget):
             # best-effort
             pass
 
+    def _toggle_browse_buttons(self, enabled: bool):
+        # show/hide browse buttons depending on user preference
+        try:
+            self.template_dir_btn.setVisible(enabled)
+            self.template_file_btn.setVisible(enabled)
+            self.datapath_btn.setVisible(enabled)
+            self.dbpath_btn.setVisible(enabled)
+            self.spath_btn.setVisible(enabled)
+        except Exception:
+            pass
+
     def _process_sync(self):
         # validate inputs
         runs_text = self.runs_edit.text().strip()
@@ -309,18 +376,20 @@ class TemplateBatchTab(QWidget):
         if not expt:
             raise ValueError("Please specify an experiment id (IPTS-...)')")
 
-        template_text = self.template_edit.text().strip()
-        if not template_text:
-            raise ValueError("Please specify the template file path")
-        template_path_obj = Path(template_text)
-        # Require the template to be a file; if a directory has been provided, treat as error
-        if template_path_obj.is_file():
-            template_file = template_path_obj
-            template_dir = template_file.parent
-        elif template_path_obj.is_dir():
-            raise ValueError("The template field must point to a template XML file, not a directory")
+        # Build template path from directory + file fields
+        template_dir_text = self.template_dir_edit.text().strip()
+        template_file_text = self.template_file_edit.text().strip()
+        if not template_file_text:
+            raise ValueError("Please specify the template file name (xml)")
+        if template_dir_text:
+            template_file = Path(template_dir_text) / template_file_text
+            template_dir = Path(template_dir_text)
         else:
-            raise ValueError(f"Template file not found: {template_text}")
+            # If no directory provided, treat template_file_text as an absolute or relative path
+            template_file = Path(template_file_text)
+            template_dir = template_file.parent
+        if not template_file.exists() or not template_file.is_file():
+            raise ValueError(f"Template file not found: {str(template_file)}")
 
         # deduce datapath and overrides from inline fields, falling back to NRReductionConfig
         datapath = self.datapath_edit.text().strip() or None
