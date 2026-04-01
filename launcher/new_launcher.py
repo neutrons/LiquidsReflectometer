@@ -5,6 +5,7 @@ from apps.sld_calculator import SLD
 from apps.overplot import Overplot
 from apps.roi_selector import ROISelector
 from apps.direct_beam import DirectBeamTab
+from apps.template_batch import TemplateBatchTab
 from qtpy import QtCore
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 
@@ -32,6 +33,12 @@ class ReductionInterface(QTabWidget):
         self.direct_beam_tab = DirectBeamTab()
         self.addTab(self.direct_beam_tab, "Direct beam")
         self.setTabText(tab_id, "Direct beam")
+
+        # Batch template reduction tab
+        tab_id += 1
+        self.template_batch_tab = TemplateBatchTab()
+        self.addTab(self.template_batch_tab, "Batch template")
+        self.setTabText(tab_id, "Batch template")
 
         # ROI selector
         tab_id += 1
