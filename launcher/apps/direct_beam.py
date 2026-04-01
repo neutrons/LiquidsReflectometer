@@ -65,7 +65,6 @@ class CdSettingsDialog(QMessageBox):
 
         # Widgets
         self.mu_file_edit = QLineEdit(self.dlg)
-        self.MUpath_edit = QLineEdit(self.dlg)
         self.cd_foils_edit = QLineEdit(self.dlg)
         self.cd_edit = QLineEdit(self.dlg)
         self.flip_check = QCheckBox('Flip attenuator mapping', self.dlg)
@@ -76,7 +75,6 @@ class CdSettingsDialog(QMessageBox):
         self._initial_defaults = initial_defaults or defaults or {}
         if defaults:
             self.mu_file_edit.setText(defaults.get('mu_file', ''))
-            self.MUpath_edit.setText(defaults.get('MUpath', ''))
             self.cd_foils_edit.setText(','.join([str(x) for x in defaults.get('Cd_foils', [])]))
             self.cd_edit.setText(','.join([str(x) for x in defaults.get('Cd', [])]))
             # flip_atten default if provided
@@ -86,7 +84,6 @@ class CdSettingsDialog(QMessageBox):
                 pass
 
         form.addRow('mu_file:', self.mu_file_edit)
-        form.addRow('MUpath:', self.MUpath_edit)
         form.addRow('Cd_foils (comma separated):', self.cd_foils_edit)
         form.addRow('Cd (comma separated):', self.cd_edit)
         form.addRow(self.flip_check)
@@ -112,7 +109,7 @@ class CdSettingsDialog(QMessageBox):
         # restore widgets to the canonical initial defaults (not the current working defaults)
         d = self._initial_defaults or {}
         self.mu_file_edit.setText(d.get('mu_file', ''))
-        self.MUpath_edit.setText(d.get('MUpath', ''))
+        # MUpath removed; keep mu_file reset only
         self.cd_foils_edit.setText(','.join([str(x) for x in d.get('Cd_foils', [])]))
         self.cd_edit.setText(','.join([str(x) for x in d.get('Cd', [])]))
         try:
@@ -132,7 +129,6 @@ class CdSettingsDialog(QMessageBox):
                 return []
         return {
             'mu_file': self.mu_file_edit.text().strip(),
-            'MUpath': self.MUpath_edit.text().strip(),
             'Cd_foils': parse_list(self.cd_foils_edit.text()),
             'Cd': parse_list(self.cd_edit.text()),
             'flip_atten': bool(self.flip_check.isChecked()),
@@ -325,11 +321,11 @@ class DirectBeamTab(QWidget):
             try:
                 db = Direct_Beam()
                 default_vals = {
-                    'mu_file': 'Cd_mu_2025.dat',
-                    'MUpath': getattr(db, 'MUpath', ''),
+                    # default mu_file left blank so Direct_Beam can discover via settings
+                    'mu_file': '',
                     'Cd_foils': getattr(db, 'Cd_foils', []),
                     'Cd': getattr(db, 'Cd', []),
-                      'flip_atten': getattr(db, 'flip_atten', False),
+                    'flip_atten': getattr(db, 'flip_atten', False),
                     'Chop2_cut_fn': getattr(db, 'Chop2_cut_fn', []),
                     'dMod': getattr(db, 'dMod', 15500),
                     't0': getattr(db, 't0', []),
@@ -419,14 +415,16 @@ class DirectBeamTab(QWidget):
             QMessageBox.critical(self, 'Error', f'Failed to create Direct_Beam: {e}')
             return
 
-        # IPTS path handling
+        # IPTS handling: prefer passing IPTS per-call to create_db so the
+        # same Direct_Beam instance can be reused for multiple IPTS values.
+        experiment_id_for_call = None
         if self.ipts_toggle.isChecked():
             ipts = self.ipts_edit.text().strip()
             if not ipts:
                 QMessageBox.warning(self, 'IPTS missing', 'Please provide IPTS when using IPTS path structure')
                 return
-            db.NEXUSpath = f"/SNS/REF_L/IPTS-{ipts}/nexus/"
-            db.savepath = f"/SNS/REF_L/IPTS-{ipts}/shared/transmission/"
+            # do not mutate the Direct_Beam instance; pass IPTS at call time
+            experiment_id_for_call = ipts
         else:
             nx = self.nexus_edit.text().strip()
             sv = self.savepath_edit.text().strip()
@@ -451,15 +449,26 @@ class DirectBeamTab(QWidget):
         db.low_res = parse_pair(self.lowres_edit.text(), db.low_res if hasattr(db, 'low_res') else [75,190])
 
         # cd settings
-        mu_file = 'Cd_mu_2025.dat'
+        mu_file_arg = None
         flip_atten = False
         try:
             cd = getattr(self, 'cd_vals', None)
             if cd:
-                if cd.get('mu_file'):
-                    mu_file = cd.get('mu_file')
-                if cd.get('MUpath'):
-                    db.MUpath = cd.get('MUpath')
+                mu = cd.get('mu_file', '').strip()
+                # prefer an explicit path if it exists; otherwise let Direct_Beam consult settings
+                if mu:
+                    # if mu already looks like an absolute or relative path, check it
+                    if os.path.isabs(mu) or os.path.sep in mu:
+                        if os.path.isfile(mu):
+                            mu_file_arg = mu
+                        else:
+                            # provided path doesn't exist; don't pass it
+                            mu_file_arg = None
+                    else:
+                        # just a filename was provided; leave None so the library will
+                        # search known locations (settings/IPTS/BIN paths)
+                        mu_file_arg = None
+                # apply other cd overrides if provided
                 if cd.get('Cd_foils'):
                     db.Cd_foils = cd.get('Cd_foils')
                 if cd.get('Cd'):
@@ -485,9 +494,24 @@ class DirectBeamTab(QWidget):
         return_traces = bool(self.plot_cb.isChecked())
         try:
             if return_traces:
-                lam, inten, err, traces = db.create_db(runs, self.savename_edit.text().strip(), plot=False, mu_file=mu_file, flip_atten=flip_atten, return_traces=True)
+                lam, inten, err, traces = db.create_db(
+                    runs,
+                    self.savename_edit.text().strip(),
+                    plot=False,
+                    mu_file=mu_file_arg,
+                    flip_atten=flip_atten,
+                    return_traces=True,
+                    experiment_id=experiment_id_for_call,
+                )
             else:
-                lam, inten, err = db.create_db(runs, self.savename_edit.text().strip(), plot=False, mu_file=mu_file, flip_atten=flip_atten)
+                lam, inten, err = db.create_db(
+                    runs,
+                    self.savename_edit.text().strip(),
+                    plot=False,
+                    mu_file=mu_file_arg,
+                    flip_atten=flip_atten,
+                    experiment_id=experiment_id_for_call,
+                )
                 traces = []
         except Exception as e:
             QMessageBox.critical(self, 'Error', f'create_db failed: {e}')

@@ -7,11 +7,26 @@ import nr_tools as tools
 
 class Direct_Beam:
 
-    def __init__(self):
-        # TODO: these need better integration with the rest of the config etc.
-        self.MUpath = '/SNS/REF_L/IPTS-36119/shared/Cd_transmission/'
-        self.savepath = '/SNS/REF_L/IPTS-36119/shared/Cd_transmission/'
-        self.NEXUSpath = '/SNS/REF_L/IPTS-34978/nexus/' # TODO this should have similar path setup to the nr_reduction_config.py
+    def __init__(self, experiment_id=None, NEXUSpath=None, savepath=None):
+        # if experiment_id is provided the IPTS-based convention will be used. Otherwise callers
+        # should supply explicit NEXUSpath/savepath when constructing the
+        # object or when calling create_db.
+        self.savepath = None
+        self.NEXUSpath = None
+        # experiment identifier (e.g. 'IPTS-36119' or '36119'). If provided to
+        # __init__ or create_db the code will use the IPTS convention to build
+        # paths when explicit paths are not supplied.
+        self.experiment_id = None
+        # apply constructor overrides: explicit NEXUSpath/savepath or experiment_id
+        if NEXUSpath is not None:
+            self.NEXUSpath = NEXUSpath
+        if savepath is not None:
+            self.savepath = savepath
+        if experiment_id:
+            self.experiment_id = self._normalize_experiment_id(experiment_id)
+            # override the paths using convention when experiment_id provided
+            self.NEXUSpath = f"/SNS/REF_L/{self.experiment_id}/nexus/"
+            self.savepath = f"/SNS/REF_L/{self.experiment_id}/shared/transmission/"
         self.Cd_foils = [57.5, 126.5, 123.0]      #microns for 50, 100A, 100B Cd foils
         self.Cd = [self.Cd_foils[0], 
             self.Cd_foils[1], 
@@ -29,7 +44,24 @@ class Direct_Beam:
         self.n_y = 304
         self.n_x = 256
 
-    def create_db(self, run_list, save_name, plot=True, mu_file = 'Cd_mu_2025.dat', flip_atten=False, return_traces=False):
+    def _normalize_experiment_id(self, expid):
+        """Normalize experiment id to form 'IPTS-XXXX'. Accepts numeric or 'IPTS-XXXX' strings."""
+        if expid is None:
+            return None
+        s = str(expid).strip()
+        if s.upper().startswith('IPTS-'):
+            return s
+        # raw numeric id
+        if s.isdigit():
+            return f'IPTS-{s}'
+        # try to extract digits
+        import re
+        m = re.search(r'(\d{4,})', s)
+        if m:
+            return f'IPTS-{m.group(1)}'
+        return s
+
+    def create_db(self, run_list, save_name, plot=True, mu_file = None, flip_atten=False, return_traces=False, experiment_id=None):
         """
         Create a direct beam spectrum from the given run list including an attenuation correction for Cd foils (if used).
         Saves the file to the specified location, with header information of the DB pixel position.
@@ -38,17 +70,16 @@ class Direct_Beam:
         run_list: list of run numbers to include in the direct beam spectrum
         save_name: name of the output file to save the direct beam spectrum to
         plot: whether to plot the direct beam spectrum
-        mu_file: name of the file containing the Cd linear attenuation coefficient data
+        mu_file: name of the file containing the Cd linear attenuation coefficient data including path. If None will read from settings file.
         flip_atten: whether to flip the attenuator values (earlier runs had an issue in the log files)
         return_traces: whether to return the individual traces for each run in addition to the combined spectrum
+        experiment_id: optional experiment ID to use for determining default paths (overrides instance-level ID)
 
         Returns:
         lam_out: array of wavelength values for the direct beam spectrum
         int_out: array of intensity values for the direct beam spectrum
         err_out: array of error values for the direct beam spectrum
         """
-        # read in Cd linear attenuation coefficient data obtained from ENDf
-        L_ENDF, mu_ENDF = np.loadtxt(self.MUpath+mu_file, unpack=True, skiprows=1)
 
         # loop over the Cd spectra measurements
         LAM = []
@@ -60,9 +91,28 @@ class Direct_Beam:
 
         if plot:
             plt.figure()
+        # determine which NEXUS and save paths to use for this create_db call.
+        # precedence: explicit experiment_id argument -> instance experiment_id set in __init__ -> instance NEXUSpath/savepath
+        nexus_base = None
+        save_base = None
+        if experiment_id:
+            expid = self._normalize_experiment_id(experiment_id)
+            nexus_base = f"/SNS/REF_L/{expid}/nexus/"
+            save_base = f"/SNS/REF_L/{expid}/shared/transmission/"
+        elif getattr(self, 'experiment_id', None):
+            nexus_base = f"/SNS/REF_L/{self.experiment_id}/nexus/"
+            save_base = f"/SNS/REF_L/{self.experiment_id}/shared/transmission/"
+        else:
+            nexus_base = self.NEXUSpath
+            save_base = self.savepath
+
+        # validate we have usable paths
+        if not nexus_base or not save_base:
+            raise ValueError('NEXUSpath/savepath not set: provide experiment_id or supply NEXUSpath/savepath when constructing Direct_Beam or call create_db with experiment_id')
+
         for i, run in enumerate(run_list):
             # get header info from Nexus: atten and chop2 phase
-            fname = self.NEXUSpath + 'REF_L_'+str(run)+'.nxs.h5'
+            fname = os.path.join(nexus_base, f'REF_L_{run}.nxs.h5')
 
             tof_array, y_tof_corr, error_array_corr, log_values, DTC_corr = BP.convert_to_binary(fname, self.low_res, collapse_x = True, tofbin=50, tofmax=100000, tofmin=0, deadtime=4.2, tof_step=100)
             T = tof_array * 1000
@@ -81,6 +131,16 @@ class Direct_Beam:
             y_crop = y_tof_corr[self.y_ROI[0]:self.y_ROI[1], :]
             I = np.sum(y_crop, axis=0)
             E = np.sum(error_array_corr[self.y_ROI[0]:self.y_ROI[1], :], axis=0)
+
+            # TODO: can this be outside the loop, but need the time.
+            if mu_file is None:
+                # Read from settings.json if not provided
+                settings = tools.read_settings(time=log_values['start_time'])
+                mu_file = settings['cd-attenuator-correction-file']
+                print(f'Using Cd attenuation file: {mu_file}')
+
+            # read in Cd linear attenuation coefficient data
+            L_ENDF, mu_ENDF = np.loadtxt(mu_file, unpack=True, skiprows=1)
 
             # Need to split some parts out into separate functions if the logic is correct.
             Cd_thickness = self._extract_cd_values(log_values, flip_atten)
@@ -138,7 +198,9 @@ class Direct_Beam:
         )
 
         array = np.column_stack((lam_out,int_out,err_out))
-        np.savetxt(Path(self.savepath, save_name), array, header = header, delimiter='\t')
+        # check if folder exists and create if not
+        Path(save_base).mkdir(parents=True, exist_ok=True)
+        np.savetxt(Path(save_base, save_name), array, header = header, delimiter='\t')
         if return_traces:
             return lam_out, int_out, err_out, traces
         return lam_out, int_out, err_out

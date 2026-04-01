@@ -263,7 +263,7 @@ class NR_Reduction:
         tRB, nRB, nRBE, log_values = self._make_binary_files(rb_num, self.config.tof_min[i], self.config.tof_max[i])
         self.log_values = log_values
         # Read in the instrument settings file from the json. # TODO: A little more logic should be added to mimic prior setup.
-        settings = self.read_settings()
+        settings = tools.read_settings(log_values["start_time"])
         self.settings = self.apply_config_overrides(settings)
         self.settings['si_sample_distance'] = self.settings['xi_reference'] - self.log_values['xi']
         self.settings['interslit_distance'] = self.settings['s1_sample_distance'] - self.settings['si_sample_distance']    
@@ -1027,56 +1027,6 @@ class NR_Reduction:
         np.savetxt(output_file,
                   array, header=head, delimiter='\t')
         print(f"Saved combined result to {output_file}")
-
-    # TODO: This should align with prior workflow but needs more work to link into the logic of flags
-    #  for using the flag of overwriting instrumnet settings. Is essentially the same as event_reduction
-    #  version but has a different logic for checking the date.
-    def read_settings(self):
-        """
-        Read settings file and return values for the given timestamp
-
-        Returns
-        -------
-        settings
-        """
-        settings_dict = dict()
-        package_dir, _ = os.path.split(__file__)
-
-        timestamp = datetime.datetime.fromisoformat(self.log_values['start_time']).date()
-
-        with open(os.path.join(package_dir, "settings.json"), "r") as fd:
-            data = json.load(fd)
-            for key in data.keys():
-                chosen_value = None
-                delta_time = None
-                for item in data[key]:
-                    valid_from = datetime.date.fromisoformat(item["from"])
-                    delta = valid_from - timestamp
-                    if delta_time is None or (delta.total_seconds() < 0 and delta > delta_time):
-                        delta_time = delta
-                        chosen_value = item["value"]
-                settings_dict[key] = chosen_value
-        key_map = {
-            'source_detector_distance': "source-det-distance",
-            'sample_detector_distance': "sample-det-distance",
-            'num_x_pixels': "number-of-x-pixels",
-            'num_y_pixels': "number-of-y-pixels",
-            'pixel_width': "pixel-width",
-            'xi_reference': "xi-reference",
-            's1_sample_distance': "s1-sample-distance",
-            'wavelength_resolution_function': "wavelength-resolution-function",
-        }
-
-        settings_output = {
-            new_key: settings_dict[old_key]
-            for new_key, old_key in key_map.items()
-        }
-
-        settings_output['sample_detector_distance'] *= 1000 # Code here expects these in mm.
-        settings_output['source_detector_distance'] *= 1000
-        settings_output['s1_sample_distance'] *= 1000
-
-        return settings_output
     
     def apply_config_overrides(self, settings: dict) -> dict:
         """

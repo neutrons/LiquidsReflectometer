@@ -6,6 +6,9 @@ Subset of functions which may be useful outside of the NRReduction calculation c
 import numpy as np
 from scipy.optimize import curve_fit
 from pathlib import Path
+import datetime
+import json
+import os
 
 def safe_divide(numerator, denominator):
     """Wrapper for safe division with zeros where denominator is zero.
@@ -448,3 +451,54 @@ def get_lam_range(chopper_lam, chopper_speed, scaled_width=3.5):
     wl_max = chopper_lam + (scaled_width / 2) * 60.0 / chopper_speed
 
     return [wl_min, wl_max]
+
+def read_settings(time):
+        '''
+        time expected to be in ISO format.
+        '''
+        """
+        Read settings file and return values for the given timestamp
+
+        Returns
+        -------
+        settings
+        """
+        settings_dict = dict()
+        package_dir, _ = os.path.split(__file__)
+
+        timestamp = datetime.datetime.fromisoformat(time).date()
+
+        with open(os.path.join(package_dir, "settings.json"), "r") as fd:
+            data = json.load(fd)
+            for key in data.keys():
+                chosen_value = None
+                delta_time = None
+                for item in data[key]:
+                    valid_from = datetime.date.fromisoformat(item["from"])
+                    delta = valid_from - timestamp
+                    if delta_time is None or (delta.total_seconds() < 0 and delta > delta_time):
+                        delta_time = delta
+                        chosen_value = item["value"]
+                settings_dict[key] = chosen_value
+        key_map = {
+            'source_detector_distance': "source-det-distance",
+            'sample_detector_distance': "sample-det-distance",
+            'num_x_pixels': "number-of-x-pixels",
+            'num_y_pixels': "number-of-y-pixels",
+            'pixel_width': "pixel-width",
+            'xi_reference': "xi-reference",
+            's1_sample_distance': "s1-sample-distance",
+            'wavelength_resolution_function': "wavelength-resolution-function",
+            'cd-attenuator-correction-file': "cd-attenuator-correction-file"
+        }
+
+        settings_output = {
+            new_key: settings_dict[old_key]
+            for new_key, old_key in key_map.items()
+        }
+
+        settings_output['sample_detector_distance'] *= 1000 # Code here expects these in mm.
+        settings_output['source_detector_distance'] *= 1000
+        settings_output['s1_sample_distance'] *= 1000
+
+        return settings_output

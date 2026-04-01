@@ -62,5 +62,11 @@
             "from":"2025-09-01",
             "value": "name=UserFunction, Formula=L - A * exp(-k * x), L=0.07564423, A=0.13093263, k=0.34918918"
         }
+    ],
+    "cd-attenuator-correction-file": [
+        {
+            "from":"2025-09-01",
+            "value": "/SNS/REF_L/IPTS-36119/shared/Cd_transmission/Cd_mu_2025.dat"
+        }
     ]
 }
