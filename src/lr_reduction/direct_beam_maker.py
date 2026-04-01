@@ -17,7 +17,7 @@ class Direct_Beam:
             self.Cd_foils[1], 
             self.Cd_foils[1]+self.Cd_foils[2], 
             2*self.Cd_foils[1]+2*self.Cd_foils[2]] #microns Cd for each attenuator
-        self.Chop2_cut_fn = [2.077, -16.8180]        # linear fit to chopper cut time
+        self.Chop2_cut_fn = [2.077, -16818.0]        # linear fit to chopper cut time
         self.Icut = 1e-10                 # cut off any data below Icut (noisy)
         self.DTCcut = 1.25                # cut off any data above DTCcut (artifact-y)
         self.DTCcut_config1 = 1.5         # cut off any data above DTCcut_config1 for the first run
