@@ -543,28 +543,64 @@ class ROISelector(QWidget):
             self.template_path_edit.setText(fname)
 
     def _get_chopper_estimate(self, h5file):
-        """Try to find a chopper-related numeric dataset in the NeXus file and
-        return a representative numeric value (or None).
-        This is a heuristic used to set a sensible TOF window when available.
+        """Attempt to compute a TOF min/max from chopper log values in the
+        provided NeXus file. Uses the following algorithm (per request):
+
+            scaled_width = 3.5
+            chopper_lam = f['entry/DASlogs/BL4B:Det:TH:BL:Lambda/value'][0]
+            chopper_speed = f['entry/DASlogs/BL4B:Det:TH:BL:Frequency/value'][0]
+            wl_min = chopper_lam - (scaled_width / 2) * 60.0 / chopper_speed
+            wl_max = chopper_lam + (scaled_width / 2) * 60.0 / chopper_speed
+
+        The wavelengths are converted to TOF using distance = 1830 mm and the
+        relation: t = lambda * distance / 3956
+
+        Returns
+        -------
+        tuple(int_tof_min, int_tof_max) or None
+            Integer TOF min/max (same units used by event_time_offset in the
+            NeXus file) or None if the required log fields are not present.
         """
-        found = []
+        scaled_width = 3.5
         try:
-            def visitor(name, obj):
-                # look for datasets with 'chop' or 'chopper' in the path
-                if isinstance(obj, h5py.Dataset):
-                    lname = name.lower()
-                    if 'chop' in lname:
-                        try:
-                            arr = np.array(obj[:])
-                            if arr.size:
-                                # prefer scalar-like entries
-                                found.append(float(np.mean(arr)))
-                        except Exception:
-                            pass
-            h5file.visititems(visitor)
+            # read chopper wavelength and frequency from expected paths
+            # these may be scalars or small arrays; pick first element if needed
+            try:
+                chopper_lam = h5file['entry/DASlogs/BL4B:Det:TH:BL:Lambda/value'][0]
+            except Exception:
+                chopper_lam = None
+            try:
+                chopper_speed = h5file['entry/DASlogs/BL4B:Det:TH:BL:Frequency/value'][0]
+            except Exception:
+                chopper_speed = None
+
+            if chopper_lam is None or chopper_speed is None:
+                return None
+
+            # ensure numeric
+            chopper_lam = float(chopper_lam)
+            chopper_speed = float(chopper_speed)
+            if chopper_speed == 0:
+                return None
+
+            wl_min = chopper_lam - (scaled_width / 2.0) * 60.0 / chopper_speed
+            wl_max = chopper_lam + (scaled_width / 2.0) * 60.0 / chopper_speed
+
+            # convert wavelength (Angstrom) to TOF using distance 1830 mm
+            dist_m = 15.75
+            tof_min = int(252.78 * wl_min * dist_m)
+            tof_max = int(252.78 * wl_max * dist_m)
+            print(f"Chopper estimate: lam={chopper_lam:.3f}A, speed={chopper_speed:.1f}Hz -> "
+                  f"wl_min={wl_min:.3f}A, wl_max={wl_max:.3f}A -> "
+                  f"tof_min={tof_min}, tof_max={tof_max}")
+
+            # guard: ensure min < max
+            if tof_min >= tof_max:
+                return None
+
+            return tof_min, tof_max
         except Exception:
             return None
-        return found[0] if found else None
 
     def load_file(self):
         path = self._file_path_from_fields()
@@ -608,53 +644,11 @@ class ROISelector(QWidget):
                 try:
                     ch_val = self._get_chopper_estimate(f)
                     self._chopper_val = ch_val
-                    print(f"Estimated value from chopper: {ch_val}") #TODO: this function needs to be written properly.
                 except Exception:
                     self._chopper_val = None
-                # try to find more specific numeric values we can use: lambda request, chopper speed, flight path length
-                try:
-                    found_lambda = None
-                    found_speed = None
-                    found_L = None
-
-                    def visitor2(name, obj):
-                        nonlocal found_lambda, found_speed, found_L
-                        if isinstance(obj, h5py.Dataset):
-                            lname = name.lower()
-                            try:
-                                arr = np.array(obj[:])
-                                if arr.size:
-                                    val = float(np.mean(arr))
-                                else:
-                                    return
-                            except Exception:
-                                return
-                            # lambda request keywords
-                            if any(k in lname for k in ('lambda', 'lambdarequest', 'lamrequest')) and found_lambda is None:
-                                found_lambda = val
-                            # chopper speed / frequency
-                            if any(k in lname for k in ('chop', 'chopper', 'frequency', 'hz', 'speed')) and found_speed is None:
-                                # filter out names that are clearly not speed when they contain 'value' or 'time' but allow general
-                                found_speed = val
-                            # flight path/distance
-                            if any(k in lname for k in ('flight', 'distance', 'l1', 'l2', 'moderator', 'detector')) and found_L is None:
-                                # heuristically accept values > 1 (meters)
-                                if val > 0:
-                                    found_L = val
-
-                    try:
-                        f.visititems(visitor2)
-                    except Exception:
-                        pass
-
-                    # store discovered values on self for later use
-                    self._chopper_lambda = found_lambda
-                    self._chopper_speed = found_speed
-                    self._flight_path = found_L
-                except Exception:
-                    self._chopper_lambda = None
-                    self._chopper_speed = None
-                    self._flight_path = None
+                # chopper-based TOF estimate (if available) is computed by
+                # _get_chopper_estimate() above and stored in self._chopper_val.
+                # No additional heuristic scanning is required here.
         except Exception as e:
             QMessageBox.critical(self, "Read error", f"Failed to read event data: {e}")
             return
@@ -683,8 +677,32 @@ class ROISelector(QWidget):
         # title already read from file (if available)
 
         # create tof bins
-        tof_min = int(np.nanmin(e_offset))
-        tof_max = int(np.nanmax(e_offset))
+        # Prefer chopper-derived TOF range when available; otherwise default
+        # to the min/max TOF present in the file.
+        ch = getattr(self, '_chopper_val', None)
+        e_min = int(np.nanmin(e_offset))
+        e_max = int(np.nanmax(e_offset))
+        if ch and isinstance(ch, tuple) and len(ch) == 2:
+            try:
+                tof_min, tof_max = int(ch[0]), int(ch[1])
+            except Exception:
+                tof_min, tof_max = e_min, e_max
+            # Validate and expand tiny or out-of-range windows so they cover
+            # a sensible range relative to the event TOF span.
+            if tof_max <= tof_min:
+                tof_min, tof_max = e_min, e_max
+            # If the chopper window is completely outside event offsets, ignore it
+            if tof_max < e_min or tof_min > e_max:
+                tof_min, tof_max = e_min, e_max
+            # Ensure minimum width: at least two tof bins (so plotting has a visible range)
+            min_width = max(self.tof_bin * 2, int(0.02 * (e_max - e_min)))
+            if (tof_max - tof_min) < min_width:
+                center = (tof_min + tof_max) // 2
+                half = max(min_width // 2, 1)
+                tof_min = max(e_min, center - half)
+                tof_max = min(e_max, center + half)
+        else:
+            tof_min, tof_max = e_min, e_max
         tof_edges = np.arange(tof_min, tof_max + self.tof_bin, self.tof_bin)
         self.tof_edges = tof_edges
 
@@ -692,8 +710,16 @@ class ROISelector(QWidget):
         # compute bin indices for each event
         tof_idx = np.digitize(e_offset[valid], tof_edges) - 1
         n_tof = len(tof_edges) - 1
+        if n_tof <= 0:
+            # no bins available, create a single-bin array and clamp indices
+            n_tof = 1
+            tof_edges = np.array([int(np.nanmin(e_offset)), int(np.nanmax(e_offset)) + 1])
+            tof_idx = np.zeros_like(tof_idx)
         y_vs_tof = np.zeros((self.n_y, n_tof), dtype=int)
-        np.add.at(y_vs_tof, (y_good, tof_idx), 1)
+        # avoid indexing errors by masking out-of-range bin indices
+        valid_tof_mask = (tof_idx >= 0) & (tof_idx < n_tof)
+        if np.any(valid_tof_mask):
+            np.add.at(y_vs_tof, (y_good[valid_tof_mask], tof_idx[valid_tof_mask]), 1)
         self.y_vs_tof = y_vs_tof
 
         # Set initial ROI values either from template or from improved peak detection
@@ -1416,8 +1442,8 @@ class ROISelector(QWidget):
                         except Exception:
                             te0 = 0
                             teN = 100000
-                        tofmin = max(te0, 10500)
-                        tofmax = min(teN, 37000)
+                        tofmin = max(te0, 100)
+                        tofmax = min(teN, 100000)
                 except Exception:
                     lam_min = lam_max = None
 

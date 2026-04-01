@@ -211,5 +211,6 @@ def get_log_values(fname):
         log_values['Atten'] = np.array([Att1,Att2,Att3,Att4])
 
     f.close()
+    
     return log_values
 
