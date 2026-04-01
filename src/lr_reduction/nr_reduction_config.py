@@ -7,7 +7,7 @@ class NRReductionConfig:
     These can be read and set from a template file.
     """
     
-    def __init__(self, method='meanTheta'):
+    def __init__(self):
         """
         Initialize reduction configuration.
         Method allows different conversion routes from lambda to q to be selected based on the experimental setup.
@@ -18,10 +18,13 @@ class NRReductionConfig:
         method : str
             'constantQ', 'meanTheta', or 'constantTOF'
         """
-        self.method = method.lower()
-        if self.method not in ['constantq', 'meantheta', 'constanttof']:
-            raise ValueError(f"Unknown method: {method}. Use 'constantQ', 'meanTheta', or 'constantTOF'")
+        #self.method = method.lower()
+        #if self.method not in ['constantq', 'meantheta', 'constanttof']:
+        #    raise ValueError(f"Unknown method: {method}. Use 'constantQ', 'meanTheta', or 'constantTOF'")
         
+        # Allow for per run setting of the method
+        self.method_per_run = []  # This should be an array of the same length as the data arrays with the method for each run. If empty, will use the default method for all runs.
+
         # Data configuration - arrays for the data and settings to be processed. These should be of equal length
         self.DBname = []    # This assumes a pre-processed DB file at the moment.
         self.RBnum = []

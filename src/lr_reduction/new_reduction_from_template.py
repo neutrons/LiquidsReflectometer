@@ -136,7 +136,8 @@ def config_from_template(template_data):
         method = 'MeanTheta' if template_data.const_q else 'constantTOF' #TODO: decide if this should be MeanTheta or constantQ
     
     # Initialize configuration
-    config = NRReductionConfig(method=method)
+    config = NRReductionConfig()
+    config.method_per_run = [method]
     
     # Update other parameters from the template
     config.RB_Ymin = [template_data.data_peak_range[0]]
@@ -180,7 +181,7 @@ def template_to_config(config_data, template_data):
     Reverse of the config settings back into the template format. Needed whilst keeping the xml format.
     """
     template = template_data
-    template.q_method = config_data.method
+    template.q_method = config_data.method_per_run[0]
     template.data_peak_range = [config_data.RB_Ymin[0], config_data.RB_Ymax[0]]
     if config_data.useBS[0] == 1:
         template.subtract_background = True

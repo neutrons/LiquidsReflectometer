@@ -35,7 +35,10 @@ class NR_Reduction:
             Configuration object
         """
         self.config = config
-        self.config.method = self.config.method.lower() # TODO: work out if this is the best place for this.
+        #self.config.method = self.config.method.lower() # TODO: work out if this is the best place for this.
+        # If method not supplied, set to default meanTheta
+        if not self.config.method_per_run:
+            self.config.method_per_run = ['meantheta'] * len(self.config.RBnum)
         self._validate_config()
         
     def _validate_config(self):
@@ -59,6 +62,21 @@ class NR_Reduction:
         if self.config.LambdaMax is not None and len(self.config.LambdaMax) != n_settings:
             raise ValueError(f"If supplied, LambdaMax expects list equal to number of runs, length {n_settings}")
         
+        # Method per run validation
+        if len(self.config.method_per_run) == 1 and n_settings > 1:
+            # If a single method is supplied for multiple runs, apply it to all runs
+            self.config.method_per_run = self.config.method_per_run * n_settings
+        elif self.config.method_per_run and len(self.config.method_per_run) != n_settings:
+            raise ValueError(f"If supplied, method_per_run expects list equal to number of runs, length {n_settings}")
+        self.config.method_per_run = [method.lower() for method in self.config.method_per_run]  # Ensure methods are lowercase
+        
+        # Check method of valid format (meanTheta, constantQ, constantTOF)
+        valid_methods = ['meantheta', 'constantq', 'constanttof']
+        for method in self.config.method_per_run:
+            if method not in valid_methods:
+                raise ValueError(f"Invalid method: {method}. Use one of {valid_methods}")
+        
+
         # Set defaults for optional arrays
         if not self.config.ThetaShift:
             self.config.ThetaShift = [0] * n_settings
@@ -111,7 +129,7 @@ class NR_Reduction:
                 # save out individual parts
                 # TODO: Need to fix the saving logic for multiple runs!! At the moment the save looks for the capitals...
                 result_out = {'Q': result['q'], 'R': result['r'], 'dR': result['dr'], 'dQ': result['dq']}
-                self.save_results(result_out, sname=f"{self.config.Sname}_{i}")
+                self.save_results(result_out, sname=f"{self.config.Sname}_{i}", method=self.config.method_per_run[i])
         
         # Combine results for all settings
         Q_combined = np.concatenate(Q)
@@ -124,7 +142,7 @@ class NR_Reduction:
         combine_results = {'Q': Q_combined[idx], 'R': R_combined[idx], 'dR': dR_combined[idx], 'dQ': dQ_combined[idx]}
 
         if save or save_all:    #TODO: fix the saving parts here this is messy!
-            self.save_results(combine_results)
+            self.save_results(combine_results, method=self.config.method_per_run)
         # TODO: Decide whether to keep in here or have as a separate part after the reduciton....?
         if plot:
             for i, rb_num in enumerate(self.config.RBnum):
@@ -477,7 +495,7 @@ class NR_Reduction:
         
         return qcen, qlo, qhi, dq_val
     
-    def _calculate_theta_and_bins(self, ymmRB, ThCen):
+    def _calculate_theta_and_bins(self, ymmRB, ThCen, method):
         """Calculate theta mapping based on reduction method (constantQ or meanTheta).
         
         Args:
@@ -490,8 +508,8 @@ class NR_Reduction:
             dTheta: Theta sigma
         """
         # calculate the mean theta from slits
-        print(self.config.method)
-        if self.config.method == 'meantheta':
+        print(method)
+        if method == 'meantheta':
             # Calculate mean theta from slits
             MeanTheta, dTheta = self.calc_mean_theta(ymmRB, self.log_values['s1Y'], self.log_values['siY'], 
                                                     self.settings['sample_detector_distance'], self.settings['si_sample_distance'],
@@ -500,7 +518,7 @@ class NR_Reduction:
             
             MeanTheta = MeanTheta + ThCen
             Theta = MeanTheta
-        elif self.config.method == 'constantq':
+        elif method == 'constantq':
             # Constant Q-line: fixed theta based on geometry
             Theta = ThCen + np.arctan(ymmRB / self.settings['sample_detector_distance']) * 180 / np.pi
 
@@ -833,7 +851,7 @@ class NR_Reduction:
             REarr = E_mask
 
         # For constantTOF, use 1D TOF binning
-        if self.config.method == "constanttof":
+        if self.config.method_per_run[i] == "constanttof":
             iRB = np.sum(Rarr, axis=0)
             eRB = np.sqrt(np.sum(REarr**2, axis=0))
             # TODO: check the zero removal part!!
@@ -861,12 +879,12 @@ class NR_Reduction:
         _, _, RBpixel, _, _, _ = self._fit_and_calculate_theta(
             i, ypix, RB, self.log_values['DBpixel'], self.log_values['DBtthd'], self.log_values['ThCen'])
 
-        print(self.config.method)
-        if self.config.method != "constanttof":
+        print(self.config.method_per_run[i])
+        if self.config.method_per_run[i] != "constanttof":
             # Calculate theta for each pixel over ROI
             ypixRB = ypix[(ypix >= self.config.RB_Ymin[i]) & (ypix <= self.config.RB_Ymax[i])] - RBpixel
             ymmRB = ypixRB * self.settings['pixel_width']
-            Theta, ThetaBinSize, dTheta = self._calculate_theta_and_bins(ymmRB, self.log_values['ThCen'])
+            Theta, ThetaBinSize, dTheta = self._calculate_theta_and_bins(ymmRB, self.log_values['ThCen'], method=self.config.method_per_run[i])
 
             # Plot 2D lambda vs theta data including overlay of q-summing lines
             if self.config.plotON:
@@ -926,8 +944,8 @@ class NR_Reduction:
                 ThetaGC.fill(0)
                 Thv = abs(Theta[T] + ThetaGC) # Crude implementation to test...
                 print("Warning: Gravity Correction has been turned off!")
-            
-            if self.config.method == "constanttof":
+
+            if self.config.method_per_run[i] == "constanttof":
                 # Jacobian determinant
                 J = self._calculate_jacobian(LAMBDA, Thv, include_dqdtheta=False)
                 theta_bin = 0 # TODO: check this logic is correct!!
@@ -978,7 +996,7 @@ class NR_Reduction:
 
         return {'q': q_vals, 'r': r, 'dr': dr, 'dq': dq}
 
-    def save_results(self, results, sname = None, full=True):
+    def save_results(self, results, sname = None, full=True, method=None):
         """
         Save results as .dat file with header
         
@@ -994,7 +1012,7 @@ class NR_Reduction:
             head = (
                 f"NR_runs = {self.config.RBnum}\n"
                 f"DB = {self.config.DBname}\n"
-                f"Method = {self.config.method}\n"
+                f"Method = {method}\n"
                 f"Normalize = {self.config.Normalize}\n"
                 f"Autoscale = {self.config.AutoScale}\n"
                 f"Scaling factors = {self.config.ScaleFactor}\n"
@@ -1010,7 +1028,7 @@ class NR_Reduction:
             head = (
                 f"NR_runs = {self.config.RBnum}\n"
                 f"DB = {self.config.DBname}\n"
-                f"Method = {self.config.method}\n"
+                f"Method = {method}\n"
                 f"Normalize = {self.config.Normalize}\n"
                 f"Autoscale = {self.config.AutoScale}\n"
                 f"Scaling factors = {self.config.ScaleFactor}\n"

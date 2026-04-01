@@ -17,7 +17,8 @@ def example_constant_q_reduction():
     print("="*60)
     
     # Create configuration for constantQ method
-    config = NRReductionConfig(method='constantQ')
+    config = NRReductionConfig()
+    config.method_per_run = ['constantQ']
 
     # Path needs to be setup for these tests but should be able to turn off later.    
     config.Spath = '/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/'
@@ -75,7 +76,8 @@ def example_mean_theta_reduction():
     print("="*60)
     
     # Create configuration for MeanTheta method
-    config = NRReductionConfig(method='meanTheta')
+    config = NRReductionConfig()
+    config.method_per_run = ['meanTheta']
     
     # Path needs to be setup for these tests but should be able to turn off later.    
     config.Spath = '/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/'
@@ -133,7 +135,8 @@ def example_constant_tof_reduction():
     print("="*60)
     
     # Create configuration for constantTOF method
-    config = NRReductionConfig(method='constantTOF')
+    config = NRReductionConfig()
+    config.method_per_run = ['constantTOF']
     
     # Path needs to be setup for these tests but should be able to turn off later.    
     config.Spath = '/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/'
