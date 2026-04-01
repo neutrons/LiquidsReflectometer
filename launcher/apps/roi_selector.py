@@ -63,16 +63,20 @@ class DBPerRunDialog(QDialog):
     Shows a two-column table with Run (read-only) and DB_file (editable).
     Returns a list of DB_file strings in the same order as runs.
     """
-    def __init__(self, parent=None, runs=None, initial=None):
+    def __init__(self, parent=None, runs=None, initial=None, q_initial=None):
         super().__init__(parent)
         self.setWindowTitle("Edit DB_file per run")
         self.runs = runs or []
+        # initial: list of DB_file strings
         self.initial = initial or []
+        # q_initial: list of q_method strings parallel to runs
+        self.q_initial = q_initial or []
         layout = QVBoxLayout()
 
         self.table = QTableWidget(self)
-        self.table.setColumnCount(2)
-        self.table.setHorizontalHeaderLabels(["Run", "DB_file"])
+        # Three columns: Run (readonly), DB_file (editable), q_method (combo)
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(["Run", "DB_file", "q_method"])
         self.table.setRowCount(len(self.runs))
         for i, run in enumerate(self.runs):
             # Run column (non-editable)
@@ -87,6 +91,21 @@ class DBPerRunDialog(QDialog):
                 val = ''
             item_db = QTableWidgetItem(val)
             self.table.setItem(i, 1, item_db)
+            # q_method combobox
+            q_combo = QComboBox(self.table)
+            q_options = ["meanTheta", "constantTOF", "constantQ", "meanQ"]
+            q_combo.addItems(q_options)
+            q_val = ''
+            try:
+                q_val = self.q_initial[i]
+            except Exception:
+                q_val = ''
+            if q_val in q_options:
+                q_combo.setCurrentIndex(q_options.index(q_val))
+            else:
+                # default to first option
+                q_combo.setCurrentIndex(0)
+            self.table.setCellWidget(i, 2, q_combo)
 
         layout.addWidget(self.table)
 
@@ -97,11 +116,18 @@ class DBPerRunDialog(QDialog):
         self.setLayout(layout)
 
     def get_values(self):
-        vals = []
+        db_vals = []
+        q_vals = []
         for i in range(self.table.rowCount()):
-            it = self.table.item(i, 1)
-            vals.append(it.text().strip() if it is not None else '')
-        return vals
+            item = self.table.item(i, 1)
+            db_vals.append(item.text().strip() if item is not None else "")
+            # q_method from combobox
+            widget = self.table.cellWidget(i, 2)
+            if isinstance(widget, QComboBox):
+                q_vals.append(widget.currentText())
+            else:
+                q_vals.append("")
+        return {"db_files": db_vals, "q_methods": q_vals}
 
 
 class SaveTemplateDialog(QDialog):
@@ -192,6 +218,7 @@ class SaveTemplateDialog(QDialog):
             "q_method": self.qmethod_combo.currentText(),
             "DB_file": self.dbfile_edit.text(),
             "DB_files": self.per_run_db,
+            "q_methods": getattr(self, 'per_run_qmethods', None),
             "autoscale": self.autoscale_cb.isChecked(),
             "use_calc_theta": self.use_calc_theta_cb.isChecked(),
         }
@@ -205,12 +232,32 @@ class SaveTemplateDialog(QDialog):
         # open the per-run editor dialog with current runs and split values
         cur = self.dbfile_edit.text().strip()
         cur_list = [s.strip() for s in cur.split(',') if s.strip()] if cur else []
-        dlg = DBPerRunDialog(self, runs=self.runs, initial=cur_list)
+        # prepare initial q_method list from parent per_run_rois if available
+        q_init = []
+        parent = self.parent()
+        try:
+            for run in self.runs:
+                if parent and hasattr(parent, 'per_run_rois') and run in parent.per_run_rois:
+                    q_init.append(parent.per_run_rois[run].get('q_method', ''))
+                else:
+                    q_init.append('')
+        except Exception:
+            q_init = []
+
+        dlg = DBPerRunDialog(self, runs=self.runs, initial=cur_list, q_initial=q_init)
         if dlg.exec_() == QDialog.Accepted:
             vals = dlg.get_values()
-            # set per_run_db and update dbfile_edit as comma-joined
-            self.per_run_db = vals
-            self.dbfile_edit.setText(','.join(vals))
+            # vals is a dict with 'db_files' and 'q_methods'
+            if isinstance(vals, dict):
+                self.per_run_db = vals.get('db_files', [])
+                self.per_run_qmethods = vals.get('q_methods', [])
+                # update the single-string edit with comma-joined db files
+                self.dbfile_edit.setText(','.join(self.per_run_db))
+            else:
+                # fallback to legacy list
+                self.per_run_db = vals
+                self.per_run_qmethods = None
+                self.dbfile_edit.setText(','.join(vals))
 
 
 class ROISelector(QWidget):
@@ -1669,6 +1716,18 @@ class ROISelector(QWidget):
             return
         vals = dlg.get_values()
         path = vals.get('path')
+        # Persist per-run q_method into per_run_rois for this session if provided
+        try:
+            q_methods = vals.get('q_methods') if isinstance(vals, dict) else None
+            if q_methods:
+                for idx, runnum in enumerate(runs_sorted):
+                    try:
+                        if idx < len(q_methods) and q_methods[idx]:
+                            self.per_run_rois[runnum]['q_method'] = q_methods[idx]
+                    except Exception:
+                        pass
+        except Exception:
+            pass
         # DB_file validation: allow comma-separated list matching the number of stored runs
         db_raw = vals.get('DB_file', '') or ''
         db_list = [s.strip() for s in db_raw.split(',') if s.strip()] if db_raw else []
@@ -1739,7 +1798,15 @@ class ROISelector(QWidget):
                     ent.tof_range = [r['tofmin'], r['tofmax']]
                     ent.data_x_range = [r['xmin'], r['xmax']]
                     ent.data_files = [int(runnum)]
-                    ent.q_method = vals.get('q_method')
+                    # prefer per-run q_method if provided via the per-run editor
+                    q_methods = vals.get('q_methods') if isinstance(vals, dict) else None
+                    try:
+                        if q_methods and len(q_methods) > idx and q_methods[idx]:
+                            ent.q_method = q_methods[idx]
+                        else:
+                            ent.q_method = vals.get('q_method')
+                    except Exception:
+                        ent.q_method = vals.get('q_method')
                     # assign per-run DB_file if the user supplied a comma-separated list
                     try:
                         if db_list:
@@ -1849,6 +1916,16 @@ class ROISelector(QWidget):
                     db_val = db_list[idx] if db_list else vals.get('DB_file', '')
                 except Exception:
                     db_val = vals.get('DB_file', '')
+                # include per-run q_method if available
+                try:
+                    q_methods = vals.get('q_methods') if isinstance(vals, dict) else None
+                    if q_methods and len(q_methods) > idx and q_methods[idx]:
+                        q_val = q_methods[idx]
+                    else:
+                        q_val = vals.get('q_method')
+                except Exception:
+                    q_val = vals.get('q_method')
+                xml += f'    <q_method>{q_val}</q_method>\n'
                 xml += f'    <DB_file>{db_val}</DB_file>\n'
                 xml += '  </Reduction>\n'
             xml += '</Reductions>\n'
