@@ -125,7 +125,7 @@ class NRReductionConfig:
     def DBpath(self) -> Path:
         if self._DBpath_override is not None:
             return Path(self._DBpath_override)
-        return self.base_path / "reduced"
+        return self.base_path / "transmission"
     @Spath.setter
     def Spath(self, value):
         self._Spath_override = value
