@@ -102,11 +102,22 @@ class TemplateBatchTab(QWidget):
         self.setLayout(layout)
 
         self.settings = QtCore.QSettings()
-        # Experiment id and update defaults
-        layout.addWidget(QLabel("Experiment id (IPTS-...):"), 0, 0)
+        # Experiment id and update defaults — keep left-justified with other inputs
+        ipts_label = QLabel("Experiment id (IPTS-...):")
         self.experiment_edit = QLineEdit()
-        layout.addWidget(self.experiment_edit, 0, 1)
+        # limit width so the row stays compact and the button sits nearer the left
+        try:
+            self.experiment_edit.setMaximumWidth(220)
+        except Exception:
+            pass
         self.update_defaults_btn = QPushButton("Update defaults")
+        try:
+            self.update_defaults_btn.setMaximumWidth(120)
+        except Exception:
+            pass
+        # Place into the same grid columns as other rows (0,1,2) so it's left-justified
+        layout.addWidget(ipts_label, 0, 0)
+        layout.addWidget(self.experiment_edit, 0, 1)
         layout.addWidget(self.update_defaults_btn, 0, 2)
 
         # Inline paths (datapath, DBpath, Spath)
@@ -116,20 +127,20 @@ class TemplateBatchTab(QWidget):
         self.datapath_btn = QPushButton("Browse")
         layout.addWidget(self.datapath_btn, 1, 2)
 
-        layout.addWidget(QLabel("DBpath:"), 2, 0)
+        layout.addWidget(QLabel("Direct Beam path:"), 2, 0)
         self.dbpath_edit = QLineEdit()
         layout.addWidget(self.dbpath_edit, 2, 1)
         self.dbpath_btn = QPushButton("Browse")
         layout.addWidget(self.dbpath_btn, 2, 2)
 
-        layout.addWidget(QLabel("Spath (output):"), 3, 0)
+        layout.addWidget(QLabel("Save path (output):"), 3, 0)
         self.spath_edit = QLineEdit()
         layout.addWidget(self.spath_edit, 3, 1)
         self.spath_btn = QPushButton("Browse")
         layout.addWidget(self.spath_btn, 3, 2)
 
         # Template directory and file
-        layout.addWidget(QLabel("Template directory (where templates live):"), 4, 0)
+        layout.addWidget(QLabel("Template directory:"), 4, 0)
         self.template_dir_edit = QLineEdit()
         layout.addWidget(self.template_dir_edit, 4, 1)
         self.template_dir_btn = QPushButton("Browse")
@@ -237,15 +248,20 @@ class TemplateBatchTab(QWidget):
         _file, _ = QFileDialog.getOpenFileName(self, "Select template file:", self.template_file_edit.text(), "", options=opts)
         if _file:
             p = Path(_file)
-            self.template_dir_edit.setText(str(p.parent))
-            self.template_file_edit.setText(str(p.name))
+            # set directory and filename immediately, validate directory asynchronously
+            self._set_path_async(self.template_dir_edit, str(p.parent), check_isdir=True)
+            try:
+                self.template_file_edit.setText(str(p.name))
+            except Exception:
+                pass
 
     def _browse_template_dir(self):
         opts = QFileDialog.Options()
         opts |= QFileDialog.DontUseNativeDialog
         _dir = QFileDialog.getExistingDirectory(self, "Select template directory:", self.template_dir_edit.text(), options=opts)
-        if os.path.isdir(_dir):
-            self.template_dir_edit.setText(_dir)
+        if _dir:
+            # set immediately and validate asynchronously
+            self._set_path_async(self.template_dir_edit, str(_dir), check_isdir=True)
 
     def _browse_template_file(self):
         # Opens file dialog rooted at template_dir if available
@@ -255,29 +271,32 @@ class TemplateBatchTab(QWidget):
         _file, _ = QFileDialog.getOpenFileName(self, "Select template file:", start, "", options=opts)
         if _file:
             p = Path(_file)
-            self.template_dir_edit.setText(str(p.parent))
-            self.template_file_edit.setText(str(p.name))
+            self._set_path_async(self.template_dir_edit, str(p.parent), check_isdir=True)
+            try:
+                self.template_file_edit.setText(str(p.name))
+            except Exception:
+                pass
 
     def _browse_datapath(self):
         opts = QFileDialog.Options()
         opts |= QFileDialog.DontUseNativeDialog
         _dir = QFileDialog.getExistingDirectory(self, "Select datapath (NEXUS):", self.datapath_edit.text(), options=opts)
-        if os.path.isdir(_dir):
-            self.datapath_edit.setText(_dir)
+        if _dir:
+            self._set_path_async(self.datapath_edit, str(_dir), check_isdir=True)
 
     def _browse_dbpath(self):
         opts = QFileDialog.Options()
         opts |= QFileDialog.DontUseNativeDialog
         _dir = QFileDialog.getExistingDirectory(self, "Select DBpath:", self.dbpath_edit.text(), options=opts)
-        if os.path.isdir(_dir):
-            self.dbpath_edit.setText(_dir)
+        if _dir:
+            self._set_path_async(self.dbpath_edit, str(_dir), check_isdir=True)
 
     def _browse_spath(self):
         opts = QFileDialog.Options()
         opts |= QFileDialog.DontUseNativeDialog
         _dir = QFileDialog.getExistingDirectory(self, "Select Spath (output):", self.spath_edit.text(), options=opts)
-        if os.path.isdir(_dir):
-            self.spath_edit.setText(_dir)
+        if _dir:
+            self._set_path_async(self.spath_edit, str(_dir), check_isdir=True)
 
     def update_defaults_from_experiment(self):
         expt = self.experiment_edit.text().strip()
@@ -423,6 +442,44 @@ class TemplateBatchTab(QWidget):
         except Exception:
             # best-effort
             pass
+
+    def _set_path_async(self, line_edit: QLineEdit, path: str, check_isdir: bool = True):
+        """Set the QLineEdit immediately, then validate the path in a background
+        thread so slow network filesystems (or blocking os.stat) do not hang the
+        GUI. If the path appears inaccessible, log a warning on the UI thread.
+        """
+        try:
+            # show chosen path immediately so UI doesn't feel blocked
+            line_edit.setText(str(path))
+        except Exception:
+            try:
+                line_edit.setText(path)
+            except Exception:
+                pass
+
+        if not check_isdir:
+            return
+
+        def _worker(p):
+            ok = False
+            try:
+                ok = os.path.isdir(p)
+            except Exception:
+                ok = False
+            if not ok:
+                try:
+                    # Post a message to the log on the GUI thread
+                    QtCore.QMetaObject.invokeMethod(
+                        self,
+                        "_append_log",
+                        QtCore.Qt.QueuedConnection,
+                        QtCore.Q_ARG(str, f"Warning: chosen path appears inaccessible: {p}"),
+                    )
+                except Exception:
+                    pass
+
+        th = threading.Thread(target=_worker, args=(str(path),), daemon=True)
+        th.start()
 
     def _toggle_browse_buttons(self, enabled: bool):
         # show/hide browse buttons depending on user preference
@@ -625,6 +682,24 @@ class TemplateBatchTab(QWidget):
                         for num in new_nums:
                             try:
                                 fig = plt.figure(num)
+                                # Ensure the figure clearly indicates which run it
+                                # belongs to: prefer a suptitle, otherwise prefix
+                                # existing axis titles.
+                                try:
+                                    fig.suptitle(f"Run {run}", fontsize=10)
+                                except Exception:
+                                    try:
+                                        for ax in getattr(fig, 'axes', []):
+                                            try:
+                                                t = ax.get_title()
+                                                if t:
+                                                    ax.set_title(f"Run {run} -- {t}")
+                                                else:
+                                                    ax.set_title(f"Run {run}")
+                                            except Exception:
+                                                pass
+                                    except Exception:
+                                        pass
                                 meta = {"run": run, "label": f"run {run}"}
                                 self.figures.append((fig, meta))
                                 # warn if the user-configured max is exceeded
