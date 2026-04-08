@@ -27,11 +27,11 @@ class Direct_Beam:
             # override the paths using convention when experiment_id provided
             self.NEXUSpath = f"/SNS/REF_L/{self.experiment_id}/nexus/"
             self.savepath = f"/SNS/REF_L/{self.experiment_id}/shared/transmission/"
-        self.Cd_foils = [57.5, 126.5, 123.0]      #microns for 50, 100A, 100B Cd foils
-        self.Cd = [self.Cd_foils[0], 
-            self.Cd_foils[1], 
-            self.Cd_foils[1]+self.Cd_foils[2], 
-            2*self.Cd_foils[1]+2*self.Cd_foils[2]] #microns Cd for each attenuator
+        #self.Cd_foils = [57.5, 126.5, 123.0]      #microns for 50, 100A, 100B Cd foils
+        self.Cd = [57.5, 
+            126.5, 
+            126.5+123.0, 
+            2*126.5+2*123.0] #microns Cd for each attenuator
         self.Chop2_cut_fn = [2.077, -16818.0]        # linear fit to chopper cut time
         self.Icut = 1e-10                 # threshold cut off any data below Icut (noisy)
         self.DTCcut = 1.25                # threshold to cut off any data above DTCcut
@@ -144,14 +144,14 @@ class Direct_Beam:
 
             # Need to split some parts out into separate functions if the logic is correct.
             Cd_thickness = self._extract_cd_values(log_values, flip_atten)
-            print(f'Run {run}: Cd thickness = {Cd_thickness:.2f} cm')
+            print(f'Run {run}: Cd thickness = {Cd_thickness:.5f} cm')
             Cd_values.append(Cd_thickness)
 
             if run == run_list[-1]: low_tag = True
             else: low_tag = False
             T, I, E, DTC = self._trim_and_chop(T, I, E, DTC, log_values["chop2_PD"], lowest = low_tag)
             T = T * 1e-3 # convert to ms
-            print(f'Run {run}: After trimming and chopping, {len(T)} points remain')
+            #print(f'Run {run}: After trimming and chopping, {len(T)} points remain')
     
             # TODO: use logic from nr_reduction_calc
             # convert to Lambda

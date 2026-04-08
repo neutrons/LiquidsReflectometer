@@ -65,7 +65,6 @@ class CdSettingsDialog(QMessageBox):
 
         # Widgets
         self.mu_file_edit = QLineEdit(self.dlg)
-        self.cd_foils_edit = QLineEdit(self.dlg)
         self.cd_edit = QLineEdit(self.dlg)
         self.flip_check = QCheckBox('Flip attenuator mapping', self.dlg)
 
@@ -75,7 +74,6 @@ class CdSettingsDialog(QMessageBox):
         self._initial_defaults = initial_defaults or defaults or {}
         if defaults:
             self.mu_file_edit.setText(defaults.get('mu_file', ''))
-            self.cd_foils_edit.setText(','.join([str(x) for x in defaults.get('Cd_foils', [])]))
             self.cd_edit.setText(','.join([str(x) for x in defaults.get('Cd', [])]))
             # flip_atten default if provided
             try:
@@ -84,7 +82,6 @@ class CdSettingsDialog(QMessageBox):
                 pass
 
         form.addRow('mu_file:', self.mu_file_edit)
-        form.addRow('Cd_foils (comma separated):', self.cd_foils_edit)
         form.addRow('Cd (comma separated):', self.cd_edit)
         form.addRow(self.flip_check)
 
@@ -110,7 +107,6 @@ class CdSettingsDialog(QMessageBox):
         d = self._initial_defaults or {}
         self.mu_file_edit.setText(d.get('mu_file', ''))
         # MUpath removed; keep mu_file reset only
-        self.cd_foils_edit.setText(','.join([str(x) for x in d.get('Cd_foils', [])]))
         self.cd_edit.setText(','.join([str(x) for x in d.get('Cd', [])]))
         try:
             self.flip_check.setChecked(bool(d.get('flip_atten', False)))
@@ -129,7 +125,6 @@ class CdSettingsDialog(QMessageBox):
                 return []
         return {
             'mu_file': self.mu_file_edit.text().strip(),
-            'Cd_foils': parse_list(self.cd_foils_edit.text()),
             'Cd': parse_list(self.cd_edit.text()),
             'flip_atten': bool(self.flip_check.isChecked()),
         }
@@ -225,7 +220,7 @@ class DirectBeamTab(QWidget):
 
         # Run list
         self.run_list_edit = QLineEdit(self)
-        self.run_list_edit.setPlaceholderText('e.g. 1001,1002,1005')
+        self.run_list_edit.setPlaceholderText('e.g. 226123,226124,226125')
         form.addRow('Run list:', self.run_list_edit)
 
         # IPTS
@@ -267,7 +262,7 @@ class DirectBeamTab(QWidget):
         self.CutOffset_spin = QDoubleSpinBox(self)
         self.CutOffset_spin.setRange(-1e6, 1e6)
         self.CutOffset_spin.setValue(1)
-        form.addRow('CutOffset:', self.CutOffset_spin)
+        form.addRow('Chopper Cut Offset:', self.CutOffset_spin)
 
         # y_ROI and low_res as simple text inputs (two ints comma separated)
         self.yroi_edit = QLineEdit(self)
@@ -276,7 +271,7 @@ class DirectBeamTab(QWidget):
 
         self.lowres_edit = QLineEdit(self)
         self.lowres_edit.setText('75,190')
-        form.addRow('low_res (min,max):', self.lowres_edit)
+        form.addRow('x_ROI (min,max):', self.lowres_edit)
 
         # Plot toggle
         self.plot_cb = QCheckBox('Plot')
@@ -323,7 +318,6 @@ class DirectBeamTab(QWidget):
                 default_vals = {
                     # default mu_file left blank so Direct_Beam can discover via settings
                     'mu_file': '',
-                    'Cd_foils': getattr(db, 'Cd_foils', []),
                     'Cd': getattr(db, 'Cd', []),
                     'flip_atten': getattr(db, 'flip_atten', False),
                     'Chop2_cut_fn': getattr(db, 'Chop2_cut_fn', []),
@@ -446,7 +440,7 @@ class DirectBeamTab(QWidget):
             except Exception:
                 return default
         db.y_ROI = parse_pair(self.yroi_edit.text(), db.y_ROI if hasattr(db, 'y_ROI') else [130,170])
-        db.low_res = parse_pair(self.lowres_edit.text(), db.low_res if hasattr(db, 'low_res') else [75,190])
+        db.low_res = parse_pair(self.lowres_edit.text(), db.low_res if hasattr(db, 'x_ROI') else [75,190])
 
         # cd settings
         mu_file_arg = None
@@ -469,8 +463,6 @@ class DirectBeamTab(QWidget):
                         # search known locations (settings/IPTS/BIN paths)
                         mu_file_arg = None
                 # apply other cd overrides if provided
-                if cd.get('Cd_foils'):
-                    db.Cd_foils = cd.get('Cd_foils')
                 if cd.get('Cd'):
                     db.Cd = cd.get('Cd')
                 flip_atten = bool(cd.get('flip_atten', False))
