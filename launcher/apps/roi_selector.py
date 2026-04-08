@@ -10,105 +10,66 @@ try:
 except Exception:
     curve_fit = None
     HAS_SCIPY = False
-from qtpy import QtCore
-from qtpy.QtGui import QBrush, QColor, QFont
-from qtpy.QtWidgets import (
-    QWidget,
-    QGridLayout,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QFileDialog,
-    QCheckBox,
-    QHBoxLayout,
-    QVBoxLayout,
-    QGroupBox,
-    QFormLayout,
-    QSpinBox,
-    QDialog,
-    QDialogButtonBox,
-    QMessageBox,
-    QComboBox,
-    QTableWidget,
-    QTableWidgetItem,
-    QListWidget,
-)
-
-from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
-# RectangleSelector removed (zoom-by-rectangle UI was removed)
-
-# TODO: Fix the background ROI defaults and handling for 1/2/no modes.
-# TODO: Fix the DB per run box.
-
-# Try import of Qt FigureCanvas (compat similar to overplot)
-FigureCanvas = None
-NavigationToolbar = None
+# Qt and Matplotlib imports (some are optional depending on environment)
 try:
-    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-    from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+    from qtpy import QtCore
+    from qtpy.QtWidgets import (
+        QDialog, QWidget, QVBoxLayout, QFormLayout, QHBoxLayout, QLineEdit,
+        QPushButton, QDialogButtonBox, QFileDialog, QCheckBox, QTableWidget,
+        QTableWidgetItem, QComboBox, QLabel, QSpinBox, QListWidget, QGroupBox,
+        QSizePolicy, QGridLayout
+    )
+    from qtpy.QtWidgets import QMessageBox
+    from qtpy.QtGui import QFont, QBrush, QColor
 except Exception:
+    # allow headless import failures; variables below will be None/missing and
+    # the rest of the code should guard against unavailable GUI elements.
     try:
-        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-        from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
+        import qtpy.QtCore as QtCore
     except Exception:
-        FigureCanvas = None
-        NavigationToolbar = None
+        QtCore = None
 
-
+try:
+    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
+    from matplotlib.figure import Figure
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import LogNorm
+except Exception:
+    FigureCanvas = None
+    NavigationToolbar = None
+    Figure = None
+    plt = None
+    LogNorm = None
+    
 class DBPerRunDialog(QDialog):
-    """Table-based DB_file per-run editor.
-
-    Shows a two-column table with Run (read-only) and DB_file (editable).
-    Returns a list of DB_file strings in the same order as runs.
-    """
+    """Simple dialog to edit per-run DB_file and q_method lists."""
     def __init__(self, parent=None, runs=None, initial=None, q_initial=None):
         super().__init__(parent)
-        self.setWindowTitle("Edit DB_file per run")
+        self.setWindowTitle("Edit per-run settings")
         self.runs = runs or []
-        # initial: list of DB_file strings
-        self.initial = initial or []
-        # q_initial: list of q_method strings parallel to runs
-        self.q_initial = q_initial or []
-        layout = QVBoxLayout()
+        self.initial = list(initial) if isinstance(initial, (list, tuple)) else ([""] * len(self.runs))
+        self.q_initial = list(q_initial) if isinstance(q_initial, (list, tuple)) else ([""] * len(self.runs))
 
+        layout = QVBoxLayout()
         self.table = QTableWidget(self)
-        # Three columns: Run (readonly), DB_file (editable), q_method (combo)
         self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(["Run", "DB_file", "q_method"])
         self.table.setRowCount(len(self.runs))
-        for i, run in enumerate(self.runs):
-            # Run column (non-editable)
-            item_run = QTableWidgetItem(str(run))
-            item_run.setFlags(item_run.flags() & ~QtCore.Qt.ItemIsEditable)
-            self.table.setItem(i, 0, item_run)
-            # DB file column (editable)
-            val = ''
-            try:
-                val = self.initial[i]
-            except Exception:
-                val = ''
-            item_db = QTableWidgetItem(val)
-            self.table.setItem(i, 1, item_db)
-            # q_method combobox
-            q_combo = QComboBox(self.table)
-            q_options = ["meanTheta", "constantTOF", "constantQ", "meanQ"]
-            q_combo.addItems(q_options)
-            q_val = ''
-            try:
-                q_val = self.q_initial[i]
-            except Exception:
-                q_val = ''
-            if q_val in q_options:
-                q_combo.setCurrentIndex(q_options.index(q_val))
-            else:
-                # default to first option
-                q_combo.setCurrentIndex(0)
-            self.table.setCellWidget(i, 2, q_combo)
+        q_options = ["meanTheta", "constantTOF", "constantQ"]
+        for i, r in enumerate(self.runs):
+            it = QTableWidgetItem(str(r))
+            it.setFlags(it.flags() & ~QtCore.Qt.ItemIsEditable)
+            self.table.setItem(i, 0, it)
+            dbv = self.initial[i] if i < len(self.initial) else ''
+            self.table.setItem(i, 1, QTableWidgetItem(dbv or ''))
+            combo = QComboBox(self.table)
+            combo.addItems(q_options)
+            qv = self.q_initial[i] if i < len(self.q_initial) else ''
+            if qv in q_options:
+                combo.setCurrentIndex(q_options.index(qv))
+            self.table.setCellWidget(i, 2, combo)
 
         layout.addWidget(self.table)
-
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -116,24 +77,24 @@ class DBPerRunDialog(QDialog):
         self.setLayout(layout)
 
     def get_values(self):
-        db_vals = []
-        q_vals = []
+        dbs = []
+        qs = []
         for i in range(self.table.rowCount()):
-            item = self.table.item(i, 1)
-            db_vals.append(item.text().strip() if item is not None else "")
-            # q_method from combobox
-            widget = self.table.cellWidget(i, 2)
-            if isinstance(widget, QComboBox):
-                q_vals.append(widget.currentText())
-            else:
-                q_vals.append("")
-        return {"db_files": db_vals, "q_methods": q_vals}
-
-
+            try:
+                db_item = self.table.item(i, 1)
+                dbs.append(db_item.text().strip() if db_item is not None else '')
+            except Exception:
+                dbs.append('')
+            try:
+                widget = self.table.cellWidget(i, 2)
+                qs.append(widget.currentText() if widget is not None else '')
+            except Exception:
+                qs.append('')
+        return {'db_files': dbs, 'q_methods': qs}
+    
 class SaveTemplateDialog(QDialog):
     def __init__(self, parent=None, defaults=None, runs=None):
         super().__init__(parent)
-        self.setWindowTitle("Save ROI as template")
         self.defaults = defaults or {}
         self.runs = runs or []
         self.per_run_db = None
@@ -149,28 +110,8 @@ class SaveTemplateDialog(QDialog):
 
         self.filename_edit = QLineEdit(self)
         form.addRow("Filename:", self.filename_edit)
-
-        # q-method dropdown
-        self.qmethod_combo = QComboBox(self)
-        q_options = ["meanTheta", "constantTOF", "constantQ", "meanQ"]
-        self.qmethod_combo.addItems(q_options)
-        try:
-            idx = q_options.index(self.defaults.get("q_method", "meanTheta"))
-        except Exception:
-            idx = 0
-        self.qmethod_combo.setCurrentIndex(idx)
-        form.addRow("q_method:", self.qmethod_combo)
-
-        # DB_file: single string or edit per-run
-        h_db = QHBoxLayout()
-        self.dbfile_edit = QLineEdit(self)
-        self.dbfile_edit.setText(self.defaults.get("DB_file", ""))
-        self.dbedit_btn = QPushButton("Edit per-run")
-        h_db.addWidget(self.dbfile_edit)
-        h_db.addWidget(self.dbedit_btn)
-        form.addRow("DB_file:", h_db)
-        # wire per-run editor
-        self.dbedit_btn.clicked.connect(self._open_db_per_run)
+        # Note: per-run settings table moved to main ROI selector UI.
+        # Save dialog will read per-run settings from its parent when saving.
 
         self.autoscale_cb = QCheckBox(self)
         self.autoscale_cb.setChecked(self.defaults.get("autoscale", True))
@@ -211,14 +152,33 @@ class SaveTemplateDialog(QDialog):
         if fname and not fname.lower().endswith('.xml'):
             fname = fname + '.xml'
         full = fname if not dirv else os.path.join(dirv, fname)
+        # Read per-run settings from parent ROISelector when available
+        parent = self.parent()
+        db_files = None
+        q_methods = None
+        try:
+            if parent is not None:
+                db_files = getattr(parent, 'per_run_db', None)
+                q_methods = getattr(parent, 'per_run_qmethods', None)
+        except Exception:
+            db_files = getattr(self, 'per_run_db', None)
+            q_methods = getattr(self, 'per_run_qmethods', None)
+
+        # Maintain legacy DB_file single-string key
+        db_single = ''
+        if isinstance(db_files, (list, tuple)) and db_files:
+            try:
+                db_single = ','.join([str(x) for x in db_files])
+            except Exception:
+                db_single = ''
+
         return {
             "path": full,
             "dir": dirv,
             "filename": fname,
-            "q_method": self.qmethod_combo.currentText(),
-            "DB_file": self.dbfile_edit.text(),
-            "DB_files": self.per_run_db,
-            "q_methods": getattr(self, 'per_run_qmethods', None),
+            "DB_file": db_single,
+            "DB_files": db_files,
+            "q_methods": q_methods,
             "autoscale": self.autoscale_cb.isChecked(),
             "use_calc_theta": self.use_calc_theta_cb.isChecked(),
         }
@@ -230,16 +190,21 @@ class SaveTemplateDialog(QDialog):
 
     def _open_db_per_run(self):
         # open the per-run editor dialog with current runs and split values
-        cur = self.dbfile_edit.text().strip()
-        cur_list = [s.strip() for s in cur.split(',') if s.strip()] if cur else []
-        # prepare initial q_method list from parent per_run_rois if available
+        # Prefer any previously set per-run values stored in this dialog.
+        if isinstance(self.per_run_db, (list, tuple)) and self.per_run_db:
+            cur_list = list(self.per_run_db)
+        else:
+            cur = self.defaults.get("DB_file", "")
+            cur_list = [s.strip() for s in cur.split(',') if s.strip()] if cur else []
+        # prepare initial q_method list from parent per_run_qmethods if available
         q_init = []
         parent = self.parent()
         try:
-            for run in self.runs:
-                if parent and hasattr(parent, 'per_run_rois') and run in parent.per_run_rois:
-                    q_init.append(parent.per_run_rois[run].get('q_method', ''))
-                else:
+            runs = self.runs or []
+            if parent and hasattr(parent, 'per_run_qmethods') and isinstance(parent.per_run_qmethods, (list, tuple)) and len(parent.per_run_qmethods) == len(runs):
+                q_init = list(parent.per_run_qmethods)
+            else:
+                for run in runs:
                     q_init.append('')
         except Exception:
             q_init = []
@@ -251,13 +216,21 @@ class SaveTemplateDialog(QDialog):
             if isinstance(vals, dict):
                 self.per_run_db = vals.get('db_files', [])
                 self.per_run_qmethods = vals.get('q_methods', [])
-                # update the single-string edit with comma-joined db files
-                self.dbfile_edit.setText(','.join(self.per_run_db))
+                # notify parent (ROISelector) to refresh its per-run table if present
+                try:
+                    if parent is not None and hasattr(parent, '_refresh_per_run_table'):
+                        parent._refresh_per_run_table()
+                except Exception:
+                    pass
             else:
                 # fallback to legacy list
                 self.per_run_db = vals
                 self.per_run_qmethods = None
-                self.dbfile_edit.setText(','.join(vals))
+                try:
+                    if parent is not None and hasattr(parent, '_refresh_per_run_table'):
+                        parent._refresh_per_run_table()
+                except Exception:
+                    pass
 
 
 class ROISelector(QWidget):
@@ -292,6 +265,19 @@ class ROISelector(QWidget):
         self.ipts_edit = QLineEdit(self)
         c_layout.addRow("IPTS number:", self.ipts_edit)
 
+        # template controls moved up so they are near the run list
+        self.template_cb = QCheckBox("Start from template", self)
+        c_layout.addRow(self.template_cb)
+
+        # template path with browse (kept compact)
+        h_tpath = QHBoxLayout()
+        self.template_path_edit = QLineEdit(self)
+        self.template_path_edit.setMinimumWidth(300)
+        self.template_browse_btn = QPushButton("...")
+        h_tpath.addWidget(self.template_path_edit)
+        h_tpath.addWidget(self.template_browse_btn)
+        c_layout.addRow("Template path:", h_tpath)
+
         # internal run edit (not shown) used to track current run when loading from run list
         self.run_edit = QLineEdit(self)
         # keep the run_edit hidden (we don't show a standalone run number field)
@@ -312,18 +298,26 @@ class ROISelector(QWidget):
         self.run_list_widget.setMaximumHeight(100)
         c_layout.addRow(self.run_list_widget)
 
-        # template controls moved up so they are near the run list
-        self.template_cb = QCheckBox("Start from template", self)
-        c_layout.addRow(self.template_cb)
+        # Per-run settings table
+        self.per_run_table = QTableWidget(self)
+        # Columns: Seq, Run, DB_file, q_method
+        self.per_run_table.setColumnCount(4)
+        self.per_run_table.setHorizontalHeaderLabels(["Seq", "Run", "DB_file", "q_method"])
+        try:
+            self.per_run_table.setMinimumHeight(120)
+            self.per_run_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        except Exception:
+            try:
+                self.per_run_table.setMaximumHeight(150)
+            except Exception:
+                pass
+        # allow editing DB_file cells; q_method is provided as a combobox per row
+        self.per_run_table.itemChanged.connect(self._on_per_run_item_changed)
+        # place the label on the line above the table to save horizontal space
+        per_run_label = QLabel("Per-run settings:")
+        c_layout.addRow(per_run_label)
+        c_layout.addRow(self.per_run_table)
 
-        # template path with browse (kept compact)
-        h_tpath = QHBoxLayout()
-        self.template_path_edit = QLineEdit(self)
-        self.template_path_edit.setMinimumWidth(300)
-        self.template_browse_btn = QPushButton("...")
-        h_tpath.addWidget(self.template_path_edit)
-        h_tpath.addWidget(self.template_browse_btn)
-        c_layout.addRow("Template path:", h_tpath)
 
         # buttons to store ROIs for the current run and to save combined template
         self.store_run_rois_btn = QPushButton("Store ROIs for run")
@@ -442,6 +436,8 @@ class ROISelector(QWidget):
         self._zoom_active_axes = set()
         # per-run stored ROI dict: runnum -> roi dict
         self.per_run_rois = {}
+        # per-run sequence mapping (runnum -> seq index from template)
+        self.per_run_seq = {}
 
         # Title label for run
         self.title_label = QLabel("")
@@ -477,6 +473,11 @@ class ROISelector(QWidget):
         # update and browse
         self.update_btn.clicked.connect(self.update_rois)
         self.template_browse_btn.clicked.connect(self._browse_template)
+        # ensure the per-run table shows headers immediately
+        try:
+            self._refresh_per_run_table()
+        except Exception:
+            pass
     # update when log-color checkbox toggled (created below)
 
     def _set_bkg_mode(self, index: int):
@@ -530,6 +531,108 @@ class ROISelector(QWidget):
                 pass
         return
 
+    def _refresh_per_run_table(self):
+        """Populate the per-run settings table from self.runs, self.per_run_db, and self.per_run_qmethods."""
+        try:
+            runs = getattr(self, 'runs', []) or []
+            self.per_run_table.blockSignals(True)
+            self.per_run_table.setRowCount(len(runs))
+            q_options = ["meanTheta", "constantTOF", "constantQ"]
+            for i, run in enumerate(runs):
+                # Seq (editable) - used to map to template entries
+                seq_val = ''
+                try:
+                    if isinstance(self.per_run_seq, dict) and run in self.per_run_seq:
+                        seq_val = str(self.per_run_seq.get(run, '') or '')
+                except Exception:
+                    seq_val = ''
+                item_seq = QTableWidgetItem(seq_val)
+                self.per_run_table.setItem(i, 0, item_seq)
+
+                # Run (read-only)
+                item_run = QTableWidgetItem(str(run))
+                item_run.setFlags(item_run.flags() & ~QtCore.Qt.ItemIsEditable)
+                self.per_run_table.setItem(i, 1, item_run)
+
+                # DB_file cell
+                dbv = ''
+                try:
+                    if isinstance(self.per_run_db, (list, tuple)) and i < len(self.per_run_db):
+                        dbv = str(self.per_run_db[i]) or ''
+                except Exception:
+                    dbv = ''
+                item_db = QTableWidgetItem(dbv)
+                self.per_run_table.setItem(i, 2, item_db)
+
+                # q_method combobox
+                q_combo = QComboBox(self.per_run_table)
+                q_combo.addItems(q_options)
+                qv = ''
+                try:
+                    if isinstance(self.per_run_qmethods, (list, tuple)) and i < len(self.per_run_qmethods):
+                        qv = self.per_run_qmethods[i] or ''
+                except Exception:
+                    qv = ''
+                if qv in q_options:
+                    q_combo.setCurrentIndex(q_options.index(qv))
+                self.per_run_table.setCellWidget(i, 3, q_combo)
+                # connect per-row combo handler
+                try:
+                    q_combo.currentIndexChanged.connect(self._on_qcombo_changed)
+                except Exception:
+                    pass
+            self.per_run_table.blockSignals(False)
+        except Exception:
+            pass
+
+    def _on_per_run_item_changed(self, item: QTableWidgetItem):
+        # update self.per_run_db when a DB_file cell is edited
+        try:
+            col = item.column()
+            row = item.row()
+            runs = getattr(self, 'runs', []) or []
+            if col == 2:
+                # DB_file edited
+                val = item.text().strip() if item.text() is not None else ''
+                if not isinstance(self.per_run_db, list) or len(self.per_run_db) != len(runs):
+                    self.per_run_db = [''] * len(runs)
+                if 0 <= row < len(self.per_run_db):
+                    self.per_run_db[row] = val
+            elif col == 0:
+                # Seq edited - store into per_run_seq[run] if possible
+                val = item.text().strip() if item.text() is not None else ''
+                try:
+                    seq_val = int(val) if val else None
+                except Exception:
+                    seq_val = None
+                try:
+                    if not isinstance(self.per_run_seq, dict):
+                        self.per_run_seq = {}
+                    if 0 <= row < len(runs):
+                        runnum = runs[row]
+                        self.per_run_seq[runnum] = seq_val
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _on_qcombo_changed(self, _index):
+        # find which row emitted the signal and update per_run_qmethods
+        try:
+            sender = self.sender()
+            for r in range(self.per_run_table.rowCount()):
+                if self.per_run_table.cellWidget(r, 3) is sender:
+                    runs = getattr(self, 'runs', []) or []
+                    if not isinstance(self.per_run_qmethods, list) or len(self.per_run_qmethods) != len(runs):
+                        self.per_run_qmethods = [''] * len(runs)
+                    try:
+                        self.per_run_qmethods[r] = sender.currentText()
+                    except Exception:
+                        self.per_run_qmethods[r] = ''
+                    break
+        except Exception:
+            pass
+
     def _file_path_from_fields(self):
         ipts = self.ipts_edit.text().strip()
         run = self.run_edit.text().strip()
@@ -538,7 +641,15 @@ class ROISelector(QWidget):
         return f"/SNS/REF_L/IPTS-{ipts}/nexus/REF_L_{run}.nxs.h5"
 
     def _browse_template(self):
-        fname, _ = QFileDialog.getOpenFileName(self, "Open template", "", "XML files (*.xml);;All files (*)")
+        # Default to IPTS folder if IPTS provided, otherwise use cwd
+        ipts = self.ipts_edit.text().strip() if hasattr(self, 'ipts_edit') else ''
+        if ipts:
+            start_dir = f"/SNS/REF_L/IPTS-{ipts}"
+            if not os.path.isdir(start_dir):
+                start_dir = os.getcwd()
+        else:
+            start_dir = os.getcwd()
+        fname, _ = QFileDialog.getOpenFileName(self, "Open template", start_dir, "XML files (*.xml);;All files (*)")
         if fname:
             self.template_path_edit.setText(fname)
 
@@ -741,6 +852,17 @@ class ROISelector(QWidget):
                     except Exception:
                         entries = []
 
+                    # Build a sequence-index -> (DB_file, q_method) mapping from entries
+                    seq_map = {}
+                    try:
+                        for xi, ent in enumerate(entries):
+                            try:
+                                seq_map[xi + 1] = (getattr(ent, 'DB_file', None), getattr(ent, 'q_method', None))
+                            except Exception:
+                                seq_map[xi + 1] = (None, None)
+                    except Exception:
+                        seq_map = {}
+
                     # Prefer the sequence index read from the NeXus file
                     seq = getattr(self, 'seq_num', None)
                     chosen = None
@@ -766,7 +888,7 @@ class ROISelector(QWidget):
                                 except Exception:
                                     continue
 
-                    # apply chosen entry if found
+                    # apply chosen entry if found (same as before)
                     if chosen is not None:
                         try:
                             if getattr(chosen, 'data_peak_range', None):
@@ -798,6 +920,79 @@ class ROISelector(QWidget):
                             applied = True
                         except Exception:
                             applied = False
+
+                    # Now populate per-run DB/q lists using seq_map and known seq numbers per run
+                    try:
+                        runs_loaded = getattr(self, 'runs', None) or []
+                    except Exception:
+                        runs_loaded = []
+                    if runs_loaded:
+                        per_db = [''] * len(runs_loaded)
+                        per_q = [''] * len(runs_loaded)
+                        # fill existing entries if present
+                        try:
+                            if isinstance(self.per_run_db, (list, tuple)) and len(self.per_run_db) == len(runs_loaded):
+                                per_db = list(self.per_run_db)
+                        except Exception:
+                            pass
+                        try:
+                            if isinstance(self.per_run_qmethods, (list, tuple)) and len(self.per_run_qmethods) == len(runs_loaded):
+                                per_q = list(self.per_run_qmethods)
+                        except Exception:
+                            pass
+
+                        # determine seq for each run (prefer stored per_run_rois[run]['seq']; fall back to current seq for current run)
+                        for i, r in enumerate(runs_loaded):
+                            seq_for_run = None
+                            try:
+                                if isinstance(self.per_run_seq, dict) and r in self.per_run_seq:
+                                    seq_for_run = self.per_run_seq.get(r)
+                            except Exception:
+                                seq_for_run = None
+                            # if this row corresponds to the current run being loaded, use self.seq_num
+                            try:
+                                cur_run = int(self.run_edit.text().strip())
+                            except Exception:
+                                cur_run = None
+                            if cur_run == r and getattr(self, 'seq_num', None) is not None:
+                                seq_for_run = getattr(self, 'seq_num', None)
+                            if seq_for_run is not None and seq_for_run in seq_map:
+                                per_db[i] = seq_map[seq_for_run][0] or ''
+                                per_q[i] = seq_map[seq_for_run][1] or ''
+                                # record seq into per_run_seq for that run so Seq column shows it
+                                try:
+                                    if not isinstance(self.per_run_seq, dict):
+                                        self.per_run_seq = {}
+                                    self.per_run_seq[r] = seq_for_run
+                                except Exception:
+                                    pass
+                        self.per_run_db = per_db
+                        self.per_run_qmethods = per_q
+                        try:
+                            self._refresh_per_run_table()
+                        except Exception:
+                            pass
+                    else:
+                        # single-run fallback
+                        try:
+                            if seq is not None and seq in seq_map:
+                                self.per_run_db = [seq_map[seq][0]]
+                                self.per_run_qmethods = [seq_map[seq][1]]
+                                try:
+                                    # also record onto per_run_seq for current run if possible
+                                    cur_run = int(self.run_edit.text().strip())
+                                    if cur_run:
+                                        if not isinstance(self.per_run_seq, dict):
+                                            self.per_run_seq = {}
+                                        self.per_run_seq[cur_run] = seq
+                                except Exception:
+                                    pass
+                            else:
+                                self.per_run_db = []
+                                self.per_run_qmethods = []
+                        except Exception:
+                            self.per_run_db = []
+                            self.per_run_qmethods = []
 
                 # Fallback: simple XML parsing for older/simple templates
                 if not applied:
@@ -844,6 +1039,86 @@ class ROISelector(QWidget):
                             else:
                                 try:
                                     self.bkg_mode_cb.setCurrentText("Use 2 background")
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+                        # read DB_file and q_method if present in the simple XML
+                        try:
+                            db_simple = get('DB_file') or get('DBFile') or None
+                            q_simple = get('q_method') or get('qMethod') or None
+                            if db_simple is not None or q_simple is not None:
+                                try:
+                                    runs_loaded = getattr(self, 'runs', None) or []
+                                except Exception:
+                                    runs_loaded = []
+
+                                # prepare per-run lists preserving existing values where possible
+                                per_db = []
+                                per_q = []
+                                if isinstance(self.per_run_db, (list, tuple)) and len(self.per_run_db) == len(runs_loaded):
+                                    per_db = list(self.per_run_db)
+                                else:
+                                    per_db = [None] * len(runs_loaded)
+                                if isinstance(self.per_run_qmethods, (list, tuple)) and len(self.per_run_qmethods) == len(runs_loaded):
+                                    per_q = list(self.per_run_qmethods)
+                                else:
+                                    per_q = [None] * len(runs_loaded)
+
+                                # prioritize sequence-based assignment (like other template fields)
+                                try:
+                                    seq = getattr(self, 'seq_num', None)
+                                except Exception:
+                                    seq = None
+                                try:
+                                    cur_run = int(self.run_edit.text().strip())
+                                except Exception:
+                                    cur_run = None
+
+                                # if sequence is available and RefLData nodes exist, take the db/q from the seq-th entry
+                                try:
+                                    all_ds = dom.getElementsByTagName('RefLData')
+                                except Exception:
+                                    all_ds = []
+
+                                chosen_db = None
+                                chosen_q = None
+                                if seq is not None and seq >= 1 and all_ds and seq - 1 < len(all_ds):
+                                    ds = all_ds[seq - 1]
+                                    el_db = ds.getElementsByTagName('DB_file')
+                                    if el_db and el_db[0].firstChild:
+                                        chosen_db = el_db[0].firstChild.data.strip()
+                                    el_q = ds.getElementsByTagName('q_method')
+                                    if el_q and el_q[0].firstChild:
+                                        chosen_q = el_q[0].firstChild.data.strip()
+                                else:
+                                    # fallback to the simple single-value tags
+                                    chosen_db = db_simple
+                                    chosen_q = q_simple
+
+                                if runs_loaded:
+                                    if cur_run is not None and cur_run in runs_loaded:
+                                        idx = runs_loaded.index(cur_run)
+                                        per_db[idx] = chosen_db
+                                        per_q[idx] = chosen_q
+                                    elif seq is not None and seq - 1 < len(runs_loaded):
+                                        per_db[seq - 1] = chosen_db
+                                        per_q[seq - 1] = chosen_q
+                                    else:
+                                        # fallback: set first run
+                                        per_db[0] = chosen_db
+                                        per_q[0] = chosen_q
+                                    # finalize lists
+                                    per_db = [x if x is not None else '' for x in per_db]
+                                    per_q = [x if x is not None else '' for x in per_q]
+                                    self.per_run_db = per_db
+                                    self.per_run_qmethods = per_q
+                                else:
+                                    self.per_run_db = [chosen_db] if chosen_db is not None else []
+                                    self.per_run_qmethods = [chosen_q] if chosen_q is not None else []
+
+                                try:
+                                    self._refresh_per_run_table()
                                 except Exception:
                                     pass
                         except Exception:
@@ -1510,6 +1785,11 @@ class ROISelector(QWidget):
         self.run_list_widget.setCurrentRow(0)
         self.run_edit.setText(str(runs[0]))
         self.load_file()
+        # refresh per-run settings table to reflect any loaded template values
+        try:
+            self._refresh_per_run_table()
+        except Exception:
+            pass
         # refresh visual marks for stored ROIs (none initially)
         try:
             self._refresh_run_list_marks()
