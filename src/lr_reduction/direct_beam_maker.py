@@ -167,7 +167,7 @@ class Direct_Beam:
                 n = log_values["scale_multiplier"]
                 print(f'Using {n} as scale multiplier')
             except Exception as e:
-                print(f'Using 1.0 as scale multiplier b/c {e}')
+                print(f'Using 1.0 as scale multiplier b/c {e} not in {repr(log_values)}')
                 n = 1.0
 
             I_trans = I / trans
