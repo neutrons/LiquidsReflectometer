@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 import sys
 
-from apps.sld_calculator import SLD
+from apps.direct_beam import DirectBeamTab
 from apps.overplot import Overplot
 from apps.roi_selector import ROISelector
-from apps.direct_beam import DirectBeamTab
+from apps.sld_calculator import SLD
 from apps.template_batch import TemplateBatchTab
 from qtpy import QtCore
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget

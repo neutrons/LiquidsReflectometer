@@ -5,9 +5,9 @@ Example usage of the unified NR reduction class
 Demonstrates how to configure and run reductions using both constantQ, constantTOF and MeanTheta methods
 """
 
+import numpy as np
 from nr_reduction_calc import NR_Reduction
 from nr_reduction_config import NRReductionConfig
-import numpy as np
 
 
 def example_constant_q_reduction():
@@ -15,12 +15,12 @@ def example_constant_q_reduction():
     print("\n" + "="*60)
     print("CONSTANT Q-LINE REDUCTION EXAMPLE")
     print("="*60)
-    
+
     # Create configuration for constantQ method
     config = NRReductionConfig()
     config.method_per_run = ['constantQ']
 
-    # Path needs to be setup for these tests but should be able to turn off later.    
+    # Path needs to be setup for these tests but should be able to turn off later.
     config.Spath = '/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/'
     #config.NEXUSpathRB = # Append path if required.
     config.DBpath = '/SNS/REF_L/shared/Cd_DB_processing/DBs/'
@@ -48,24 +48,24 @@ def example_constant_q_reduction():
 
     # Output name
     config.Sname = "NR_constantQ"
-    
+
     # Processing options
     config.Normalize = False
     config.AutoScale = False
     config.useCalcTheta = True
     config.plotON = True  # Set to False for batch processing
-    
+
     # Method-specific parameters
     config.peak_pad = 5
     config.Qline_threshold = 0.66
-    
+
     # Run reduction
     reducer = NR_Reduction(config)
     results = reducer.reduce()
-    
+
     print(f"\nReduced {len(config.RBnum)} runs")
     print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
-    
+
     return results
 
 
@@ -74,12 +74,12 @@ def example_mean_theta_reduction():
     print("\n" + "="*60)
     print("MEAN THETA REDUCTION EXAMPLE")
     print("="*60)
-    
+
     # Create configuration for MeanTheta method
     config = NRReductionConfig()
     config.method_per_run = ['meanTheta']
-    
-    # Path needs to be setup for these tests but should be able to turn off later.    
+
+    # Path needs to be setup for these tests but should be able to turn off later.
     config.Spath = '/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/'
     #config.NEXUSpathRB = # Append path if required.
     config.DBpath = '/SNS/REF_L/shared/Cd_DB_processing/DBs/'
@@ -105,26 +105,26 @@ def example_mean_theta_reduction():
 
     # Output name
     config.Sname = "NR_meanTheta"
-    
+
     # Processing options
     config.Normalize = False
-    config.AutoScale = True 
+    config.AutoScale = True
     config.useCalcTheta = False
     config.plotON = True  # Set to False for batch processing
-    
+
     # Method-specific parameters
     config.peak_pad = 1
     config.Qline_threshold = 1.0
     config.DetSigma = 0.8
     config.DetResFn = 'rectangular'
-    
+
     # Run reduction
     reducer = NR_Reduction(config)
     results = reducer.reduce()
-    
+
     print(f"\nReduced {len(config.RBnum)} runs with repeat averaging")
     print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
-    
+
     return results
 
 
@@ -133,12 +133,12 @@ def example_constant_tof_reduction():
     print("\n" + "="*60)
     print("CONSTANT TOF REDUCTION EXAMPLE")
     print("="*60)
-    
+
     # Create configuration for constantTOF method
     config = NRReductionConfig()
     config.method_per_run = ['constantTOF']
-    
-    # Path needs to be setup for these tests but should be able to turn off later.    
+
+    # Path needs to be setup for these tests but should be able to turn off later.
     config.Spath = '/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/'
     #config.NEXUSpathRB = # Append path if required.
     config.DBpath = '/SNS/REF_L/shared/Cd_DB_processing/DBs/'
@@ -161,27 +161,27 @@ def example_constant_tof_reduction():
         RB_Ymax + 3,
         RB_Ymax + 8
     ))
-    
+
     # Output name
     config.Sname = "NR_constantTOF"
-    
+
     # Processing options
     config.Normalize = False
     config.AutoScale = True
     config.useCalcTheta = True
     config.plotON = True
-    
+
     # Method-specific parameters
     config.peak_pad = 1
     config.plotQ4 = False  # ConstantTOF typically doesn't plot Q4
-    
+
     # Run reduction
     reducer = NR_Reduction(config)
     results = reducer.reduce()
-    
+
     print(f"\nReduced {len(config.RBnum)} runs (TOF-binned)")
     print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
-    
+
     return results
 
 
@@ -192,4 +192,4 @@ if __name__ == '__main__':
     example_constant_tof_reduction()
 
 
-    
+
