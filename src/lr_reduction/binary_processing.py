@@ -147,8 +147,19 @@ def get_log_values(fname):
     log_values["thi"] = f['entry/DASlogs/BL4B:Mot:thi.RBV/value'][-1]
     log_values["ths"] = f['entry/DASlogs/BL4B:Mot:ths.RBV/value'][-1]
     log_values["tthd"] = f['entry/DASlogs/BL4B:Mot:tthd.RBV/value'][-1]
+    # Autoreduction indicators
     log_values["seq_num"] = f['entry/DASlogs/BL4B:CS:Autoreduce:Sequence:Num/value'][0]
     log_values["seq_id"] = f['entry/DASlogs/BL4B:CS:Autoreduce:Sequence:Id/value'][0]
+    try:
+        #log_values["seq_total"] = f['entry/DASlogs/BL4B:CS:Autoreduce:Sequence:Total/value'][0]
+        #log_values["center_pixel"] = f['entry/DASlogs/BL4B:CS:Autoreduce:Sequence:CenterPixel/value'][0]
+        #log_values["data_type"] = f['entry/DASlogs/BL4B:CS:Autoreduce:Sequence:DataType/value'][0]
+        log_values["scale_multiplier"] = f['entry/DASlogs/BL4B:CS:Autoreduce:ScaleMultiplier/value'][0]
+        #log_values["distance_sample_detector"] = f['entry/DASlogs/BL4B:CS:Autoreduce:Sequence:DistanceSampleDetector/value'][0]
+        #log_values["template_id"] = f['entry/DASlogs/BL4B:CS:Autoreduce:Sequence:TemplateId/value'][0]
+    except Exception as e:
+        print(f'Cannot process {fname} b/c {e} fails to extract')
+        pass
     # Get slit gap openings.
     log_values["siY"]=np.array(f['entry/DASlogs/BL4B:Mot:si:Y:Gap:Readback/average_value'][0])
     log_values["s1Y"]=np.array(f['entry/DASlogs/BL4B:Mot:s1:Y:Gap:Readback/average_value'][0])
