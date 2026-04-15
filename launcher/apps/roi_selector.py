@@ -1,8 +1,9 @@
 #!/usr/bin/python3
 import os
+
 import h5py
 import numpy as np
-import traceback
+
 # Try to import scipy curve fit for better peak finding (optional)
 try:
     from scipy.optimize import curve_fit
@@ -13,14 +14,29 @@ except Exception:
 # Qt and Matplotlib imports (some are optional depending on environment)
 try:
     from qtpy import QtCore
+    from qtpy.QtGui import QBrush, QColor, QFont
     from qtpy.QtWidgets import (
-        QDialog, QWidget, QVBoxLayout, QFormLayout, QHBoxLayout, QLineEdit,
-        QPushButton, QDialogButtonBox, QFileDialog, QCheckBox, QTableWidget,
-        QTableWidgetItem, QComboBox, QLabel, QSpinBox, QListWidget, QGroupBox,
-        QSizePolicy, QGridLayout
+        QCheckBox,
+        QComboBox,
+        QDialog,
+        QDialogButtonBox,
+        QFileDialog,
+        QFormLayout,
+        QGridLayout,
+        QGroupBox,
+        QHBoxLayout,
+        QLabel,
+        QLineEdit,
+        QListWidget,
+        QMessageBox,
+        QPushButton,
+        QSizePolicy,
+        QSpinBox,
+        QTableWidget,
+        QTableWidgetItem,
+        QVBoxLayout,
+        QWidget,
     )
-    from qtpy.QtWidgets import QMessageBox
-    from qtpy.QtGui import QFont, QBrush, QColor
 except Exception:
     # allow headless import failures; variables below will be None/missing and
     # the rest of the code should guard against unavailable GUI elements.
@@ -30,17 +46,18 @@ except Exception:
         QtCore = None
 
 try:
-    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
-    from matplotlib.figure import Figure
     import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+    from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
     from matplotlib.colors import LogNorm
+    from matplotlib.figure import Figure
 except Exception:
     FigureCanvas = None
     NavigationToolbar = None
     Figure = None
     plt = None
     LogNorm = None
-    
+
 class DBPerRunDialog(QDialog):
     """Simple dialog to edit per-run DB_file and q_method lists."""
     def __init__(self, parent=None, runs=None, initial=None, q_initial=None):
@@ -91,7 +108,7 @@ class DBPerRunDialog(QDialog):
             except Exception:
                 qs.append('')
         return {'db_files': dbs, 'q_methods': qs}
-    
+
 class SaveTemplateDialog(QDialog):
     def __init__(self, parent=None, defaults=None, runs=None):
         super().__init__(parent)
@@ -2247,4 +2264,4 @@ class ROISelector(QWidget):
             QMessageBox.critical(self, "Save error", f"Failed to save combined template: {e}")
 
 
-    
+

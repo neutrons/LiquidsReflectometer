@@ -1,15 +1,17 @@
+import copy
+import os
+from pathlib import Path
+
 import h5py
+import new_reduction_template_reader as reduction_template_reader
+import nr_tools as tools
+import numpy as np
+from matplotlib import pyplot as plt
+from new_reduction_template_reader import ReductionParameters
+
 #import template
 from nr_reduction_calc import NR_Reduction  # TODO: Fix names of files!!
 from nr_reduction_config import NRReductionConfig
-from pathlib import Path
-import os
-import numpy as np
-import nr_tools as tools
-from new_reduction_template_reader import ReductionParameters
-import new_reduction_template_reader as reduction_template_reader
-from matplotlib import pyplot as plt
-import copy
 
 
 def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True):
@@ -27,7 +29,7 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     Can be simplified in future.
 
     NOTE: new files for reading the template were made to not cause issues with prior setup but can be changed in future.
-    
+
     runno: reflectivity run number
     template_file: template file, including Path
     experiment_id: str IPTS number which appends to datapath if this isn't provided (e.g. "IPTS-36119")
@@ -36,7 +38,7 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     override_params: dict  Dictionary of config settings to override the defaults in either the template reader or the NRReduction config defaults.
     plot: bool Toggle to plot outputs during reduction steps.
 
-    returns 
+    returns
         combined_results: dict of Q, R, dR, dQ. This is assembled with anything else on same seq num. #TODO: check if need individual one returned too.
     """
 
@@ -57,7 +59,7 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     config.experiment_id = experiment_id
     config.Sname = f"REFL_{seq_id}_{seq_num}_{runno}"
     config.plotON = plot
-    
+
     if datapath:
         config.NEXUSpathRB = datapath
 
@@ -84,7 +86,7 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     result = {'Q': results['q'], 'R': results['r'], 'dR': results['dr'], 'dQ': results['dq']}
     reduce_calc.save_results(result, sname=f"{config.Sname}_partial")
 
-    # Collect "like" runs together 
+    # Collect "like" runs together
     seq_list, run_list, combined_results, scaling_factors = assemble_results(seq_id, config.Spath, autoscale=config.AutoScale, plot=plot, RQ4=config.plotQ4)
     # Add scaling factor to output
     scale_list = np.array([np.float64(1)] + scaling_factors)
@@ -116,16 +118,16 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
 def config_from_template(template_data):
     """
     Create an NRReductionConfig from a template file.
-    
+
     Parameters
     ----------
-    template_data : 
-    
+    template_data :
+
     Returns
     -------
     NRReductionConfig
         Configuration object ready for NR_Reduction
-        
+
     """
     # NOTE: Various of the config items expect arrays so ensure is set as single item array here.
 
@@ -134,17 +136,17 @@ def config_from_template(template_data):
         method = template_data.q_method
     else:
         method = 'MeanTheta' if template_data.const_q else 'constantTOF' #TODO: decide if this should be MeanTheta or constantQ
-    
+
     # Initialize configuration
     config = NRReductionConfig()
     config.method_per_run = [method]
-    
+
     # Update other parameters from the template
     config.RB_Ymin = [template_data.data_peak_range[0]]
     config.RB_Ymax = [template_data.data_peak_range[1]]
 
     if template_data.subtract_background == True:
-        config.useBS = [1] 
+        config.useBS = [1]
     else:
         config.useBS = [0]
     config.BkgROI = [template_data.background_roi]
@@ -173,7 +175,7 @@ def config_from_template(template_data):
     config.useCalcTheta = getattr(template_data, "use_calc_theta", config.useCalcTheta)
     config.Qline_threshold = getattr(template_data, "qline_threshold", config.Qline_threshold)
     config.ScaleFactor = [getattr(template_data, "scale_factor", 1.0)]
-    
+
     return config
 
 def template_to_config(config_data, template_data):
@@ -222,7 +224,7 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
         seq_list, run_list, combined results
 
     """
- 
+
     # Keep track of sequence IDs and run numbers so we can make a new template
     seq_list = []
     run_list = []
@@ -282,14 +284,14 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
         Q.append(result[0, :])
         R.append(result[1, :])
         dR.append(result[2, :])
-        dQ.append(result[3, :])  
+        dQ.append(result[3, :])
 
         # This is a bit muddled with a few things in arrays and dict. TODO: clean-up so don't need both.
         dict_output.append({'Q': result[0,:], 'R': result[1,:], 'dR': result[2,:], 'dQ': result[3,:]})
 
     if len(Q) == 0:
         raise ValueError(f"No valid runs found for sequence {seq_id}")
-    
+
     if plot:
         plot_reflectivity(dict_output, RQ4)
 
@@ -298,7 +300,7 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
     R_combined = np.concatenate(R)
     dR_combined = np.concatenate(dR)
     dQ_combined = np.concatenate(dQ)
-    
+
     # Sort by Q for combined data
     idx = np.argsort(Q_combined)
     combine_results = {'Q': Q_combined[idx], 'R': R_combined[idx], 'dR': dR_combined[idx], 'dQ': dQ_combined[idx]}
@@ -407,7 +409,7 @@ def plot_reflectivity(data_array, RQ4=False, log_x = True):
     """
     Plot reflectivity assuming data_array is an array of dictionaries with keys of Q, R, dQ and dR.
     # TODO: Add error handling for not being an array or a proper dictionary.
-    
+
     :param data_array: Description
     :param RQ4: Description
     :param log_x: Description
@@ -432,4 +434,3 @@ def plot_reflectivity(data_array, RQ4=False, log_x = True):
     ax.set_xlabel('Q [1/'+Angstrom+']', fontsize=14)
     ax.set_title('NR data') # TODO: add better title handling
     plt.show()
-

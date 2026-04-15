@@ -1,26 +1,22 @@
 #!/usr/bin/python3
 import os
+
+import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 from qtpy import QtCore
 from qtpy.QtWidgets import (
-    QFileDialog,
-    QGridLayout,
+    QCheckBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
     QLabel,
-    QPushButton,
-    QWidget,
     QLineEdit,
     QMessageBox,
-    QHBoxLayout,
+    QPushButton,
     QVBoxLayout,
-    QCheckBox,
-    QGroupBox,
-    QFormLayout,
-    QSpinBox,
-    QDoubleSpinBox,
+    QWidget,
 )
-
-import numpy as np
-from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
 
 # Try matplotlib Qt backends
 FigureCanvas = None
@@ -57,7 +53,7 @@ class CdSettingsDialog(QMessageBox):
     def __init__(self, parent=None, defaults=None, initial_defaults=None):
         super().__init__(parent)
         # Using simple dialog via QMessageBox with custom widget is cumbersome; build a QDialog-like widget
-        from qtpy.QtWidgets import QDialog, QFormLayout, QDialogButtonBox
+        from qtpy.QtWidgets import QDialog, QDialogButtonBox, QFormLayout
         self.dlg = QDialog(parent)
         self.dlg.setWindowTitle("Cd settings")
         layout = QVBoxLayout()
@@ -132,7 +128,7 @@ class CdSettingsDialog(QMessageBox):
 
 class ModeratorDialog(QMessageBox):
     def __init__(self, parent=None, defaults=None, initial_defaults=None):
-        from qtpy.QtWidgets import QDialog, QFormLayout, QDialogButtonBox
+        from qtpy.QtWidgets import QDialog, QDialogButtonBox, QFormLayout
         super().__init__(parent)
         self.dlg = QDialog(parent)
         self.dlg.setWindowTitle('Moderator settings')
@@ -561,4 +557,4 @@ class DirectBeamTab(QWidget):
                 plt.ylabel('I')
                 plt.tight_layout()
                 plt.show()
- 
+

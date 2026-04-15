@@ -1,24 +1,23 @@
 #!/usr/bin/python3
 import os
-from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtWidgets import (
-    QFileDialog,
-    QGridLayout,
-    QLabel,
-    QListWidget,
-    QListWidgetItem,
-    QPushButton,
-    QComboBox,
-    QWidget,
-    QLineEdit,
-    QMessageBox,
-    QHBoxLayout,
-    QVBoxLayout,
-)
 
+import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
+from qtpy import QtCore
+from qtpy.QtWidgets import (
+    QComboBox,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 # Try a few possible Qt backends for matplotlib (Qt5, QtAgg, Qt4)
 FigureCanvas = None

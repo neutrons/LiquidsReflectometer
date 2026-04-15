@@ -3,7 +3,7 @@ import numpy as np
 from scipy.special import lambertw
 
 ## NOTES: This moves away from events after the dead-time correction has been applied.
-## Various aspects of this are easier through h5py than mantid wksp. Here will include a few functions to 
+## Various aspects of this are easier through h5py than mantid wksp. Here will include a few functions to
 ## work through the steps which might not all be needed in the final version but shows the idea.
 
 # TODO: link up the parts that are self. from copying across.
@@ -11,7 +11,7 @@ from scipy.special import lambertw
 def convert_to_binary(fname, lowres, collapse_x = True, tofbin=50, tofmax=100000, tofmin=0, deadtime=4.2, tof_step=100, n_y=304, n_x=256):
     '''
     Main function for converting to load the file, apply the dead-time correction and obtain y vs tof data (non-event).
-    
+
     :param fname: File to load
     :param lowres: pixel range for low-res direction (i.e. x-pixels for LR). expects of format [min, max]
     :param collapse_x: planned option to keep the x-pixel direction but not implemented. True sums over x-pixels in the lowres range.
@@ -54,7 +54,7 @@ def load_and_extract(fname):
     pcharge=np.array(f['entry/proton_charge'][:])
     # This is single value. TODO: streamline so don't need this and the previous log.
     cPC=np.array(f['entry/DASlogs/proton_charge/value'][:])
-    
+
     log_values = get_log_values(fname)
 
     return e_offset, event_id, error_event_offset, pcharge, cPC, log_values
@@ -63,7 +63,7 @@ def load_and_extract(fname):
 def get_deadtime_correction(error_event_offset, e_offset, pcharge, tofbin=50, tofmax=50000, tofmin=0, use_bad_counts=True, deadtime=4.2, tof_step=100):
     '''
     Gets and applies the dead-time correction.
-    
+
     :param error_event_offset: Description
     :param e_offset: Description
     :param pcharge: Description
@@ -82,7 +82,7 @@ def get_deadtime_correction(error_event_offset, e_offset, pcharge, tofbin=50, to
     bin_edges = np.concatenate([[tof_array[0] - tofbin/2], tof_array + tofbin/2])
     # Fill with the event time offsets
     counts, _ = np.histogram(e_offset, bins=bin_edges)
-    
+
     if use_bad_counts:
         # Include the bad counts for dead-time correction
         bad_counts, _ = np.histogram(error_event_offset, bins=bin_edges)
@@ -92,7 +92,7 @@ def get_deadtime_correction(error_event_offset, e_offset, pcharge, tofbin=50, to
     # Normalise by proton charge
     counts_norm = counts / pGood
 
-    # Calculate the dead-time correction - this links to existing expression and properties.   
+    # Calculate the dead-time correction - this links to existing expression and properties.
     with np.errstate(divide='ignore', invalid='ignore'):
         b = -lambertw(-counts_norm * deadtime / tofbin) / (deadtime / tofbin)
         DTC = np.real(b / counts_norm)
@@ -103,7 +103,7 @@ def get_deadtime_correction(error_event_offset, e_offset, pcharge, tofbin=50, to
 def get_y_tof(tof_array, event_id, e_offset, lowres, pcharge, n_y = 304, n_x = 256):
     '''
     Collapses the event data into y vs tof histogram.
-    
+
     :param tof_array: array of tof
     :param event_id: array of event ids
     :param e_offset: array of event time offsets
@@ -179,7 +179,7 @@ def get_log_values(fname):
     # TODO: check if we need any of the other chopper parts.
     log_values["frequency"]=np.array(f['entry/DASlogs/BL4B:Det:TH:BL:Frequency/value'][0])
     log_values["lam_request"]=np.array(f['entry/DASlogs/BL4B:Det:TH:BL:Lambda/value'][0])
-    
+
     try:
         log_values["chopper_mod"]=np.array(f['entry/DASlogs/BL4B:Chop:Skf2:ChopperModerator/value'][0])
     except:
@@ -191,7 +191,7 @@ def get_log_values(fname):
     log_values["emission_coefficients"]=np.array([off/1000, mult/1000])
 
     log_values["chop2_PD"] = np.array(f['entry/DASlogs/BL4B:Chop:Skf2:PhaseAccuracy/average_value'][0])
-        
+
     # TODO: Test these!!
     try:
         atten_menu = np.array(f['entry/DASlogs/BL4B:Actuator:Menu/value'][0])
@@ -218,10 +218,9 @@ def get_log_values(fname):
         Att1 = np.array(f['entry/DASlogs/BL4B:Actuator:50MRb/average_value'][0])
         Att2 = np.array(f['entry/DASlogs/BL4B:Actuator:100MRb/average_value'][0])
         Att3 = np.array(f['entry/DASlogs/BL4B:Actuator:200MRb/average_value'][0])
-        Att4 = np.array(f['entry/DASlogs/BL4B:Actuator:400MRb/average_value'][0])       
+        Att4 = np.array(f['entry/DASlogs/BL4B:Actuator:400MRb/average_value'][0])
         log_values['Atten'] = np.array([Att1,Att2,Att3,Att4])
 
     f.close()
-    
-    return log_values
 
+    return log_values

@@ -2,17 +2,18 @@
 Example script for running new reduction with config from template (e.g. for autoreduction workflow)
 """
 
-import numpy as np
-import new_reduction_from_template as new_template
 from pathlib import Path
+
+import new_reduction_from_template as new_template
+
 
 def example_template_reduction():
     # Example for just a single angle.
-    
+
     print("\n" + "="*60)
     print("TEMPLATE REDUCTION EXAMPLE")
     print("="*60)
-    
+
     # These shouldn't be needed in the longer term.
     datapath = Path('/SNS/REF_L/IPTS-30101/nexus')
     DBpath = Path('/SNS/REF_L/shared/Cd_DB_processing/DBs/')
@@ -30,19 +31,19 @@ def example_template_reduction():
     }
 
     results = new_template.reduce_from_template(211029, template_path / "test_template.xml", "IPTS-36119", datapath=datapath, template_path=template_path, override_params=override_params, plot=True)
-   
+
     #print(f"\nReduced {len(config.RBnum)} runs")
     print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
-    
+
     return results
 
 def example_template_reduction_3ang():
     # Example with 3 angles in a set
-    
+
     print("\n" + "="*60)
     print("TEMPLATE REDUCTION EXAMPLE")
     print("="*60)
-    
+
     datapath = Path('/SNS/REF_L/IPTS-30101/nexus')
     DBpath = Path('/SNS/REF_L/shared/Cd_DB_processing/DBs/')
     template_path = Path('/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/')
@@ -66,20 +67,20 @@ def example_template_reduction_3ang():
         }
 
         results = new_template.reduce_from_template(run, template_path / "test_template_3ang.xml", "IPTS-36119", datapath=datapath,template_path=template_path,override_params=override_params, plot=True)
-   
+
         #print(f"\nReduced {len(config.RBnum)} runs")
         print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
-    
+
 
     return results
 
 def example_template_reduction_new():
     # Example to redo the prior reduction but reading from the new template.
-    
+
     print("\n" + "="*60)
     print("TEMPLATE REDUCTION EXAMPLE")
     print("="*60)
-    
+
     datapath = Path('/SNS/REF_L/IPTS-30101/nexus')
     Spath = Path('/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/')
     DBpath = Path('/SNS/REF_L/shared/Cd_DB_processing/DBs/')
@@ -96,12 +97,12 @@ def example_template_reduction_new():
             'DBpath': DBpath
         }
 
-        results = new_template.reduce_from_template(run, template_path / "REFL_211029_template_new.xml", "IPTS-36119", 
+        results = new_template.reduce_from_template(run, template_path / "REFL_211029_template_new.xml", "IPTS-36119",
                                                     datapath=datapath, template_path=template_path, override_params=override_params, plot=True)
-   
+
         #print(f"\nReduced {len(config.RBnum)} runs")
         print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
-    
+
 
     return results
 
