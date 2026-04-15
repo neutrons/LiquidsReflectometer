@@ -161,14 +161,23 @@ class Direct_Beam:
             mu = np.interp(L, L_ENDF, mu_ENDF)
             trans = np.exp(-mu*Cd_thickness)
 
+            # Need to interpret the scale multiplier and apply the correction
+            # This allows the program to handle slit-scan DBs
+            try:
+                n = log_values["scale_multiplier"]
+                print(f'Using {n} as scale multiplier')
+            except Exception as e:
+                print(f'Using 1.0 as scale multiplier b/c {e}')
+                n = 1.0
+
             I_trans = I / trans
             if plot:
                 plt.plot(L, I_trans, 'o', markersize=1)
             # store trace for optional return
             traces.append((L, I_trans, run))
             LAM.extend(L)
-            INT.extend(I_trans)
-            ERR.extend(E/trans)
+            INT.extend(I_trans * n * n)
+            ERR.extend((E * n * n)/trans)
 
         LAM = np.array(LAM)
         INT = np.array(INT)
