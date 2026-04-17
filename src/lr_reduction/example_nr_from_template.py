@@ -4,7 +4,7 @@ Example script for running new reduction with config from template (e.g. for aut
 
 from pathlib import Path
 
-import new_reduction_from_template as new_template
+import lr_reduction.new_reduction_from_template as new_template
 
 
 def example_template_reduction():

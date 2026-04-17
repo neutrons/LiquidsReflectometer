@@ -3,15 +3,15 @@ import os
 from pathlib import Path
 
 import h5py
-import new_reduction_template_reader as reduction_template_reader
-import nr_tools as tools
+import lr_reduction.new_reduction_template_reader as reduction_template_reader
+import lr_reduction.nr_tools as tools
 import numpy as np
 from matplotlib import pyplot as plt
-from new_reduction_template_reader import ReductionParameters
+from lr_reduction.new_reduction_template_reader import ReductionParameters
 
 #import template
-from nr_reduction_calc import NR_Reduction  # TODO: Fix names of files!!
-from nr_reduction_config import NRReductionConfig
+from lr_reduction.nr_reduction_calc import NR_Reduction  # TODO: Fix names of files!!
+from lr_reduction.nr_reduction_config import NRReductionConfig
 
 
 def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True):

@@ -7,9 +7,9 @@ For now, it assumes a pre-processed DB file.
 """
 import os
 
-import binary_processing as BP
+import lr_reduction.binary_processing as BP
 import matplotlib.pyplot as plt
-import nr_tools as tools
+import lr_reduction.nr_tools as tools
 import numpy as np
 from matplotlib.colors import LogNorm
 from scipy.ndimage import gaussian_filter1d, uniform_filter1d

@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
 
-import binary_processing as BP
-import nr_tools as tools
+import lr_reduction.binary_processing as BP
+import lr_reduction.nr_tools as tools
 import numpy as np
 from matplotlib import pyplot as plt
 

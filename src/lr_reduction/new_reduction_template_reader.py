@@ -24,7 +24,7 @@ import time
 import xml.dom.minidom
 
 #from lr_reduction.gravity_correction import GravityDirection
-from instrument_settings import InstrumentSettings
+from lr_reduction.instrument_settings import InstrumentSettings
 
 from lr_reduction import __version__ as VERSION
 
