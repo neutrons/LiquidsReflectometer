@@ -157,7 +157,7 @@ def test_constant_tof_reduction():
 
 if __name__ == '__main__':
     # Run examples
-    test_mean_theta_reduction()
-    #test_constant_tof_reduction()
+    #test_mean_theta_reduction()
+    test_constant_tof_reduction()
 
 
