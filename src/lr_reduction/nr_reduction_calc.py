@@ -344,6 +344,10 @@ class NR_Reduction:
         LAMBDA = 3956 * (tRB - (t0[0] + t0[1] * LAMBDA)) / self.settings['source_detector_distance']
         LambdaBinSize = abs(LAMBDA[1] - LAMBDA[0])
         
+        if self.config.plotON:
+            fig, ax = plt.subplots()
+            ax.plot(LAMBDA, np.sum(RB, axis=0), label='pre-mask')
+
         # Trim to desired lambda range
         mask = ((LAMBDA >= self.config.LambdaMinUse) & (LAMBDA <= self.config.LambdaMaxUse))
         LAMBDA = LAMBDA[mask]
@@ -353,11 +357,20 @@ class NR_Reduction:
         # # Interpolate DB lambda to match new RB binning
         # iDB = np.interp(LAMBDA, lDB, iDB)
         # eDB = np.interp(LAMBDA, lDB, eDB)
-        
+
+        if self.config.plotON:        
+            ax.plot(lDB, iDB, label='DB')
+            ax.plot(LAMBDA, np.sum(RB, axis=0), label='post mask')
+            
         # Rebin DB lambda to match new RB binning
         iDB = tools.rebin_counts(LAMBDA, lDB, iDB)
         eDB = np.sqrt(tools.rebin_counts(LAMBDA, lDB, eDB**2))
         
+        if self.config.plotON:        
+            ax.plot(LAMBDA, iDB, label='DB rebin')
+            ax.legend()
+            plt.show()
+
         # TODO: check what is stored and whether this is the best place.
         self.q = q
         
@@ -867,7 +880,7 @@ class NR_Reduction:
             REarr = eRB
         
         # Normalize by incident spectrum & propagate error
-        R0 = Rarr.copy()       
+        R0 = Rarr.copy()    
         Rarr, REarr = tools.divide_propagate_error(R0, REarr, iDB, eDB)
         
         # Remove NaNs - #TODO: check if this is still correct...

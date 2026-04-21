@@ -426,7 +426,7 @@ def load_db_file(db_dir, db_name, comment="#"):
 
     return col1, col2, col3, meta
 
-def get_lam_range(chopper_lam, chopper_speed, scaled_width=3.5):
+def get_lam_range(chopper_lam, chopper_speed, scaled_width=3.4):
     """
     Determine lambda range from chopper settings
 
@@ -439,6 +439,7 @@ def get_lam_range(chopper_lam, chopper_speed, scaled_width=3.5):
     scaled_width
         equivalent bandwidth to 60Hz to use (default 3.5A)
         # TODO: Check this range. It is wider that the lr_reduction allowed before.
+        # Edited via observation to include a shift.
 
     Returns
     -------
@@ -446,9 +447,8 @@ def get_lam_range(chopper_lam, chopper_speed, scaled_width=3.5):
         [min, max] wavelength range
     """
 
-    # Cut the edges by using a width of 2.6 A
-    wl_min = chopper_lam - (scaled_width / 2) * 60.0 / chopper_speed
-    wl_max = chopper_lam + (scaled_width / 2) * 60.0 / chopper_speed
+    wl_min = chopper_lam - (scaled_width / 2) * 60.0 / chopper_speed - 0.15
+    wl_max = chopper_lam + (scaled_width / 2) * 60.0 / chopper_speed - 0.15
 
     return [wl_min, wl_max]
 
