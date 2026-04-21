@@ -14,7 +14,7 @@ from lr_reduction.nr_reduction_calc import NR_Reduction  # TODO: Fix names of fi
 from lr_reduction.nr_reduction_config import NRReductionConfig
 
 
-def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True):
+def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True, eight_col=None):
     """
     Wrapper function to reduce a single run with reading of parameters from an xml template of the lr_reduction format.
     Then collect like results within the save folder and combine them together.
@@ -67,6 +67,10 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     if seq_num != 1:
         config.Normalize = False
 
+    # override the saving of 8 column if provided into the function. TODO: decide if needed.
+    if eight_col:
+        config.save8col = eight_col
+
     # override template with anything provided
     if override_params:
         for key, value in override_params.items():
@@ -82,17 +86,26 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     reduce_calc = NR_Reduction(config)
     results = reduce_calc._reduce_single_run(i=0, rb_num=config.RBnum[0], save=True)
 
-    # Save the single run output. TODO: this might need cleaning up between the different functions.
-    result = {'Q': results['q'], 'R': results['r'], 'dR': results['dr'], 'dQ': results['dq']}
+    if eight_col:
+        # Save the single run output. TODO: this might need cleaning up between the different functions.
+        result = {'Q': results['q'], 'R': results['r'], 'dR': results['dr'], 'dQ': results['dq'],
+                'T': result['t'], 'L': result['l'], 'dT': result['dt'], 'dL': result['dl']}
+    else:
+        result = {'Q': results['q'], 'R': results['r'], 'dR': results['dr'], 'dQ': results['dq']}       
+    
     reduce_calc.save_results(result, sname=f"{config.Sname}_partial")
+    if eight_col: #TODO: decide whether this is instead of prior save
+        reduce_calc.save_results(result, sname=f"{config.Sname}_partial", eight_column=True)
 
     # Collect "like" runs together
-    seq_list, run_list, combined_results, scaling_factors = assemble_results(seq_id, config.Spath, autoscale=config.AutoScale, plot=plot, RQ4=config.plotQ4)
+    seq_list, run_list, combined_results, scaling_factors = assemble_results(seq_id, config.Spath, autoscale=config.AutoScale, plot=plot, RQ4=config.plotQ4, eight_col=eight_col)
     # Add scaling factor to output
     scale_list = np.array([np.float64(1)] + scaling_factors)
     config.ScaleFactor *= scale_list
     # Save combined data
     reduce_calc.save_results(combined_results, sname=f"REFL_{seq_id}_combined_data", full=False)
+    if eight_col: #TODO: decide whether this is instead of prior save
+        reduce_calc.save_results(combined_results, sname=f"REFL_{seq_id}_combined_data", full=False, eight_column=True)
 
     # plot
     if plot:
@@ -179,6 +192,7 @@ def config_from_template(template_data):
     config.useCalcTheta = getattr(template_data, "use_calc_theta", config.useCalcTheta)
     config.Qline_threshold = getattr(template_data, "qline_threshold", config.Qline_threshold)
     config.ScaleFactor = [getattr(template_data, "scale_factor", 1.0)]
+    config.save8col = getattr(template_data, "save_eight_col", config.save8col)
 
     return config
 
@@ -208,6 +222,7 @@ def template_to_config(config_data, template_data):
     template.qline_threshold = config_data.Qline_threshold
     template.scale_factor = config_data.ScaleFactor[0]
     template.use_emission_time = config_data.use_emission_time
+    template.save8col = config_data.save8col
 
     if (config_data.LambdaMin is not None) & (config_data.LambdaMax is not None):
         template.lam_range = [config_data.LambdaMin[0], config_data.LambdaMax[0]]
@@ -215,7 +230,7 @@ def template_to_config(config_data, template_data):
     return template
 
 
-def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False):
+def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False, eight_col = False):
     """
     Assemble the results for any files in the saved directory that have the same sequence number.
     Finds files saved witht the "partial.dat" ending, sorts the data , autoscales if the flag applied,
@@ -241,7 +256,11 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
     file_list = sorted(os.listdir(output_dir))
     print("Files found:", len(full_names))
     for item in file_list:
-        if item.startswith("REFL_%s" % seq_id) and item.endswith("partial.dat"):
+        if eight_col:
+            search_flag = item.endswith("partial_8col.dat")
+        else:
+            search_flag = item.endswith("partial.dat")
+        if item.startswith("REFL_%s" % seq_id) and search_flag:
             toks = item.split("_")
             if not len(toks) == 5 or int(toks[2]) == 0:
                 continue
@@ -268,6 +287,7 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
 
     # TODO: add better autoscaling options. Make scaling a function in nr_tools?
     Q, R, dR, dQ = [], [], [], []
+    T, L, dT, dL = [], [], [], []
     dict_output = []
     scaling_factors = []
     for run, result in enumerate(sorted_data):
@@ -292,9 +312,17 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
         R.append(result[1, :])
         dR.append(result[2, :])
         dQ.append(result[3, :])
+        if eight_col:
+            L.append(result[4, :])
+            dL.append(result[5, :])
+            T.append(result[6, :])
+            dT.append(result[7, :])
 
-        # This is a bit muddled with a few things in arrays and dict. TODO: clean-up so don't need both.
-        dict_output.append({'Q': result[0,:], 'R': result[1,:], 'dR': result[2,:], 'dQ': result[3,:]})
+            dict_output.append({'Q': result[0,:], 'R': result[1,:], 'dR': result[2,:], 'dQ': result[3,:],
+                                'L': result[4,:], 'dL': result[5,:], 'T': result[6,:], 'dT': result[7,:]})
+        else:
+            # This is a bit muddled with a few things in arrays and dict. TODO: clean-up so don't need both.
+            dict_output.append({'Q': result[0,:], 'R': result[1,:], 'dR': result[2,:], 'dQ': result[3,:]})
 
     if len(Q) == 0:
         raise ValueError(f"No valid runs found for sequence {seq_id}")
@@ -307,10 +335,19 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False)
     R_combined = np.concatenate(R)
     dR_combined = np.concatenate(dR)
     dQ_combined = np.concatenate(dQ)
+    if eight_col:
+        T_combined = np.concatenate(T)
+        dT_combined = np.concatenate(dT)
+        L_combined = np.concatenate(L)
+        dL_combined = np.concatenate(dL)
 
     # Sort by Q for combined data
     idx = np.argsort(Q_combined)
-    combine_results = {'Q': Q_combined[idx], 'R': R_combined[idx], 'dR': dR_combined[idx], 'dQ': dQ_combined[idx]}
+    if eight_col:
+        combine_results = {'Q': Q_combined[idx], 'R': R_combined[idx], 'dR': dR_combined[idx], 'dQ': dQ_combined[idx],
+                           'L': L_combined[idx], 'dL': dL_combined[idx], 'T': T_combined[idx], 'dT': dT_combined[idx]}
+    else:
+        combine_results = {'Q': Q_combined[idx], 'R': R_combined[idx], 'dR': dR_combined[idx], 'dQ': dQ_combined[idx]}
 
     return seq_list, run_list, combine_results, scaling_factors
 

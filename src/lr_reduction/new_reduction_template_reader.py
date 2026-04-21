@@ -85,6 +85,7 @@ class ReductionParameters:
         self.use_calc_theta = True
         self.qline_threshold = 0.66
         self.scale_factor = 1.0
+        self.save8col = None
 
         # Instrument geometry parameters
         instrument_settings = InstrumentSettings()
@@ -193,6 +194,7 @@ class ReductionParameters:
         _xml += "<use_calc_theta>%s</use_calc_theta>\n" % str(self.use_calc_theta)
         _xml += "<qline_threshold>%s</qline_threshold>\n" % str(self.qline_threshold)
         _xml += "<scale_factor>%s</scale_factor>\n" % str(self.scale_factor)
+        _xml += "<save_eight_col>%s</save_eight_col>\n" % str(self.save8col)
 
         _xml += "</RefLData>\n"
 
@@ -269,6 +271,7 @@ class ReductionParameters:
         self.use_calc_theta = getBoolElement(instrument_dom, "use_calc_theta", default=self.use_calc_theta)
         self.qline_threshold = getFloatElement(instrument_dom, "qline_threshold", default=self.qline_threshold)
         self.scale_factor = getFloatElement(instrument_dom, "scale_factor", default=self.scale_factor)
+        self.save8col = getBoolElement(instrument_dom, "save_eight_col", default=self.save8col)
 
         lam_min = getFloatElement(instrument_dom, "lam_min", default = None)
         lam_max = getFloatElement(instrument_dom, "lam_max", default = None)

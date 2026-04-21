@@ -88,13 +88,14 @@ class NR_Reduction:
         if not self.config.tof_max:
             self.config.tof_max = [100000] * n_settings # TODO: Work out where to set this up properly!
 
-    def reduce(self, save=True, save_all=True, plot=True):
+    def reduce(self, save=True, save_all=True, plot=True, eight_col=None):
         """
         Perform the reduction of all angle settings and combine into an output.
 
         save: (optional) save out the final combined Q, R, dR, dQ file
         save_all: (optiona) save out the combined and individual settings
         plot: (optional) show the NR plot on completion
+        eight_col: (optional) allows override of saving out the 8 column data, otherwise read from the config.
 
         Returns
         -------
@@ -102,6 +103,9 @@ class NR_Reduction:
             Dictionary containing Q, R, dR, dQ arrays
         """
         Q, R, dR, dQ = [], [], [], []
+        L, T, dL, dT = [], [], [], []
+        if not eight_col:
+            eight_col = self.config.save8col
 
         # TODO: Add handling for summed run files.
         for i, rb_num in enumerate(self.config.RBnum):
@@ -124,24 +128,38 @@ class NR_Reduction:
             R.append(result['r'])
             dR.append(result['dr'])
             dQ.append(result['dq'])
+            dL.append(result['dl'])
+            dT.append(result['dt'])
+            L.append(result['l'])
+            T.append(result['t'])
             if save_all:
                 # save out individual parts
                 # TODO: Need to fix the saving logic for multiple runs!! At the moment the save looks for the capitals...
-                result_out = {'Q': result['q'], 'R': result['r'], 'dR': result['dr'], 'dQ': result['dq']}
+                result_out = {'Q': result['q'], 'R': result['r'], 'dR': result['dr'], 'dQ': result['dq'],
+                              'T': result['t'], 'L': result['l'], 'dT': result['dt'], 'dL': result['dl']}
                 self.save_results(result_out, sname=f"{self.config.Sname}_{i}", method=self.config.method_per_run[i])
+                if eight_col: #TODO: decide whether this is instead of prior save
+                    self.save_results(result_out, sname=f"{self.config.Sname}_{i}", method=self.config.method_per_run[i], eight_column=True)
 
         # Combine results for all settings
         Q_combined = np.concatenate(Q)
         R_combined = np.concatenate(R)
         dR_combined = np.concatenate(dR)
         dQ_combined = np.concatenate(dQ)
+        dL_combined = np.concatenate(dL)
+        dT_combined = np.concatenate(dT)
+        L_combined = np.concatenate(L)
+        T_combined = np.concatenate(T)
 
         # Sort by Q for combined data
         idx = np.argsort(Q_combined)
-        combine_results = {'Q': Q_combined[idx], 'R': R_combined[idx], 'dR': dR_combined[idx], 'dQ': dQ_combined[idx]}
+        combine_results = {'Q': Q_combined[idx], 'R': R_combined[idx], 'dR': dR_combined[idx], 'dQ': dQ_combined[idx],
+                           'T': T_combined[idx], 'L': L_combined[idx], 'dT': dT_combined[idx], 'dL': dL_combined[idx]}
 
         if save or save_all:    #TODO: fix the saving parts here this is messy!
             self.save_results(combine_results, method=self.config.method_per_run)
+            if eight_col: #TODO: decide whether this is instead of prior save
+                self.save_results(combine_results, method=self.config.method_per_run, eight_column=True)
         # TODO: Decide whether to keep in here or have as a separate part after the reduciton....?
         if plot:
             for i, rb_num in enumerate(self.config.RBnum):
@@ -342,13 +360,10 @@ class NR_Reduction:
         LAMBDA = 3956 * (tRB) / self.settings['source_detector_distance']
         LAMBDA = 3956 * (tRB - (t0[0] + t0[1] * LAMBDA)) / self.settings['source_detector_distance']
         LambdaBinSize = abs(LAMBDA[1] - LAMBDA[0])
-<<<<<<< HEAD
         
         if self.config.plotON:
             fig, ax = plt.subplots()
             ax.plot(LAMBDA, np.sum(RB, axis=0), label='pre-mask')
-=======
->>>>>>> origin/new_workflow
 
         # Trim to desired lambda range
         mask = ((LAMBDA >= self.config.LambdaMinUse) & (LAMBDA <= self.config.LambdaMaxUse))
@@ -360,7 +375,6 @@ class NR_Reduction:
         # iDB = np.interp(LAMBDA, lDB, iDB)
         # eDB = np.interp(LAMBDA, lDB, eDB)
 
-<<<<<<< HEAD
         if self.config.plotON:        
             ax.plot(lDB, iDB, label='DB')
             ax.plot(LAMBDA, np.sum(RB, axis=0), label='post mask')
@@ -373,11 +387,6 @@ class NR_Reduction:
             ax.plot(LAMBDA, iDB, label='DB rebin')
             ax.legend()
             plt.show()
-=======
-        # Rebin DB lambda to match new RB binning
-        iDB = tools.rebin_counts(LAMBDA, lDB, iDB)
-        eDB = np.sqrt(tools.rebin_counts(LAMBDA, lDB, eDB**2))
->>>>>>> origin/new_workflow
 
         # TODO: check what is stored and whether this is the best place.
         self.q = q
@@ -888,11 +897,7 @@ class NR_Reduction:
             REarr = eRB
 
         # Normalize by incident spectrum & propagate error
-<<<<<<< HEAD
         R0 = Rarr.copy()    
-=======
-        R0 = Rarr.copy()
->>>>>>> origin/new_workflow
         Rarr, REarr = tools.divide_propagate_error(R0, REarr, iDB, eDB)
 
         # Remove NaNs - #TODO: check if this is still correct...
@@ -960,6 +965,10 @@ class NR_Reduction:
         dr = q_vals * 0
         dq = q_vals * 0
         Jsum = q_vals * 0
+        l_store = q_vals * 0
+        t_store = q_vals * 0
+        dL = q_vals * 0
+        dT = q_vals * 0
 
         for T in range(Rarr.shape[0]):
             # Apply gravity correction
@@ -998,12 +1007,18 @@ class NR_Reduction:
                     dr[idx] = dr[idx] + (REarr[T, L] * wt)**2
                     dq[idx] = dqval
                     Jsum[idx] = Jsum[idx] + wt
+                    # adding for extra column output
+                    l_store[idx] = LAMBDA[L]
+                    t_store[idx] = Thv[L]
+                    dL[idx] = dLambda[L]
+                    dT[idx] = dTheta[T]
 
         FAC = Jsum / Rarr.shape[0]
 
         # Remove NaNs and zeros and keep region within qline fraction #TODO: work out whether the qline_fraction part is needed both here and above.
         mask = (np.isfinite(r) & (FAC != 0))
         q_vals, r, dr, dq, FAC, Qline_fraction = (x[mask] for x in (q_vals, r, dr, dq, FAC, Qline_fraction))
+        l_store, t_store, dL, dT = (x[mask] for x in (l_store, t_store, dL, dT))
 
         r = r / FAC * Qline_fraction
         dr = np.sqrt(dr) / FAC * Qline_fraction
@@ -1019,9 +1034,9 @@ class NR_Reduction:
             dr = dr / NormV
             print(f'Normalization factor: {np.round(1/NormV, 3)}')
 
-        return {'q': q_vals, 'r': r, 'dr': dr, 'dq': dq}
+        return {'q': q_vals, 'r': r, 'dr': dr, 'dq': dq, 't': t_store, 'l': l_store, 'dt': dT, 'dl': dL}
 
-    def save_results(self, results, sname = None, full=True, method=None):
+    def save_results(self, results, sname = None, full=True, method=None, eight_column=False):
         """
         Save results as .dat file with header
 
@@ -1030,8 +1045,15 @@ class NR_Reduction:
         results : dict
             Results from reduce() method
         """
-        array = np.column_stack((results['Q'], results['R'], results['dR'], results['dQ']))
 
+        if eight_column:
+            array = np.column_stack((results['Q'], results['R'], results['dR'], results['dQ'],
+                                          results['L'], results['dL'], results['T'], results['dT']))
+            col_label = "columns = Q, R, dR, dQ (sigma), L, dL, T, dT"
+        else:
+            array = np.column_stack((results['Q'], results['R'], results['dR'], results['dQ']))
+            col_label = "columns = Q, R, dR, dQ (sigma)"
+            
         # TODO: Sort out the header to include best information...
         if full:
             head = (
@@ -1046,7 +1068,7 @@ class NR_Reduction:
                 f"{'---' * 20}\n"
                 f"Config: {vars(self.config)}\n"
                 f"{'---' * 20}\n"
-                f"columns = Q, R, dR, dQ (sigma)\n"
+                f"{col_label}\n"
                 f"{'---' * 20}"
             )
         else:   # Not sure how best to output the config for combined settings so don't include for now.
@@ -1060,13 +1082,18 @@ class NR_Reduction:
                 f"Lambda Range = {self.config.LambdaMinUse}\u212B to {self.config.LambdaMaxUse}\u212B\n"
                 f"THS = {self.log_values['ths']}, THI = {self.log_values['thi']}, ThCen = {self.log_values['ThCen']}\n"
                 f"{'---' * 20}\n"
-                f"columns = Q, R, dR, dQ (sigma)\n"
+                f"{col_label}\n"
                 f"{'---' * 20}"
             )
         if not sname:
-            output_file = self.config.Spath / f"{self.config.Sname}.dat"
+            output_file = self.config.Spath / f"{self.config.Sname}"
         else:
-            output_file = self.config.Spath / f"{sname}.dat"
+            output_file = self.config.Spath / f"{sname}"
+
+        if eight_column:
+            output_file = f"{output_file}_8col.dat"
+        else:
+            output_file = f"{output_file}.dat"
         np.savetxt(output_file,
                   array, header=head, delimiter='\t')
         print(f"Saved combined result to {output_file}")
