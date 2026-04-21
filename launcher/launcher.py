@@ -8,9 +8,6 @@ from apps.quick_reduce import QuickReduce
 from apps.reduction import Reduction
 from apps.sld_calculator import SLD
 from apps.xrr import XRR
-from apps.overplot import Overplot
-from apps.roi_selector import ROISelector
-from apps.direct_beam import DirectBeamTab
 from qtpy import QtCore
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 

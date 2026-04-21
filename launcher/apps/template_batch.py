@@ -3,24 +3,24 @@ import os
 import threading
 from pathlib import Path
 
-from qtpy import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtWidgets
 from qtpy.QtWidgets import (
+    QCheckBox,
     QFileDialog,
     QGridLayout,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QPushButton,
-    QCheckBox,
-    QLineEdit,
-    QDialog,
-    QWidget,
     QSpinBox,
+    QWidget,
 )
+
 try:
     # Use QtAgg canvas for embedding matplotlib figures
+    import matplotlib.pyplot as plt
     from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
     from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-    import matplotlib.pyplot as plt
 except Exception:
     FigureCanvas = None
     NavigationToolbar = None
@@ -581,7 +581,7 @@ class TemplateBatchTab(QWidget):
             raise ValueError("Please specify runs to process")
         try:
             runs = parse_run_list(runs_text)
-        except Exception as e:
+        except Exception:
             raise
 
         expt = self.experiment_edit.text().strip()

@@ -1,34 +1,33 @@
 """
 Main calculation file for reflectivity reduction. It allows for different q conversion methods.
 NR_Reduction.reduce() is main function to call from a script to process multiple runs from an array.
-NR_Reduction._reduce_single_run() is the function to call if only process a single run and want to 
+NR_Reduction._reduce_single_run() is the function to call if only process a single run and want to
 bypass the combining (e.g. for the autoreduction process).
-For now, it assumes a pre-processed DB file. 
+For now, it assumes a pre-processed DB file.
 """
+import os
+
+import lr_reduction.binary_processing as BP
+import matplotlib.pyplot as plt
+import lr_reduction.nr_tools as tools
 import numpy as np
-import matplotlib.pyplot as plt 
 from matplotlib.colors import LogNorm
 from scipy.ndimage import gaussian_filter1d, uniform_filter1d
-import os
-import binary_processing as BP
-import nr_tools as tools
-import datetime
-import json
 
 
 class NR_Reduction:
     """
     Main calculation file for reflectivity reduction. It allows for different q conversion methods.
     NR_Reduction.reduce() is main function to call from a script to process multiple runs from an array.
-    NR_Reduction._reduce_single_run() is the function to call if only process a single run and want to 
+    NR_Reduction._reduce_single_run() is the function to call if only process a single run and want to
     bypass the combining (e.g. for the autoreduction process).
-    For now, it assumes a pre-processed DB file. 
+    For now, it assumes a pre-processed DB file.
     """
-    
+
     def __init__(self, config):
         """
         Initialize
-        
+
         Parameters
         ----------
         config : NRReductionConfig
@@ -40,7 +39,7 @@ class NR_Reduction:
         if not self.config.method_per_run:
             self.config.method_per_run = ['meantheta'] * len(self.config.RBnum)
         self._validate_config()
-        
+
     def _validate_config(self):
         """
         Validate configuration consistency
@@ -48,7 +47,7 @@ class NR_Reduction:
         For optional arrays the defaults are set if not explicitly provided.
         """
         n_settings = len(self.config.RBnum)
-        
+
         if not self.config.DBname:
             raise ValueError("DBname must be set")
         if n_settings == 0:
@@ -61,7 +60,7 @@ class NR_Reduction:
             raise ValueError(f"If supplied, LambdaMin expects list equal to number of runs, length {n_settings}")
         if self.config.LambdaMax is not None and len(self.config.LambdaMax) != n_settings:
             raise ValueError(f"If supplied, LambdaMax expects list equal to number of runs, length {n_settings}")
-        
+
         # Method per run validation
         if len(self.config.method_per_run) == 1 and n_settings > 1:
             # If a single method is supplied for multiple runs, apply it to all runs
@@ -69,13 +68,13 @@ class NR_Reduction:
         elif self.config.method_per_run and len(self.config.method_per_run) != n_settings:
             raise ValueError(f"If supplied, method_per_run expects list equal to number of runs, length {n_settings}")
         self.config.method_per_run = [method.lower() for method in self.config.method_per_run]  # Ensure methods are lowercase
-        
+
         # Check method of valid format (meanTheta, constantQ, constantTOF)
         valid_methods = ['meantheta', 'constantq', 'constanttof']
         for method in self.config.method_per_run:
             if method not in valid_methods:
                 raise ValueError(f"Invalid method: {method}. Use one of {valid_methods}")
-        
+
 
         # Set defaults for optional arrays
         if not self.config.ThetaShift:
@@ -85,14 +84,14 @@ class NR_Reduction:
         if not self.config.ScaleFactor:
             self.config.ScaleFactor = [1] * n_settings
         if not self.config.tof_min:
-            self.config.tof_min = [0] * n_settings  
+            self.config.tof_min = [0] * n_settings
         if not self.config.tof_max:
             self.config.tof_max = [100000] * n_settings # TODO: Work out where to set this up properly!
-            
+
     def reduce(self, save=True, save_all=True, plot=True):
         """
         Perform the reduction of all angle settings and combine into an output.
-        
+
         save: (optional) save out the final combined Q, R, dR, dQ file
         save_all: (optiona) save out the combined and individual settings
         plot: (optional) show the NR plot on completion
@@ -103,10 +102,10 @@ class NR_Reduction:
             Dictionary containing Q, R, dR, dQ arrays
         """
         Q, R, dR, dQ = [], [], [], []
-        
+
         # TODO: Add handling for summed run files.
         for i, rb_num in enumerate(self.config.RBnum):
-            print(f'--------------------------------------------')
+            print('--------------------------------------------')
             result = self._reduce_single_run(i, rb_num)
 
             # TODO: add better autoscaling options.
@@ -114,8 +113,8 @@ class NR_Reduction:
                 y1=R[i-1][np.where(Q[i-1] >= min(result['q']))]
                 y2=result['r'][np.where(result['q'] <= max(Q[i-1]))]
                 e1=dR[i-1][np.where(Q[i-1] >= min(result['q']))]
-                e2=result['dr'][np.where(result['q'] <= max(Q[i-1]))]   
-        
+                e2=result['dr'][np.where(result['q'] <= max(Q[i-1]))]
+
                 scale, sigma_scale = tools.weighted_mean(y1,y2,e1,e2)
                 result['r'] = result['r'] * scale
                 result['dr'] = result['dr'] * scale
@@ -130,13 +129,13 @@ class NR_Reduction:
                 # TODO: Need to fix the saving logic for multiple runs!! At the moment the save looks for the capitals...
                 result_out = {'Q': result['q'], 'R': result['r'], 'dR': result['dr'], 'dQ': result['dq']}
                 self.save_results(result_out, sname=f"{self.config.Sname}_{i}", method=self.config.method_per_run[i])
-        
+
         # Combine results for all settings
         Q_combined = np.concatenate(Q)
         R_combined = np.concatenate(R)
         dR_combined = np.concatenate(dR)
         dQ_combined = np.concatenate(dQ)
-        
+
         # Sort by Q for combined data
         idx = np.argsort(Q_combined)
         combine_results = {'Q': Q_combined[idx], 'R': R_combined[idx], 'dR': dR_combined[idx], 'dQ': dQ_combined[idx]}
@@ -146,11 +145,11 @@ class NR_Reduction:
         # TODO: Decide whether to keep in here or have as a separate part after the reduciton....?
         if plot:
             for i, rb_num in enumerate(self.config.RBnum):
-                if self.config.plotQ4: 
+                if self.config.plotQ4:
                     plt.errorbar(Q[i],R[i]*Q[i]**4, yerr=dR[i]*Q[i]**4, xerr=dQ[i],  fmt='o', markersize=1)
                     plt.ylabel(r'$R \cdot Q^4$', fontsize=14)
                     plt.xscale('linear')
-                else: 
+                else:
                     plt.errorbar(Q[i],R[i], yerr=dR[i], xerr=dQ[i],  fmt='o', markersize=1)
                     plt.ylabel('R')
                     plt.xscale('log')
@@ -170,24 +169,24 @@ class NR_Reduction:
             'dR_per_run': dR,
             'dQ_per_run': dQ,
         }
-    
+
     def _load_binary_from_disk(self, rb_num, i):
         """
-        This is not used in the main workflow as want to recalculate based on x-ranges. In future if store binary as 
+        This is not used in the main workflow as want to recalculate based on x-ranges. In future if store binary as
         both x and y this might be useful.
         """
         # Define expected binary file paths
         nRB_bin = self.config.BINpath / f"{rb_num}{self.config.BINsubname}.npy"
         nRBE_bin = self.config.BINpath / f"{rb_num}{self.config.errBINsubname}.npy"
         nRB_tof = self.config.BINpath / f"{rb_num}{self.config.DTCsubname}.dat"
-        
+
         # Check if all binary files exist
         files_exist = (
-            os.path.isfile(nRB_bin) and 
-            os.path.isfile(nRBE_bin) and 
+            os.path.isfile(nRB_bin) and
+            os.path.isfile(nRBE_bin) and
             os.path.isfile(nRB_tof)
         )
-    
+
         if files_exist:
             # Load from cached binary files
             print(f"Loading cached binary files for run {rb_num}")
@@ -197,7 +196,7 @@ class NR_Reduction:
             tof_array = tof_crc[0] if isinstance(tof_crc, np.ndarray) and len(tof_crc.shape) > 1 else tof_crc
             log_values = {} # TODO: Better handling here, possible read of header? For now this is not in the workflow.
             return tof_array, y_tof_corr, error_array_corr, log_values
-        
+
         else:
             # Binary files don't exist, compute from Nexus file
             print(f"Computing binary data from Nexus file for run {rb_num}...")
@@ -207,20 +206,20 @@ class NR_Reduction:
     def _make_binary_files(self, rb_num, tof_min=0, tof_max=50000):
         """
         Make binary files.
-        
+
         If computes from nexus, returns the TOF array, Y vs TOF data, and error array without saving to disk.
         This allows parameters like lowres to be updated without using stale cached files.
-        
+
         Parameters
         ----------
         rb_num : int
             Run block number
-        
+
         Returns
         -------
         tuple
             (tof_array, y_tof_corr, error_array_corr) - Arrays ready for reduction
-        
+
         Raises
         ------
         FileNotFoundError
@@ -228,15 +227,15 @@ class NR_Reduction:
         RuntimeError
             If binary processing fails
         """
-                
+
         # Get Nexus file path
         nNxRB = self.config.NEXUSpathRB / f"REF_L_{rb_num}.nxs.h5"
-        
+
         if not os.path.isfile(nNxRB):
             raise FileNotFoundError(f"Nexus file not found: {nNxRB}")
-        
+
         lowres = self.config.data_x_range
-        
+
         # Convert to binary
         try:
             tof_array, y_tof_corr, error_array_corr, log_values, _ = BP.convert_to_binary(
@@ -251,26 +250,26 @@ class NR_Reduction:
                 n_y=304,    # TODO: Work out how to add here when settings not created yet.
                 n_x=256
             )
-            
+
             print(f"Binary data computed successfully for run {rb_num}")
             return tof_array, y_tof_corr, error_array_corr, log_values
-            
+
         except Exception as e:
             raise RuntimeError(f"Failed to compute binary data for run {rb_num}: {str(e)}")
-    
+
     def _load_and_extract_lambda(self, i, rb_num):
         """
         Load binary TOF data and convert to lambda space including the emission time correction.
         Return arrays for run and direct beam with matching bins.
         Return additional metadata for later calculations.
-        
+
         Parameters
         ----------
         i : int
             Run index
         rb_num : int
             Run number
-            
+
         Returns
         -------
         tuple
@@ -284,8 +283,8 @@ class NR_Reduction:
         settings = tools.read_settings(log_values["start_time"])
         self.settings = self.apply_config_overrides(settings)
         self.settings['si_sample_distance'] = self.settings['xi_reference'] - self.log_values['xi']
-        self.settings['interslit_distance'] = self.settings['s1_sample_distance'] - self.settings['si_sample_distance']    
-        
+        self.settings['interslit_distance'] = self.settings['s1_sample_distance'] - self.settings['si_sample_distance']
+
         # Calculate lam range if not provided - # TODO: Add smarter calculation.
         if self.config.LambdaMin is None or self.config.LambdaMax is None:
             lam_range = tools.get_lam_range(self.log_values["lam_request"], self.log_values["frequency"])
@@ -301,7 +300,7 @@ class NR_Reduction:
         # Flip the arrays to give detector pixel ascending.
         RB = np.flipud(nRB)
         RBE = np.flipud(nRBE)
-        
+
         # Read in pre-processed direct beam file and extract header information from pre-process step.
         lDB, iDB, eDB, metaDB = tools.load_db_file(self.config.DBpath, self.config.DBname[i])
         DBpixel = float(metaDB['db_pixel']) # TODO: Add handling for if this doesn't exist.
@@ -316,7 +315,7 @@ class NR_Reduction:
         ThCen = theta_motor + self.config.ThetaShift[i]
         self.log_values['ThCen'] = ThCen
         print(f"Theta, TTHD = {np.round(ThCen, 3)}, {np.round(self.log_values['tthd'], 3)}")
-        
+
         # Create Q vector
         q = tools.log_qvector(self.config.qmin, self.config.qmax, self.config.dqbin)
         # Y pixel array
@@ -343,21 +342,25 @@ class NR_Reduction:
         LAMBDA = 3956 * (tRB) / self.settings['source_detector_distance']
         LAMBDA = 3956 * (tRB - (t0[0] + t0[1] * LAMBDA)) / self.settings['source_detector_distance']
         LambdaBinSize = abs(LAMBDA[1] - LAMBDA[0])
+<<<<<<< HEAD
         
         if self.config.plotON:
             fig, ax = plt.subplots()
             ax.plot(LAMBDA, np.sum(RB, axis=0), label='pre-mask')
+=======
+>>>>>>> origin/new_workflow
 
         # Trim to desired lambda range
         mask = ((LAMBDA >= self.config.LambdaMinUse) & (LAMBDA <= self.config.LambdaMaxUse))
         LAMBDA = LAMBDA[mask]
         RB = RB[:, mask]
         RBE = RBE[:, mask]
-        
+
         # # Interpolate DB lambda to match new RB binning
         # iDB = np.interp(LAMBDA, lDB, iDB)
         # eDB = np.interp(LAMBDA, lDB, eDB)
 
+<<<<<<< HEAD
         if self.config.plotON:        
             ax.plot(lDB, iDB, label='DB')
             ax.plot(LAMBDA, np.sum(RB, axis=0), label='post mask')
@@ -370,16 +373,21 @@ class NR_Reduction:
             ax.plot(LAMBDA, iDB, label='DB rebin')
             ax.legend()
             plt.show()
+=======
+        # Rebin DB lambda to match new RB binning
+        iDB = tools.rebin_counts(LAMBDA, lDB, iDB)
+        eDB = np.sqrt(tools.rebin_counts(LAMBDA, lDB, eDB**2))
+>>>>>>> origin/new_workflow
 
         # TODO: check what is stored and whether this is the best place.
         self.q = q
-        
+
         return lDB, iDB, eDB, DBpixel, DBtthd, q, ypix, RB, RBE, LAMBDA, LambdaBinSize, ThCen, mode # TODO: should q be returned and a self.q?
 
     def _fit_and_calculate_theta(self, i, ypix, RB, DBpixel, DBtthd, ThCen):
         """
         Fit specular peak position on detector and calculate corresponding theta
-        
+
         Parameters
         ----------
         i : int
@@ -394,7 +402,7 @@ class NR_Reduction:
             Direct beam tthd angle
         ThCen : float
             Theta value from logs (i.e. starting theta)
-            
+
         Returns
         -------
         tuple
@@ -412,7 +420,7 @@ class NR_Reduction:
         par, fit, bkg = tools.fit_peak(Ydata, Idata, peaktype=self.config.peak_type, bkgtype='linear')
         Yfit = fit[:, 0]
         Ifit = fit[:, 1]
-        
+
         # Calculate theta from fit pixel position and comparison to expected peak position based on DB pixel/tthd positions.
         RBpixel = par[1]
         dPix = RBpixel - DBpixel
@@ -426,7 +434,7 @@ class NR_Reduction:
         # TODO: Alter the function to do the calculation once and apply different angle offsets
         # Calculate expected beam profile on detector using logs
         Icalc_nonfit = tools.calc_beam_on_detector(Yfit, DBpixel, self.log_values['siY'], self.log_values['s1Y'],
-                                            self.settings['interslit_distance'], self.settings['si_sample_distance'], 
+                                            self.settings['interslit_distance'], self.settings['si_sample_distance'],
                                          self.settings['sample_detector_distance'], self.settings['pixel_width'],
                                          self.config.DetSigma, self.config.DetResFn)
 
@@ -436,16 +444,16 @@ class NR_Reduction:
             self.log_values['ThCen'] = ThCen
             # Calculate expected beam profile on detector using logs
             Icalc = tools.calc_beam_on_detector(Yfit, RBpixel, self.log_values['siY'], self.log_values['s1Y'],
-                                        self.settings['interslit_distance'], self.settings['si_sample_distance'], 
+                                        self.settings['interslit_distance'], self.settings['si_sample_distance'],
                                         self.settings['sample_detector_distance'], self.settings['pixel_width'],
                                         self.config.DetSigma, self.config.DetResFn)
         else:
             RBpixel = DBpixel
             Icalc = Icalc_nonfit
-        
+
         Icalc = (Icalc * par[0]) + bkg
         Icalc_nonfit = (Icalc_nonfit * par[0]) + bkg
-        
+
         # Plot beam profile if requested - compares to calculated profile from instrument geometry.
         if self.config.plotON:
             fig, ax = plt.subplots()
@@ -463,33 +471,33 @@ class NR_Reduction:
             ax.set_xlabel('Detector Pixel', fontsize=14)
             ax.legend()
             plt.show()
-        
+
         return Yfit, Ifit, RBpixel, Icalc, ThCen, bkg
 
     def _calculate_jacobian(self, LAMBDA, Thv, include_dqdtheta=True):
         """Calculate Jacobian determinant for Q-space transformation.
-        
+
         Args:
             LAMBDA: Wavelength array
             Thv: Theta values (can be 1D or 2D)
             include_dqdtheta: If True, use full 2D Jacobian; if False, use only dqdlambda
-        
+
         Returns:
             J: Jacobian magnitude
         """
         dqdtheta = (4 * np.pi / LAMBDA) * np.cos(np.radians(Thv)) * np.pi / 180
         dqdlambda = -(4 * np.pi / LAMBDA**2) * np.sin(np.radians(Thv))
-        
+
         if include_dqdtheta:
             jacobian = abs(np.sqrt(dqdtheta**2 + dqdlambda**2))
         else:
             jacobian = abs(dqdlambda)
-        
+
         return jacobian
-    
+
     def _pixel_to_q(self, Thv, LAMBDA, LambdaBinSize, dTheta, dLambda, ThetaBinSize=0):
         """Calculate Q values and resolution for a given theta and wavelength.
-        
+
         Args:
             Thv: Theta value
             LAMBDA: Wavelength value
@@ -497,24 +505,24 @@ class NR_Reduction:
             dTheta: Theta sigma values
             dLambda: Wavelength sigma values
             ThetaBinSize: Optional inclusion of theta bin size for non-constantTOF
-        
+
         Returns:
             qcen, qlo, qhi, dq_val
         """
         qcen = 4 * np.pi * np.sin(np.radians(Thv)) / LAMBDA
         qlo = 4 * np.pi * np.sin(np.radians(Thv - ThetaBinSize / 2)) / (LAMBDA + LambdaBinSize / 2)
-        qhi = 4 * np.pi * np.sin(np.radians(Thv + ThetaBinSize / 2)) / (LAMBDA - LambdaBinSize / 2)       
+        qhi = 4 * np.pi * np.sin(np.radians(Thv + ThetaBinSize / 2)) / (LAMBDA - LambdaBinSize / 2)
         dq_val = qcen * np.sqrt((dLambda / LAMBDA)**2 + (dTheta / Thv)**2)
-        
+
         return qcen, qlo, qhi, dq_val
-    
+
     def _calculate_theta_and_bins(self, ymmRB, ThCen, method):
         """Calculate theta mapping based on reduction method (constantQ or meanTheta).
-        
+
         Args:
             ymmRB: Y pixel positions in mm relative to RB center
             ThCen: Center theta angle to be used in calculation
-        
+
         Returns:
             Theta: Theta array for each pixel
             ThetaBinSize: Bin sizes for array
@@ -524,11 +532,11 @@ class NR_Reduction:
         print(method)
         if method == 'meantheta':
             # Calculate mean theta from slits
-            MeanTheta, dTheta = self.calc_mean_theta(ymmRB, self.log_values['s1Y'], self.log_values['siY'], 
+            MeanTheta, dTheta = self.calc_mean_theta(ymmRB, self.log_values['s1Y'], self.log_values['siY'],
                                                     self.settings['sample_detector_distance'], self.settings['si_sample_distance'],
                                                     self.settings['interslit_distance'], self.config.DetSigma,
                                                     self.config.DetResFn, self.config.plotON)
-            
+
             MeanTheta = MeanTheta + ThCen
             Theta = MeanTheta
         elif method == 'constantq':
@@ -542,35 +550,35 @@ class NR_Reduction:
             dTheta = np.full(len(Theta), dTheta_val)
         else:
             raise ValueError("Theta calculation only defined for config.method 'constantQ' or 'meanTheta'")
-            
+
         # Store theta bins for next calculation.
         ThetaBinSize = abs(np.diff(Theta))
         lastBinSize = ThetaBinSize[-1]
         ThetaBinSize = np.concatenate([ThetaBinSize, [lastBinSize]])
-        
+
         return Theta, ThetaBinSize, dTheta
-    
+
     def _calc_detector_convolution(self,m, b, ResFn, sigma, plotON=True):
-        
+
         verts = [
                 tools.intersect(m[0], b[0], m[1], b[1]),
                 tools.intersect(m[1], b[1], m[2], b[2]),
                 tools.intersect(m[2], b[2], m[3], b[3]),
                 tools.intersect(m[3], b[3], m[0], b[0]),
             ]
-            
+
         verts = np.array(verts)
         Det_corners = np.vstack([verts, verts[0]])
-            
+
         #pad the y axis to prepare for convolution
         if ResFn == 'rectangular':
-            pad = sigma * np.sqrt(12) 
+            pad = sigma * np.sqrt(12)
             width = sigma * np.sqrt(12)
 
         if ResFn == 'gaussian':
-            pad = sigma * 4.0 
+            pad = sigma * 4.0
 
-            
+
         # define the theta and Y vectors, Y is padded to allow convolution
         nt=1000
         ny=1000
@@ -581,29 +589,29 @@ class NR_Reduction:
 
         # create a smeared array
         smear=np.zeros((ny,nt))
-            
+
         #loop through theta
         for i in range(nt):
             #calculate the hi and lo Y values in this theta slice
             hi = np.minimum(tvec[i]*m[3] + b[3], tvec[i]*m[2] + b[2])
             lo = np.maximum(tvec[i]*m[0] + b[0], tvec[i]*m[1] + b[1])
-            
+
             # make a tophat function
             p = np.where((yvec >= lo) & (yvec <= hi))
             d = yvec*0
             d[p] = d[p]+1
 
             # smear it and store it
-            if ResFn == 'rectangular': 
-                smear[:,i] = uniform_filter1d(d, size=int(width/ystep)) 
-            if ResFn == 'gaussian': 
-                smear[:,i] = gaussian_filter1d(d, sigma = sigma/ystep)     
-        
+            if ResFn == 'rectangular':
+                smear[:,i] = uniform_filter1d(d, size=int(width/ystep))
+            if ResFn == 'gaussian':
+                smear[:,i] = gaussian_filter1d(d, sigma = sigma/ystep)
+
         # mask out empty rows
         mask = np.any(smear != 0, axis = 1)
         smear = smear[mask]
         yvec = yvec[mask]
-            
+
         if plotON:
             fig, ax = plt.subplots()
             ax.imshow(smear, origin='lower', aspect='auto', extent=[min(tvec),max(tvec),min(yvec),max(yvec)], cmap='magma')
@@ -618,7 +626,7 @@ class NR_Reduction:
         # Calculate the Mean and Sigma of theta angles as a function of Y position on the detector
         # create a fine grid of Y positions, convolve with the detector resolution
         # calculate the mean and sigma for provided Y values from the convolved array
-        
+
         # define positive angles and up and negative angles as down
         a, y, m, b = tools.calc_beam_geometry_from_slits(si_H, s1_H, d_s1_si, d_si_sam, d_sam_det, radians=False)
 
@@ -631,15 +639,15 @@ class NR_Reduction:
 
         for Y in yvalues:
             pos = np.where(abs(Y-yvec) == min(abs(Y-yvec)))
-            
+
             # simple line cut through convolved array
             mu = np.sum(smear[pos,:] * tvec) / np.sum(smear[pos,:])
             var = np.sum(smear[pos,:] * (tvec - mu)**2) / np.sum(smear[pos,:])
             sig = np.sqrt(var)
-            
+
             mean_theta.append(mu)
             sigma_theta.append(sig)
-            
+
         mean_theta = np.array(mean_theta)
         sigma_theta = np.array(sigma_theta)
 
@@ -649,11 +657,11 @@ class NR_Reduction:
     def plot_theta_lam(self, LAMBDA, Theta, Rarr, iDB, qlines=True, set_ylims=None, set_xlims=None): #TODO: decide if this should be in the class?
             '''
             Generate 2D plot of theta-lambda with option to overlay lines of constant q from calculation
-            
+
             LAMBDA: array of lambda values
             Theta: corresponding array of theta values
-            Rarr: 
-            iDB: 
+            Rarr:
+            iDB:
             qlines: Option to overlay q lines
             set_ylims: Option to specify y limits, otherwise uses extent of Theta array. (e.g. [0.3,0.8])
             set_xlims: Option to specify x limits, otherwise uses LambdaMin and LambdaMax from config. (e.g. [2.2, 9])
@@ -665,14 +673,14 @@ class NR_Reduction:
             cmap = 'magma'
             ax.pcolormesh(LAMBDA, abs(Theta), RN, norm=LogNorm(vmin=vmin, vmax=RN.max()),
                           shading='auto', cmap=cmap)
-            
+
             if qlines:
                 dqbin_plot = self.config.dqbin * 20
                 qvs = tools.log_qvector(self.config.qmin, self.config.qmax, dqbin_plot)
                 for qv in qvs:
                     qline = np.degrees(np.arcsin(qv * LAMBDA / 4 / np.pi))
                     ax.plot(LAMBDA, qline, '--g', linewidth=1.5)
-            
+
             if set_ylims:
                 ax.set_ylim(set_ylims[0],set_ylims[1])
             else:
@@ -687,7 +695,7 @@ class NR_Reduction:
             ax.set_xlabel('Lambda [Å]', fontsize=14)
             ax.set_ylabel('Theta [deg]', fontsize=14)
             plt.show()
-    
+
     def _background_roi_sorter(self, BkgROI, ymin, ymax):
         # Wrapper to handle the background region when set by the template.
         # This has 2 zeroes in the array when only 1 background region is selected.
@@ -710,9 +718,9 @@ class NR_Reduction:
         Calculate and apply background subtraction.
         This is handled in lambda space so uses a different function to lr_reduction.
         Background range supplied as a single array of size 4 to be start and stop
-        values either side of the specular peak. There will be a separate helper function 
+        values either side of the specular peak. There will be a separate helper function
         for handling when this is adjacent to the specular (i.e. provides zeros in the template)
-        
+
         LAMBDA: Description
         R: Description
         E: Description
@@ -745,7 +753,7 @@ class NR_Reduction:
 
         # uncertainties
         var_bkg = (eb1**2 + eb2**2) / 2
-        
+
         if ploton:
             self.roi_plot(R, ypix, y_roi, LAMBDA, ymin, ymax, bkgd=True, background_idx=background_idx)
             '''
@@ -760,7 +768,7 @@ class NR_Reduction:
             ax.axhline(y=background_idx[0], color='red', linestyle='--', linewidth=1)
             ax.axhline(y=background_idx[1], color='red', linestyle='--', linewidth=1)
             ax.axhline(y=background_idx[2], color='red', linestyle='--', linewidth=1)
-            ax.axhline(y=background_idx[3], color='red', linestyle='--', linewidth=1) 
+            ax.axhline(y=background_idx[3], color='red', linestyle='--', linewidth=1)
             ax.set_title('Background subtraction ROIs', fontsize=16)
             ax.set_xlabel('Lambda [Å]', fontsize=14)
             ax.set_ylabel('Detector Pixel', fontsize=14)
@@ -770,7 +778,7 @@ class NR_Reduction:
         # subtract background
         for i in range(R.shape[1]):
             bkg = a[i] * y_roi + c[i]
-            
+
             R_crop[:, i] -= bkg
             E_crop[:, i] = np.sqrt(E_crop[:, i]**2 + var_bkg[i])
 
@@ -793,7 +801,7 @@ class NR_Reduction:
             ax.axhline(y=background_idx[0], color='red', linestyle='--', linewidth=1)
             ax.axhline(y=background_idx[1], color='red', linestyle='--', linewidth=1)
             ax.axhline(y=background_idx[2], color='red', linestyle='--', linewidth=1)
-            ax.axhline(y=background_idx[3], color='red', linestyle='--', linewidth=1) 
+            ax.axhline(y=background_idx[3], color='red', linestyle='--', linewidth=1)
         ax.set_title('Y-pixel ROIs', fontsize=16)
         ax.set_xlabel('Lambda [Å]', fontsize=14)
         ax.set_ylabel('Detector Pixel', fontsize=14)
@@ -828,14 +836,14 @@ class NR_Reduction:
     def _reduce_single_run(self, i, rb_num, save=True):
         """
         Reduce a single run setting using the pre-defined config.
-        
+
         Parameters
         ----------
         i : int
             Run index within the set to be combined (e.g. for angle-variable settings)
         rb_num : int
             Run number
-            
+
         Returns
         -------
         dict
@@ -878,11 +886,15 @@ class NR_Reduction:
             # for continuity, probably needs clearing up:
             Rarr = iRB
             REarr = eRB
-        
+
         # Normalize by incident spectrum & propagate error
+<<<<<<< HEAD
         R0 = Rarr.copy()    
+=======
+        R0 = Rarr.copy()
+>>>>>>> origin/new_workflow
         Rarr, REarr = tools.divide_propagate_error(R0, REarr, iDB, eDB)
-        
+
         # Remove NaNs - #TODO: check if this is still correct...
         nan_idx = ~np.isfinite(Rarr)
         Rarr[nan_idx] = 0
@@ -902,13 +914,13 @@ class NR_Reduction:
             # Plot 2D lambda vs theta data including overlay of q-summing lines
             if self.config.plotON:
                 self.plot_theta_lam(LAMBDA, Theta, Rarr, iDB, qlines=True)
-        
+
             # Remove truncated Q-lines based on qline threshold
             lmin = 4 * np.pi * np.sin(np.radians(min(abs(Theta)))) / self.q #TODO: track through self.q vs qvals...!!
             lmax = 4 * np.pi * np.sin(np.radians(max(abs(Theta)))) / self.q
-            Qline_fraction = (np.minimum(self.config.LambdaMaxUse, lmax) - 
+            Qline_fraction = (np.minimum(self.config.LambdaMaxUse, lmax) -
                             np.maximum(self.config.LambdaMinUse, lmin)) / (lmax - lmin)
-        
+
             mask = (Qline_fraction >= self.config.Qline_threshold)
             q_vals = self.q[mask]
             Qline_fraction = Qline_fraction[mask]
@@ -926,10 +938,10 @@ class NR_Reduction:
             dTheta = np.array([tools.dTheta_Sigma(self.log_values['siY'], self.log_values['s1Y'], self.settings['interslit_distance'])])
             q_vals = self.q
             Qline_fraction = np.ones(len(q_vals)) # check this!!
-        
+
         # Lambda resolution
         dLambda = tools.dLambda_Sigma(LAMBDA)
-        
+
         # Gravity correction
         # For this function expects e.g. 4.0 for downward angle
         if mode == 1:
@@ -937,7 +949,7 @@ class NR_Reduction:
         else:
             IncTheta = self.log_values["thi"]
         ThetaGC = tools.gravity_correct(LAMBDA, IncTheta, self.settings['si_sample_distance'], self.settings['interslit_distance'])
-        
+
         # Transform to Q-space
         ## something is wrong with q_vals shape. Might need to reassign self.q to q_vals...?
         #r = self.q * 0
@@ -966,7 +978,7 @@ class NR_Reduction:
                 # Jacobian determinant
                 J = self._calculate_jacobian(LAMBDA, Thv, include_dqdtheta=True)
                 theta_bin = ThetaBinSize[T]
-            
+
             # Loop through lambda to map to Q space
             for L in range(Rarr.shape[1]):
                 # Calculate Q values
@@ -988,14 +1000,14 @@ class NR_Reduction:
                     Jsum[idx] = Jsum[idx] + wt
 
         FAC = Jsum / Rarr.shape[0]
-        
+
         # Remove NaNs and zeros and keep region within qline fraction #TODO: work out whether the qline_fraction part is needed both here and above.
         mask = (np.isfinite(r) & (FAC != 0))
         q_vals, r, dr, dq, FAC, Qline_fraction = (x[mask] for x in (q_vals, r, dr, dq, FAC, Qline_fraction))
-        
+
         r = r / FAC * Qline_fraction
         dr = np.sqrt(dr) / FAC * Qline_fraction
-        
+
         # Apply scale factor if specified.
         r = r * self.config.ScaleFactor[i]
         dr = dr * self.config.ScaleFactor[i]
@@ -1012,14 +1024,14 @@ class NR_Reduction:
     def save_results(self, results, sname = None, full=True, method=None):
         """
         Save results as .dat file with header
-        
+
         Parameters
         ----------
         results : dict
             Results from reduce() method
         """
         array = np.column_stack((results['Q'], results['R'], results['dR'], results['dQ']))
-        
+
         # TODO: Sort out the header to include best information...
         if full:
             head = (
@@ -1058,12 +1070,12 @@ class NR_Reduction:
         np.savetxt(output_file,
                   array, header=head, delimiter='\t')
         print(f"Saved combined result to {output_file}")
-    
+
     def apply_config_overrides(self, settings: dict) -> dict:
         """
         Apply overrides to the instrument settings if not None in the config
         and returns updated dictionary.
-        
+
         """
         overrides = {
             'xi_reference': getattr(self.config, 'xi_ref', None),

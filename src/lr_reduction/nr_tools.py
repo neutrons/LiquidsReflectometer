@@ -3,20 +3,22 @@ Subset of functions which may be useful outside of the NRReduction calculation c
 # TODO: Lots of this files still needs commenting.
 """
 
-import numpy as np
-from scipy.optimize import curve_fit
-from pathlib import Path
 import datetime
 import json
 import os
+from pathlib import Path
+
+import numpy as np
+from scipy.optimize import curve_fit
+
 
 def safe_divide(numerator, denominator):
     """Wrapper for safe division with zeros where denominator is zero.
-    
+
     Args:
         numerator: Numerator array
         denominator: Denominator array
-    
+
     Returns:
         Result array with zeros where denominator is zero
     """
@@ -24,33 +26,33 @@ def safe_divide(numerator, denominator):
 
 def divide_propagate_error(num, num_err, denom, denom_err):
     """Wrapper to proagate errors through division consistently: (num/denom).
-    
+
     Args:
         num: Numerator array
         num_err: Numerator error array
         denom: Denominator array
         denom_err: Denominator error array
-    
+
     Returns:
         (result, error): Divided array and propagated error
     """
     result = safe_divide(num, denom)
-    
+
     # Error propagation: (num/denom) has error sqrt((num_err/num)^2 + (denom_err/denom)^2) * (num/denom)
     term1 = safe_divide(num_err, num)
     term2 = safe_divide(denom_err, denom)
     error = np.abs(result) * np.sqrt(term1**2 + term2**2)
-    
+
     return result, error
 
 def find_pixel_index(pixels, value, occurence=0):
     """Wrapper to find specific pixel index
-    
+
     Args:
         pixels: Pixel array
         value: Value to find
         occurence: specific occurence or all (e.g. first, last). Use None for full array. default is first.
-    
+
     Returns:
         Index depending on occurrence
     """
@@ -62,7 +64,7 @@ def find_pixel_index(pixels, value, occurence=0):
 def log_qvector(qmin, qmax, dqbin):
     """
     Generate logarithmically spaced q vector of defined bin size.
-    
+
     qmin: minimum q
     qmax: maximum q
     dqbin: bin size
@@ -70,7 +72,7 @@ def log_qvector(qmin, qmax, dqbin):
     n = int(np.floor(np.log(qmax/qmin) / np.log(1 + dqbin))) + 1
     return qmin * (1 + dqbin) ** np.arange(n + 1)
 
-def weighted_mean(y1,y2,e1,e2, sigma_mask=3):       
+def weighted_mean(y1,y2,e1,e2, sigma_mask=3):
     #find the weighted average
     v=y1/y2
     sigma_v = np.sqrt((e1 / y2)**2 + (e2 * y1 / y2**2)**2)
@@ -87,7 +89,7 @@ def weighted_mean(y1,y2,e1,e2, sigma_mask=3):
     mean = np.sum(v * w) / np.sum(w)
     sigma_mean = np.sqrt(1 / np.sum(w))
 
-    return mean, sigma_mean 
+    return mean, sigma_mean
 
 # Define functions for peak_fitting:
 def gaussian(x,a,x0,sig):
@@ -110,12 +112,12 @@ def super_gaussian_constant(x, a, x0, sig, ex, c):
 
 def fit_peak(ypix, iY, peaktype="gauss", bkgtype="none"):
     """
-    Fit a peak using a gaussian or super-gauss 
+    Fit a peak using a gaussian or super-gauss
     Returns
     -------
     par : Fit parameters
     fit : y and fitted curve
-    bkg : Background from fit 
+    bkg : Background from fit
     """
     # TODO: can add check on goodness of fit later.
 
@@ -183,7 +185,7 @@ def get_edges(centers):
         e0 = centers[0] - (midpoints[0] - centers[0])
         en = centers[-1] + (centers[-1] - midpoints[-1])
         return np.concatenate(([e0], midpoints, [en]))
-    
+
 def rebin_counts(x, xp, fp):
     """
     Count-preserving rebin from original bin centers (xp)
@@ -207,9 +209,9 @@ def rebin_counts(x, xp, fp):
         xp_edges,
         cumulative,
         left=0.0,
-        right=cumulative[-1]     
+        right=cumulative[-1]
     )
-    
+
     new_counts = np.diff(cumulative_new)
 
     return new_counts
@@ -221,9 +223,9 @@ def calc_beam_geometry_from_slits(si_H, s1_H, d_s1_si, d_si_sam, d_sam_det, radi
 
     # define positive angles and up and negative angles as down
     # a1, a4 are the max and min angle passing through the top of the slit
-    # a2, a3 are the max and min angles passing through the bottom of the slit 
+    # a2, a3 are the max and min angles passing through the bottom of the slit
     # Defined here as a=[a1, a2, a3, a4]
-    
+
     # angular ranges at the incident slits
     a_plus  = np.arctan((s1_H + si_H)/(2*d_s1_si))
     a_minus = np.arctan((s1_H - si_H)/(2*d_s1_si))
@@ -255,8 +257,8 @@ def calc_beam_geometry_from_slits(si_H, s1_H, d_s1_si, d_si_sam, d_sam_det, radi
 def calc_beam_on_detector(Ypix, CenPix, Si, S1, dS1Si, dSiSam, dSamDet, mmpix, DetRes, DetResFn):
     # based on slits and instrument geometry, calculate beam profile on the detector
     # read in the Ypix array to calculate over
-    # adjust by the center pixel 
-    
+    # adjust by the center pixel
+
     Ymm = (Ypix-CenPix) * mmpix
 
     _, y, m, b = calc_beam_geometry_from_slits(Si, S1, dS1Si, dSiSam, dSamDet)
@@ -272,21 +274,21 @@ def calc_beam_on_detector(Ypix, CenPix, Si, S1, dS1Si, dSiSam, dSamDet, mmpix, D
                     (Ymm - b[1]) / m[1])
 
     I = fs - ss
-    
+
     # remove points below y3 and above y1, limits of the polygon
     I[(Ymm < y.min()) | (Ymm > y.max())] = 0
     I[I < 0] = 0
-    
+
     # grid spacing
     dy = Ymm[1] - Ymm[0]
-    
+
     # Convolve with the detector resolution, works better as tophat than gauss!
     if DetResFn == 'rectangular':
         width = DetRes * np.sqrt(12)
         n = max(1, int(np.round(width / dy)))
         kernel = np.ones(n) / n
         I = np.convolve(I, kernel, mode="same")
-        
+
     # Gaussian kernel half-width (~±4σ)
     elif DetResFn == 'gaussian':
         half_width = int(np.ceil(4 * DetRes / dy))
@@ -294,17 +296,17 @@ def calc_beam_on_detector(Ypix, CenPix, Si, S1, dS1Si, dSiSam, dSamDet, mmpix, D
         kernel = np.exp(-0.5 * (xk / DetRes)**2)
         kernel /= kernel.sum()
         I = np.convolve(I, kernel, mode="same")
-    
+
     elif DetResFn not in ["none", None]:
          raise ValueError("DetResFn must be 'rectangular', 'gaussian', or 'none'")
-    
+
     # normalize
     if I.max() <= 0:
         raise ValueError("Maximum I has calculated negative")
     else:
         I = I/I.max()
         return I
-    
+
 def intersect(m1, b1, m2, b2):
     # find intersection of two lines
     x = (b2 - b1) / (m1 - m2)
@@ -313,19 +315,19 @@ def intersect(m1, b1, m2, b2):
 
 # TODO: Link these resolution functions to the lr_reduction ones...
 def dTheta_Sigma(Si, S1, dS1Si):
-    
+
     # Trapezoidal half-width angles (deg)
     HW_bot = np.degrees(np.arctan((S1 + Si) / (2 * dS1Si)))     # full half-width
     HW_top = np.degrees(np.arctan((S1 - Si) / (2 * dS1Si)))     # flat-top half-width
-    
+
     a=-HW_bot
     b=-HW_top
     c=HW_top
     d=HW_bot
-    
+
     #analytical equation for the sigma of a trapezoidal function
     Sigma=np.sqrt(((d-a)**2+(c-b)**2+(d-a)*(c-b))/24)
-     
+
     return Sigma
 
 def dLambda_Sigma(Lambda):
@@ -333,45 +335,45 @@ def dLambda_Sigma(Lambda):
     L = 0.07564423
     A = 0.13093263
     k = 0.34918918
-    
+
     dLAM = L - A*np.exp(-k*Lambda)
 
     return dLAM
 
 # TODO: Link this into the gravity_correction in lr_reduction...
 def gravity_correct(LAM, ThetaIn, dSamp, dSlit):
-    
+
     dSamp=dSamp/1000    #dSamp is m from sample to incident slit
     dSlit=dSlit/1000    #dSlit is m between slits
-    
+
     #calculation from the ILL paper. this works for inclined beams.
     g=9.8067                #m/s^2
     h=6.6260715e-34         #Js=kg m^2/s
     mn=1.67492749804e-27    #kg
     V=h/(mn*LAM*1e-10)
     K=g/(2*V**2)
-       
+
     #define the sample position as x=0, y=0. increasing x is towards moderator
     xs=0
-    
+
     #positions of slits
     x1=dSamp
     x2=(dSamp+dSlit)
-    
+
     #height of slits determined by incident theta, y=0 is the sample height
     y1=x1*np.tan(ThetaIn*np.pi/180)
     y2=x2*np.tan(ThetaIn*np.pi/180)
-    
+
     #this is the location of the top of the parabola
     x0=(y1-y2+K*(x1**2-x2**2))/(2*K*(x1-x2))
     y0=y2+K*(x2-x0)**2
-    
+
     xs=x0-np.sqrt(y0/K)
-    
+
     ThetaSam=np.arctan(2*K*(x0-xs))*180/np.pi                 #angle is arctan(dy/dx) at sample
-    
+
     dTheta=ThetaSam-ThetaIn
-    
+
     return dTheta
 
 

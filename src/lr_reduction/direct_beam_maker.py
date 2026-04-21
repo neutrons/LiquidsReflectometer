@@ -1,9 +1,11 @@
-import binary_processing as BP
-from pathlib import Path
 import os
+from pathlib import Path
+
+import lr_reduction.binary_processing as BP
+import lr_reduction.nr_tools as tools
 import numpy as np
 from matplotlib import pyplot as plt
-import nr_tools as tools
+
 
 class Direct_Beam:
 
@@ -28,9 +30,9 @@ class Direct_Beam:
             self.NEXUSpath = f"/SNS/REF_L/{self.experiment_id}/nexus/"
             self.savepath = f"/SNS/REF_L/{self.experiment_id}/shared/transmission/"
         #self.Cd_foils = [57.5, 126.5, 123.0]      #microns for 50, 100A, 100B Cd foils
-        self.Cd = [57.5, 
-            126.5, 
-            126.5+123.0, 
+        self.Cd = [57.5,
+            126.5,
+            126.5+123.0,
             2*126.5+2*123.0] #microns Cd for each attenuator
         self.Chop2_cut_fn = [2.077, -16818.0]        # linear fit to chopper cut time
         self.Icut = 1e-10                 # threshold cut off any data below Icut (noisy)
@@ -152,14 +154,23 @@ class Direct_Beam:
             T, I, E, DTC = self._trim_and_chop(T, I, E, DTC, log_values["chop2_PD"], lowest = low_tag)
             T = T * 1e-3 # convert to ms
             #print(f'Run {run}: After trimming and chopping, {len(T)} points remain')
-    
+
             # TODO: use logic from nr_reduction_calc
             # convert to Lambda
             L=3956*T/self.dMod
             L=3956*(T-(self.t0[0]+self.t0[1]*L))/self.dMod
-            
+
             mu = np.interp(L, L_ENDF, mu_ENDF)
             trans = np.exp(-mu*Cd_thickness)
+
+            # Need to interpret the scale multiplier and apply the correction
+            # This allows the program to handle slit-scan DBs
+            try:
+                n = log_values["scale_multiplier"]
+                print(f'Using {n} as scale multiplier')
+            except Exception as e:
+                print(f'Using 1.0 as scale multiplier b/c {e} not in {repr(log_values)}')
+                n = 1.0
 
             I_trans = I / trans
             if plot:
@@ -167,8 +178,8 @@ class Direct_Beam:
             # store trace for optional return
             traces.append((L, I_trans, run))
             LAM.extend(L)
-            INT.extend(I_trans)
-            ERR.extend(E/trans)
+            INT.extend(I_trans * n * n)
+            ERR.extend((E * n * n)/trans)
 
         LAM = np.array(LAM)
         INT = np.array(INT)
@@ -207,7 +218,7 @@ class Direct_Beam:
 
     def _calc_average_db_pixel(self, db_pixel_list, tthd):
         """
-        Wrapper to calculate the average DB pixel position and its standard deviation, 
+        Wrapper to calculate the average DB pixel position and its standard deviation,
         as well as the average tthd and its standard deviation for use in header.
         """
         MeanPos = np.round(np.mean(db_pixel_list),2)
@@ -259,14 +270,14 @@ class Direct_Beam:
 
         if flip_atten:
             Atten = np.floor(1 - Atten)
-    
-        Cd_thickness = (self.Cd[0] * Atten[0] + 
+
+        Cd_thickness = (self.Cd[0] * Atten[0] +
                         self.Cd[1] * Atten[1] +
                         self.Cd[2] * Atten[2] +
                         self.Cd[3] * Atten[3])* 1e-4  #cm
 
         return Cd_thickness
-    
+
     def _trim_and_chop(self, T, I, E, DTC, chop2_phase, lowest = False):
 
         # trim off points that drop below the intensity threshold

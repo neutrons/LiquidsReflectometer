@@ -15,7 +15,7 @@ from lr_reduction.scaling_factors.calculate import (
     scaling_factor_critical_edge,
 )
 
-from . import __version__ as VERSION
+from lr_reduction import __version__ as VERSION
 
 
 class RunCollection:

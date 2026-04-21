@@ -66,7 +66,7 @@
     "cd-attenuator-correction-file": [
         {
             "from":"2025-09-01",
-            "value": "/SNS/REF_L/IPTS-36119/shared/Cd_transmission/Cd_mu_2025.dat"
+            "value": "/SNS/REF_L/shared/Cd_transmission/Cd_mu_2025.dat"
         }
     ]
 }

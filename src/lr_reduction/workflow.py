@@ -238,7 +238,7 @@ def offset_from_first_run(ws, template_file: str, output_dir: str):
     float
         The theta offset
     """
-    from . import peak_finding
+    from lr_reduction import peak_finding
 
     print("\nProcessing: %s" % ws.getRunNumber())
     # Get the sequence number
@@ -337,7 +337,7 @@ def reduce_explorer(ws, ws_db, theta_pv=None, center_pixel=145, db_center_pixel=
     d_refl : numpy.ndarray
         The uncertainty in the reflectivity
     """
-    from . import peak_finding
+    from lr_reduction import peak_finding
 
     if theta_pv is None:
         if (

@@ -13,8 +13,8 @@ from matplotlib import pyplot as plt
 
 mantid.kernel.config.setLogLevel(3)
 
-from . import template
-from .event_reduction import apply_dead_time_correction, compute_resolution
+from lr_reduction import template
+from lr_reduction.event_reduction import apply_dead_time_correction, compute_resolution
 
 
 def reduce_30Hz_from_ws(
