@@ -51,6 +51,8 @@ class ReductionParameters:
         self.tof_range = [9600.0, 21600.0]
         #self.select_tof_range = True
 
+        self.lam_range = [None, None]
+
         self.data_x_range = [115, 210]
 
         # Data files
@@ -143,6 +145,9 @@ class ReductionParameters:
         #_xml += "<x_range_flag>%s</x_range_flag>\n" % str(self.data_x_range_flag)
 
         #_xml += "<norm_dataset>%s</norm_dataset>\n" % str(self.norm_file)
+        if self.lam_range is not None:
+            _xml += "<lam_min>%s</lam_min>\n" % str(self.lam_range[0])
+            _xml += "<lam_max>%s</lam_max>\n" % str(self.lam_range[1])
 
         _xml += "<q_min>%s</q_min>\n" % str(self.q_min)
         _xml += "<q_step>%s</q_step>\n" % str(self.q_step)
@@ -265,6 +270,12 @@ class ReductionParameters:
         self.qline_threshold = getFloatElement(instrument_dom, "qline_threshold", default=self.qline_threshold)
         self.scale_factor = getFloatElement(instrument_dom, "scale_factor", default=self.scale_factor)
 
+        lam_min = getFloatElement(instrument_dom, "lam_min", default = None)
+        lam_max = getFloatElement(instrument_dom, "lam_max", default = None)
+        if (lam_min is not None) & (lam_max is not None):
+            self.lam_range = [lam_min, lam_max]
+        else:
+            self.lam_range = None
 
         # Instrument settings
         self.apply_instrument_settings = getBoolElement(instrument_dom, "apply_instrument_settings", default=False)

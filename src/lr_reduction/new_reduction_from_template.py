@@ -155,6 +155,10 @@ def config_from_template(template_data):
     config.tof_min = [template_data.tof_range[0]]    # TODO: check which tof one to use...
     config.data_x_range = template_data.data_x_range
 
+    if template_data.lam_range is not None:
+        config.LambdaMin = [template_data.lam_range[0]]
+        config.LambdaMax = [template_data.lam_range[1]]
+
     config.qmin = template_data.q_min
     config.dqbin = template_data.q_step
 
@@ -204,6 +208,9 @@ def template_to_config(config_data, template_data):
     template.qline_threshold = config_data.Qline_threshold
     template.scale_factor = config_data.ScaleFactor[0]
     template.use_emission_time = config_data.use_emission_time
+
+    if (config_data.LambdaMin is not None) & (config_data.LambdaMax is not None):
+        template.lam_range = [config_data.LambdaMin[0], config_data.LambdaMax[0]]
 
     return template
 
