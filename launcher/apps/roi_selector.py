@@ -2021,6 +2021,7 @@ class ROISelector(QWidget):
         if dlg.exec_() != QDialog.Accepted:
             return
         vals = dlg.get_values()
+        print('stored vals', vals)
         path = vals.get('path')
         # Persist per-run q_method into per_run_rois for this session if provided
         try:
