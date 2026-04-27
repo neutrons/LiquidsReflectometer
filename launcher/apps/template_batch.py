@@ -158,25 +158,29 @@ class TemplateBatchTab(QWidget):
         self.runs_edit = QLineEdit()
         layout.addWidget(self.runs_edit, 6, 1)
 
+        layout.addWidget(QLabel("File Name Suffix (optional):"), 7, 0)
+        self.subname_edit = QLineEdit()
+        layout.addWidget(self.subname_edit, 7, 1)
+
         # Plot checkbox (separate row to avoid overlap)
         self.plot_checkbox = QCheckBox("Plot results")
         self.plot_checkbox.setChecked(False)
-        layout.addWidget(self.plot_checkbox, 7, 1)
+        layout.addWidget(self.plot_checkbox, 8, 1)
 
         # Enable browse buttons toggle (default disabled to avoid hangs)
         self.enable_browse_chk = QCheckBox("Enable Browse buttons")
         self.enable_browse_chk.setChecked(False)
-        layout.addWidget(self.enable_browse_chk, 7, 2)
+        layout.addWidget(self.enable_browse_chk, 8, 2)
 
         # Process button
         self.process_btn = QPushButton("Process")
         self.process_btn.setStyleSheet("background-color : green")
-        layout.addWidget(self.process_btn, 8, 1)
+        layout.addWidget(self.process_btn, 9, 1)
 
         # Log area (left column)
         self.log_edit = QtWidgets.QTextEdit()
         self.log_edit.setReadOnly(True)
-        layout.addWidget(self.log_edit, 9, 0, 3, 1)
+        layout.addWidget(self.log_edit, 10, 0, 3, 1)
 
         # Embedded plot viewer (single canvas with prev/next navigation)
         # Keep a capped list of Figures to avoid creating too many tabs/windows.
@@ -206,13 +210,13 @@ class TemplateBatchTab(QWidget):
         plot_ctrl_layout.addWidget(self.max_plots_spin)
         plot_ctrl_layout.addWidget(self.clear_plots_btn)
         # place plot controls in right column (col 1..2)
-        layout.addWidget(plot_ctrl_widget, 9, 1, 1, 2)
+        layout.addWidget(plot_ctrl_widget, 10, 1, 1, 2)
 
         # Canvas placeholder (right column)
         self.canvas_container = QtWidgets.QWidget()
         self.canvas_layout = QtWidgets.QVBoxLayout()
         self.canvas_container.setLayout(self.canvas_layout)
-        layout.addWidget(self.canvas_container, 10, 1, 2, 2)
+        layout.addWidget(self.canvas_container, 11, 1, 2, 2)
 
         # Connect plot controls
         self.prev_btn.clicked.connect(self._show_prev_figure)
@@ -345,6 +349,9 @@ class TemplateBatchTab(QWidget):
         _runs = self.settings.value("template_runs", "")
         self.runs_edit.setText(_runs)
 
+        _subname = self.settings.value("template_subname", None)
+        self.subname_edit.setText(_subname)
+
         _expt = self.settings.value("template_experiment_id", "")
         self.experiment_edit.setText(_expt)
 
@@ -382,6 +389,8 @@ class TemplateBatchTab(QWidget):
     def save_settings(self):
         self.settings.setValue("template_runs", self.runs_edit.text())
         self.settings.setValue("template_experiment_id", self.experiment_edit.text())
+        subname_text = self.subname_edit.text() if self.subname_edit else None
+        self.settings.setValue("template_subname", subname_text or None)
         # persist template dir and file separately
         self.settings.setValue("template_dir", self.template_dir_edit.text())
         self.settings.setValue("template_file", self.template_file_edit.text())
@@ -603,6 +612,8 @@ class TemplateBatchTab(QWidget):
         if not template_file.exists() or not template_file.is_file():
             raise ValueError(f"Template file not found: {str(template_file)}")
 
+        template_subname = self.subname_edit.text() if self.subname_edit else None
+
         # deduce datapath and overrides from inline fields, falling back to NRReductionConfig
         datapath = self.datapath_edit.text().strip() or None
         DBpath = self.dbpath_edit.text().strip() or None
@@ -643,6 +654,8 @@ class TemplateBatchTab(QWidget):
                 # If datapath provided, also pass as NEXUSpathRB in override_params for completeness
                 if datapath:
                     override_params["NEXUSpathRB"] = Path(datapath)
+                if template_subname:
+                    override_params["subname"] = template_subname
 
                 # Log start
                 QtCore.QMetaObject.invokeMethod(self, "_append_log", QtCore.Qt.QueuedConnection, QtCore.Q_ARG(str, f"Starting run {run}..."))

@@ -39,6 +39,10 @@ class NR_Reduction:
         # If method not supplied, set to default meanTheta
         if not self.config.method_per_run:
             self.config.method_per_run = ['meantheta'] * len(self.config.RBnum)
+
+        if self.config.subname is not None:
+            self.config.Sname = f"{self.config.Sname}_{self.config.subname}"
+        
         self._validate_config()
 
     def _validate_config(self):
@@ -158,9 +162,9 @@ class NR_Reduction:
                            'T': T_combined[idx], 'L': L_combined[idx], 'dT': dT_combined[idx], 'dL': dL_combined[idx]}
 
         if save or save_all:    #TODO: fix the saving parts here this is messy!
-            self.save_results(combine_results, method=self.config.method_per_run)
+            self.save_results(combine_results, method=self.config.method_per_run, full=False)
             if eight_col: #TODO: decide whether this is instead of prior save
-                self.save_results(combine_results, method=self.config.method_per_run, eight_column=True)
+                self.save_results(combine_results, method=self.config.method_per_run, eight_column=True, full=False)
         # TODO: Decide whether to keep in here or have as a separate part after the reduciton....?
         if plot:
             for i, rb_num in enumerate(self.config.RBnum):

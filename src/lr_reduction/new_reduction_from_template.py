@@ -103,9 +103,14 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     scale_list = np.array([np.float64(1)] + scaling_factors)
     config.ScaleFactor *= scale_list
     # Save combined data
-    reduce_calc.save_results(combined_results, sname=f"REFL_{seq_id}_combined_data", full=False)
+    if config.subname:
+        combined_name = f"{config.subname}_combined_data"
+    else:
+        combined_name = "combined_data"
+
+    reduce_calc.save_results(combined_results, sname=f"REFL_{seq_id}_{combined_name}", full=False)
     if eight_col: #TODO: decide whether this is instead of prior save
-        reduce_calc.save_results(combined_results, sname=f"REFL_{seq_id}_combined_data", full=False, eight_column=True)
+        reduce_calc.save_results(combined_results, sname=f"REFL_{seq_id}_{combined_name}", full=False, eight_column=True)
 
     # plot
     if plot:

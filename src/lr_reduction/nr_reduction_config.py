@@ -34,6 +34,7 @@ class NRReductionConfig:
         self.Sname = "reduction_output" # TODO: change the default here to align with defaults from refred
         self.experiment_id = "" # IPTS number
         self.data_x_range = [50,200]
+        self.subname = None   # Option to have a subtitle on the saved out files.
 
         # Path configuration - Defaults assume IPTS specified and saved into that folder.
         self._Spath_override = None
@@ -112,12 +113,12 @@ class NRReductionConfig:
     def Spath(self) -> Path:
         if self._Spath_override is not None:
             return Path(self._Spath_override)
-        return self.base_path / "reduced"
+        return self.base_path / "shared" / "reduced"
     @property
     def BINpath(self) -> Path:
         if self._BINpath_override is not None:
             return Path(self._BINpath_override)
-        return self.base_path / "reduced"
+        return self.base_path / "shared" / "reduced"
     @property
     def NEXUSpathRB(self) -> Path:
         if self._NEXUSpathRB_override is not None:
@@ -127,7 +128,7 @@ class NRReductionConfig:
     def DBpath(self) -> Path:
         if self._DBpath_override is not None:
             return Path(self._DBpath_override)
-        return self.base_path / "transmission"
+        return self.base_path / "shared" / "transmission"
     @Spath.setter
     def Spath(self, value):
         self._Spath_override = value
