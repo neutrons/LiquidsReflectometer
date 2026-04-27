@@ -130,7 +130,9 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
         file_to_change = template_path / prior_template
     write_template(seq_list, run_list, file_to_change, template_updated, seq_num, template_path, save_name=template_save_name, prior_template=prior_template)
 
-    return combined_results
+    run_group = len(run_list)
+
+    return combined_results, run_group
 
 
 def config_from_template(template_data):
@@ -228,6 +230,8 @@ def template_to_config(config_data, template_data):
     template.scale_factor = config_data.ScaleFactor[0]
     template.use_emission_time = config_data.use_emission_time
     template.save8col = config_data.save8col
+
+    #template.source_detector_distance = config_data.source_detector_distance
 
     if (config_data.LambdaMin is not None) & (config_data.LambdaMax is not None):
         template.lam_range = [config_data.LambdaMin[0], config_data.LambdaMax[0]]

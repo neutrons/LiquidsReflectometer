@@ -61,7 +61,7 @@ class ReductionParameters:
 
         # Q range
         self.q_min = 0.001
-        self.q_step = 0.001
+        self.q_step = 0.01
         self.const_q = False
 
         # Scattering angle
@@ -83,7 +83,7 @@ class ReductionParameters:
         self.q_method = None
         self.autoscale = True   # Might need to check for new flags from recent change and make sure this doesn't conflict.
         self.use_calc_theta = True
-        self.qline_threshold = 0.66
+        self.qline_threshold = 1.0
         self.scale_factor = 1.0
         self.save8col = None
 
@@ -166,9 +166,13 @@ class ReductionParameters:
         #_xml += "<use_dead_time_threshold>%s</use_dead_time_threshold>\n" % str(self.use_dead_time_threshold)
         #_xml += "<dead_time_threshold>%s</dead_time_threshold>\n" % str(self.dead_time_threshold)
 
+        # Emission time correction
+        _xml += "<use_emission_time>%s</use_emission_time>\n" % str(self.use_emission_time)
+        
         # Instrument settings
         _xml += "<apply_instrument_settings>%s</apply_instrument_settings>\n" % str(self.apply_instrument_settings)
-        _xml += "<source_detector_distance>%s</source_detector_distance>\n" % str(self.source_detector_distance)
+        if not self.use_emission_time:
+            _xml += "<source_detector_distance>%s</source_detector_distance>\n" % str(self.source_detector_distance)
         _xml += "<sample_detector_distance>%s</sample_detector_distance>\n" % str(self.sample_detector_distance)
         _xml += "<num_x_pixels>%s</num_x_pixels>\n" % str(self.num_x_pixels)
         _xml += "<num_y_pixels>%s</num_y_pixels>\n" % str(self.num_y_pixels)
@@ -183,8 +187,6 @@ class ReductionParameters:
         #if self.gravity_direction is not None:
         #    _xml += "<gravity_direction>%s</gravity_direction>\n" % str(self.gravity_direction)  # -1, 0, 1
 
-        # Emission time correction
-        _xml += "<use_emission_time>%s</use_emission_time>\n" % str(self.use_emission_time)
 
         # New parts added from new reduction config scheme
         _xml += "<norm_scale>%s</norm_scale>\n" % str(self.norm_scale)
@@ -280,11 +282,16 @@ class ReductionParameters:
         else:
             self.lam_range = None
 
+        # Emission time
+        # Defaults to True, but will be skipped if the necessary meta data is not found
+        self.use_emission_time = getBoolElement(instrument_dom, "use_emission_time", default=True)
+
         # Instrument settings
         self.apply_instrument_settings = getBoolElement(instrument_dom, "apply_instrument_settings", default=False)
-        self.source_detector_distance = getFloatElement(
-            instrument_dom, "source_detector_distance", default=self.source_detector_distance
-        )
+        if not self.use_emission_time:
+            self.source_detector_distance = getFloatElement(
+                instrument_dom, "source_detector_distance", default=self.source_detector_distance
+            )
         self.sample_detector_distance = getFloatElement(
             instrument_dom, "sample_detector_distance", default=self.sample_detector_distance
         )
@@ -301,9 +308,6 @@ class ReductionParameters:
         #    getIntElement(instrument_dom, "gravity_direction", default=self.gravity_direction)
         #)
 
-        # Emission time
-        # Defaults to True, but will be skipped if the necessary meta data is not found
-        self.use_emission_time = getBoolElement(instrument_dom, "use_emission_time", default=True)
 
 
 #############################################

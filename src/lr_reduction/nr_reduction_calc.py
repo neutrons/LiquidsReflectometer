@@ -364,6 +364,7 @@ class NR_Reduction:
             self.settings['source_detector_distance'] = self.log_values['emission_mod_distance']
 
         print(f"Using distance of {self.settings['source_detector_distance']} for Lambda conversion")
+        #self.config.source_detector_distance = self.settings['source_detector_distance']
         LAMBDA = 3956 * (tRB) / self.settings['source_detector_distance']
         LAMBDA = 3956 * (tRB - (t0[0] + t0[1] * LAMBDA)) / self.settings['source_detector_distance']
         LambdaBinSize = abs(LAMBDA[1] - LAMBDA[0])

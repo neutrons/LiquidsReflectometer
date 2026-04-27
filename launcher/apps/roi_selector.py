@@ -716,8 +716,8 @@ class ROISelector(QWidget):
 
             # convert wavelength (Angstrom) to TOF using distance 1830 mm
             dist_m = 15.75
-            tof_min = int(252.78 * wl_min * dist_m)
-            tof_max = int(252.78 * wl_max * dist_m)
+            tof_min = int(252.78 * wl_min * dist_m) - 1500  # TODO: fix this so the selected range is separated from the load range. Padding added to allow for now.
+            tof_max = int(252.78 * wl_max * dist_m) + 1500
             print(f"Chopper estimate: lam={chopper_lam:.3f}A, speed={chopper_speed:.1f}Hz -> "
                   f"wl_min={wl_min:.3f}A, wl_max={wl_max:.3f}A -> "
                   f"tof_min={tof_min}, tof_max={tof_max}")
@@ -1682,8 +1682,8 @@ class ROISelector(QWidget):
                             tofmin = int(tof_edges[t_idx[0]])
                             tofmax = int(tof_edges[min(t_idx[-1] + 1, len(tof_edges) - 1)])
                         else:
-                            tofmin = int(max(tof_edges[0], tof_edges[tpeak] - 2000))
-                            tofmax = int(min(tof_edges[-1], tof_edges[tpeak] + 2000))
+                            tofmin = int(max(tof_edges[0], tof_edges[tpeak] - 20000))
+                            tofmax = int(min(tof_edges[-1], tof_edges[tpeak] + 20000))
                     except Exception:
                         tofmin = int(max(tof_edges[0], (tof_edges[0] + tof_edges[-1]) // 2 - 2000))
                         tofmax = int(min(tof_edges[-1], (tof_edges[0] + tof_edges[-1]) // 2 + 2000))

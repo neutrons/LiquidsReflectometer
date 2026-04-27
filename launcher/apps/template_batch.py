@@ -29,6 +29,8 @@ except Exception:
     except Exception:
         plt = None
 
+from matplotlib.backends.backend_pdf import PdfPages
+
 try:
     import new_reduction_from_template as new_template
 except Exception:
@@ -172,15 +174,20 @@ class TemplateBatchTab(QWidget):
         self.enable_browse_chk.setChecked(False)
         layout.addWidget(self.enable_browse_chk, 8, 2)
 
+        # Button for save summary
+        self.save_summary_checkbox = QCheckBox("Save summary (PDF)")
+        self.save_summary_checkbox.setChecked(False)
+        layout.addWidget(self.save_summary_checkbox, 9, 1)
+
         # Process button
         self.process_btn = QPushButton("Process")
         self.process_btn.setStyleSheet("background-color : green")
-        layout.addWidget(self.process_btn, 9, 1)
+        layout.addWidget(self.process_btn, 10, 1)
 
         # Log area (left column)
         self.log_edit = QtWidgets.QTextEdit()
         self.log_edit.setReadOnly(True)
-        layout.addWidget(self.log_edit, 10, 0, 3, 1)
+        layout.addWidget(self.log_edit, 11, 0, 3, 1)
 
         # Embedded plot viewer (single canvas with prev/next navigation)
         # Keep a capped list of Figures to avoid creating too many tabs/windows.
@@ -210,13 +217,13 @@ class TemplateBatchTab(QWidget):
         plot_ctrl_layout.addWidget(self.max_plots_spin)
         plot_ctrl_layout.addWidget(self.clear_plots_btn)
         # place plot controls in right column (col 1..2)
-        layout.addWidget(plot_ctrl_widget, 10, 1, 1, 2)
+        layout.addWidget(plot_ctrl_widget, 11, 1, 1, 2)
 
         # Canvas placeholder (right column)
         self.canvas_container = QtWidgets.QWidget()
         self.canvas_layout = QtWidgets.QVBoxLayout()
         self.canvas_container.setLayout(self.canvas_layout)
-        layout.addWidget(self.canvas_container, 11, 1, 2, 2)
+        layout.addWidget(self.canvas_container, 12, 1, 2, 2)
 
         # Connect plot controls
         self.prev_btn.clicked.connect(self._show_prev_figure)
@@ -355,6 +362,9 @@ class TemplateBatchTab(QWidget):
         _expt = self.settings.value("template_experiment_id", "")
         self.experiment_edit.setText(_expt)
 
+        _save_summary = self.settings.value("template_save_summary", False)
+        self.save_summary_checkbox.setChecked(bool(_save_summary))
+
         # template dir/file
         _template_dir = self.settings.value("template_dir", "")
         _template_file = self.settings.value("template_file", "")
@@ -395,6 +405,7 @@ class TemplateBatchTab(QWidget):
         self.settings.setValue("template_dir", self.template_dir_edit.text())
         self.settings.setValue("template_file", self.template_file_edit.text())
         self.settings.setValue("template_plot", bool(self.plot_checkbox.isChecked()))
+        self.settings.setValue("template_save_summary", bool(self.save_summary_checkbox.isChecked()))
         # persist inline overrides
         self.settings.setValue("template_datapath", self.datapath_edit.text())
         self.settings.setValue("template_DBpath", self.dbpath_edit.text())
@@ -515,6 +526,7 @@ class TemplateBatchTab(QWidget):
         self.next_btn.setEnabled(enabled and len(self.figures) > 0)
         self.clear_plots_btn.setEnabled(enabled and len(self.figures) > 0)
 
+    @QtCore.Slot(int)
     def _show_figure_at_index(self, idx: int):
         # Remove existing canvas widgets
         for i in reversed(range(self.canvas_layout.count())):
@@ -636,6 +648,9 @@ class TemplateBatchTab(QWidget):
             pass
 
         plot_flag = bool(self.plot_checkbox.isChecked())
+        plot_groupings = []
+        current_group_figs = []
+        group_index = 0
 
         # Save settings was already called on the main thread before the worker started.
 
@@ -663,7 +678,7 @@ class TemplateBatchTab(QWidget):
                 # call reduce_from_template similar to examples
                 try:
                     # If plotting requested and matplotlib is present, capture any figures
-                    if plot_flag and plt is not None:
+                    if plt is not None:
                         try:
                             old_nums = set(plt.get_fignums())
                         except Exception:
@@ -676,22 +691,41 @@ class TemplateBatchTab(QWidget):
                             orig_show = None
 
                         # run the reduction synchronously (figures will be created but not shown)
-                        new_template.reduce_from_template(
+                        _, group_num = new_template.reduce_from_template(
                             run,
                             Path(template_file),
                             expt,
                             datapath=Path(datapath) if datapath else None,
                             template_path=Path(template_dir),
                             override_params=override_params,
-                            plot=plot_flag,
+                            #plot=plot_flag,
+                            plot=True
                         )
+
+                        group_index += 1
+                        current_group_figs = []
 
                         # collect newly created figures
                         try:
                             new_nums = [n for n in plt.get_fignums() if n not in old_nums]
+                            if not new_nums:
+                                continue
+
                         except Exception:
                             new_nums = []
 
+                        if plot_flag:
+                            selected_nums = new_nums
+                        else:
+                            # only take second to last if possible from each group
+                            if len(new_nums) >= 2:
+                                selected_nums = [new_nums[-2]]
+                            #elif len(new_nums) == 1:
+                            #    selected_nums = [new_nums[-1]]
+                            else:
+                                selected_nums = []
+
+                        run_figs = []
                         for num in new_nums:
                             try:
                                 fig = plt.figure(num)
@@ -714,7 +748,10 @@ class TemplateBatchTab(QWidget):
                                     except Exception:
                                         pass
                                 meta = {"run": run, "label": f"run {run}"}
-                                self.figures.append((fig, meta))
+                                current_group_figs.append((fig, meta))
+                                run_figs.append((fig, meta))
+                                plot_groupings.append(fig)
+
                                 # warn if the user-configured max is exceeded
                                 try:
                                     user_max = int(self.max_plots_spin.value())
@@ -733,6 +770,24 @@ class TemplateBatchTab(QWidget):
                             except Exception:
                                 pass
 
+                        for num in selected_nums:
+                            for fig, meta in run_figs:
+                                if fig.number == num:
+                                    self.figures.append((fig, meta))
+
+                        if self.save_summary_checkbox.isChecked() and current_group_figs:
+                            output_path = Path(self.spath_edit.text() or ".") / f"plot_summary_{run}_{group_index}.pdf"
+                            with PdfPages(output_path) as pdf:
+                                for fig, meta in current_group_figs:
+                                    pdf.savefig(fig)
+
+                            QtCore.QMetaObject.invokeMethod(
+                                self,
+                                "_append_log",
+                                QtCore.Qt.QueuedConnection,
+                                QtCore.Q_ARG(str, f"Saved group PDF: {output_path}")
+                            )
+
                         # restore original show
                         try:
                             if orig_show is not None:
@@ -742,17 +797,24 @@ class TemplateBatchTab(QWidget):
 
                         # show the most recently added figure
                         if self.figures:
-                            self._show_figure_at_index(len(self.figures) - 1)
+                            #self._show_figure_at_index(len(self.figures) - 1)
+                            QtCore.QMetaObject.invokeMethod(
+                                    self,
+                                    "_show_figure_at_index",
+                                    QtCore.Qt.QueuedConnection,
+                                    QtCore.Q_ARG(int, len(self.figures) - 1)
+                                )
                     else:
                         # no plotting requested or matplotlib missing: just run normally
-                        new_template.reduce_from_template(
+                        _, group_num = new_template.reduce_from_template(
                             run,
                             Path(template_file),
                             expt,
                             datapath=Path(datapath) if datapath else None,
                             template_path=Path(template_dir),
                             override_params=override_params,
-                            plot=plot_flag,
+                            #plot=plot_flag,
+                            plot=True
                         )
                 finally:
                     QtCore.QMetaObject.invokeMethod(self, "_append_log", QtCore.Qt.QueuedConnection, QtCore.Q_ARG(str, f"Run {run} completed"))
