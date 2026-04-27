@@ -330,13 +330,10 @@ def dTheta_Sigma(Si, S1, dS1Si):
 
     return Sigma
 
-def dLambda_Sigma(Lambda):
-    #exponential fit to dLAM
-    L = 0.07564423
-    A = 0.13093263
-    k = 0.34918918
+def dLambda_Sigma(Lambda, l_val = 0.07564423, a_val = 0.13093263, k_val = 0.34918918):
 
-    dLAM = L - A*np.exp(-k*Lambda)
+    #exponential fit to dLAM
+    dLAM = l_val - a_val*np.exp(-k_val*Lambda)
 
     return dLAM
 

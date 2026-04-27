@@ -13,6 +13,7 @@ import lr_reduction.nr_tools as tools
 import numpy as np
 from matplotlib.colors import LogNorm
 from scipy.ndimage import gaussian_filter1d, uniform_filter1d
+from lr_reduction.user_defined_function import UserDefinedFunction
 
 
 class NR_Reduction:
@@ -353,10 +354,12 @@ class NR_Reduction:
                 print("Moderator information unavailable: skipping emission time calculation")
                 self.use_emission_time = False
 
+        print(f"Checking before flag applied {self.settings['source_detector_distance']} distance")
         # Use the emission based source-detector distance from the logs
         if self.config.use_emission_time:
             self.settings['source_detector_distance'] = self.log_values['emission_mod_distance']
 
+        print(f"Using distance of {self.settings['source_detector_distance']} for Lambda conversion")
         LAMBDA = 3956 * (tRB) / self.settings['source_detector_distance']
         LAMBDA = 3956 * (tRB - (t0[0] + t0[1] * LAMBDA)) / self.settings['source_detector_distance']
         LambdaBinSize = abs(LAMBDA[1] - LAMBDA[0])
@@ -386,6 +389,7 @@ class NR_Reduction:
         if self.config.plotON:        
             ax.plot(LAMBDA, iDB, label='DB rebin')
             ax.legend()
+            ax.set_yscale('log')
             plt.show()
 
         # TODO: check what is stored and whether this is the best place.
@@ -944,8 +948,11 @@ class NR_Reduction:
             q_vals = self.q
             Qline_fraction = np.ones(len(q_vals)) # check this!!
 
-        # Lambda resolution
-        dLambda = tools.dLambda_Sigma(LAMBDA)
+        # Lambda resolution - set to read from settings file function
+        wav_fn_settings = self.settings['wavelength_resolution_function']
+        resolution_function = UserDefinedFunction(wav_fn_settings)
+        dLambda = np.array(resolution_function(LAMBDA))
+        #dLambda = tools.dLambda_Sigma(LAMBDA)
 
         # Gravity correction
         # For this function expects e.g. 4.0 for downward angle
