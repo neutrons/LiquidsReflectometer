@@ -14,7 +14,7 @@ import numpy as np
 from matplotlib.colors import LogNorm
 from scipy.ndimage import gaussian_filter1d, uniform_filter1d
 from lr_reduction.user_defined_function import UserDefinedFunction
-
+import lr_reduction.save_reduced_data as save_fn
 
 class NR_Reduction:
     """
@@ -57,20 +57,20 @@ class NR_Reduction:
             raise ValueError("DBname must be set")
         if n_settings == 0:
             raise ValueError("RBnum must be set")
-        if len(self.config.DBname) != n_settings:
-            raise ValueError(f"DBname length {len(self.config.DBname)} != RBnum length {n_settings}")
-        if len(self.config.RB_Ymin) != n_settings or len(self.config.RB_Ymax) != n_settings:
+        if len(self.config.DBname) < n_settings:
+            raise ValueError(f"DBname length {len(self.config.DBname)} < RBnum length {n_settings}")
+        if len(self.config.RB_Ymin) < n_settings or len(self.config.RB_Ymax) < n_settings:
             raise ValueError(f"RB_Ymin/RB_Ymax length must match RBnum length {n_settings}")
-        if self.config.LambdaMin is not None and len(self.config.LambdaMin) != n_settings:
+        if self.config.LambdaMin is not None and len(self.config.LambdaMin) < n_settings:
             raise ValueError(f"If supplied, LambdaMin expects list equal to number of runs, length {n_settings}")
-        if self.config.LambdaMax is not None and len(self.config.LambdaMax) != n_settings:
+        if self.config.LambdaMax is not None and len(self.config.LambdaMax) < n_settings:
             raise ValueError(f"If supplied, LambdaMax expects list equal to number of runs, length {n_settings}")
 
         # Method per run validation
         if len(self.config.method_per_run) == 1 and n_settings > 1:
             # If a single method is supplied for multiple runs, apply it to all runs
             self.config.method_per_run = self.config.method_per_run * n_settings
-        elif self.config.method_per_run and len(self.config.method_per_run) != n_settings:
+        elif self.config.method_per_run and len(self.config.method_per_run) < n_settings:
             raise ValueError(f"If supplied, method_per_run expects list equal to number of runs, length {n_settings}")
         self.config.method_per_run = [method.lower() for method in self.config.method_per_run]  # Ensure methods are lowercase
 
@@ -115,7 +115,7 @@ class NR_Reduction:
         # TODO: Add handling for summed run files.
         for i, rb_num in enumerate(self.config.RBnum):
             print('--------------------------------------------')
-            result = self._reduce_single_run(i, rb_num)
+            result, config_out, log_vals = self._reduce_single_run(i, rb_num)
 
             # TODO: add better autoscaling options.
             if self.config.AutoScale and i != 0:
@@ -125,9 +125,14 @@ class NR_Reduction:
                 e2=result['dr'][np.where(result['q'] <= max(Q[i-1]))]
 
                 scale, sigma_scale = tools.weighted_mean(y1,y2,e1,e2)
+                print(scale)
+                if not np.isfinite(scale):
+                    print(f"Unable to find scaling factor for {rb_num}")
+                    scale = 1
                 result['r'] = result['r'] * scale
                 result['dr'] = result['dr'] * scale
                 print('Scaling factor: ', np.round(scale,3))
+                self.config.ScaleFactor[i] *= scale
 
             Q.append(result['q'])
             R.append(result['r'])
@@ -142,9 +147,10 @@ class NR_Reduction:
                 # TODO: Need to fix the saving logic for multiple runs!! At the moment the save looks for the capitals...
                 result_out = {'Q': result['q'], 'R': result['r'], 'dR': result['dr'], 'dQ': result['dq'],
                               'T': result['t'], 'L': result['l'], 'dT': result['dt'], 'dL': result['dl']}
-                self.save_results(result_out, sname=f"{self.config.Sname}_{i}", method=self.config.method_per_run[i])
+                #self.save_results(result_out, self.config, self.log_values, sname=f"{self.config.Sname}_{i}", method=self.config.method_per_run[i])
+                save_fn.save_results(result_out, self.config, self.log_values, sname=f"{self.config.Sname}_{i+1}_{rb_num}")
                 if eight_col: #TODO: decide whether this is instead of prior save
-                    self.save_results(result_out, sname=f"{self.config.Sname}_{i}", method=self.config.method_per_run[i], eight_column=True)
+                    save_fn.save_results(result_out, self.config, self.log_values, sname=f"{self.config.Sname}_{i+1}_{rb_num}", eight_column=True)
 
         # Combine results for all settings
         Q_combined = np.concatenate(Q)
@@ -162,9 +168,9 @@ class NR_Reduction:
                            'T': T_combined[idx], 'L': L_combined[idx], 'dT': dT_combined[idx], 'dL': dL_combined[idx]}
 
         if save or save_all:    #TODO: fix the saving parts here this is messy!
-            self.save_results(combine_results, method=self.config.method_per_run, full=False)
+            save_fn.save_results(combine_results, self.config, self.log_values, full=True, sname=f"{self.config.Sname}_combined")
             if eight_col: #TODO: decide whether this is instead of prior save
-                self.save_results(combine_results, method=self.config.method_per_run, eight_column=True, full=False)
+                save_fn.save_results(combine_results, self.config, self.log_values, eight_column=True, full=True, sname=f"{self.config.Sname}_combined")
         # TODO: Decide whether to keep in here or have as a separate part after the reduciton....?
         if plot:
             for i, rb_num in enumerate(self.config.RBnum):
@@ -191,6 +197,7 @@ class NR_Reduction:
             'R_per_run': R,
             'dR_per_run': dR,
             'dQ_per_run': dQ,
+            'config': self.config
         }
 
     def _load_binary_from_disk(self, rb_num, i):
@@ -1046,11 +1053,17 @@ class NR_Reduction:
             dr = dr / NormV
             print(f'Normalization factor: {np.round(1/NormV, 3)}')
 
-        return {'q': q_vals, 'r': r, 'dr': dr, 'dq': dq, 't': t_store, 'l': l_store, 'dt': dT, 'dl': dL}
+        return {'q': q_vals, 'r': r, 'dr': dr, 'dq': dq, 't': t_store, 'l': l_store, 'dt': dT, 'dl': dL}, self.config, self.log_values
 
-    def save_results(self, results, sname = None, full=True, method=None, eight_column=False):
+    def save_results(self, results, sname = None, full=True, method=None, eight_column=False, config_header=None, sequence=None):
         """
         Save results as .dat file with header
+        sname: optional save name to overwrite the default
+        full: flag to include more information in the header
+        method: option to explicitly feed the method
+        eight_column: option to save out 8-column data with L, dL, T, dT in addition to the standard 4 column
+        config_header: option to specify the config to include in the header
+        sequence: option to specify index within the set of runs for selecting settings from config into the header #TODO: should this be in the method?
 
         Parameters
         ----------
@@ -1061,11 +1074,13 @@ class NR_Reduction:
         if eight_column:
             array = np.column_stack((results['Q'], results['R'], results['dR'], results['dQ'],
                                           results['L'], results['dL'], results['T'], results['dT']))
-            col_label = "columns = Q, R, dR, dQ (sigma), L, dL, T, dT"
+            #col_label = "columns = Q, R, dR, dQ (sigma), L, dL, T, dT"
         else:
             array = np.column_stack((results['Q'], results['R'], results['dR'], results['dQ']))
-            col_label = "columns = Q, R, dR, dQ (sigma)"
+            #col_label = "columns = Q, R, dR, dQ (sigma)"
             
+        head = self._build_header(full=full, eight_column=eight_column, config_header=config_header, sequence=sequence)
+        '''
         # TODO: Sort out the header to include best information...
         if full:
             head = (
@@ -1097,6 +1112,8 @@ class NR_Reduction:
                 f"{col_label}\n"
                 f"{'---' * 20}"
             )
+            '''
+        
         if not sname:
             output_file = self.config.Spath / f"{self.config.Sname}"
         else:
@@ -1109,6 +1126,62 @@ class NR_Reduction:
         np.savetxt(output_file,
                   array, header=head, delimiter='\t')
         print(f"Saved combined result to {output_file}")
+
+    def _build_header(self, full=True, eight_column=False, config_header=None, sequence=None):
+        """
+        Wrapper to handle assembly logic for the output file header.
+        """
+
+        if eight_column:
+            col_label = "columns = Q, R, dR, dQ (sigma), L, dL, T, dT"
+        else:
+            col_label = "columns = Q, R, dR, dQ (sigma)"
+
+        if not config_header:
+            config_header = self.config
+
+        if sequence:
+            sorted_config = {k: tools.maybe_index(v, sequence) for k, v in config_header.items()}
+        else:
+            sorted_config = config_header
+
+        # TODO: Lambda Use values need to be arrays and stored angles need to be arrays.
+        if full:
+            head = (
+                f"NR_runs = {sorted_config.RBnum}\n"
+                f"DB = {sorted_config.DBname}\n"
+                f"Method = {sorted_config.method_per_run}\n"
+                f"Normalize = {sorted_config.Normalize}\n"
+                f"Autoscale = {sorted_config.AutoScale}\n"
+                f"Scaling factors = {sorted_config.ScaleFactor}\n"
+                f"Lambda Range = {sorted_config.LambdaMinUse}\u212B to {sorted_config.LambdaMaxUse}\u212B\n"
+                f"THS = {self.log_values['ths']}, THI = {self.log_values['thi']}, ThCen = {self.log_values['ThCen']}\n"
+                f"{'---' * 20}\n"
+                f"Config: {vars(config_header)}\n"
+                f"{'---' * 20}\n"
+                f"{col_label}\n"
+                f"{'---' * 20}"
+            )
+
+        else:
+            head = (
+                f"NR_runs = {sorted_config.RBnum}\n"
+                f"DB = {sorted_config.DBname}\n"
+                f"Method = {sorted_config.method_per_run}\n"
+                f"Normalize = {sorted_config.Normalize}\n"
+                f"Autoscale = {sorted_config.AutoScale}\n"
+                f"Scaling factors = {sorted_config.ScaleFactor}\n"
+                f"Lambda Range = {sorted_config.LambdaMinUse}\u212B to {sorted_config.LambdaMaxUse}\u212B\n"
+                f"THS = {self.log_values['ths']}, THI = {self.log_values['thi']}, ThCen = {self.log_values['ThCen']}\n"
+                f"{'---' * 20}\n"
+                f"Config: {vars(sorted_config)}\n"
+                f"{'---' * 20}\n"
+                f"{col_label}\n"
+                f"{'---' * 20}"
+            )
+
+        return head
+    
 
     def apply_config_overrides(self, settings: dict) -> dict:
         """

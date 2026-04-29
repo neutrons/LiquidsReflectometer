@@ -501,3 +501,16 @@ def read_settings(time):
         settings_output['s1_sample_distance'] *= 1000
 
         return settings_output
+
+def maybe_index(value, idx=None):
+    if idx is None:
+        return value
+
+    # Avoid indexing scalars and strings
+    if isinstance(value, (str, bytes)) or np.isscalar(value):
+        return value
+
+    try:
+        return value[idx]
+    except (TypeError, IndexError, KeyError):
+        return value

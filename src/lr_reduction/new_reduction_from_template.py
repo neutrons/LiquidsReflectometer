@@ -12,7 +12,7 @@ from lr_reduction.new_reduction_template_reader import ReductionParameters
 #import template
 from lr_reduction.nr_reduction_calc import NR_Reduction  # TODO: Fix names of files!!
 from lr_reduction.nr_reduction_config import NRReductionConfig
-
+import lr_reduction.save_reduced_data as save_fn
 
 def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True, eight_col=None):
     """
@@ -84,7 +84,7 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
 
     # Run reduction
     reduce_calc = NR_Reduction(config)
-    results = reduce_calc._reduce_single_run(i=0, rb_num=config.RBnum[0], save=True)
+    results, config_out, log_values = reduce_calc._reduce_single_run(i=0, rb_num=config.RBnum[0], save=True)
 
     if eight_col:
         # Save the single run output. TODO: this might need cleaning up between the different functions.
@@ -92,25 +92,26 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
                 'T': result['t'], 'L': result['l'], 'dT': result['dt'], 'dL': result['dl']}
     else:
         result = {'Q': results['q'], 'R': results['r'], 'dR': results['dr'], 'dQ': results['dq']}       
-    
-    reduce_calc.save_results(result, sname=f"{config.Sname}_partial")
+
+    save_fn.save_results(result, config_out, log_values, sname=f"{config.Sname}_partial")
     if eight_col: #TODO: decide whether this is instead of prior save
-        reduce_calc.save_results(result, sname=f"{config.Sname}_partial", eight_column=True)
+        save_fn.save_results(result, config_out, log_values, sname=f"{config.Sname}_partial", eight_column=True)
 
     # Collect "like" runs together
-    seq_list, run_list, combined_results, scaling_factors = assemble_results(seq_id, config.Spath, autoscale=config.AutoScale, plot=plot, RQ4=config.plotQ4, eight_col=eight_col)
+    seq_list, run_list, combined_results, scaling_factors, config_array = assemble_results(seq_id, config.Spath, autoscale=config.AutoScale, plot=plot, RQ4=config.plotQ4, eight_col=eight_col)
     # Add scaling factor to output
     scale_list = np.array([np.float64(1)] + scaling_factors)
     config.ScaleFactor *= scale_list
+
     # Save combined data
     if config.subname:
         combined_name = f"{config.subname}_combined_data"
     else:
         combined_name = "combined_data"
 
-    reduce_calc.save_results(combined_results, sname=f"REFL_{seq_id}_{combined_name}", full=False)
+    save_fn.save_results(combined_results, config_out, log_values, sname=f"REFL_{seq_id}_{combined_name}", full=True)
     if eight_col: #TODO: decide whether this is instead of prior save
-        reduce_calc.save_results(combined_results, sname=f"REFL_{seq_id}_{combined_name}", full=False, eight_column=True)
+        reduce_calc.save_results(combined_results, config_out, log_values, sname=f"REFL_{seq_id}_{combined_name}", full=False, eight_column=True)
 
     # plot
     if plot:
@@ -279,10 +280,13 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False,
 
     # Load the data
     data_array = []
+    config_array = []
     for idx, file in enumerate(full_names):
         seq_id_store = seq_list[idx]
-        data = np.loadtxt(Path(output_dir) / file, unpack=True) # TODO: sort as Path.
-        data_array.append(data)
+        #data = np.loadtxt(Path(output_dir) / file, unpack=True) # TODO: sort as Path.
+        data_load, config_load = save_fn.load_from_file(Path(output_dir) / file)
+        data_array.append(data_load)
+        config_array.append(config_load)
     print("Data loaded:", len(data_array))
 
     # Do a sort based on lowest q?? TODO: work out this sorting part... Hasn't been fully tested.
@@ -358,7 +362,7 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False,
     else:
         combine_results = {'Q': Q_combined[idx], 'R': R_combined[idx], 'dR': dR_combined[idx], 'dQ': dQ_combined[idx]}
 
-    return seq_list, run_list, combine_results, scaling_factors
+    return seq_list, run_list, combine_results, scaling_factors, config_array
 
 def write_template(seq_list, run_list, file_to_change, template_data_updated, seq_updated, output_dir, save_name=None, prior_template=None):
     """

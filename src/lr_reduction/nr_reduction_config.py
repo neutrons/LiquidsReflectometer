@@ -103,6 +103,10 @@ class NRReductionConfig:
         self.peak_pad = 1 # number of extra pixels to include outside the background ranges fit the peak fit range
         self.peak_type = 'supergauss'   # function for the fit. Current options: 'gauss' or 'supergauss'
 
+        # TODO: check how to include these.
+        self.LambdaMinUse = None
+        self.LambdaMaxUse = None
+
     # Path configuration - Defaults assume IPTS specified and saved into that folder.
     # #TODO: test the defaults loading part...!
     @property
