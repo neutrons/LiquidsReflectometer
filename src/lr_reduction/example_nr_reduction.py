@@ -4,11 +4,13 @@ Example usage of the unified NR reduction class
 
 Demonstrates how to configure and run reductions using both constantQ, constantTOF and MeanTheta methods
 """
-
+from pathlib import Path
+import json
 import numpy as np
+
 from lr_reduction.nr_reduction_calc import NR_Reduction
 from lr_reduction.nr_reduction_config import NRReductionConfig
-
+import lr_reduction.save_reduced_data as save_fn
 
 
 def example_mean_theta_reduction():
@@ -183,7 +185,16 @@ def example_mean_theta_reduction_8col():
 
     print(f"\nReduced {len(config.RBnum)} runs with repeat averaging")
     print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
-
+    
+    save_json = True
+    if save_json:
+        filepath_out = Path(config.Spath / f"{config.Sname}_settings.json")
+        with open(filepath_out, "w") as f:
+            json.dump(
+                save_fn.make_json_safe(config.__dict__),
+                f,
+                indent=2
+            )
     return results
 
 if __name__ == '__main__':
@@ -191,6 +202,6 @@ if __name__ == '__main__':
     #example_mean_theta_reduction()
     #example_constant_tof_reduction()
     example_mean_theta_reduction_8col()
-
+    
 
 

@@ -212,7 +212,15 @@ class NR_Reduction:
             'R_per_run': R,
             'dR_per_run': dR,
             'dQ_per_run': dQ,
-            'config': self.config
+            'config': self.config,
+            'L': L_combined[idx],
+            'dL': dL_combined[idx],
+            'T': T_combined[idx],
+            'dT': dT_combined[idx],
+            'L_per_run': L,
+            'T_per_run': T,
+            'dL_per_run': dL,
+            'dT_per_run': dT
         }
 
     def _load_binary_from_disk(self, rb_num, i):

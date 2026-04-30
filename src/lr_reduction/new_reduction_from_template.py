@@ -13,6 +13,7 @@ from lr_reduction.new_reduction_template_reader import ReductionParameters
 from lr_reduction.nr_reduction_calc import NR_Reduction  # TODO: Fix names of files!!
 from lr_reduction.nr_reduction_config import NRReductionConfig
 import lr_reduction.save_reduced_data as save_fn
+import lr_reduction.new_reduction_from_file as nrff
 
 def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True, eight_col=None):
     """
@@ -264,15 +265,16 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False,
 
     # Find the files
     file_list = sorted(os.listdir(output_dir))
-    print("Files found:", len(full_names))
+    print("Files found:", len(file_list))
     for item in file_list:
         if eight_col:
-            search_flag = item.endswith("partial_8col.dat")
+            search_flag = item.endswith("partial_8col.dat") #TODO: make sure it searches on the subname too.
         else:
             search_flag = item.endswith("partial.dat")
         if item.startswith("REFL_%s" % seq_id) and search_flag:
             toks = item.split("_")
-            if not len(toks) == 5 or int(toks[2]) == 0:
+            if not len(toks) >= 3 or int(toks[2]) == 0:
+                print('here')
                 continue
             seq_list.append(int(toks[2]))
             run_list.append(int(toks[3]))
@@ -283,16 +285,18 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False,
     config_array = []
     for idx, file in enumerate(full_names):
         seq_id_store = seq_list[idx]
-        #data = np.loadtxt(Path(output_dir) / file, unpack=True) # TODO: sort as Path.
-        data_load, config_load = save_fn.load_from_file(Path(output_dir) / file)
-        data_array.append(data_load)
-        config_array.append(config_load)
+        data = np.loadtxt(Path(output_dir) / file, unpack=True) # TODO: sort as Path.
+        #output = nrff.load_from_file(Path(output_dir) / file)
+        #data_load = output["data"]
+        #config_load = output["config"]
+        data_array.append(data)
+        #config_array.append(config_load)
     print("Data loaded:", len(data_array))
 
     # Do a sort based on lowest q?? TODO: work out this sorting part... Hasn't been fully tested.
     to_sort = []
     for run in range(len(data_array)):
-        first_q = data_array[run][0,0]
+        first_q = data_array[run][0, 0]
         to_sort.append(first_q)
     sort_list = np.argsort(to_sort)
 

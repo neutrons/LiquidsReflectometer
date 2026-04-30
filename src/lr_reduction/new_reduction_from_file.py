@@ -14,7 +14,7 @@ from lr_reduction.nr_reduction_config import NRReductionConfig
 import lr_reduction.save_reduced_data as save_fn
 import lr_reduction.nr_tools as tools
 
-def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = None, override_params: dict = None, plot=True, eight_col=None, save_json=False, check_for_prior=False):
+def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = None, override_params: dict = None, plot=True, save_json=False, check_for_prior=False):
     """
     Wrapper function to reduce a single run with reading of parameters from the header of a file or a saved json file, instead of the xml.
     Then collect like results within the save folder and combine them together.
@@ -26,7 +26,6 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
     datapath: Path optional override of location to look up NEXUS file
     override_params: dict  Dictionary of config settings to override the defaults in either the template reader or the NRReduction config defaults.
     plot: bool Toggle to plot outputs during reduction steps.
-    eight_col: optional to save out 8 column data
     save_json: optional to save out a separate json setting file
     check_for_prior: optional to look in the save folder for other runs with the same prefix to join together. Important for autoreduction.
 
@@ -50,35 +49,9 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
 
         # TODO: Sort out the sequence num part to make sure it runs the right indices of the config
         # This assumes want to process in increasing seq order
-        seq_to_use = group_output["seq_nums"][idx]
-        sort_seq = np.argsort(seq_to_use)
-        print(sort_seq)
-        group_output_new={}
-        group_output_new["seq_nums"] = [group_output["seq_nums"][idx][i] for i in sort_seq]
-        group_output_new["run_nums"] = [group_output["run_nums"][idx][i] for i in sort_seq]
-        group_output_new["seq_ids"] = [group_output["seq_ids"][idx][i] for i in sort_seq]
+        group_output_sorted = sort_runs(group_output, idx)
 
-        # Put None where the seq_id are missing
-        full_range = list(range(1, max(group_output_new["seq_nums"]) + 1))
-        # Map values to their positions
-        map2 = dict(zip(group_output_new["seq_nums"], group_output_new["run_nums"]))
-        map3 = dict(zip(group_output_new["seq_nums"], group_output_new["seq_ids"]))
-        # Build aligned lists
-        base_aligned  = [x if x in group_output_new["seq_nums"] else None for x in full_range]
-        list2_aligned = [map2.get(x, None) for x in full_range]
-        list3_aligned = [map3.get(x, group_output_new["seq_ids"][-1]) for x in full_range]
-
-        #print(base_aligned)
-        #print(list2_aligned)
-        #print(list3_aligned)
-        group_output_sorted = {}
-        group_output_sorted = {"run_nums": list2_aligned,
-                               "seq_nums": base_aligned,
-                               "seq_ids": list3_aligned
-                                }
-
-        # Sort run_nums based on these indices and remove any unused intermediate indices from the config?
-        # i.e. check the config is long enough and pop any that are too long at intermediate points, but has to look through to find long arrays.
+        # TODO: validate check that config is long enough?
         
         print(config_new.ScaleFactor)
         config_new.RBnum = group_output_sorted["run_nums"]
@@ -91,10 +64,6 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
         if datapath:
             config_new.NEXUSpathRB = datapath
 
-        # override the saving of 8 column if provided into the function. TODO: decide if needed.
-        if eight_col:
-            config_new.save8col = eight_col
-
         # override template with anything provided
         if override_params:
             for key, value in override_params.items():
@@ -103,30 +72,29 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
                 else:
                     raise AttributeError(f"{key} is not a valid config parameter")
 
+        eight_col = config_new.save8col
+
         # Run reduction
         reducer = NR_Reduction(config_new)
-        results = reducer.reduce(eight_col=True)
-        # TODO: check on subname handling - should be ok here when run NR_Reduction but need to test.
+        results = reducer.reduce(eight_col=eight_col)
+
         config_final = results["config"]
 
-        updated_config = results["config"]
-
         if check_for_prior:
-            # TODO: add handling for 8 col
             # Look in folder for files of correct format
-            dict_output, combine_results, scaling_factors = find_combine_priors(updated_config, group_output_sorted["run_nums"], results, eight_col)
-            
+            dict_output, combine_results, scaling_factors, matched_files, sorted_run_nums = find_combine_priors(config_final, group_output_sorted["run_nums"], results, group_output_sorted, eight_col)
+
             # update the config scaling factors
-            config_final.ScaleFactors *= scaling_factors
+            config_final.ScaleFactor = scaling_factors
 
             # TODO: Need to read in the used_theta_vals
             used_theta_vals = {"thi":[], "ths":[], "ThCen":[]}
             # save files
             # non-concatenated
-            for i in range(len(dict_output["Q"])):
-                save_fn.save_results(dict_output, config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{group_output_sorted['run_nums'][i]}")
+            for i in range(len(dict_output)):
+                save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{sorted_run_nums[i]}")
                 if eight_col: #TODO: decide whether this is instead of prior save
-                    save_fn.save_results(dict_output, config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{group_output_sorted['run_nums'][i]}", eight_column=True)
+                    save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{sorted_run_nums[i]}", eight_column=True)
 
             # concatenated
             save_fn.save_results(combine_results, config_final, used_theta_vals, full=True, sname=f"{config_final.Sname}_combined")
@@ -150,6 +118,33 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
 
     return all_results
 
+def sort_runs(group_output, idx):
+    seq_to_use = group_output["seq_nums"][idx]
+    sort_seq = np.argsort(seq_to_use)
+
+    group_output_new={}
+    group_output_new["seq_nums"] = [group_output["seq_nums"][idx][i] for i in sort_seq]
+    group_output_new["run_nums"] = [group_output["run_nums"][idx][i] for i in sort_seq]
+    group_output_new["seq_ids"] = [group_output["seq_ids"][idx][i] for i in sort_seq]
+
+    # Put None where the seq_id are missing
+    full_range = list(range(1, max(group_output_new["seq_nums"]) + 1))
+    # Map values to their positions
+    map2 = dict(zip(group_output_new["seq_nums"], group_output_new["run_nums"]))
+    map3 = dict(zip(group_output_new["seq_nums"], group_output_new["seq_ids"]))
+    # Build aligned lists
+    base_aligned  = [x if x in group_output_new["seq_nums"] else None for x in full_range]
+    list2_aligned = [map2.get(x, None) for x in full_range]
+    list3_aligned = [map3.get(x, group_output_new["seq_ids"][-1]) for x in full_range]
+
+    group_output_sorted = {}
+    group_output_sorted = {"run_nums": list2_aligned,
+                            "seq_nums": base_aligned,
+                            "seq_ids": list3_aligned
+                            }
+    
+    return group_output_sorted
+        
 def group_runs(run_array, experiment_id, datapath):
     current_seq_id = None
 
@@ -213,43 +208,68 @@ def find_priors(updated_config, eight_col, run_nums):
     print("New files found:", len(matched_files))
     return matched_files
 
-def load_prior_data(results, matched_files, updated_config):
+def load_prior_data(results, matched_files, updated_config, initial_seq, initial_run_nums):
     existing_data = []
+    loaded_seq_nums = []
+    loaded_run_nums = []
     for val in range(len(results["Q_per_run"])):
 
         # arrange to columns
-        data_to_add = np.vstack((results["Q_per_run"][val],
-                                        results["R_per_run"][val],
-                                        results["dR_per_run"][val],
-                                        results["dQ_per_run"][val]))
+        if updated_config.save8col:
+            data_to_add = np.vstack((results["Q_per_run"][val],
+                                            results["R_per_run"][val],
+                                            results["dR_per_run"][val],
+                                            results["dQ_per_run"][val],
+                                            results["L_per_run"][val],
+                                            results["dL_per_run"][val],
+                                            results["T_per_run"][val],
+                                            results["dT_per_run"][val]
+                                            ))
+        else:
+            data_to_add = np.vstack((results["Q_per_run"][val],
+                                results["R_per_run"][val],
+                                results["dR_per_run"][val],
+                                results["dQ_per_run"][val]
+                                ))
 
         existing_data.append(data_to_add)
+        loaded_seq_nums.append(initial_seq[val])
+        loaded_run_nums.append(initial_run_nums[val])
 
     # Load, sort data order
     for item in matched_files:
         data = np.loadtxt(Path(updated_config.Spath) / item[0], unpack=True)
         existing_data.append(data)
+        loaded_seq_nums.append(item[1])
+        loaded_run_nums.append(item[2])
     
     # sort
-    sorted_data = sorted(existing_data, key=lambda x: x[0][0])
+    indices = sorted(range(len(existing_data)), key=lambda i: existing_data[i][0][0])
+    sorted_data = [existing_data[i] for i in indices]
+    sorted_seq_num = [loaded_seq_nums[i] for i in indices]
+    sorted_run_num = [loaded_run_nums[i] for i in indices]
 
-    return sorted_data
+    return sorted_data, sorted_seq_num, sorted_run_num
 
-def find_combine_priors(updated_config, run_nums, results, eight_col=False):
+def find_combine_priors(updated_config, run_nums, results, group_output_sorted, eight_col=False):
     # Find the files
     matched_files = find_priors(updated_config, eight_col, run_nums)
 
+    initial_scalefactors = updated_config.ScaleFactor
+    initial_seq = group_output_sorted["seq_nums"]
+    initial_run_nums = group_output_sorted["run_nums"]
+
     if len(matched_files) > 0:
         
-        sorted_data = load_prior_data(results, matched_files, updated_config)
-
+        print(f"Found {len(matched_files)} to combine")
+        sorted_data, sorted_seq_num, sorted_run_num = load_prior_data(results, matched_files, updated_config, initial_seq, initial_run_nums)
         # TODO: quite a bit is a duplicate of in the calc file. Can be smarter here.
         Q, R, dR, dQ = [], [], [], []
         T, L, dT, dL = [], [], [], []
         dict_output = []
         scaling_factors = []
         for run, result in enumerate(sorted_data):
-            if updated_config.Autoscale and run != 0:
+            if updated_config.AutoScale and run != 0:
                 mask1 = Q[run-1] >= min(result[0, :])
                 mask2 = result[0, :] <= max(Q[run-1])
 
@@ -260,11 +280,17 @@ def find_combine_priors(updated_config, run_nums, results, eight_col=False):
 
                 scale, sigma_scale = tools.weighted_mean(y1, y2, e1, e2)
 
+                if not np.isfinite(scale):
+                    print(f"Unable to find scaling factor for {run}")
+                    scale = 1
+
                 result[1, :] *= scale
                 result[2, :] *= scale
 
                 print('Scaling factor:', np.round(scale, 3))
                 scaling_factors.append(scale)
+                position = sorted_seq_num[run] - 1
+                initial_scalefactors[position] *= scale
 
             Q.append(result[0, :])
             R.append(result[1, :])
@@ -301,10 +327,10 @@ def find_combine_priors(updated_config, run_nums, results, eight_col=False):
         else:
             combine_results = {'Q': Q_combined[idx], 'R': R_combined[idx], 'dR': dR_combined[idx], 'dQ': dQ_combined[idx]}
 
-        return dict_output, combine_results, scaling_factors
+        return dict_output, combine_results, initial_scalefactors, matched_files, sorted_run_num
     
     else:
-        return {}, {}, []
+        return {}, {}, [], [], []
 
 def json_to_config(json_input):
     config_init = NRReductionConfig()
@@ -342,12 +368,6 @@ def load_from_file(filepath):
         raise ValueError(f"Unsupported file type: {filepath.suffix}")
 
     return {"data": data, "config": config}
-
-# Work out if need to restore any file types back
-def restore_config_types(cfg):
-    if "ScaleFactor" in cfg:
-        cfg["ScaleFactor"] = np.array(cfg["ScaleFactor"])
-    return cfg
 
 def save_config_json(filepath, config):
     with open(filepath, "w") as f:
