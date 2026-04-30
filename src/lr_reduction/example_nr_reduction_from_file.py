@@ -31,11 +31,34 @@ def example_from_json():
 
     return output
 
+def example_wrong_order():
+    run_list = [227165,227164,227166]
+    setting_file = "/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/REFL_227158_settings.json"
+    experiment_id = "IPTS-36776"
+    Spath = Path('/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/')
+    Sname = "REFL_227164_wrong_order_test"
+    override_params = {'Spath': Spath, 'Sname': Sname}
+    output = reduction.reduce_from_file(run_list, setting_file, experiment_id, override_params=override_params, plot=True, save_json=False)
+
+    return output
+
+def example_one_missing():
+    run_list = [227165,227166]
+    setting_file = "/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/REFL_227158_settings.json"
+    experiment_id = "IPTS-36776"
+    Spath = Path('/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/')
+    subname = "missing_test"
+    override_params = {'Spath': Spath, "subname": subname}
+    output = reduction.reduce_from_file(run_list, setting_file, experiment_id, override_params=override_params, plot=True, save_json=False)
+
+    return output
 
 if __name__ == '__main__':
     # Run examples
-    example_from_dat()
-    example_from_json()
+    #example_from_dat()
+    #example_from_json()
+    #example_wrong_order()
+    example_one_missing()
 
 
 

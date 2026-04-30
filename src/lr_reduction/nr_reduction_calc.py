@@ -112,17 +112,26 @@ class NR_Reduction:
         if not eight_col:
             eight_col = self.config.save8col
 
+        used_theta_vals = {"thi": [], "ths": [], "ThCen": []}
         # TODO: Add handling for summed run files.
+        non_specified = []
+        last_valid_idx = None
+        valid_rb_nums = []
         for i, rb_num in enumerate(self.config.RBnum):
             print('--------------------------------------------')
+            if rb_num is None:
+                print("No run completed at sequence ID", i+1)
+                non_specified.append(i)
+                continue
+            
             result, config_out, log_vals = self._reduce_single_run(i, rb_num)
 
             # TODO: add better autoscaling options.
-            if self.config.AutoScale and i != 0:
-                y1=R[i-1][np.where(Q[i-1] >= min(result['q']))]
-                y2=result['r'][np.where(result['q'] <= max(Q[i-1]))]
-                e1=dR[i-1][np.where(Q[i-1] >= min(result['q']))]
-                e2=result['dr'][np.where(result['q'] <= max(Q[i-1]))]
+            if self.config.AutoScale and last_valid_idx is not None:
+                y1=R[last_valid_idx][np.where(Q[last_valid_idx] >= min(result['q']))]
+                y2=result['r'][np.where(result['q'] <= max(Q[last_valid_idx]))]
+                e1=dR[last_valid_idx][np.where(Q[last_valid_idx] >= min(result['q']))]
+                e2=result['dr'][np.where(result['q'] <= max(Q[last_valid_idx]))]
 
                 scale, sigma_scale = tools.weighted_mean(y1,y2,e1,e2)
                 print(scale)
@@ -134,6 +143,10 @@ class NR_Reduction:
                 print('Scaling factor: ', np.round(scale,3))
                 self.config.ScaleFactor[i] *= scale
 
+            used_theta_vals["thi"].append(np.round(log_vals["thi"], 3))
+            used_theta_vals["ths"].append(np.round(log_vals["ths"], 3))
+            used_theta_vals["ThCen"].append(np.round(log_vals["ThCen"], 3))
+
             Q.append(result['q'])
             R.append(result['r'])
             dR.append(result['dr'])
@@ -142,15 +155,17 @@ class NR_Reduction:
             dT.append(result['dt'])
             L.append(result['l'])
             T.append(result['t'])
+            last_valid_idx = len(R) - 1
+            valid_rb_nums.append(rb_num)
             if save_all:
                 # save out individual parts
                 # TODO: Need to fix the saving logic for multiple runs!! At the moment the save looks for the capitals...
                 result_out = {'Q': result['q'], 'R': result['r'], 'dR': result['dr'], 'dQ': result['dq'],
-                              'T': result['t'], 'L': result['l'], 'dT': result['dt'], 'dL': result['dl']}
+                            'T': result['t'], 'L': result['l'], 'dT': result['dt'], 'dL': result['dl']}
                 #self.save_results(result_out, self.config, self.log_values, sname=f"{self.config.Sname}_{i}", method=self.config.method_per_run[i])
-                save_fn.save_results(result_out, self.config, self.log_values, sname=f"{self.config.Sname}_{i+1}_{rb_num}")
+                save_fn.save_results(result_out, self.config, used_theta_vals, sname=f"{self.config.Sname}_{i+1}_{rb_num}")
                 if eight_col: #TODO: decide whether this is instead of prior save
-                    save_fn.save_results(result_out, self.config, self.log_values, sname=f"{self.config.Sname}_{i+1}_{rb_num}", eight_column=True)
+                    save_fn.save_results(result_out, self.config, used_theta_vals, sname=f"{self.config.Sname}_{i+1}_{rb_num}", eight_column=True)
 
         # Combine results for all settings
         Q_combined = np.concatenate(Q)
@@ -168,18 +183,18 @@ class NR_Reduction:
                            'T': T_combined[idx], 'L': L_combined[idx], 'dT': dT_combined[idx], 'dL': dL_combined[idx]}
 
         if save or save_all:    #TODO: fix the saving parts here this is messy!
-            save_fn.save_results(combine_results, self.config, self.log_values, full=True, sname=f"{self.config.Sname}_combined")
+            save_fn.save_results(combine_results, self.config, used_theta_vals, full=True, sname=f"{self.config.Sname}_combined")
             if eight_col: #TODO: decide whether this is instead of prior save
-                save_fn.save_results(combine_results, self.config, self.log_values, eight_column=True, full=True, sname=f"{self.config.Sname}_combined")
+                save_fn.save_results(combine_results, self.config, used_theta_vals, eight_column=True, full=True, sname=f"{self.config.Sname}_combined")
         # TODO: Decide whether to keep in here or have as a separate part after the reduciton....?
         if plot:
-            for i, rb_num in enumerate(self.config.RBnum):
+            for q, r, dr, dq, rb_num in zip(Q, R, dR, dQ, valid_rb_nums):
                 if self.config.plotQ4:
-                    plt.errorbar(Q[i],R[i]*Q[i]**4, yerr=dR[i]*Q[i]**4, xerr=dQ[i],  fmt='o', markersize=1)
+                    plt.errorbar(q, r*q**4, yerr=dr*q**4, xerr=dq, fmt='o', markersize=1)
                     plt.ylabel(r'$R \cdot Q^4$', fontsize=14)
                     plt.xscale('linear')
                 else:
-                    plt.errorbar(Q[i],R[i], yerr=dR[i], xerr=dQ[i],  fmt='o', markersize=1)
+                    plt.errorbar(q, r, yerr=dr, xerr=dq, fmt='o', markersize=1)
                     plt.ylabel('R')
                     plt.xscale('log')
             plt.title('NR data: '+str(rb_num), fontsize=16)

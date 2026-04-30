@@ -9,11 +9,12 @@ from lr_reduction.nr_reduction_config import NRReductionConfig
 def save_results(results, config_header, log_values, sname = None, full=True, eight_column=False, sequence=None):
     """
     Save results as .dat file with header
+    results: results to save
+    config_header: config to be used for the meta data in header
+    log_values: log values to include in meta data header (specifically theta values)
     sname: optional save name to overwrite the default
     full: flag to include more information in the header
-    method: option to explicitly feed the method
     eight_column: option to save out 8-column data with L, dL, T, dT in addition to the standard 4 column
-    config_header: option to specify the config to include in the header
     sequence: option to specify index within the set of runs for selecting settings from config into the header #TODO: should this be in the method?
 
     Parameters

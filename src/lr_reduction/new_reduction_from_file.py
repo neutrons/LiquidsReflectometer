@@ -2,6 +2,7 @@ import copy
 import os
 from pathlib import Path
 import json
+import re
 
 import h5py
 import numpy as np
@@ -11,25 +12,23 @@ from matplotlib import pyplot as plt
 from lr_reduction.nr_reduction_calc import NR_Reduction  # TODO: Fix names of files!!
 from lr_reduction.nr_reduction_config import NRReductionConfig
 import lr_reduction.save_reduced_data as save_fn
+import lr_reduction.nr_tools as tools
 
-def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = None, override_params: dict = None, plot=True, eight_col=None, save_json=False):
+def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = None, override_params: dict = None, plot=True, eight_col=None, save_json=False, check_for_prior=False):
     """
     Wrapper function to reduce a single run with reading of parameters from the header of a file or a saved json file, instead of the xml.
     Then collect like results within the save folder and combine them together.
     This is intended for use with e.g. autoreduction.
 
-    It loads the template and extracts values for that run, creates the reduction config and fills with parameters from the template
-    file. It then overrides any parameters set within the override parameter dictionary to give full flexibility. It saves out the
-    individual run in an equivalent format to prior autoreduction processes. Then loads and sorts any which have the same seq_id in
-    the title and combines them into an output file. Equivalent to prior autoreduction processes.
-
-    runno: reflectivity run number
-    template_file: template file, including Path
+    run_array: set of reflectivity run number, which will be grouped by seq_id
+    setting_file: .dat file to read header or .json setting file, including Path
     experiment_id: str IPTS number which appends to datapath if this isn't provided (e.g. "IPTS-36119")
     datapath: Path optional override of location to look up NEXUS file
-    template_path: Path optional override of template location. Otherwise uses IPTS shared folder
     override_params: dict  Dictionary of config settings to override the defaults in either the template reader or the NRReduction config defaults.
     plot: bool Toggle to plot outputs during reduction steps.
+    eight_col: optional to save out 8 column data
+    save_json: optional to save out a separate json setting file
+    check_for_prior: optional to look in the save folder for other runs with the same prefix to join together. Important for autoreduction.
 
     returns
         combined_results: dict of Q, R, dR, dQ. This is assembled with anything else on same seq num. #TODO: check if need individual one returned too.
@@ -48,12 +47,44 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
         # reset config
         file_load = load_from_file(setting_file) # moving here to try fix scale factor issue
         config_new = json_to_config(file_load["config"])
+
+        # TODO: Sort out the sequence num part to make sure it runs the right indices of the config
+        # This assumes want to process in increasing seq order
+        seq_to_use = group_output["seq_nums"][idx]
+        sort_seq = np.argsort(seq_to_use)
+        print(sort_seq)
+        group_output_new={}
+        group_output_new["seq_nums"] = [group_output["seq_nums"][idx][i] for i in sort_seq]
+        group_output_new["run_nums"] = [group_output["run_nums"][idx][i] for i in sort_seq]
+        group_output_new["seq_ids"] = [group_output["seq_ids"][idx][i] for i in sort_seq]
+
+        # Put None where the seq_id are missing
+        full_range = list(range(1, max(group_output_new["seq_nums"]) + 1))
+        # Map values to their positions
+        map2 = dict(zip(group_output_new["seq_nums"], group_output_new["run_nums"]))
+        map3 = dict(zip(group_output_new["seq_nums"], group_output_new["seq_ids"]))
+        # Build aligned lists
+        base_aligned  = [x if x in group_output_new["seq_nums"] else None for x in full_range]
+        list2_aligned = [map2.get(x, None) for x in full_range]
+        list3_aligned = [map3.get(x, group_output_new["seq_ids"][-1]) for x in full_range]
+
+        #print(base_aligned)
+        #print(list2_aligned)
+        #print(list3_aligned)
+        group_output_sorted = {}
+        group_output_sorted = {"run_nums": list2_aligned,
+                               "seq_nums": base_aligned,
+                               "seq_ids": list3_aligned
+                                }
+
+        # Sort run_nums based on these indices and remove any unused intermediate indices from the config?
+        # i.e. check the config is long enough and pop any that are too long at intermediate points, but has to look through to find long arrays.
+        
         print(config_new.ScaleFactor)
-        config_new.RBnum = group_output["run_nums"][idx]
+        config_new.RBnum = group_output_sorted["run_nums"]
         config_new.experiment_id = experiment_id
 
-        # TODO: work out the saving, does it need to match prior behavior?
-        config_new.Sname = f"REFL_{group_output['seq_ids'][idx][0]}"
+        config_new.Sname = f"REFL_{group_output_sorted['seq_ids'][0]}"
         print(config_new.Sname)
         config_new.plotON = plot
 
@@ -72,18 +103,43 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
                 else:
                     raise AttributeError(f"{key} is not a valid config parameter")
 
-        #print(vars(config)) # Print to check the changes.
-        #print(vars(template_data))
-
         # Run reduction
         reducer = NR_Reduction(config_new)
         results = reducer.reduce(eight_col=True)
+        # TODO: check on subname handling - should be ok here when run NR_Reduction but need to test.
+        config_final = results["config"]
+
+        updated_config = results["config"]
+
+        if check_for_prior:
+            # TODO: add handling for 8 col
+            # Look in folder for files of correct format
+            dict_output, combine_results, scaling_factors = find_combine_priors(updated_config, group_output_sorted["run_nums"], results, eight_col)
+            
+            # update the config scaling factors
+            config_final.ScaleFactors *= scaling_factors
+
+            # TODO: Need to read in the used_theta_vals
+            used_theta_vals = {"thi":[], "ths":[], "ThCen":[]}
+            # save files
+            # non-concatenated
+            for i in range(len(dict_output["Q"])):
+                save_fn.save_results(dict_output, config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{group_output_sorted['run_nums'][i]}")
+                if eight_col: #TODO: decide whether this is instead of prior save
+                    save_fn.save_results(dict_output, config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{group_output_sorted['run_nums'][i]}", eight_column=True)
+
+            # concatenated
+            save_fn.save_results(combine_results, config_final, used_theta_vals, full=True, sname=f"{config_final.Sname}_combined")
+            if eight_col: #TODO: decide whether this is instead of prior save
+                save_fn.save_results(combine_results, config_final, used_theta_vals, eight_column=True, full=True, sname=f"{config_final.Sname}_combined")
+
+
+            #if plot:
+            #    plot_reflectivity(dict_output, RQ4)
 
         all_results.append(results)
 
-        #TODO: decide about saving json etc.
         if save_json:
-            config_final = results["config"]
             filepath_out = Path(config_final.Spath / f"{config_final.Sname}_settings.json")
             with open(filepath_out, "w") as f:
                 json.dump(
@@ -140,6 +196,115 @@ def group_runs(run_array, experiment_id, datapath):
     # TODO work out if need to repeat the id etc.
     return {"run_nums": run_nums, "seq_nums": seq_nums, "seq_ids": seq_ids}
 
+def find_priors(updated_config, eight_col, run_nums):
+    pattern = re.compile(
+                rf"^{re.escape(updated_config.Sname)}_(\d+)_(\d+){'_8col' if eight_col else ''}\.dat$"
+                    )
+
+    file_list = sorted(os.listdir(updated_config.Spath))
+    matched_files = []
+    for item in file_list:
+        m = pattern.match(item)
+        if m:
+            num1, num2 = map(int, m.groups())
+            # ignore any already in the currently processed set
+            if num2 not in run_nums:
+                matched_files.append((item, num1, num2))
+    print("New files found:", len(matched_files))
+    return matched_files
+
+def load_prior_data(results, matched_files, updated_config):
+    existing_data = []
+    for val in range(len(results["Q_per_run"])):
+
+        # arrange to columns
+        data_to_add = np.vstack((results["Q_per_run"][val],
+                                        results["R_per_run"][val],
+                                        results["dR_per_run"][val],
+                                        results["dQ_per_run"][val]))
+
+        existing_data.append(data_to_add)
+
+    # Load, sort data order
+    for item in matched_files:
+        data = np.loadtxt(Path(updated_config.Spath) / item[0], unpack=True)
+        existing_data.append(data)
+    
+    # sort
+    sorted_data = sorted(existing_data, key=lambda x: x[0][0])
+
+    return sorted_data
+
+def find_combine_priors(updated_config, run_nums, results, eight_col=False):
+    # Find the files
+    matched_files = find_priors(updated_config, eight_col, run_nums)
+
+    if len(matched_files) > 0:
+        
+        sorted_data = load_prior_data(results, matched_files, updated_config)
+
+        # TODO: quite a bit is a duplicate of in the calc file. Can be smarter here.
+        Q, R, dR, dQ = [], [], [], []
+        T, L, dT, dL = [], [], [], []
+        dict_output = []
+        scaling_factors = []
+        for run, result in enumerate(sorted_data):
+            if updated_config.Autoscale and run != 0:
+                mask1 = Q[run-1] >= min(result[0, :])
+                mask2 = result[0, :] <= max(Q[run-1])
+
+                y1 = R[run-1][mask1]
+                y2 = result[1, :][mask2]
+                e1 = dR[run-1][mask1]
+                e2 = result[2, :][mask2]
+
+                scale, sigma_scale = tools.weighted_mean(y1, y2, e1, e2)
+
+                result[1, :] *= scale
+                result[2, :] *= scale
+
+                print('Scaling factor:', np.round(scale, 3))
+                scaling_factors.append(scale)
+
+            Q.append(result[0, :])
+            R.append(result[1, :])
+            dR.append(result[2, :])
+            dQ.append(result[3, :])
+            if eight_col:
+                L.append(result[4, :])
+                dL.append(result[5, :])
+                T.append(result[6, :])
+                dT.append(result[7, :])
+
+                dict_output.append({'Q': result[0,:], 'R': result[1,:], 'dR': result[2,:], 'dQ': result[3,:],
+                                    'L': result[4,:], 'dL': result[5,:], 'T': result[6,:], 'dT': result[7,:]})
+            else:
+                # This is a bit muddled with a few things in arrays and dict. TODO: clean-up so don't need both.
+                dict_output.append({'Q': result[0,:], 'R': result[1,:], 'dR': result[2,:], 'dQ': result[3,:]})
+
+        # Combine results for all settings
+        Q_combined = np.concatenate(Q)
+        R_combined = np.concatenate(R)
+        dR_combined = np.concatenate(dR)
+        dQ_combined = np.concatenate(dQ)
+        if eight_col:
+            T_combined = np.concatenate(T)
+            dT_combined = np.concatenate(dT)
+            L_combined = np.concatenate(L)
+            dL_combined = np.concatenate(dL)
+
+        # Sort by Q for combined data
+        idx = np.argsort(Q_combined)
+        if eight_col:
+            combine_results = {'Q': Q_combined[idx], 'R': R_combined[idx], 'dR': dR_combined[idx], 'dQ': dQ_combined[idx],
+                            'L': L_combined[idx], 'dL': dL_combined[idx], 'T': T_combined[idx], 'dT': dT_combined[idx]}
+        else:
+            combine_results = {'Q': Q_combined[idx], 'R': R_combined[idx], 'dR': dR_combined[idx], 'dQ': dQ_combined[idx]}
+
+        return dict_output, combine_results, scaling_factors
+    
+    else:
+        return {}, {}, []
 
 def json_to_config(json_input):
     config_init = NRReductionConfig()
