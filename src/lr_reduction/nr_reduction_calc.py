@@ -112,7 +112,7 @@ class NR_Reduction:
         if not eight_col:
             eight_col = self.config.save8col
 
-        used_theta_vals = {"thi": [], "ths": [], "ThCen": []}
+        used_theta_vals = {"thi": [], "ths": [], "ThCen": [], "title": []}
         # TODO: Add handling for summed run files.
         non_specified = []
         last_valid_idx = None
@@ -146,6 +146,7 @@ class NR_Reduction:
             used_theta_vals["thi"].append(np.round(log_vals["thi"], 3))
             used_theta_vals["ths"].append(np.round(log_vals["ths"], 3))
             used_theta_vals["ThCen"].append(np.round(log_vals["ThCen"], 3))
+            used_theta_vals['title'].append(self.log_values['title'])
 
             Q.append(result['q'])
             R.append(result['r'])
@@ -164,7 +165,7 @@ class NR_Reduction:
                             'T': result['t'], 'L': result['l'], 'dT': result['dt'], 'dL': result['dl']}
                 #self.save_results(result_out, self.config, self.log_values, sname=f"{self.config.Sname}_{i}", method=self.config.method_per_run[i])
                 save_fn.save_results(result_out, self.config, used_theta_vals, sname=f"{self.config.Sname}_{i+1}_{rb_num}")
-                if eight_col: #TODO: decide whether this is instead of prior save
+                if eight_col:
                     save_fn.save_results(result_out, self.config, used_theta_vals, sname=f"{self.config.Sname}_{i+1}_{rb_num}", eight_column=True)
 
         # Combine results for all settings
@@ -184,7 +185,7 @@ class NR_Reduction:
 
         if save or save_all:    #TODO: fix the saving parts here this is messy!
             save_fn.save_results(combine_results, self.config, used_theta_vals, full=True, sname=f"{self.config.Sname}_combined")
-            if eight_col: #TODO: decide whether this is instead of prior save
+            if eight_col:
                 save_fn.save_results(combine_results, self.config, used_theta_vals, eight_column=True, full=True, sname=f"{self.config.Sname}_combined")
         # TODO: Decide whether to keep in here or have as a separate part after the reduciton....?
         if plot:
@@ -338,7 +339,7 @@ class NR_Reduction:
         self.settings['si_sample_distance'] = self.settings['xi_reference'] - self.log_values['xi']
         self.settings['interslit_distance'] = self.settings['s1_sample_distance'] - self.settings['si_sample_distance']
 
-        # Calculate lam range if not provided - # TODO: Add smarter calculation.
+        # Calculate lam range if not provided
         if self.config.LambdaMin is None or self.config.LambdaMax is None:
             lam_range = tools.get_lam_range(self.log_values["lam_request"], self.log_values["frequency"])
         if self.config.LambdaMin is None:
@@ -923,7 +924,6 @@ class NR_Reduction:
         if self.config.method_per_run[i] == "constanttof":
             iRB = np.sum(Rarr, axis=0)
             eRB = np.sqrt(np.sum(REarr**2, axis=0))
-            # TODO: check the zero removal part!!
             # Remove zeros
             mask = (iDB != 0) & (iRB != 0)
             LAMBDA = LAMBDA[mask]
@@ -939,7 +939,7 @@ class NR_Reduction:
         R0 = Rarr.copy()    
         Rarr, REarr = tools.divide_propagate_error(R0, REarr, iDB, eDB)
 
-        # Remove NaNs - #TODO: check if this is still correct...
+        # Remove NaNs
         nan_idx = ~np.isfinite(Rarr)
         Rarr[nan_idx] = 0
         REarr[nan_idx] = 0
@@ -1078,6 +1078,7 @@ class NR_Reduction:
 
         return {'q': q_vals, 'r': r, 'dr': dr, 'dq': dq, 't': t_store, 'l': l_store, 'dt': dT, 'dl': dL}, self.config, self.log_values
 
+    '''
     def save_results(self, results, sname = None, full=True, method=None, eight_column=False, config_header=None, sequence=None):
         """
         Save results as .dat file with header
@@ -1103,39 +1104,6 @@ class NR_Reduction:
             #col_label = "columns = Q, R, dR, dQ (sigma)"
             
         head = self._build_header(full=full, eight_column=eight_column, config_header=config_header, sequence=sequence)
-        '''
-        # TODO: Sort out the header to include best information...
-        if full:
-            head = (
-                f"NR_runs = {self.config.RBnum}\n"
-                f"DB = {self.config.DBname}\n"
-                f"Method = {method}\n"
-                f"Normalize = {self.config.Normalize}\n"
-                f"Autoscale = {self.config.AutoScale}\n"
-                f"Scaling factors = {self.config.ScaleFactor}\n"
-                f"Lambda Range = {self.config.LambdaMinUse}\u212B to {self.config.LambdaMaxUse}\u212B\n"
-                f"THS = {self.log_values['ths']}, THI = {self.log_values['thi']}, ThCen = {self.log_values['ThCen']}\n"
-                f"{'---' * 20}\n"
-                f"Config: {vars(self.config)}\n"
-                f"{'---' * 20}\n"
-                f"{col_label}\n"
-                f"{'---' * 20}"
-            )
-        else:   # Not sure how best to output the config for combined settings so don't include for now.
-            head = (
-                f"NR_runs = {self.config.RBnum}\n"
-                f"DB = {self.config.DBname}\n"
-                f"Method = {method}\n"
-                f"Normalize = {self.config.Normalize}\n"
-                f"Autoscale = {self.config.AutoScale}\n"
-                f"Scaling factors = {self.config.ScaleFactor}\n"
-                f"Lambda Range = {self.config.LambdaMinUse}\u212B to {self.config.LambdaMaxUse}\u212B\n"
-                f"THS = {self.log_values['ths']}, THI = {self.log_values['thi']}, ThCen = {self.log_values['ThCen']}\n"
-                f"{'---' * 20}\n"
-                f"{col_label}\n"
-                f"{'---' * 20}"
-            )
-            '''
         
         if not sname:
             output_file = self.config.Spath / f"{self.config.Sname}"
@@ -1149,6 +1117,7 @@ class NR_Reduction:
         np.savetxt(output_file,
                   array, header=head, delimiter='\t')
         print(f"Saved combined result to {output_file}")
+        
 
     def _build_header(self, full=True, eight_column=False, config_header=None, sequence=None):
         """
@@ -1172,6 +1141,7 @@ class NR_Reduction:
         if full:
             head = (
                 f"NR_runs = {sorted_config.RBnum}\n"
+                f"Run Title = {self.log_values['title']}\n"
                 f"DB = {sorted_config.DBname}\n"
                 f"Method = {sorted_config.method_per_run}\n"
                 f"Normalize = {sorted_config.Normalize}\n"
@@ -1189,6 +1159,7 @@ class NR_Reduction:
         else:
             head = (
                 f"NR_runs = {sorted_config.RBnum}\n"
+                f"Run Title = {self.log_values['title']}\n"
                 f"DB = {sorted_config.DBname}\n"
                 f"Method = {sorted_config.method_per_run}\n"
                 f"Normalize = {sorted_config.Normalize}\n"
@@ -1204,7 +1175,7 @@ class NR_Reduction:
             )
 
         return head
-    
+        '''
 
     def apply_config_overrides(self, settings: dict) -> dict:
         """

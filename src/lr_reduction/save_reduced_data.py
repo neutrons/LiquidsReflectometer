@@ -4,7 +4,7 @@ import json
 import lr_reduction.nr_tools as tools
 import numpy as np
 from lr_reduction.nr_reduction_config import NRReductionConfig
-
+from matplotlib.backends.backend_pdf import PdfPages
 
 def save_results(results, config_header, log_values, sname = None, full=True, eight_column=False, sequence=None):
     """
@@ -69,6 +69,7 @@ def _build_header(config_header, log_values, full=True, eight_column=False, sequ
     if full:
         head = (
             f"NR_runs = {sorted_config.RBnum}\n"
+            f"Run Title = {log_values['title']}\n"
             f"DB = {sorted_config.DBname}\n"
             f"Method = {sorted_config.method_per_run}\n"
             f"Normalize = {sorted_config.Normalize}\n"
@@ -86,6 +87,7 @@ def _build_header(config_header, log_values, full=True, eight_column=False, sequ
     else:
         head = (
             f"NR_runs = {sorted_config.RBnum}\n"
+            f"Run Title = {log_values['title']}\n"
             f"DB = {sorted_config.DBname}\n"
             f"Method = {sorted_config.method_per_run}\n"
             f"Normalize = {sorted_config.Normalize}\n"
@@ -118,7 +120,14 @@ def make_json_safe(obj):
     else:
         return obj
     
+# TODO: link this up to store the figures and save them out.
+def save_plot_pdf_summary(savepath, savename, fig_list):
 
+    output_path = Path(savepath.text() or ".") / f"plot_summary_{savename}.pdf"
+    with PdfPages(output_path) as pdf:
+        for fig, meta in fig_list:
+            pdf.savefig(fig)
+    print(f"Saved plot summary {output_path}.")
 
 
 

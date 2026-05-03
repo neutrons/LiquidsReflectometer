@@ -88,17 +88,18 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
             config_final.ScaleFactor = scaling_factors
 
             # TODO: Need to read in the used_theta_vals
-            used_theta_vals = {"thi":[], "ths":[], "ThCen":[]}
+            used_theta_vals = {"thi":[], "ths":[], "ThCen":[], "title": []}
             # save files
             # non-concatenated
+            # TODO: this is resaving them. Think this is the best option.
             for i in range(len(dict_output)):
                 save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{sorted_run_nums[i]}")
-                if eight_col: #TODO: decide whether this is instead of prior save
+                if eight_col:
                     save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{sorted_run_nums[i]}", eight_column=True)
 
             # concatenated
             save_fn.save_results(combine_results, config_final, used_theta_vals, full=True, sname=f"{config_final.Sname}_combined")
-            if eight_col: #TODO: decide whether this is instead of prior save
+            if eight_col:
                 save_fn.save_results(combine_results, config_final, used_theta_vals, eight_column=True, full=True, sname=f"{config_final.Sname}_combined")
 
 

@@ -168,6 +168,7 @@ def get_log_values(fname):
     log_values["xi"]=np.array(f['entry/DASlogs/BL4B:Mot:xi.RBV/average_value'][0])
 
     log_values['start_time'] = f['entry/start_time'].asstr()[0]
+    log_values['title'] = f['entry/title'].asstr()[0]
 
     log_values["op_mode"] = f['entry/DASlogs/BL4B:CS:ExpPl:OperatingMode/value'][0] # This is one that can say "Free Liquid"
     try:

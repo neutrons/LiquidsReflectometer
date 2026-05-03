@@ -776,7 +776,7 @@ class TemplateBatchTab(QWidget):
                                     self.figures.append((fig, meta))
 
                         if self.save_summary_checkbox.isChecked() and current_group_figs:
-                            output_path = Path(self.spath_edit.text() or ".") / f"plot_summary_{run}_{group_index}.pdf"
+                            output_path = Path(self.spath_edit.text() or ".") / f"plot_summary_{run}.pdf"
                             with PdfPages(output_path) as pdf:
                                 for fig, meta in current_group_figs:
                                     pdf.savefig(fig)
