@@ -94,9 +94,15 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     else:
         result = {'Q': results['q'], 'R': results['r'], 'dR': results['dr'], 'dQ': results['dq']}       
 
-    save_fn.save_results(result, config_out, log_values, sname=f"{config.Sname}_partial")
+    # Save data
+    if config.subname:
+        partial_name = f"{config.subname}_partial"
+    else:
+        partial_name = "partial"
+
+    save_fn.save_results(result, config_out, log_values, sname=f"{config.Sname}{partial_name}")
     if eight_col: #TODO: decide whether this is instead of prior save
-        save_fn.save_results(result, config_out, log_values, sname=f"{config.Sname}_partial", eight_column=True)
+        save_fn.save_results(result, config_out, log_values, sname=f"{config.Sname}{partial_name}", eight_column=True)
 
     # Collect "like" runs together
     seq_list, run_list, combined_results, scaling_factors, config_array = assemble_results(seq_id, config.Spath, autoscale=config.AutoScale, plot=plot, RQ4=config.plotQ4, eight_col=eight_col)
@@ -110,9 +116,9 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     else:
         combined_name = "combined_data"
 
-    save_fn.save_results(combined_results, config_out, log_values, sname=f"REFL_{seq_id}_{combined_name}", full=True)
+    save_fn.save_results(combined_results, config_out, log_values, sname=f"REFL_{seq_id}{combined_name}", full=True)
     if eight_col: #TODO: decide whether this is instead of prior save
-        reduce_calc.save_results(combined_results, config_out, log_values, sname=f"REFL_{seq_id}_{combined_name}", full=False, eight_column=True)
+        reduce_calc.save_results(combined_results, config_out, log_values, sname=f"REFL_{seq_id}{combined_name}", full=False, eight_column=True)
 
     # plot
     if plot:
@@ -273,7 +279,7 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False,
             search_flag = item.endswith("partial.dat")
         if item.startswith("REFL_%s" % seq_id) and search_flag:
             toks = item.split("_")
-            if not len(toks) >= 3 or int(toks[2]) == 0:
+            if not len(toks) == 5 or int(toks[2]) == 0: # TODO: check was using 3 as a check
                 print('here')
                 continue
             seq_list.append(int(toks[2]))
