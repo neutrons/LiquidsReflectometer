@@ -42,7 +42,7 @@ def save_results(results, config_header, log_values, sname = None, full=True, ei
         output_file = f"{output_file}.dat"
     np.savetxt(output_file,
                 array, header=head, delimiter='\t')
-    print(f"Saved combined result to {output_file}")
+    print(f"Saved result to {output_file}")
 
 def _build_header(config_header, log_values, full=True, eight_column=False, sequence=None):
     """
@@ -117,6 +117,12 @@ def make_json_safe(obj):
         return obj.item()
     elif isinstance(obj, Path):
         return str(obj)
+    elif callable(obj):
+        # Convert functions/methods to a readable string to avoid JSON serialization errors
+        try:
+            return str(obj)
+        except Exception:
+            return repr(obj)
     else:
         return obj
     

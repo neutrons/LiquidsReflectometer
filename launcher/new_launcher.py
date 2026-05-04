@@ -6,6 +6,7 @@ from apps.overplot import Overplot
 from apps.roi_selector import ROISelector
 from apps.sld_calculator import SLD
 from apps.template_batch import TemplateBatchTab
+from apps.file_batch import FileBatchTab
 from qtpy import QtCore
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 
@@ -40,6 +41,14 @@ class ReductionInterface(QTabWidget):
         self.addTab(self.template_batch_tab, "Batch template")
         self.setTabText(tab_id, "Batch template")
 
+        
+        # Batch file-driven reduction tab (DAT/JSON)
+        tab_id += 1
+        self.file_batch_tab = FileBatchTab()
+        self.addTab(self.file_batch_tab, "Batch file")
+        self.setTabText(tab_id, "Batch file")
+        
+        
         # ROI selector
         tab_id += 1
         self.roi_tab = ROISelector()

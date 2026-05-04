@@ -76,13 +76,23 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
 
         # Run reduction
         reducer = NR_Reduction(config_new)
-        results = reducer.reduce(eight_col=eight_col)
+        results = reducer.reduce(eight_col=eight_col, plot=plot)
 
         config_final = results["config"]
 
         if check_for_prior:
             # Look in folder for files of correct format
             dict_output, combine_results, scaling_factors, matched_files, sorted_run_nums = find_combine_priors(config_final, group_output_sorted["run_nums"], results, group_output_sorted, eight_col)
+
+            # check dictionaries and arrays aren't empty and pass if they are
+            if not dict_output:
+                continue
+            if not combine_results:
+                continue
+            if not scaling_factors:
+                continue
+            if not matched_files:
+                continue
 
             # update the config scaling factors
             config_final.ScaleFactor = scaling_factors
@@ -96,15 +106,21 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
                 save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{sorted_run_nums[i]}")
                 if eight_col:
                     save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{sorted_run_nums[i]}", eight_column=True)
-
+            if plot:
+                plot_reflectivity(dict_output, RQ4=False)
             # concatenated
-            save_fn.save_results(combine_results, config_final, used_theta_vals, full=True, sname=f"{config_final.Sname}_combined")
+            try:
+                save_fn.save_results(combine_results, config_final, used_theta_vals, full=True, sname=f"{config_final.Sname}_combined")
+            except KeyError as e:
+                print(f"Warning: combined results missing expected key {e}; skipping save_results for combined output")
             if eight_col:
-                save_fn.save_results(combine_results, config_final, used_theta_vals, eight_column=True, full=True, sname=f"{config_final.Sname}_combined")
-
+                try:
+                    save_fn.save_results(combine_results, config_final, used_theta_vals, eight_column=True, full=True, sname=f"{config_final.Sname}_combined")
+                except KeyError as e:
+                    print(f"Warning: combined results missing expected key {e}; skipping save_results (8col) for combined output")
 
             #if plot:
-            #    plot_reflectivity(dict_output, RQ4)
+            #    plot_reflectivity(combine_results, RQ4=False)
 
         all_results.append(results)
 
@@ -194,9 +210,9 @@ def group_runs(run_array, experiment_id, datapath):
 
 def find_priors(updated_config, eight_col, run_nums):
     pattern = re.compile(
-                rf"^{re.escape(updated_config.Sname)}_(\d+)_(\d+){'_8col' if eight_col else ''}\.dat$"
+                rf"^{re.escape(updated_config.Sname)}_(\d+)_(\d+){'_8col' if eight_col else ''}{re.escape(updated_config.subname)}.dat$"
                     )
-
+    #print(f"Looking for files with pattern: {pattern.pattern} in {updated_config.Spath}")
     file_list = sorted(os.listdir(updated_config.Spath))
     matched_files = []
     for item in file_list:
@@ -206,7 +222,9 @@ def find_priors(updated_config, eight_col, run_nums):
             # ignore any already in the currently processed set
             if num2 not in run_nums:
                 matched_files.append((item, num1, num2))
-    print("New files found:", len(matched_files))
+    print("New files found:", len(matched_files)) # only finds those not re-processed.
+    #print(matched_files)
+    #print(file_list)
     return matched_files
 
 def load_prior_data(results, matched_files, updated_config, initial_seq, initial_run_nums):
@@ -328,6 +346,7 @@ def find_combine_priors(updated_config, run_nums, results, group_output_sorted, 
         else:
             combine_results = {'Q': Q_combined[idx], 'R': R_combined[idx], 'dR': dR_combined[idx], 'dQ': dQ_combined[idx]}
 
+        #print(combine_results)
         return dict_output, combine_results, initial_scalefactors, matched_files, sorted_run_num
     
     else:
@@ -373,3 +392,33 @@ def load_from_file(filepath):
 def save_config_json(filepath, config):
     with open(filepath, "w") as f:
         json.dump(json_to_config(config), f, indent=2)
+
+def plot_reflectivity(data_array, RQ4=False, log_x = True):
+    """
+    Plot reflectivity assuming data_array is an array of dictionaries with keys of Q, R, dQ and dR.
+    # TODO: Add error handling for not being an array or a proper dictionary.
+
+    :param data_array: Description
+    :param RQ4: Description
+    :param log_x: Description
+    """
+    fig, ax = plt.subplots()
+
+    for vals in data_array:
+        Q = vals["Q"]
+        R = vals["R"]
+        dQ = vals["dQ"]
+        dR = vals["dR"]
+        if RQ4:
+            ax.errorbar(Q,R*Q**4, yerr=dR*Q**4, xerr=dQ,  fmt='o', markersize=1)
+            ax.set_ylabel(r'$R \cdot Q^4$', fontsize=14)
+        else:
+            ax.errorbar(Q,R, yerr=dR, xerr=dQ,  fmt='o', markersize=1)
+            ax.set_ylabel('R', fontsize=14)
+        if log_x:
+            ax.set_xscale('log')
+        ax.set_yscale('log')
+    Angstrom = '\u212B'
+    ax.set_xlabel('Q [1/'+Angstrom+']', fontsize=14)
+    ax.set_title('NR data') # TODO: add better title handling
+    plt.show()

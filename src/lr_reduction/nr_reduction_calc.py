@@ -40,9 +40,14 @@ class NR_Reduction:
         if not self.config.method_per_run:
             self.config.method_per_run = ['meantheta'] * len(self.config.RBnum)
 
-        if self.config.subname is not None:
-            self.config.Sname = f"{self.config.Sname}_{self.config.subname}"
-        
+        if self.config.subname is not None and self.config.subname != "":
+            #self.config.Sname = f"{self.config.Sname}_{self.config.subname}"
+            # if doesn't start with '_' add it
+            if not self.config.subname.startswith("_"):
+                self.config.subname = f"_{self.config.subname}"
+        else:
+            self.config.subname = ""
+
         self._validate_config()
 
     def _validate_config(self):
@@ -164,9 +169,9 @@ class NR_Reduction:
                 result_out = {'Q': result['q'], 'R': result['r'], 'dR': result['dr'], 'dQ': result['dq'],
                             'T': result['t'], 'L': result['l'], 'dT': result['dt'], 'dL': result['dl']}
                 #self.save_results(result_out, self.config, self.log_values, sname=f"{self.config.Sname}_{i}", method=self.config.method_per_run[i])
-                save_fn.save_results(result_out, self.config, used_theta_vals, sname=f"{self.config.Sname}_{i+1}_{rb_num}")
+                save_fn.save_results(result_out, self.config, used_theta_vals, sname=f"{self.config.Sname}_{i+1}_{rb_num}{self.config.subname}")
                 if eight_col:
-                    save_fn.save_results(result_out, self.config, used_theta_vals, sname=f"{self.config.Sname}_{i+1}_{rb_num}", eight_column=True)
+                    save_fn.save_results(result_out, self.config, used_theta_vals, sname=f"{self.config.Sname}_{i+1}_{rb_num}{self.config.subname}", eight_column=True)
 
         # Combine results for all settings
         Q_combined = np.concatenate(Q)
@@ -184,24 +189,29 @@ class NR_Reduction:
                            'T': T_combined[idx], 'L': L_combined[idx], 'dT': dT_combined[idx], 'dL': dL_combined[idx]}
 
         if save or save_all:    #TODO: fix the saving parts here this is messy!
-            save_fn.save_results(combine_results, self.config, used_theta_vals, full=True, sname=f"{self.config.Sname}_combined")
+            save_fn.save_results(combine_results, self.config, used_theta_vals, full=True, sname=f"{self.config.Sname}_combined{self.config.subname}")
             if eight_col:
-                save_fn.save_results(combine_results, self.config, used_theta_vals, eight_column=True, full=True, sname=f"{self.config.Sname}_combined")
+                save_fn.save_results(combine_results, self.config, used_theta_vals, eight_column=True, full=True, sname=f"{self.config.Sname}_combined{self.config.subname}")
         # TODO: Decide whether to keep in here or have as a separate part after the reduciton....?
         if plot:
+            # Create an explicit figure and axes for the combined NR plot so that
+            # launchers that capture figures (by inspecting plt.get_fignums())
+            # reliably detect the final plot. Using explicit axes avoids relying
+            # on implicit current-figure creation.
+            fig, ax = plt.subplots()
             for q, r, dr, dq, rb_num in zip(Q, R, dR, dQ, valid_rb_nums):
                 if self.config.plotQ4:
-                    plt.errorbar(q, r*q**4, yerr=dr*q**4, xerr=dq, fmt='o', markersize=1)
-                    plt.ylabel(r'$R \cdot Q^4$', fontsize=14)
-                    plt.xscale('linear')
+                    ax.errorbar(q, r * q**4, yerr=dr * q**4, xerr=dq, fmt='o', markersize=1)
+                    ax.set_ylabel(r'$R \cdot Q^4$', fontsize=14)
+                    ax.set_xscale('linear')
                 else:
-                    plt.errorbar(q, r, yerr=dr, xerr=dq, fmt='o', markersize=1)
-                    plt.ylabel('R')
-                    plt.xscale('log')
-            plt.title('NR data: '+str(rb_num), fontsize=16)
-            plt.yscale('log')   # Do we need a toggle on this?
+                    ax.errorbar(q, r, yerr=dr, xerr=dq, fmt='o', markersize=1)
+                    ax.set_ylabel('R')
+                    ax.set_xscale('log')
+            ax.set_title('NR data: ' + str(rb_num), fontsize=16)
+            ax.set_yscale('log')   # Do we need a toggle on this?
             Angstrom = '\u212B'
-            plt.xlabel('Q [1/'+Angstrom+']', fontsize=14)
+            ax.set_xlabel('Q [1/' + Angstrom + ']', fontsize=14)
             plt.show()
 
         return {
