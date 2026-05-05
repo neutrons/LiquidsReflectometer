@@ -194,10 +194,6 @@ class NR_Reduction:
                 save_fn.save_results(combine_results, self.config, used_theta_vals, eight_column=True, full=True, sname=f"{self.config.Sname}_combined{self.config.subname}")
         # TODO: Decide whether to keep in here or have as a separate part after the reduciton....?
         if plot:
-            # Create an explicit figure and axes for the combined NR plot so that
-            # launchers that capture figures (by inspecting plt.get_fignums())
-            # reliably detect the final plot. Using explicit axes avoids relying
-            # on implicit current-figure creation.
             fig, ax = plt.subplots()
             for q, r, dr, dq, rb_num in zip(Q, R, dR, dQ, valid_rb_nums):
                 if self.config.plotQ4:

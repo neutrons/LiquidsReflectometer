@@ -35,6 +35,19 @@ def example_mean_theta_reduction():
     config.RB_Ymin=[143,142,138]
     config.RB_Ymax=[157,157,159]
     
+    # Path needs to be setup for these tests but should be able to turn off later.
+    config.Spath = '/SNS/REF_L/IPTS-36681/shared/EBW_reduced/'
+    #config.NEXUSpathRB = # Append path if required.
+    config.DBpath = '/SNS/REF_L/IPTS-36681/shared/transmission/'
+
+    config.experiment_id = "IPTS-36861"
+    # Set data
+    config.DBname = ['DB_A1_Cd.txt', 'DB_A2_Cd.txt', 'DB_A3_Cd.txt']
+    config.RBnum=[228220,228221,228222]
+    config.RB_Ymin=[143,142,138]
+    config.RB_Ymax=[157,157,159]  
+    
+    
     config.ThetaShift = [0, 0, 0]
     config.useBS = [1, 1, 1]
     config.ScaleFactor = [1, 1, 1]
@@ -95,6 +108,20 @@ def example_constant_tof_reduction():
     config.RB_Ymin=[143,142,138]
     config.RB_Ymax=[157,157,159]
 
+
+    # Path needs to be setup for these tests but should be able to turn off later.
+    config.Spath = '/SNS/REF_L/IPTS-36681/shared/EBW_reduced/'
+    #config.NEXUSpathRB = # Append path if required.
+    config.DBpath = '/SNS/REF_L/IPTS-36681/shared/transmission/'
+
+    config.experiment_id = "IPTS-36681"
+    # Set data
+    config.DBname = ['DB_A1_Cd.txt', 'DB_A2_Cd.txt', 'DB_A3_Cd.txt']
+    config.RBnum=[228220,228221,228222]
+    config.RB_Ymin=[143,142,138]
+    config.RB_Ymax=[157,157,159]  
+    
+    
     config.ThetaShift = [0, 0, 0]
     config.useBS = [1, 1, 1]
     config.ScaleFactor = [1, 1, 1]
@@ -122,7 +149,8 @@ def example_constant_tof_reduction():
 
     # Run reduction
     reducer = NR_Reduction(config)
-    results = reducer.reduce()
+    #results = reducer.reduce()
+    results = reducer.reduce(eight_col=True)
 
     print(f"\nReduced {len(config.RBnum)} runs (TOF-binned)")
     print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
@@ -200,7 +228,7 @@ def example_mean_theta_reduction_8col():
 if __name__ == '__main__':
     # Run examples
     #example_mean_theta_reduction()
-    #example_constant_tof_reduction()
+    example_constant_tof_reduction()
     example_mean_theta_reduction_8col()
     
 
