@@ -65,18 +65,20 @@ def _build_header(config_header, log_values, full=True, eight_column=False, sequ
         config_json = sorted_config.__dict__
         config_json = json.dumps(make_json_safe(config_json))
 
+    angle_header = json.dumps({"THS": tools.clean_log_value(log_values['ths']), "THI": tools.clean_log_value(log_values['thi']), "ThCen": tools.clean_log_value(log_values['ThCen'])})
+    title_header = json.dumps({"title": log_values['title']})
     # TODO: Lambda Use values need to be arrays and stored angles need to be arrays.
     if full:
         head = (
             f"NR_runs = {sorted_config.RBnum}\n"
-            f"Run Title = {log_values['title']}\n"
+            f"Run Title: {title_header}\n"
             f"DB = {sorted_config.DBname}\n"
             f"Method = {sorted_config.method_per_run}\n"
             f"Normalize = {sorted_config.Normalize}\n"
             f"Autoscale = {sorted_config.AutoScale}\n"
             f"Scaling factors = {sorted_config.ScaleFactor}\n"
             f"Lambda Range = {sorted_config.LambdaMinUse}\u212B to {sorted_config.LambdaMaxUse}\u212B\n"
-            f"THS = {log_values['ths']}, THI = {log_values['thi']}, ThCen = {log_values['ThCen']}\n"
+            f"Angles: {angle_header}\n"
             f"{'---' * 20}\n"
             f"Config: {config_json}\n"
             f"{'---' * 20}\n"
@@ -87,14 +89,14 @@ def _build_header(config_header, log_values, full=True, eight_column=False, sequ
     else:
         head = (
             f"NR_runs = {sorted_config.RBnum}\n"
-            f"Run Title = {log_values['title']}\n"
+            f"Run Title: {title_header}\n"
             f"DB = {sorted_config.DBname}\n"
             f"Method = {sorted_config.method_per_run}\n"
             f"Normalize = {sorted_config.Normalize}\n"
             f"Autoscale = {sorted_config.AutoScale}\n"
             f"Scaling factors = {sorted_config.ScaleFactor}\n"
             f"Lambda Range = {sorted_config.LambdaMinUse}\u212B to {sorted_config.LambdaMaxUse}\u212B\n"
-            f"THS = {log_values['ths']}, THI = {log_values['thi']}, ThCen = {log_values['ThCen']}\n"
+            f"Angles: {angle_header}\n"
             f"{'---' * 20}\n"
             f"Config: {config_json}\n"
             f"{'---' * 20}\n"
@@ -129,9 +131,9 @@ def make_json_safe(obj):
 # TODO: link this up to store the figures and save them out.
 def save_plot_pdf_summary(savepath, savename, fig_list):
 
-    output_path = Path(savepath.text() or ".") / f"plot_summary_{savename}.pdf"
+    output_path = Path(savepath) / f"plot_summary_{savename}.pdf"
     with PdfPages(output_path) as pdf:
-        for fig, meta in fig_list:
+        for fig in fig_list:
             pdf.savefig(fig)
     print(f"Saved plot summary {output_path}.")
 

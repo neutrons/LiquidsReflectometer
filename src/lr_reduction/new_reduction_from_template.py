@@ -15,7 +15,7 @@ from lr_reduction.nr_reduction_config import NRReductionConfig
 import lr_reduction.save_reduced_data as save_fn
 import lr_reduction.new_reduction_from_file as nrff
 
-def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True, eight_col=None):
+def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True, eight_col=None, save_pdf_summary=False):
     """
     Wrapper function to reduce a single run with reading of parameters from an xml template of the lr_reduction format.
     Then collect like results within the save folder and combine them together.
@@ -38,6 +38,7 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     template_path: Path optional override of template location. Otherwise uses IPTS shared folder
     override_params: dict  Dictionary of config settings to override the defaults in either the template reader or the NRReduction config defaults.
     plot: bool Toggle to plot outputs during reduction steps.
+    save_pdf_summary: Toggle to include saving a PDF summary. Not yet hooked up
 
     returns
         combined_results: dict of Q, R, dR, dQ. This is assembled with anything else on same seq num. #TODO: check if need individual one returned too.

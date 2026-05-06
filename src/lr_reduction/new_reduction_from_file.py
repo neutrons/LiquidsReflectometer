@@ -14,7 +14,7 @@ from lr_reduction.nr_reduction_config import NRReductionConfig
 import lr_reduction.save_reduced_data as save_fn
 import lr_reduction.nr_tools as tools
 
-def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = None, override_params: dict = None, plot=True, save_json=False, check_for_prior=False):
+def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = None, override_params: dict = None, plot=True, save_json=False, check_for_prior=False, save_pdf_summary=False):
     """
     Wrapper function to reduce a single run with reading of parameters from the header of a file or a saved json file, instead of the xml.
     Then collect like results within the save folder and combine them together.
@@ -28,6 +28,7 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
     plot: bool Toggle to plot outputs during reduction steps.
     save_json: optional to save out a separate json setting file
     check_for_prior: optional to look in the save folder for other runs with the same prefix to join together. Important for autoreduction.
+    save_pdf_summary: optional save of plots as a pdf output
 
     returns
         combined_results: dict of Q, R, dR, dQ. This is assembled with anything else on same seq num. #TODO: check if need individual one returned too.
@@ -76,13 +77,15 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
 
         # Run reduction
         reducer = NR_Reduction(config_new)
-        results = reducer.reduce(eight_col=eight_col, plot=plot)
+        results = reducer.reduce(eight_col=eight_col, plot=plot, save_pdf_summary=save_pdf_summary)
 
         config_final = results["config"]
+        figures_out = results["figures"]
+        logs_out = results["used_log_vals"]
 
         if check_for_prior:
             # Look in folder for files of correct format
-            dict_output, combine_results, scaling_factors, matched_files, sorted_run_nums = find_combine_priors(config_final, group_output_sorted["run_nums"], results, group_output_sorted, eight_col)
+            dict_output, combine_results, scaling_factors, matched_files, sorted_run_nums, angle_logs = find_combine_priors(config_final, group_output_sorted["run_nums"], results, group_output_sorted, eight_col)
 
             # check dictionaries and arrays aren't empty and pass if they are
             if not dict_output:
@@ -98,29 +101,35 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
             config_final.ScaleFactor = scaling_factors
 
             # TODO: Need to read in the used_theta_vals
-            used_theta_vals = {"thi":[], "ths":[], "ThCen":[], "title": []}
+            #used_theta_vals = {"thi":[], "ths":[], "ThCen":[], "title": []}
+            used_theta_vals = {k: angle_logs.get(k, []) + logs_out.get(k, []) for k in angle_logs.keys() | logs_out.keys()}
             # save files
             # non-concatenated
             # TODO: this is resaving them. Think this is the best option.
             for i in range(len(dict_output)):
-                save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{sorted_run_nums[i]}")
+                save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{sorted_run_nums[i]}{config_final.subname}")
                 if eight_col:
-                    save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{sorted_run_nums[i]}", eight_column=True)
-            if plot:
-                plot_reflectivity(dict_output, RQ4=False)
+                    save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{sorted_run_nums[i]}{config_final.subname}", eight_column=True)
+            if plot or save_pdf_summary:
+                new_plot = plot_reflectivity(dict_output, RQ4=False, show_fig=plot)
+                if save_pdf_summary:
+                    figures_out.append(new_plot)
             # concatenated
             try:
-                save_fn.save_results(combine_results, config_final, used_theta_vals, full=True, sname=f"{config_final.Sname}_combined")
+                save_fn.save_results(combine_results, config_final, used_theta_vals, full=True, sname=f"{config_final.Sname}_combined{config_final.subname}")
             except KeyError as e:
                 print(f"Warning: combined results missing expected key {e}; skipping save_results for combined output")
             if eight_col:
                 try:
-                    save_fn.save_results(combine_results, config_final, used_theta_vals, eight_column=True, full=True, sname=f"{config_final.Sname}_combined")
+                    save_fn.save_results(combine_results, config_final, used_theta_vals, eight_column=True, full=True, sname=f"{config_final.Sname}_combined{config_final.subname}")
                 except KeyError as e:
                     print(f"Warning: combined results missing expected key {e}; skipping save_results (8col) for combined output")
 
             #if plot:
             #    plot_reflectivity(combine_results, RQ4=False)
+            if save_pdf_summary and plot:
+                # Overwrite output with new plot if created
+                save_fn.save_plot_pdf_summary(config_final.Spath, f"{config_final.Sname}{config_final.subname}", figures_out)
 
         all_results.append(results)
 
@@ -256,8 +265,27 @@ def load_prior_data(results, matched_files, updated_config, initial_seq, initial
         loaded_run_nums.append(initial_run_nums[val])
 
     # Load, sort data order
+    angle_logs_thi = []
+    angle_logs_ths = []
+    angle_logs_thcen = []
+    title_log = []
+
     for item in matched_files:
-        data = np.loadtxt(Path(updated_config.Spath) / item[0], unpack=True)
+        filepath = Path(updated_config.Spath) / item[0]
+        with open(filepath, "r") as f:
+            for line in f:
+                if line.startswith("# Angles: "):
+                    angles_out = json.loads(line[len("# Angles: "):])
+                elif line.startswith("# Run Title:"):
+                    title_out = json.loads(line[len("# Run Title: "):])
+
+        if angles_out:
+            angle_logs_ths.append(angles_out["THS"])
+            angle_logs_thi.append(angles_out["THI"])
+            angle_logs_thcen.append(angles_out["ThCen"])
+        if title_out:
+            title_log.append(title_out["title"])
+        data = np.loadtxt(filepath, unpack=True)
         existing_data.append(data)
         loaded_seq_nums.append(item[1])
         loaded_run_nums.append(item[2])
@@ -267,12 +295,19 @@ def load_prior_data(results, matched_files, updated_config, initial_seq, initial
     sorted_data = [existing_data[i] for i in indices]
     sorted_seq_num = [loaded_seq_nums[i] for i in indices]
     sorted_run_num = [loaded_run_nums[i] for i in indices]
+    angle_logs_thcen = max(angle_logs_thcen, key=len) # THis is weird and messy and needs a fix but because it adds on in prior cycles...!!
+    angle_logs_ths = max(angle_logs_ths, key=len)
+    angle_logs_thi = max(angle_logs_thi, key=len)
+    title_log = max(title_log, key=len)
 
-    return sorted_data, sorted_seq_num, sorted_run_num
+    angle_logs = {"ths": angle_logs_ths, "thi": angle_logs_thi, "ThCen": angle_logs_thcen, "title": title_log}
+
+    return sorted_data, sorted_seq_num, sorted_run_num, angle_logs
 
 def find_combine_priors(updated_config, run_nums, results, group_output_sorted, eight_col=False):
     # Find the files
     matched_files = find_priors(updated_config, eight_col, run_nums)
+    print(matched_files)
 
     initial_scalefactors = updated_config.ScaleFactor
     initial_seq = group_output_sorted["seq_nums"]
@@ -281,7 +316,7 @@ def find_combine_priors(updated_config, run_nums, results, group_output_sorted, 
     if len(matched_files) > 0:
         
         print(f"Found {len(matched_files)} to combine")
-        sorted_data, sorted_seq_num, sorted_run_num = load_prior_data(results, matched_files, updated_config, initial_seq, initial_run_nums)
+        sorted_data, sorted_seq_num, sorted_run_num, angle_logs = load_prior_data(results, matched_files, updated_config, initial_seq, initial_run_nums)
         # TODO: quite a bit is a duplicate of in the calc file. Can be smarter here.
         Q, R, dR, dQ = [], [], [], []
         T, L, dT, dL = [], [], [], []
@@ -347,10 +382,11 @@ def find_combine_priors(updated_config, run_nums, results, group_output_sorted, 
             combine_results = {'Q': Q_combined[idx], 'R': R_combined[idx], 'dR': dR_combined[idx], 'dQ': dQ_combined[idx]}
 
         #print(combine_results)
-        return dict_output, combine_results, initial_scalefactors, matched_files, sorted_run_num
+        return dict_output, combine_results, initial_scalefactors, matched_files, sorted_run_num, angle_logs
     
     else:
-        return {}, {}, [], [], []
+        # TODO: fix this...
+        return {}, {}, [], [], [], {}
 
 def json_to_config(json_input):
     config_init = NRReductionConfig()
@@ -393,7 +429,7 @@ def save_config_json(filepath, config):
     with open(filepath, "w") as f:
         json.dump(json_to_config(config), f, indent=2)
 
-def plot_reflectivity(data_array, RQ4=False, log_x = True):
+def plot_reflectivity(data_array, RQ4=False, log_x = True, show_fig=True):
     """
     Plot reflectivity assuming data_array is an array of dictionaries with keys of Q, R, dQ and dR.
     # TODO: Add error handling for not being an array or a proper dictionary.
@@ -421,4 +457,9 @@ def plot_reflectivity(data_array, RQ4=False, log_x = True):
     Angstrom = '\u212B'
     ax.set_xlabel('Q [1/'+Angstrom+']', fontsize=14)
     ax.set_title('NR data') # TODO: add better title handling
-    plt.show()
+    if show_fig:
+        plt.show()
+    else:
+        plt.close()
+
+    return fig

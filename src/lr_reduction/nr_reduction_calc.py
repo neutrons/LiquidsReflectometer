@@ -98,7 +98,7 @@ class NR_Reduction:
         if not self.config.tof_max:
             self.config.tof_max = [100000] * n_settings # TODO: Work out where to set this up properly!
 
-    def reduce(self, save=True, save_all=True, plot=True, eight_col=None):
+    def reduce(self, save=True, save_all=True, plot=None, eight_col=None, save_pdf_summary=False):
         """
         Perform the reduction of all angle settings and combine into an output.
 
@@ -106,6 +106,7 @@ class NR_Reduction:
         save_all: (optiona) save out the combined and individual settings
         plot: (optional) show the NR plot on completion
         eight_col: (optional) allows override of saving out the 8 column data, otherwise read from the config.
+        save_pdf_summary: (optional) allows save of PDF plot summary for diagnostics
 
         Returns
         -------
@@ -116,6 +117,16 @@ class NR_Reduction:
         L, T, dL, dT = [], [], [], []
         if not eight_col:
             eight_col = self.config.save8col
+        
+        if plot is not None:
+            self.config.plotON = plot
+
+        # Setup to store figures for summary PDF and flag
+        if self.config.plotON or save_pdf_summary:
+            self.create_figures = True
+        else:
+            self.create_figures = False
+        self.fig_store = []
 
         used_theta_vals = {"thi": [], "ths": [], "ThCen": [], "title": []}
         # TODO: Add handling for summed run files.
@@ -193,7 +204,7 @@ class NR_Reduction:
             if eight_col:
                 save_fn.save_results(combine_results, self.config, used_theta_vals, eight_column=True, full=True, sname=f"{self.config.Sname}_combined{self.config.subname}")
         # TODO: Decide whether to keep in here or have as a separate part after the reduciton....?
-        if plot:
+        if self.create_figures:
             fig, ax = plt.subplots()
             for q, r, dr, dq, rb_num in zip(Q, R, dR, dQ, valid_rb_nums):
                 if self.config.plotQ4:
@@ -208,7 +219,14 @@ class NR_Reduction:
             ax.set_yscale('log')   # Do we need a toggle on this?
             Angstrom = '\u212B'
             ax.set_xlabel('Q [1/' + Angstrom + ']', fontsize=14)
-            plt.show()
+            self.fig_store.append(fig)
+            if self.config.plotON:
+                plt.show()
+            else:
+                plt.close()
+
+        if save_pdf_summary:
+            save_fn.save_plot_pdf_summary(self.config.Spath, f"{self.config.Sname}{self.config.subname}", self.fig_store)
 
         return {
             'Q': Q_combined[idx],
@@ -227,7 +245,9 @@ class NR_Reduction:
             'L_per_run': L,
             'T_per_run': T,
             'dL_per_run': dL,
-            'dT_per_run': dT
+            'dT_per_run': dT,
+            'figures': self.fig_store,
+            'used_log_vals': used_theta_vals # TODO: not sure this is the best approach here but needed for combining in file redcution.
         }
 
     def _load_binary_from_disk(self, rb_num, i):
@@ -406,7 +426,7 @@ class NR_Reduction:
         LAMBDA = 3956 * (tRB - (t0[0] + t0[1] * LAMBDA)) / self.settings['source_detector_distance']
         LambdaBinSize = abs(LAMBDA[1] - LAMBDA[0])
         
-        if self.config.plotON:
+        if self.create_figures:
             fig, ax = plt.subplots()
             ax.plot(LAMBDA, np.sum(RB, axis=0), label='pre-mask')
 
@@ -420,7 +440,7 @@ class NR_Reduction:
         # iDB = np.interp(LAMBDA, lDB, iDB)
         # eDB = np.interp(LAMBDA, lDB, eDB)
 
-        if self.config.plotON:        
+        if self.create_figures:        
             ax.plot(lDB, iDB, label='DB')
             ax.plot(LAMBDA, np.sum(RB, axis=0), label='post mask')
             
@@ -428,11 +448,15 @@ class NR_Reduction:
         iDB = tools.rebin_counts(LAMBDA, lDB, iDB)
         eDB = np.sqrt(tools.rebin_counts(LAMBDA, lDB, eDB**2))
         
-        if self.config.plotON:        
+        if self.create_figures:        
             ax.plot(LAMBDA, iDB, label='DB rebin')
             ax.legend()
             ax.set_yscale('log')
-            plt.show()
+            self.fig_store.append(fig)
+            if self.config.plotON:
+                plt.show()
+            else:
+                plt.close()
 
         # TODO: check what is stored and whether this is the best place.
         self.q = q
@@ -510,7 +534,7 @@ class NR_Reduction:
         Icalc_nonfit = (Icalc_nonfit * par[0]) + bkg
 
         # Plot beam profile if requested - compares to calculated profile from instrument geometry.
-        if self.config.plotON:
+        if self.create_figures:
             fig, ax = plt.subplots()
             ax.plot(Ydata, Idata, 'ok')
             ax.plot(Yfit, Ifit, '-r', label=f'{self.config.peak_type} fit')
@@ -525,7 +549,10 @@ class NR_Reduction:
             ax.set_title('Vertical beam distribution', fontsize=16)
             ax.set_xlabel('Detector Pixel', fontsize=14)
             ax.legend()
-            plt.show()
+            self.fig_store.append(fig)
+            if self.config.plotON:
+                plt.show()
+            else: plt.close()
 
         return Yfit, Ifit, RBpixel, Icalc, ThCen, bkg
 
@@ -590,7 +617,7 @@ class NR_Reduction:
             MeanTheta, dTheta = self.calc_mean_theta(ymmRB, self.log_values['s1Y'], self.log_values['siY'],
                                                     self.settings['sample_detector_distance'], self.settings['si_sample_distance'],
                                                     self.settings['interslit_distance'], self.config.DetSigma,
-                                                    self.config.DetResFn, self.config.plotON)
+                                                    self.config.DetResFn, self.create_figures, self.config.plotON)
 
             MeanTheta = MeanTheta + ThCen
             Theta = MeanTheta
@@ -613,7 +640,7 @@ class NR_Reduction:
 
         return Theta, ThetaBinSize, dTheta
 
-    def _calc_detector_convolution(self,m, b, ResFn, sigma, plotON=True):
+    def _calc_detector_convolution(self,m, b, ResFn, sigma, plotON=True, show_fig=True):
 
         verts = [
                 tools.intersect(m[0], b[0], m[1], b[1]),
@@ -674,10 +701,14 @@ class NR_Reduction:
             ax.set_xlabel('dTheta [deg]', fontsize=14)
             ax.set_ylabel('Detector position [mm]', fontsize=14)
             ax.set_title('Angular beam distribution', fontsize=16)
-            plt.show()
+            self.fig_store.append(fig)
+            if show_fig:
+                plt.show()
+            else:
+                plt.close()
         return yvec, smear, tvec
 
-    def calc_mean_theta(self, yvalues, si_H, s1_H, d_sam_det, d_si_sam, d_s1_si, sigma, ResFn, plotON):
+    def calc_mean_theta(self, yvalues, si_H, s1_H, d_sam_det, d_si_sam, d_s1_si, sigma, ResFn, create_fig, show_fig):
         # Calculate the Mean and Sigma of theta angles as a function of Y position on the detector
         # create a fine grid of Y positions, convolve with the detector resolution
         # calculate the mean and sigma for provided Y values from the convolved array
@@ -686,7 +717,7 @@ class NR_Reduction:
         a, y, m, b = tools.calc_beam_geometry_from_slits(si_H, s1_H, d_s1_si, d_si_sam, d_sam_det, radians=False)
 
         # convolve theta-y polygon with detector resolution
-        yvec, smear, tvec = self._calc_detector_convolution(m, b, ResFn, sigma, plotON)
+        yvec, smear, tvec = self._calc_detector_convolution(m, b, ResFn, sigma, create_fig, show_fig)
 
         # Compute mean and sigma analytically
         mean_theta = []
@@ -709,7 +740,7 @@ class NR_Reduction:
         return mean_theta, sigma_theta
 
 
-    def plot_theta_lam(self, LAMBDA, Theta, Rarr, iDB, qlines=True, set_ylims=None, set_xlims=None): #TODO: decide if this should be in the class?
+    def plot_theta_lam(self, LAMBDA, Theta, Rarr, iDB, qlines=True, set_ylims=None, set_xlims=None, show_fig=True): #TODO: decide if this should be in the class?
             '''
             Generate 2D plot of theta-lambda with option to overlay lines of constant q from calculation
 
@@ -749,7 +780,11 @@ class NR_Reduction:
             ax.set_title('Q integration lines', fontsize=16)
             ax.set_xlabel('Lambda [Å]', fontsize=14)
             ax.set_ylabel('Theta [deg]', fontsize=14)
-            plt.show()
+            self.fig_store.append(fig)
+            if show_fig:
+                plt.show()
+            else:
+                plt.close()
 
     def _background_roi_sorter(self, BkgROI, ymin, ymax):
         # Wrapper to handle the background region when set by the template.
@@ -810,7 +845,7 @@ class NR_Reduction:
         var_bkg = (eb1**2 + eb2**2) / 2
 
         if ploton:
-            self.roi_plot(R, ypix, y_roi, LAMBDA, ymin, ymax, bkgd=True, background_idx=background_idx)
+            self.roi_plot(R, ypix, y_roi, LAMBDA, ymin, ymax, bkgd=True, background_idx=background_idx, show_fig=self.config.plotON)
             '''
             ll=np.where((ypix > min(background_idx[0]-5,background_idx[1]-5)) & (ypix < max(background_idx[2]+5,background_idx[3]+5)))
             fig, ax = plt.subplots()
@@ -839,7 +874,7 @@ class NR_Reduction:
 
         return R_crop, E_crop
 
-    def roi_plot(self,R, ypix, y_roi, LAMBDA, ymin, ymax, bkgd=True, background_idx=None):
+    def roi_plot(self,R, ypix, y_roi, LAMBDA, ymin, ymax, bkgd=True, background_idx=None, show_fig=True):
         if not bkgd:
             background_idx = [min(y_roi), min(y_roi), max(y_roi), max(y_roi)]
         else:
@@ -860,7 +895,11 @@ class NR_Reduction:
         ax.set_title('Y-pixel ROIs', fontsize=16)
         ax.set_xlabel('Lambda [Å]', fontsize=14)
         ax.set_ylabel('Detector Pixel', fontsize=14)
-        plt.show()
+        self.fig_store.append(fig)
+        if show_fig:
+            plt.show()
+        else:
+            plt.close()
 
     def _choose_theta_log(self):
         """
@@ -919,10 +958,10 @@ class NR_Reduction:
         # Apply background subtraction
         if self.config.useBS[i]:
             Rarr, REarr = self.background_subtract(LAMBDA, RB, RBE, R_mask, E_mask, y_roi, ypix, self.config.RB_Ymin[i],
-                                             self.config.RB_Ymax[i], self.config.BkgROI[i], self.config.plotON)
+                                             self.config.RB_Ymax[i], self.config.BkgROI[i], self.create_figures)
         else:
-            if self.config.plotON:
-                self.roi_plot(RB, ypix, y_roi, LAMBDA, self.config.RB_Ymin[i], self.config.RB_Ymax[i], bkgd=False)
+            if self.create_figures:
+                self.roi_plot(RB, ypix, y_roi, LAMBDA, self.config.RB_Ymin[i], self.config.RB_Ymax[i], bkgd=False, show_fig=self.config.plotON)
             Rarr = R_mask
             REarr = E_mask
 
@@ -962,8 +1001,8 @@ class NR_Reduction:
             Theta, ThetaBinSize, dTheta = self._calculate_theta_and_bins(ymmRB, self.log_values['ThCen'], method=self.config.method_per_run[i])
 
             # Plot 2D lambda vs theta data including overlay of q-summing lines
-            if self.config.plotON:
-                self.plot_theta_lam(LAMBDA, Theta, Rarr, iDB, qlines=True)
+            if self.create_figures:
+                self.plot_theta_lam(LAMBDA, Theta, Rarr, iDB, qlines=True, show_fig=self.config.plotON)
 
             # Remove truncated Q-lines based on qline threshold
             lmin = 4 * np.pi * np.sin(np.radians(min(abs(Theta)))) / self.q #TODO: track through self.q vs qvals...!!
