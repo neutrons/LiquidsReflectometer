@@ -637,125 +637,284 @@ class FileBatchTab(QWidget):
 
             capture_figs = (plt is not None) and (plot_flag or self.save_summary_checkbox.isChecked())
             old_nums = set()
-            orig_show = None
             try:
                 if capture_figs:
                     try:
                         old_nums = set(plt.get_fignums())
                     except Exception:
                         old_nums = set()
-                    orig_show = getattr(plt, 'show', None)
+
+                # Run the reducer. The new reduce_from_file supports saving a PDF
+                # summary via the `save_pdf_summary` flag and manages its own
+                # plt.show() calls, so we no longer monkey-patch plt.show here.
+                # Temporarily suppress plt.show() during the reducer so the
+                # reducer cannot pop up windows while we capture returned
+                # Figure objects and embed them into the Canvas. We'll restore
+                # the original show() afterwards.
+                orig_show = getattr(plt, 'show', None)
+                try:
+                    # Always suppress plt.show while reducer runs so it cannot
+                    # pop external windows; we'll embed returned Figure objects
+                    # into the Canvas ourselves.
                     try:
-                        # prevent reduction from calling a blocking plt.show()
-                        plt.show = lambda *args, **kwargs: None
+                        plt.show = lambda *a, **kw: None
                     except Exception:
                         orig_show = None
 
-                # Run the reducer (plt.show is suppressed while capture active)
-                results = new_file.reduce_from_file(
-                    runs,
-                    settings_file,
-                    expt,
-                    datapath=Path(datapath) if datapath else None,
-                    override_params=override_params,
-                    plot=capture_figs,
-                    save_json=bool(self.save_json_checkbox.isChecked()),
-                    check_for_prior=bool(self.check_prior_checkbox.isChecked()),
-                )
-
+                    ret = new_file.reduce_from_file(
+                        runs,
+                        settings_file,
+                        expt,
+                        datapath=Path(datapath) if datapath else None,
+                        override_params=override_params,
+                        plot=plot_flag,
+                        save_json=bool(self.save_json_checkbox.isChecked()),
+                        check_for_prior=bool(self.check_prior_checkbox.isChecked()),
+                        save_pdf_summary=bool(self.save_summary_checkbox.isChecked()),
+                    )
+                finally:
+                    # restore original show
+                    try:
+                        if orig_show is not None:
+                            plt.show = orig_show
+                    except Exception:
+                        pass
+                # normalize return: reduce_from_file may return (results, num_figures)
+                if isinstance(ret, (list, tuple)) and len(ret) >= 1:
+                    results = ret[0]
+                    try:
+                        num_figures = ret[1]
+                    except Exception:
+                        num_figures = None
+                else:
+                    results = ret
+                    num_figures = None
+                print("number of figures:", num_figures)
                 group_index += 1
                 current_group_figs = []
 
-                # collect new figures created by this reduction
+                # Prefer figures returned directly from the reducer (list of Figure objects)
+                reducer_figures = None
                 try:
-                    if capture_figs:
-                        new_nums = [n for n in plt.get_fignums() if n not in old_nums]
-                    else:
-                        new_nums = []
+                    # If the reducer returned a tuple (results, figures_list)
+                    if isinstance(ret, (list, tuple)) and len(ret) >= 2:
+                        reducer_figures = ret[1]
                 except Exception:
-                    new_nums = []
-
-                if plot_flag:
-                    selected_nums = list(new_nums)
-                else:
-                    # keep legacy behaviour of picking a representative figure when
-                    # interactive plotting is disabled, but always ensure we also
-                    # capture the final figure created by the reduction (likely the
-                    # combined NR plot) if any figures were produced.
-                    if len(new_nums) >= 2:
-                        selected_nums = [new_nums[-2]]
-                    else:
-                        selected_nums = []
-                    # include the final-created figure (last in new_nums) if present
-                    if new_nums:
-                        final_num = new_nums[-1]
-                        if final_num not in selected_nums:
-                            selected_nums.append(final_num)
+                    reducer_figures = None
 
                 run_figs = []
-                for num in new_nums:
+                # If reducer provided figure objects, use them directly
+                if reducer_figures:
                     try:
-                        fig = plt.figure(num)
-                        try:
-                            fig.suptitle(f"Run {runs[0]}-{runs[-1]}", fontsize=10)
-                        except Exception:
-                            try:
-                                for ax in getattr(fig, 'axes', []):
+                        # Support several shapes returned by reducer:
+                        # - list of Figure objects -> flat list
+                        # - list of lists (per-group lists of Figure objects)
+                        # - list of Figure objects where each Figure has attributes
+                        #   `._reduction_group` and/or `._reduction_is_final`
+                        grouped = False
+                        # detect list-of-lists
+                        if any(isinstance(x, (list, tuple)) for x in reducer_figures):
+                            grouped = True
+                            groups = reducer_figures
+                        else:
+                            # flat list: maybe Figures with metadata
+                            groups = [reducer_figures]
+
+                        for g_idx, group in enumerate(groups):
+                            for fig in group:
+                                try:
+                                    # attach a helpful meta so UI can label it
                                     try:
-                                        t = ax.get_title()
-                                        if t:
-                                            ax.set_title(f"Run {runs[0]}-{runs[-1]} -- {t}")
-                                        else:
-                                            ax.set_title(f"Run {runs[0]}-{runs[-1]}")
+                                        fig.suptitle(f"Run {runs[0]}-{runs[-1]}", fontsize=10)
                                     except Exception:
-                                        pass
+                                        try:
+                                            for ax in getattr(fig, 'axes', []):
+                                                try:
+                                                    t = ax.get_title()
+                                                    if t:
+                                                        ax.set_title(f"Run {runs[0]}-{runs[-1]} -- {t}")
+                                                    else:
+                                                        ax.set_title(f"Run {runs[0]}-{runs[-1]}")
+                                                except Exception:
+                                                    pass
+                                        except Exception:
+                                            pass
+                                    meta = {"run": runs, "label": f"run {runs[0]}-{runs[-1]}", "group": g_idx}
+                                    current_group_figs.append((fig, meta))
+                                    run_figs.append((fig, meta))
+                                    plot_groupings.append(fig)
+                                except Exception:
+                                    pass
+                    except Exception:
+                        run_figs = []
+
+                    # Decide which figures to store/display according to UI flags
+                    if plot_flag:
+                        # store all produced figures (user wants to see everything)
+                        for fig, meta in run_figs:
+                            self.figures.append((fig, meta))
+                    else:
+                        # plot is not selected.
+                        if bool(self.save_summary_checkbox.isChecked()):
+                            # save_summary selected: user wants a PDF and a
+                            # compact UI view — show only the last figure from
+                            # each logical group. We don't have explicit group
+                            # boundaries from the reducer, but we can infer the
+                            # number of groups from the reducer return value
+                            # `results` (it's a list of per-group results).
+                            try:
+                                num_groups = len(results) if isinstance(results, (list, tuple)) else None
+                            except Exception:
+                                num_groups = None
+
+                            if num_groups and num_groups > 0:
+                                # pick the last `num_groups` figures from the
+                                # flat run_figs list as a heuristic (one final
+                                # figure per group, in order).
+                                if len(run_figs) >= num_groups:
+                                    tails = run_figs[-num_groups:]
+                                else:
+                                    tails = run_figs
+                                for f, m in tails:
+                                    self.figures.append((f, m))
+                            else:
+                                # Fallback: show just the very last figure
+                                if run_figs:
+                                    last_fig, last_meta = run_figs[-1]
+                                    self.figures.append((last_fig, last_meta))
+                        else:
+                            # neither plotting nor summary: show ALL returned
+                            # figures (user expects full set in Canvas)
+                            for fig, meta in run_figs:
+                                self.figures.append((fig, meta))
+
+                    # enforce cap (close oldest if necessary)
+                    while len(self.figures) > self._MAX_STORED_FIGURES:
+                        fig_to_close, _m = self.figures.pop(0)
+                        try:
+                            plt.close(fig_to_close)
+                        except Exception:
+                            pass
+
+                else:
+                    # Fallback: inspect global plt figures (legacy behaviour)
+                    try:
+                        if capture_figs:
+                            new_nums = [n for n in plt.get_fignums() if n not in old_nums]
+                        else:
+                            new_nums = []
+                    except Exception:
+                        new_nums = []
+
+                    if plot_flag:
+                        selected_nums = list(new_nums)
+                    else:
+                        if len(new_nums) >= 2:
+                            selected_nums = [new_nums[-2]]
+                        else:
+                            selected_nums = []
+                        if new_nums:
+                            final_num = new_nums[-1]
+                            if final_num not in selected_nums:
+                                selected_nums.append(final_num)
+
+                    for num in new_nums:
+                        try:
+                            fig = plt.figure(num)
+                            try:
+                                fig.suptitle(f"Run {runs[0]}-{runs[-1]}", fontsize=10)
+                            except Exception:
+                                try:
+                                    for ax in getattr(fig, 'axes', []):
+                                        try:
+                                            t = ax.get_title()
+                                            if t:
+                                                ax.set_title(f"Run {runs[0]}-{runs[-1]} -- {t}")
+                                            else:
+                                                ax.set_title(f"Run {runs[0]}-{runs[-1]}")
+                                        except Exception:
+                                            pass
+                                except Exception:
+                                    pass
+                            meta = {"run": runs, "label": f"run {runs[0]}-{runs[-1]}"}
+                            current_group_figs.append((fig, meta))
+                            run_figs.append((fig, meta))
+                            plot_groupings.append(fig)
+                            try:
+                                user_max = int(self.max_plots_spin.value())
+                            except Exception:
+                                user_max = None
+                            if user_max is not None and len(self.figures) > user_max:
+                                QMessageBox.warning(self, "Plot history large", f"Stored plot count ({len(self.figures)}) exceeded your configured maximum ({user_max}).\nConsider clearing the plot history.")
+                        except Exception:
+                            pass
+
+                    # enforce cap
+                    while len(self.figures) > self._MAX_STORED_FIGURES:
+                        fig_to_close, _m = self.figures.pop(0)
+                        try:
+                            plt.close(fig_to_close)
+                        except Exception:
+                            pass
+
+                    for num in selected_nums:
+                        for fig, meta in run_figs:
+                            if fig.number == num:
+                                self.figures.append((fig, meta))
+
+                # If plot_flag is True, also capture any figures created during
+                # the reduction run (by inspecting plt.get_fignums()) and merge
+                # them with the figures we collected above (avoids missing
+                # figures that weren't returned explicitly).
+                if plot_flag:
+                    try:
+                        new_nums_post = [n for n in plt.get_fignums() if n not in old_nums]
+                    except Exception:
+                        new_nums_post = []
+
+                    # Build a mapping from figure number -> (fig, meta) for any
+                    # figures we already collected from reducer returns.
+                    num_to_fig = {}
+                    for f, m in run_figs:
+                        try:
+                            num_to_fig.get(f.number)  # access to ensure attribute exists
+                            num_to_fig[f.number] = (f, m)
+                        except Exception:
+                            # If the figure has no .number, skip mapping; we'll
+                            # append it after mapping in returned order.
+                            pass
+
+                    appended = set()
+                    # Append figures in the chronological order determined by
+                    # matplotlib's figure numbering (new_nums_post).
+                    for num in new_nums_post:
+                        if num in num_to_fig:
+                            fig, meta = num_to_fig[num]
+                            self.figures.append((fig, meta))
+                            appended.add(num)
+                        else:
+                            # figure created but not returned explicitly: fetch
+                            try:
+                                fig = plt.figure(num)
+                                meta = {"run": runs, "label": f"run {runs[0]}-{runs[-1]}"}
+                                self.figures.append((fig, meta))
+                                appended.add(num)
                             except Exception:
                                 pass
-                        meta = {"run": runs, "label": f"run {runs[0]}-{runs[-1]}"}
-                        current_group_figs.append((fig, meta))
-                        run_figs.append((fig, meta))
-                        plot_groupings.append(fig)
+
+                    # Any returned figures that didn't have a known figure
+                    # number (or weren't included in new_nums_post) append in
+                    # their returned order after the ordered list.
+                    for f, m in run_figs:
                         try:
-                            user_max = int(self.max_plots_spin.value())
+                            n = getattr(f, 'number', None)
+                            if n is None or n not in appended:
+                                self.figures.append((f, m))
                         except Exception:
-                            user_max = None
-                        if user_max is not None and len(self.figures) > user_max:
-                            QMessageBox.warning(self, "Plot history large", f"Stored plot count ({len(self.figures)}) exceeded your configured maximum ({user_max}).\nConsider clearing the plot history.")
-                    except Exception:
-                        pass
-
-                # enforce cap
-                while len(self.figures) > self._MAX_STORED_FIGURES:
-                    fig_to_close, _m = self.figures.pop(0)
-                    try:
-                        plt.close(fig_to_close)
-                    except Exception:
-                        pass
-
-                for num in selected_nums:
-                    for fig, meta in run_figs:
-                        if fig.number == num:
-                            self.figures.append((fig, meta))
-
-                if self.save_summary_checkbox.isChecked() and current_group_figs:
-                    output_path = Path(self.spath_edit.text() or ".") / f"plot_summary_{runs[0]}-{runs[-1]}.pdf"
-                    with PdfPages(output_path) as pdf:
-                        for fig, meta in current_group_figs:
-                            pdf.savefig(fig)
-
-                    QtCore.QMetaObject.invokeMethod(
-                        self,
-                        "_append_log",
-                        QtCore.Qt.QueuedConnection,
-                        QtCore.Q_ARG(str, f"Saved group PDF: {output_path}")
-                    )
+                            self.figures.append((f, m))
             finally:
-                # restore original show in all cases
-                try:
-                    if capture_figs and orig_show is not None:
-                        plt.show = orig_show
-                except Exception:
-                    pass
+                # no-op cleanup; reduce_from_file handles plt.show/closing itself
+                pass
 
                 # show the most recently added figure (on the GUI thread)
                 if self.figures:

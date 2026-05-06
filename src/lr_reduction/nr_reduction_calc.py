@@ -204,26 +204,26 @@ class NR_Reduction:
             if eight_col:
                 save_fn.save_results(combine_results, self.config, used_theta_vals, eight_column=True, full=True, sname=f"{self.config.Sname}_combined{self.config.subname}")
         # TODO: Decide whether to keep in here or have as a separate part after the reduciton....?
-        if self.create_figures:
-            fig, ax = plt.subplots()
-            for q, r, dr, dq, rb_num in zip(Q, R, dR, dQ, valid_rb_nums):
-                if self.config.plotQ4:
-                    ax.errorbar(q, r * q**4, yerr=dr * q**4, xerr=dq, fmt='o', markersize=1)
-                    ax.set_ylabel(r'$R \cdot Q^4$', fontsize=14)
-                    ax.set_xscale('linear')
-                else:
-                    ax.errorbar(q, r, yerr=dr, xerr=dq, fmt='o', markersize=1)
-                    ax.set_ylabel('R')
-                    ax.set_xscale('log')
-            ax.set_title('NR data: ' + str(rb_num), fontsize=16)
-            ax.set_yscale('log')   # Do we need a toggle on this?
-            Angstrom = '\u212B'
-            ax.set_xlabel('Q [1/' + Angstrom + ']', fontsize=14)
-            self.fig_store.append(fig)
-            if self.config.plotON:
-                plt.show()
+        # Always create this last figure and store into the output just have optional show.
+        fig, ax = plt.subplots()
+        for q, r, dr, dq, rb_num in zip(Q, R, dR, dQ, valid_rb_nums):
+            if self.config.plotQ4:
+                ax.errorbar(q, r * q**4, yerr=dr * q**4, xerr=dq, fmt='o', markersize=1)
+                ax.set_ylabel(r'$R \cdot Q^4$', fontsize=14)
+                ax.set_xscale('linear')
             else:
-                plt.close()
+                ax.errorbar(q, r, yerr=dr, xerr=dq, fmt='o', markersize=1)
+                ax.set_ylabel('R')
+                ax.set_xscale('log')
+        ax.set_title('NR data: ' + str(rb_num), fontsize=16)
+        ax.set_yscale('log')   # Do we need a toggle on this?
+        Angstrom = '\u212B'
+        ax.set_xlabel('Q [1/' + Angstrom + ']', fontsize=14)
+        self.fig_store.append(fig)
+        if self.config.plotON:
+            plt.show()
+        else:
+            plt.close()
 
         if save_pdf_summary:
             save_fn.save_plot_pdf_summary(self.config.Spath, f"{self.config.Sname}{self.config.subname}", self.fig_store)
@@ -846,24 +846,6 @@ class NR_Reduction:
 
         if ploton:
             self.roi_plot(R, ypix, y_roi, LAMBDA, ymin, ymax, bkgd=True, background_idx=background_idx, show_fig=self.config.plotON)
-            '''
-            ll=np.where((ypix > min(background_idx[0]-5,background_idx[1]-5)) & (ypix < max(background_idx[2]+5,background_idx[3]+5)))
-            fig, ax = plt.subplots()
-            log_data = np.log(R[ll[0],:]+0.00001)
-            ax.imshow(log_data, vmin=np.percentile(log_data,0.5), vmax=np.percentile(log_data, 99.5), aspect='auto', extent=[LAMBDA.min(), LAMBDA.max(),
-                                                        min(background_idx[0]-5,background_idx[1]-5),
-                                                        max(background_idx[2]+5,background_idx[3]+5)], cmap='magma')
-            ax.axhline(y=ymin, color='green', linestyle='--')
-            ax.axhline(y=ymax, color='green', linestyle='--')
-            ax.axhline(y=background_idx[0], color='red', linestyle='--', linewidth=1)
-            ax.axhline(y=background_idx[1], color='red', linestyle='--', linewidth=1)
-            ax.axhline(y=background_idx[2], color='red', linestyle='--', linewidth=1)
-            ax.axhline(y=background_idx[3], color='red', linestyle='--', linewidth=1)
-            ax.set_title('Background subtraction ROIs', fontsize=16)
-            ax.set_xlabel('Lambda [Å]', fontsize=14)
-            ax.set_ylabel('Detector Pixel', fontsize=14)
-            plt.show()
-            '''
 
         # subtract background
         for i in range(R.shape[1]):
@@ -1122,105 +1104,6 @@ class NR_Reduction:
             print(f'Normalization factor: {np.round(1/NormV, 3)}')
 
         return {'q': q_vals, 'r': r, 'dr': dr, 'dq': dq, 't': t_store, 'l': l_store, 'dt': dT, 'dl': dL}, self.config, self.log_values
-
-    '''
-    def save_results(self, results, sname = None, full=True, method=None, eight_column=False, config_header=None, sequence=None):
-        """
-        Save results as .dat file with header
-        sname: optional save name to overwrite the default
-        full: flag to include more information in the header
-        method: option to explicitly feed the method
-        eight_column: option to save out 8-column data with L, dL, T, dT in addition to the standard 4 column
-        config_header: option to specify the config to include in the header
-        sequence: option to specify index within the set of runs for selecting settings from config into the header #TODO: should this be in the method?
-
-        Parameters
-        ----------
-        results : dict
-            Results from reduce() method
-        """
-
-        if eight_column:
-            array = np.column_stack((results['Q'], results['R'], results['dR'], results['dQ'],
-                                          results['L'], results['dL'], results['T'], results['dT']))
-            #col_label = "columns = Q, R, dR, dQ (sigma), L, dL, T, dT"
-        else:
-            array = np.column_stack((results['Q'], results['R'], results['dR'], results['dQ']))
-            #col_label = "columns = Q, R, dR, dQ (sigma)"
-            
-        head = self._build_header(full=full, eight_column=eight_column, config_header=config_header, sequence=sequence)
-        
-        if not sname:
-            output_file = self.config.Spath / f"{self.config.Sname}"
-        else:
-            output_file = self.config.Spath / f"{sname}"
-
-        if eight_column:
-            output_file = f"{output_file}_8col.dat"
-        else:
-            output_file = f"{output_file}.dat"
-        np.savetxt(output_file,
-                  array, header=head, delimiter='\t')
-        print(f"Saved combined result to {output_file}")
-        
-
-    def _build_header(self, full=True, eight_column=False, config_header=None, sequence=None):
-        """
-        Wrapper to handle assembly logic for the output file header.
-        """
-
-        if eight_column:
-            col_label = "columns = Q, R, dR, dQ (sigma), L, dL, T, dT"
-        else:
-            col_label = "columns = Q, R, dR, dQ (sigma)"
-
-        if not config_header:
-            config_header = self.config
-
-        if sequence:
-            sorted_config = {k: tools.maybe_index(v, sequence) for k, v in config_header.items()}
-        else:
-            sorted_config = config_header
-
-        # TODO: Lambda Use values need to be arrays and stored angles need to be arrays.
-        if full:
-            head = (
-                f"NR_runs = {sorted_config.RBnum}\n"
-                f"Run Title = {self.log_values['title']}\n"
-                f"DB = {sorted_config.DBname}\n"
-                f"Method = {sorted_config.method_per_run}\n"
-                f"Normalize = {sorted_config.Normalize}\n"
-                f"Autoscale = {sorted_config.AutoScale}\n"
-                f"Scaling factors = {sorted_config.ScaleFactor}\n"
-                f"Lambda Range = {sorted_config.LambdaMinUse}\u212B to {sorted_config.LambdaMaxUse}\u212B\n"
-                f"THS = {self.log_values['ths']}, THI = {self.log_values['thi']}, ThCen = {self.log_values['ThCen']}\n"
-                f"{'---' * 20}\n"
-                f"Config: {vars(config_header)}\n"
-                f"{'---' * 20}\n"
-                f"{col_label}\n"
-                f"{'---' * 20}"
-            )
-
-        else:
-            head = (
-                f"NR_runs = {sorted_config.RBnum}\n"
-                f"Run Title = {self.log_values['title']}\n"
-                f"DB = {sorted_config.DBname}\n"
-                f"Method = {sorted_config.method_per_run}\n"
-                f"Normalize = {sorted_config.Normalize}\n"
-                f"Autoscale = {sorted_config.AutoScale}\n"
-                f"Scaling factors = {sorted_config.ScaleFactor}\n"
-                f"Lambda Range = {sorted_config.LambdaMinUse}\u212B to {sorted_config.LambdaMaxUse}\u212B\n"
-                f"THS = {self.log_values['ths']}, THI = {self.log_values['thi']}, ThCen = {self.log_values['ThCen']}\n"
-                f"{'---' * 20}\n"
-                f"Config: {vars(sorted_config)}\n"
-                f"{'---' * 20}\n"
-                f"{col_label}\n"
-                f"{'---' * 20}"
-            )
-
-        return head
-        '''
 
     def apply_config_overrides(self, settings: dict) -> dict:
         """
