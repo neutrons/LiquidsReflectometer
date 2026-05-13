@@ -113,8 +113,8 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
                     save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{sorted_run_nums[i]}{config_final.subname}", eight_column=True)
             # Always make the final plot, only show it if plot is True
             new_plot = plot_reflectivity(dict_output, RQ4=False, show_fig=plot)
-            figures_out.extend(new_plot)
-            output_figures.extend(new_plot)
+            figures_out.append(new_plot)
+            output_figures.append(new_plot)
             # concatenated
             try:
                 save_fn.save_results(combine_results, config_final, used_theta_vals, full=True, sname=f"{config_final.Sname}_combined{config_final.subname}")
@@ -242,6 +242,12 @@ def load_prior_data(results, matched_files, updated_config, initial_seq, initial
     existing_data = []
     loaded_seq_nums = []
     loaded_run_nums = []
+    #TODO: This needs cleaning up!
+
+    # Remove None entries from initial set
+    initial_seq = [x for x in initial_seq if x is not None]
+    initial_run_nums = [x for x in initial_run_nums if x is not None]
+
     for val in range(len(results["Q_per_run"])):
 
         # arrange to columns
@@ -271,6 +277,9 @@ def load_prior_data(results, matched_files, updated_config, initial_seq, initial
     angle_logs_ths = []
     angle_logs_thcen = []
     title_log = []
+    prior_data = []
+    prior_seq_nums = []
+    prior_run_nums = []
 
     for item in matched_files:
         filepath = Path(updated_config.Spath) / item[0]
@@ -288,15 +297,33 @@ def load_prior_data(results, matched_files, updated_config, initial_seq, initial
         if title_out:
             title_log.append(title_out["title"])
         data = np.loadtxt(filepath, unpack=True)
-        existing_data.append(data)
-        loaded_seq_nums.append(item[1])
-        loaded_run_nums.append(item[2])
-    
+        prior_data.append(data)
+        prior_seq_nums.append(item[1])
+        prior_run_nums.append(item[2])
+
+    # Join the two together based on seq num (ignore None values)
+    highest_seq_num = max((x for x in loaded_seq_nums + prior_seq_nums if x is not None), default=0)
+    print(highest_seq_num)
+    combined_data = [None] * highest_seq_num
+    combined_seq_nums = [None] * highest_seq_num
+    combined_run_nums = [None] * highest_seq_num
+    for i in range(len(combined_data)):
+        if i+1 in loaded_seq_nums:
+            idx = loaded_seq_nums.index(i+1)
+            combined_data[i] = existing_data[idx]
+            combined_seq_nums[i] = loaded_seq_nums[idx]
+            combined_run_nums[i] = loaded_run_nums[idx]
+        elif i+1 in prior_seq_nums:
+            idx = prior_seq_nums.index(i+1)
+            combined_data[i] = prior_data[idx]
+            combined_seq_nums[i] = prior_seq_nums[idx]
+            combined_run_nums[i] = prior_run_nums[idx]
+
     # sort
-    indices = sorted(range(len(existing_data)), key=lambda i: existing_data[i][0][0])
-    sorted_data = [existing_data[i] for i in indices]
-    sorted_seq_num = [loaded_seq_nums[i] for i in indices]
-    sorted_run_num = [loaded_run_nums[i] for i in indices]
+    indices = sorted(range(len(combined_data)), key=lambda i: combined_data[i][0][0])
+    sorted_data = [combined_data[i] for i in indices]
+    sorted_seq_num = [combined_seq_nums[i] for i in indices]
+    sorted_run_num = [combined_run_nums[i] for i in indices]
     angle_logs_thcen = max(angle_logs_thcen, key=len) # THis is weird and messy and needs a fix but because it adds on in prior cycles...!!
     angle_logs_ths = max(angle_logs_ths, key=len)
     angle_logs_thi = max(angle_logs_thi, key=len)
@@ -324,17 +351,27 @@ def find_combine_priors(updated_config, run_nums, results, group_output_sorted, 
         T, L, dT, dL = [], [], [], []
         dict_output = []
         scaling_factors = []
+        print(sorted_seq_num, sorted_run_num, len(sorted_data))
         for run, result in enumerate(sorted_data):
             if updated_config.AutoScale and run != 0:
-                mask1 = Q[run-1] >= min(result[0, :])
-                mask2 = result[0, :] <= max(Q[run-1])
+                #mask1 = Q[run-1] >= min(result[0, :])
+                #mask2 = result[0, :] <= max(Q[run-1])
 
-                y1 = R[run-1][mask1]
-                y2 = result[1, :][mask2]
-                e1 = dR[run-1][mask1]
-                e2 = result[2, :][mask2]
+                #y1 = R[run-1][mask1]
+                #y2 = result[1, :][mask2]
+                #e1 = dR[run-1][mask1]
+                #e2 = result[2, :][mask2]
 
-                scale, sigma_scale = tools.weighted_mean(y1, y2, e1, e2)
+                #scale, sigma_scale = tools.weighted_mean(y1, y2, e1, e2)
+
+                #TODO: the function can take a series of arrays rather than stepwise.
+                y1=R[run-1]
+                y2=result[1, :]
+                e1=dR[run-1]
+                e2=result[2, :]
+
+                scaling_factors_out = tools.calc_scaling_factors(xarrays = [Q[run-1], result[0,:]], yarrays = [y1, y2], yerrarrays=[e1, e2], method="weighted_mean", sigma_mask=3, set_first_to_one=False)
+                scale = scaling_factors_out[0]
 
                 if not np.isfinite(scale):
                     print(f"Unable to find scaling factor for {run}")
