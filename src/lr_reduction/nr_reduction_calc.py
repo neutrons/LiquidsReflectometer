@@ -141,15 +141,18 @@ class NR_Reduction:
                 continue
             
             result, config_out, log_vals = self._reduce_single_run(i, rb_num)
-
+            print("Completed reduction for run", rb_num)
             # TODO: add better autoscaling options.
             if self.config.AutoScale and last_valid_idx is not None:
-                y1=R[last_valid_idx][np.where(Q[last_valid_idx] >= min(result['q']))]
-                y2=result['r'][np.where(result['q'] <= max(Q[last_valid_idx]))]
-                e1=dR[last_valid_idx][np.where(Q[last_valid_idx] >= min(result['q']))]
-                e2=result['dr'][np.where(result['q'] <= max(Q[last_valid_idx]))]
 
-                scale, sigma_scale = tools.weighted_mean(y1,y2,e1,e2)
+                y1=R[last_valid_idx]
+                y2=result['r']
+                e1=dR[last_valid_idx]
+                e2=result['dr']
+
+                scaling_factors = tools.calc_scaling_factors(xarrays = [Q[last_valid_idx], result['q']], yarrays = [y1, y2], yerrarrays=[e1, e2], method="weighted_mean", sigma_mask=3, set_first_to_one=False)
+                scale = scaling_factors[0]
+
                 print(scale)
                 if not np.isfinite(scale):
                     print(f"Unable to find scaling factor for {rb_num}")

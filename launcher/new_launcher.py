@@ -35,13 +35,6 @@ class ReductionInterface(QTabWidget):
         self.addTab(self.direct_beam_tab, "Direct beam")
         self.setTabText(tab_id, "Direct beam")
 
-        # Batch template reduction tab
-        tab_id += 1
-        self.template_batch_tab = TemplateBatchTab()
-        self.addTab(self.template_batch_tab, "Batch template")
-        self.setTabText(tab_id, "Batch template")
-
-        
         # Batch file-driven reduction tab (DAT/JSON)
         tab_id += 1
         self.file_batch_tab = FileBatchTab()
@@ -61,6 +54,11 @@ class ReductionInterface(QTabWidget):
         self.addTab(self.sld_tab, "SLD calculator")
         self.setTabText(tab_id, "SLD calculator")
 
+        # Batch template reduction tab
+        tab_id += 1
+        self.template_batch_tab = TemplateBatchTab()
+        self.addTab(self.template_batch_tab, "Batch template")
+        self.setTabText(tab_id, "Batch template")
 
 if __name__ == "__main__":
     app = QApplication([])

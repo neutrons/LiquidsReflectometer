@@ -79,9 +79,12 @@ def weighted_mean(y1,y2,e1,e2, sigma_mask=3):
     w=1/sigma_v**2
     # initial weighted mean
     mean=np.sum(v*w)/np.sum(w)
+    resid = v - mean
+    std = np.std(resid)
 
     # identify outlier
-    mask = np.abs(v - mean) < sigma_mask * sigma_v
+    #mask = np.abs(v - mean) < sigma_mask * sigma_v
+    mask = np.abs(resid) < sigma_mask * std
     v = v[mask]
     w = w[mask]
 
@@ -90,6 +93,60 @@ def weighted_mean(y1,y2,e1,e2, sigma_mask=3):
     sigma_mean = np.sqrt(1 / np.sum(w))
 
     return mean, sigma_mean
+
+def calc_scaling_factors(xarrays, yarrays, yerrarrays, method="weighted_mean", sigma_mask=3, set_first_to_one=True):
+    # Calculate scaling factors for multiple runs based on a specified method (default is weighted mean)
+    # xarrays: list of x arrays corresponding to the yarrays (used for cropping to overlap regions)
+    # yarrays: list of arrays to be scaled
+    # yerrarrays: list of corresponding error arrays
+    # method: method to calculate scaling factors (currently only "weighted_mean" implemented)
+    # sigma_mask: sigma threshold for outlier rejection in weighted mean
+
+    # crop arrays to overlap regions between sequential arrays
+    ycrop = []
+    for i in range(len(yarrays)-1):
+        # Find overlapping region between sequential arrays
+        y1=yarrays[i][np.where(xarrays[i] >= min(xarrays[i+1]))]
+        y2=yarrays[i+1][np.where(xarrays[i+1] <= max(xarrays[i]))]
+        e1=yerrarrays[i][np.where(xarrays[i] >= min(xarrays[i+1]))]
+        e2=yerrarrays[i+1][np.where(xarrays[i+1] <= max(xarrays[i]))]
+        x_common = xarrays[i][np.where((xarrays[i] >= min(xarrays[i+1])) & (xarrays[i] <= max(xarrays[i+1])))]
+
+        # Interpolate to account for different binning if needed. Use the array with more points
+        # TODO: Improve interpolation for cases with few points
+        if len(y1) > len(y2):
+            y2_interp = np.interp(x_common, xarrays[i+1], yarrays[i+1])
+            var_interp = np.interp(x_common, xarrays[i+1], yerrarrays[i+1])
+            e2_interp = np.sqrt(var_interp)
+            ycrop.append((y1, y2_interp, e1, e2_interp))
+        elif len(y2) > len(y1):
+            y1_interp = np.interp(x_common, xarrays[i], yarrays[i])
+            var_interp = np.interp(x_common, xarrays[i], yerrarrays[i])
+            e1_interp = np.sqrt(var_interp)
+            ycrop.append((y1_interp, y2, e1_interp, e2))
+        else:
+            ycrop.append((y1, y2, e1, e2))
+
+    if method == "weighted_mean":
+        if set_first_to_one:
+            scaling_factors = [1.0]  # First run is the reference, so scaling factor is 1
+            start_idx = 1
+        else:
+            scaling_factors = []
+            start_idx = 0
+
+        # calculate using the cropped arrays
+        for i in range(start_idx, len(ycrop)):
+            mean, sigma_mean = weighted_mean(ycrop[i][0], ycrop[i][1], ycrop[i][2], ycrop[i][3], sigma_mask=sigma_mask)
+            if i != 0:
+                scaling_factors.append(abs(mean)* scaling_factors[-1])  # Scale cumulatively
+            else:
+                scaling_factors.append(abs(mean))
+
+        return np.array(scaling_factors)
+
+    else:
+        raise ValueError(f"Method '{method}' not implemented. Currently only 'weighted_mean' is supported.")
 
 # Define functions for peak_fitting:
 def gaussian(x,a,x0,sig):
