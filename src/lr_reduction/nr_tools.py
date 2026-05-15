@@ -110,22 +110,26 @@ def calc_scaling_factors(xarrays, yarrays, yerrarrays, method="weighted_mean", s
         y2=yarrays[i+1][np.where(xarrays[i+1] <= max(xarrays[i]))]
         e1=yerrarrays[i][np.where(xarrays[i] >= min(xarrays[i+1]))]
         e2=yerrarrays[i+1][np.where(xarrays[i+1] <= max(xarrays[i]))]
-        x_common = xarrays[i][np.where((xarrays[i] >= min(xarrays[i+1])) & (xarrays[i] <= max(xarrays[i+1])))]
+        x_common1 = xarrays[i][np.where((xarrays[i] >= min(xarrays[i+1])) & (xarrays[i] <= max(xarrays[i+1])))]
+        x_common2 = xarrays[i+1][np.where((xarrays[i+1] >= min(xarrays[i])) & (xarrays[i+1] <= max(xarrays[i])))]
 
         # Interpolate to account for different binning if needed. Use the array with more points
         # TODO: Improve interpolation for cases with few points
         if len(y1) > len(y2):
-            y2_interp = np.interp(x_common, xarrays[i+1], yarrays[i+1])
-            var_interp = np.interp(x_common, xarrays[i+1], yerrarrays[i+1])
+            y2_interp = np.interp(x_common1, xarrays[i+1], yarrays[i+1])
+            var_interp = np.interp(x_common1, xarrays[i+1], yerrarrays[i+1])
             e2_interp = np.sqrt(var_interp)
             ycrop.append((y1, y2_interp, e1, e2_interp))
         elif len(y2) > len(y1):
-            y1_interp = np.interp(x_common, xarrays[i], yarrays[i])
-            var_interp = np.interp(x_common, xarrays[i], yerrarrays[i])
+            y1_interp = np.interp(x_common2, xarrays[i], yarrays[i])
+            var_interp = np.interp(x_common2, xarrays[i], yerrarrays[i])
             e1_interp = np.sqrt(var_interp)
             ycrop.append((y1_interp, y2, e1_interp, e2))
         else:
-            ycrop.append((y1, y2, e1, e2))
+            y1_interp = np.interp(x_common2, xarrays[i], yarrays[i])
+            var_interp = np.interp(x_common2, xarrays[i], yerrarrays[i])
+            e1_interp = np.sqrt(var_interp)
+            ycrop.append((y1_interp, y2, e1_interp, e2))
 
     if method == "weighted_mean":
         if set_first_to_one:

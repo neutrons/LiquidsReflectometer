@@ -67,6 +67,7 @@ def _build_header(config_header, log_values, full=True, eight_column=False, sequ
 
     angle_header = json.dumps({"THS": tools.clean_log_value(log_values['ths']), "THI": tools.clean_log_value(log_values['thi']), "ThCen": tools.clean_log_value(log_values['ThCen'])})
     title_header = json.dumps({"title": log_values['title']})
+    scale_factor_header = json.dumps({"scale_factor": tools.clean_log_value(sorted_config.ScaleFactor)})
     # TODO: Lambda Use values need to be arrays and stored angles need to be arrays.
     if full:
         head = (
@@ -76,7 +77,7 @@ def _build_header(config_header, log_values, full=True, eight_column=False, sequ
             f"Method = {sorted_config.method_per_run}\n"
             f"Normalize = {sorted_config.Normalize}\n"
             f"Autoscale = {sorted_config.AutoScale}\n"
-            f"Scaling factors = {sorted_config.ScaleFactor}\n"
+            f"Scaling factors = {scale_factor_header}\n"
             f"Lambda Range = {sorted_config.LambdaMinUse}\u212B to {sorted_config.LambdaMaxUse}\u212B\n"
             f"Angles: {angle_header}\n"
             f"{'---' * 20}\n"
@@ -94,7 +95,7 @@ def _build_header(config_header, log_values, full=True, eight_column=False, sequ
             f"Method = {sorted_config.method_per_run}\n"
             f"Normalize = {sorted_config.Normalize}\n"
             f"Autoscale = {sorted_config.AutoScale}\n"
-            f"Scaling factors = {sorted_config.ScaleFactor}\n"
+            f"Scaling factors = {scale_factor_header}\n"
             f"Lambda Range = {sorted_config.LambdaMinUse}\u212B to {sorted_config.LambdaMaxUse}\u212B\n"
             f"Angles: {angle_header}\n"
             f"{'---' * 20}\n"

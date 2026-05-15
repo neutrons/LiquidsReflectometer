@@ -14,7 +14,8 @@ from lr_reduction.nr_reduction_config import NRReductionConfig
 import lr_reduction.save_reduced_data as save_fn
 import lr_reduction.nr_tools as tools
 
-def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = None, override_params: dict = None, plot=True, save_json=False, check_for_prior=False, save_pdf_summary=False):
+def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = None, override_params: dict = None, plot=True, 
+                     save_json=False, check_for_prior=False, save_pdf_summary=False):
     """
     Wrapper function to reduce a single run with reading of parameters from the header of a file or a saved json file, instead of the xml.
     Then collect like results within the save folder and combine them together.
