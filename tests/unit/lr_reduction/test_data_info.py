@@ -21,10 +21,25 @@ def test_from_workspace_direct_beam_earth_centered_coordinates(mock_sample_logs_
 def test_from_workspace_direct_beam_free_liquid_mode(mock_sample_logs_class):
     """Test direct beam detection with free liquid mode"""
     mock_logs = {
-        "BL4B:CS:Mode:Coordinates": 1,
         "BL4B:CS:ExpPl:OperatingMode": "Free Liquid",
         "thi": 0.210,
         "tthd": 0.212,
+    }
+    mock_sample_logs_class.return_value = mock_logs
+
+    result = DataType.from_workspace(Mock())
+    assert result == DataType.DIRECT_BEAM
+
+
+@patch("lr_reduction.data_info.SampleLogValues")
+def test_from_workspace_coordinate_mode_overrides_legacy_operating_mode(mock_sample_logs_class):
+    """Beam-centered coordinate mode should win over the legacy Free Liquid fallback."""
+    mock_logs = {
+        "BL4B:CS:Mode:Coordinates": 1,
+        "BL4B:CS:ExpPl:OperatingMode": "Free Liquid",
+        "thi": 0.210,
+        "ths": 0.0006,
+        "tthd": 0.0008,
     }
     mock_sample_logs_class.return_value = mock_logs
 

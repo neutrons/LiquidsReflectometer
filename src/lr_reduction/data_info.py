@@ -8,6 +8,7 @@ import numpy as np
 from mantid.simpleapi import logger
 
 from lr_reduction.mantid_utils import SampleLogValues
+from lr_reduction.theta_selection import theta_log_name
 from lr_reduction.types import MantidWorkspace
 
 
@@ -38,12 +39,7 @@ class DataType(IntEnum):
         value = cls.REFLECTED_BEAM
         try:
             # Determine whether this is a direct beam based on the geometry
-            if (
-                    # This is a new log for earth-centered
-                    ("BL4B:CS:Mode:Coordinates" in sample_logs and sample_logs["BL4B:CS:Mode:Coordinates"] == 0)
-                    or
-                    # This is for backward compatibility from before the new log value
-                    sample_logs["BL4B:CS:ExpPl:OperatingMode"] == "Free Liquid"):
+            if theta_log_name(sample_logs) == "thi":
                 # Earth-centered coordinate system
                 thi = sample_logs["thi"]
                 tthd = sample_logs["tthd"]
