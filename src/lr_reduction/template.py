@@ -13,6 +13,7 @@ from mantid.simpleapi import logger
 from lr_reduction import event_reduction, peak_finding, reduction_template_reader
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.reduction_template_reader import ReductionParameters
+from lr_reduction.theta_selection import theta_log_name
 from lr_reduction.types import MantidWorkspace
 
 TOLERANCE = 0.07
@@ -261,22 +262,18 @@ def process_from_template_ws(
     # Determine scattering angle. If a value was given, don't add the offset
     if theta_value is not None:
         theta = theta_value * np.pi / 180.0
+        theta_pv = "input"
     else:
-        if (
-            "BL4B:CS:ExpPl:OperatingMode" in ws_sc.getRun()
-            and ws_sc.getRun().getProperty("BL4B:CS:ExpPl:OperatingMode").value[0] == "Free Liquid"
-        ):
-            theta = thi_value * np.pi / 180.0
-        else:
-            theta = ths_value * np.pi / 180.0
+        theta_pv = theta_log_name(ws_sc.getRun())
+        theta = (thi_value if theta_pv == "thi" else ths_value) * np.pi / 180.0
 
         # Add offset
         theta += template_data.angle_offset * np.pi / 180.0
 
     theta_degrees = theta * 180 / np.pi
     logger.notice(
-        "wl=%g; ths=%g; thi=%g; offset=%g; theta used=%g"
-        % (_wl, ths_value, thi_value, template_data.angle_offset, theta_degrees)
+        "wl=%g; ths=%g; thi=%g; theta_pv=%s; offset=%g; theta used=%g"
+        % (_wl, ths_value, thi_value, theta_pv, template_data.angle_offset, theta_degrees)
     )
 
     # Get the reduction parameters from the template
