@@ -33,7 +33,13 @@ jobs:
         uses: prefix-dev/setup-pixi@v0.9.5
         with:
           manifest-path: pyproject.toml
-
+          
+      - name: Configure Git credentials for code.ornl.gov
+        env:
+          TOKEN: ${{ secrets.DATA_READ_TOKEN }}
+        run: |
+          git config --global url."https://gitlab-ci-token:${TOKEN}@code.ornl.gov/".insteadOf "https://code.ornl.gov/"
+          
       - name: Download test data
         run: |
           git submodule update --init
