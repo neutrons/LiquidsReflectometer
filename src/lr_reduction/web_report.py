@@ -18,6 +18,7 @@ from lr_reduction.data_info import DataType
 from lr_reduction.mantid_utils import SampleLogValues
 from lr_reduction.reduction_template_reader import ReductionParameters
 from lr_reduction.types import MantidWorkspace
+import lr_reduction.new_reduction_from_file as nrff
 
 XY_PLOT_ZOOM_X_RANGE = [25, 225]
 XY_PLOT_ZOOM_Y_RANGE = [100, 200]
@@ -170,6 +171,7 @@ def generate_report_sections(
     workspace: MantidWorkspace,
     template_file: str | ReductionParameters | None,
     meta_data: dict = None,
+    config_in = None
 ) -> ReportSections:
     """
     Generate diagnostics plots and report metadata from a reduction workspace.
@@ -182,6 +184,8 @@ def generate_report_sections(
         Template file path or pre-parsed template data, or `None` for a direct beam
     meta_data : dict
         Metadata to embed in the report, or `None` for a direct beam
+    settings_file:
+        For new workflow provide setting file instead. #TODO: make this transition cleaner.
 
     Returns
     -------
@@ -208,12 +212,21 @@ def generate_report_sections(
     logger.notice(f"  - generating report [{number_events}]")
 
     if data_type == DataType.REFLECTED_BEAM:
-        # Read template if needed
+        #TODO: work on separating these better?
         if isinstance(template_file, str):
             template_data = template.read_template(template_file, sequence_number)
         else:
             template_data = template_file
-        report = generate_report_section_reduction_parameters(workspace, template_data, meta_data)
+        if config_in is not None:
+            # Get the parameters from the settings instead
+            config = None
+            report, config = generate_report_section_reduction_parameters_new(config_in, workspace, sequence_number)
+        # Read template if needed
+        elif template_file is not None:
+            report = generate_report_section_reduction_parameters(workspace, template_data, meta_data)
+        else:
+            logger.error("Reflected beam type requires a template or setting file to be provided")
+
     elif data_type == DataType.DIRECT_BEAM:
         report = generate_report_section_direct_beam_parameters(workspace)
         template_data = None
@@ -224,7 +237,7 @@ def generate_report_sections(
     run_meta_data = generate_report_section_run_meta_data(workspace)
 
     try:
-        plots = generate_report_plots(workspace, template_data, data_type)
+        plots = generate_report_plots(workspace, template_data, data_type, config_settings=config, sequence_number=sequence_number)
     except Exception as e:  # noqa: BLE001
         logger.notice(f"Could not generate plots: {e}")
         logger.error("Could not generate plots", exc_info=True)
@@ -263,7 +276,6 @@ def generate_report_section_run_meta_data(workspace: MantidWorkspace) -> str:
     meta += "</table>\n<p>\n"
     return meta
 
-
 def generate_report_section_reduction_parameters(workspace: MantidWorkspace, template_data: ReductionParameters, meta_data: dict) -> str:
     """Generate HTML report from a reduced workspace and template data
 
@@ -284,6 +296,7 @@ def generate_report_section_reduction_parameters(workspace: MantidWorkspace, tem
     logger.notice("  - generating reduction parameters")
 
     sample_logs = SampleLogValues(workspace)
+
     direct_beam = template_data.norm_file
     two_backgrounds = meta_data["use_functional_bck"]
 
@@ -354,6 +367,91 @@ def generate_report_section_reduction_parameters(workspace: MantidWorkspace, tem
     meta += "</table>\n"
     return meta
 
+# TODO: fix this...
+def generate_report_section_reduction_parameters_new(config, workspace: MantidWorkspace, sequence_number: int) -> str:
+    """Generate HTML report from a reduced workspace and template data
+
+    Parameters
+    ----------
+    workspace: MantidWorkspace
+        Reflected beam workspace
+    template_data
+        Reduction parameters
+    meta_data
+        Reduction metadata
+
+    Returns
+    -------
+    str
+        Reduction configuration in the form of an HTML table
+    """
+    # TODO: work out if need the separate meta_data input.
+    logger.notice("  - generating reduction parameters")
+
+    #file_load = nrff.load_from_file(setting_file)
+    #config = nrff.json_to_config(file_load["config"])
+
+    sample_logs = SampleLogValues(workspace)
+    direct_beam = config.DBname[sequence_number-1]
+    bkgd_roi = config.BkgROI[sequence_number-1]
+
+    meta = "<table style='width:80%'>"
+    meta += "<tr><td>Run:</td><td><b>%s</b></td><td><b>Direct beam: %s</b></td></tr>" % (
+        int(sample_logs["run_number"]),
+        direct_beam,
+    )
+    meta += "<tr><td>Q-binning:</td><td>%s</td><td>-</td></tr>" % config.method_per_run[sequence_number-1]
+
+    meta += "<tr><td>Peak range:</td><td>%s - %s</td><td>" % (
+        config.RB_Ymin[sequence_number-1],
+        config.RB_Ymax[sequence_number-1]
+    )
+    meta += "<tr><td>Background:</td><td>%s - %s , %s - %s</td></tr>" % (
+        bkgd_roi[0],
+        bkgd_roi[1],
+        bkgd_roi[2],
+        bkgd_roi[3],
+    )
+
+    meta += "<tr><td>X range:</td><td>%s - %s</td></tr>" % (
+        config.data_x_range[0],
+        config.data_x_range[1]
+    )
+    meta += "<tr><td>Sequence:</td><td>%s: %s/%s</td></tr>" % (
+        sample_logs["sequence_id"],
+        sample_logs["sequence_number"],
+        sample_logs["sequence_total"],
+    )
+
+    # TODO: add other flags from new reduction.
+    meta += "<tr><td>Auto-normalization:</td><td>%s</td></tr>" % (config.Normalize)
+    meta += "<tr><td>Auto-scaling:</td><td>%s</td></tr>" % (config.AutoScale)
+    meta += "<tr><td>Calc Theta:</td><td>%s</td></tr>" % (config.useCalcTheta)
+
+    meta += "<tr><td>Report time:</td><td>%s</td></tr>" % time.ctime()
+    meta += "</table>\n"
+
+    if config.ThetaShift:
+        theta_shift = config.ThetaShift[sequence_number-1]
+    else:
+        theta_shift = 0
+
+    meta += "<table style='width:100%'>"
+    meta += "<tr><th>Wavelength</th><th>Q</th><th>dqbin</th><th>Thi</th><th>Ths</th><th>Offset</th><th>tthd</th></tr>"  # noqa E501
+    meta += "<tr><td>%6.4g - %6.4g</td><td>%6.4g - %6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td></tr>\n" % (
+        config.LambdaMin[sequence_number-1],
+        config.LambdaMax[sequence_number-1],
+        config.qmin,
+        config.qmax,
+        config.dqbin,
+        sample_logs["thi"],
+        sample_logs["ths"],
+        theta_shift,
+        sample_logs["tthd"]
+        #meta_data["theta"] * 180.0 / np.pi,
+    )
+    meta += "</table>\n"
+    return meta, config
 
 def generate_report_section_direct_beam_parameters(workspace: MantidWorkspace) -> str:
     """Generate HTML report from a direct beam workspace
@@ -387,7 +485,7 @@ def generate_report_section_direct_beam_parameters(workspace: MantidWorkspace) -
     return meta
 
 
-def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionParameters, data_type: DataType) -> list[str]:
+def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionParameters, data_type: DataType, config_settings = None, sequence_number = None) -> list[str]:
     """
     Generate diagnostic plots from the event workspace
 
@@ -423,12 +521,28 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
         tof_range_ms = None
         tof_zoom_range = None
     else:
-        scatt_peak = template_data.data_peak_range
-        scatt_low_res = template_data.data_x_range
-        scatt_bck = template_data.background_roi
-        tof_range_ms = [t / 1000.0 for t in template_data.tof_range]
-        # convert to ms and add margins
-        tof_zoom_range = [template_data.tof_range[0]/1000.0 - 5.0, template_data.tof_range[1]/1000.0 + 5.0]
+        print('here')
+        if config_settings is not None:
+            # TODO: need to feed an index...
+            if sequence_number is None:
+                idx = 0
+            else:
+                idx = sequence_number - 1
+            scatt_peak = [config_settings.RB_Ymin[idx], config_settings.RB_Ymax[idx]]
+            scatt_low_res = config_settings.data_x_range
+            scatt_bck = config_settings.BkgROI[idx]
+            # TODO: might be better to have these as wavelength and convert?
+            tof_range_ms = [t / 1000.0 for t in [config_settings.tof_min[idx], config_settings.tof_max[idx]]]
+            # convert to ms and add margins
+            tof_zoom_range = [config_settings.tof_min[idx]/1000.0 - 5.0, config_settings.tof_max[idx]/1000.0 + 5.0]
+
+        else:    
+            scatt_peak = template_data.data_peak_range
+            scatt_low_res = template_data.data_x_range
+            scatt_bck = template_data.background_roi
+            tof_range_ms = [t / 1000.0 for t in template_data.tof_range]
+            # convert to ms and add margins
+            tof_zoom_range = [template_data.tof_range[0]/1000.0 - 5.0, template_data.tof_range[1]/1000.0 + 5.0]
 
     # X-Y plot
     xy_plot = None
@@ -733,6 +847,17 @@ def _plot2d(
         plotly_objects.append(y_right)
 
     if y_bck_range is not None:
+        for line in y_bck_range:
+            y_line = go.Scatter(
+                name="",
+                y=[line, line],
+                x=[min(x), max(x)],
+                marker=dict(
+                    color="rgba(152, 152, 152, .8)",
+                ),
+            )
+            plotly_objects.append(y_line)
+        '''    
         y_left = go.Scatter(
             name="",
             y=[y_bck_range[0], y_bck_range[0]],
@@ -751,6 +876,7 @@ def _plot2d(
         )
         plotly_objects.append(y_left)
         plotly_objects.append(y_right)
+        '''
 
     x_layout = dict(
         title=x_label,
@@ -870,6 +996,17 @@ def _plot1d(
     if bck_range is not None:
         y_pos = [v for v in y if v > 0]
         min_y = min(y_pos) if y_pos else range_min_default
+        for line in bck_range:
+            x_line = go.Scatter(
+                name="",
+                x=[line, line],
+                y=[min_y, max(y)],
+                marker=dict(
+                    color="rgba(152, 152, 152, .8)",
+                ),
+            )
+            data.append(x_line)
+        '''
         x_left = go.Scatter(
             name="",
             x=[bck_range[0], bck_range[0]],
@@ -886,9 +1023,11 @@ def _plot1d(
                 color="rgba(152, 152, 152, .8)",
             ),
         )
+        
         data.append(x_left)
         data.append(x_right)
-
+        '''
+        
     x_layout = dict(
         title=x_label,
         zeroline=False,
@@ -972,3 +1111,4 @@ def _plotText(text, title=""):
     plot = pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
 
     return plot
+

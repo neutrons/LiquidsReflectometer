@@ -35,7 +35,6 @@ class NR_Reduction:
             Configuration object
         """
         self.config = config
-        #self.config.method = self.config.method.lower() # TODO: work out if this is the best place for this.
         # If method not supplied, set to default meanTheta
         if not self.config.method_per_run:
             self.config.method_per_run = ['meantheta'] * len(self.config.RBnum)

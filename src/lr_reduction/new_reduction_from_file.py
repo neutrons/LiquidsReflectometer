@@ -131,7 +131,10 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
                 # Overwrite output with new plot if created
                 save_fn.save_plot_pdf_summary(config_final.Spath, f"{config_final.Sname}{config_final.subname}", figures_out)
 
-        all_results.append(results)
+            all_results.append(dict_output)
+        else:
+            all_results.append(results)
+            sorted_run_nums = group_output['run_nums'][idx]
         all_figures.extend(figures_out)
 
         if save_json:
@@ -146,7 +149,7 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
     num_figures = len(all_figures)
 
     # Might need to come back to which figures are output.
-    return all_results, output_figures
+    return all_results, output_figures, sorted_run_nums, config_final
 
 def sort_runs(group_output, idx):
     seq_to_use = group_output["seq_nums"][idx]

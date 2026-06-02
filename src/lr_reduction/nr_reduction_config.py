@@ -57,7 +57,6 @@ class NRReductionConfig:
         self.BkgROI = []    # Need to work out a default...and explain the format here.
         self.useBS = []  # Toggle to use background subtraction per angle
         self.useGravity = True # Toggle to use gravity correction
-        # TODO: After testing, decide how/if to toggle gravity and if it should be in the template.
 
         # Q-space configuration #TODO: make better defaults here!!
         # These should be specified within the templates but enable ranges for lambda and q. #TODO: check if zeros are removed?
@@ -103,12 +102,12 @@ class NRReductionConfig:
         self.peak_pad = 1 # number of extra pixels to include outside the background ranges fit the peak fit range
         self.peak_type = 'supergauss'   # function for the fit. Current options: 'gauss' or 'supergauss'
 
-        # TODO: check how to include these.
+        # These are a reference of what is actually used, saved into the config at the end.
+        # TODO: check how to include these on init.
         self.LambdaMinUse = None
         self.LambdaMaxUse = None
 
     # Path configuration - Defaults assume IPTS specified and saved into that folder.
-    # #TODO: test the defaults loading part...!
     @property
     def base_path(self) -> Path:
         return Path("/SNS/REF_L") / self.experiment_id
