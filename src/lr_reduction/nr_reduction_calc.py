@@ -1041,6 +1041,10 @@ class NR_Reduction:
         dL = q_vals * 0
         dT = q_vals * 0
 
+        # Compute per-lambda bin widths for correct integration when mapping to Q
+        L_edges = tools.get_edges(LAMBDA)
+        dLambda_bins = np.diff(L_edges)
+
         for T in range(Rarr.shape[0]):
             # Apply gravity correction
             if self.config.useGravity == True: # TODO: Implementation needs checking/deciding whether to keep!
@@ -1072,12 +1076,14 @@ class NR_Reduction:
                     # if no overlap, put into nearest q bin
                     if idx.size == 0:
                         idx = np.array([np.argmin(np.abs(qcen - q_vals))])
-                    # spread evenly over all overlapped bins. #TODO: Future, investigate options here.
+                    # spread evenly over all overlapped bins. Include lambda bin width so
+                    # contributions are true integrals (independent of histogram/bin size).
                     wt = J[L] / idx.size
-                    r[idx] = r[idx] + Rarr[T, L] * wt
-                    dr[idx] = dr[idx] + (REarr[T, L] * wt)**2
+                    dl = dLambda_bins[L]
+                    r[idx] = r[idx] + Rarr[T, L] * wt * dl
+                    dr[idx] = dr[idx] + (REarr[T, L] * wt * dl)**2
                     dq[idx] = dqval
-                    Jsum[idx] = Jsum[idx] + wt
+                    Jsum[idx] = Jsum[idx] + wt * dl
                     # adding for extra column output
                     l_store[idx] = LAMBDA[L]
                     t_store[idx] = Thv[L]
