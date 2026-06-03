@@ -43,7 +43,7 @@ def theta_log_name(log_source: MantidWorkspace) -> str:
     Parameters
     ----------
     log_source : MantidWorkspace
-        Workspace or mapping-like object containing the relevant sample log values.
+        Workspace containing the relevant sample log values.
 
     Returns
     -------
