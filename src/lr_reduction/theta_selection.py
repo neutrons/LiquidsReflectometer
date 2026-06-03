@@ -16,13 +16,13 @@ class SampleLogSource(Protocol):
     def __getitem__(self, log_name: str) -> Any: ...
 
 
-def _sample_logs(log_source: MantidWorkspace | SampleLogSource) -> SampleLogSource:
+def _sample_logs(log_source: MantidWorkspace) -> SampleLogSource:
     """
     Normalize workspace and mapping inputs to a value-based sample-log accessor.
 
     Parameters
     ----------
-    log_source : MantidWorkspace | SampleLogSource
+    log_source : MantidWorkspace
         Workspace or mapping-like object containing sample log values.
 
     Returns
@@ -35,7 +35,7 @@ def _sample_logs(log_source: MantidWorkspace | SampleLogSource) -> SampleLogSour
     return log_source
 
 
-def is_earth_centered_geometry(log_source: MantidWorkspace | SampleLogSource) -> bool:
+def is_earth_centered_geometry(log_source: MantidWorkspace) -> bool:
     """
     Determine whether the run used earth-centered geometry.
 

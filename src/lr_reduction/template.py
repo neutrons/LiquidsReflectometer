@@ -264,9 +264,8 @@ def process_from_template_ws(
         theta = theta_value * np.pi / 180.0
         theta_pv = "input"
     else:
-        use_incident_theta = is_earth_centered_geometry(ws_sc)
         theta_pv = theta_log_name(ws_sc)
-        theta = (thi_value if use_incident_theta else ths_value) * np.pi / 180.0
+        theta = (thi_value if is_earth_centered_geometry(ws_sc) else ths_value) * np.pi / 180.0
 
         # Add offset
         theta += template_data.angle_offset * np.pi / 180.0

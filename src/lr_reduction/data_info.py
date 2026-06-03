@@ -39,7 +39,7 @@ class DataType(IntEnum):
         value = cls.REFLECTED_BEAM
         try:
             # Determine whether this is a direct beam based on the geometry
-            if is_earth_centered_geometry(sample_logs):
+            if is_earth_centered_geometry(input_workspace):
                 # Earth-centered coordinate system
                 thi = sample_logs["thi"]
                 tthd = sample_logs["tthd"]
