@@ -1,6 +1,6 @@
 import pytest
 
-from lr_reduction.theta_selection import theta_log_name, uses_incident_theta
+from lr_reduction.theta_selection import is_earth_centered_geometry, theta_log_name
 
 
 @pytest.mark.parametrize(
@@ -13,8 +13,8 @@ from lr_reduction.theta_selection import theta_log_name, uses_incident_theta
         ({}, False),
     ],
 )
-def test_uses_incident_theta(logs, expected):
-    assert uses_incident_theta(logs) is expected
+def test_is_earth_centered_geometry(logs, expected):
+    assert is_earth_centered_geometry(logs) is expected
 
 
 @pytest.mark.parametrize(

@@ -13,7 +13,7 @@ from mantid.simpleapi import logger
 from lr_reduction import event_reduction, peak_finding, reduction_template_reader
 from lr_reduction.instrument_settings import InstrumentSettings
 from lr_reduction.reduction_template_reader import ReductionParameters
-from lr_reduction.theta_selection import theta_log_name
+from lr_reduction.theta_selection import is_earth_centered_geometry, theta_log_name
 from lr_reduction.types import MantidWorkspace
 
 TOLERANCE = 0.07
@@ -264,8 +264,9 @@ def process_from_template_ws(
         theta = theta_value * np.pi / 180.0
         theta_pv = "input"
     else:
-        theta_pv = theta_log_name(ws_sc.getRun())
-        theta = (thi_value if theta_pv == "thi" else ths_value) * np.pi / 180.0
+        use_incident_theta = is_earth_centered_geometry(ws_sc)
+        theta_pv = theta_log_name(ws_sc)
+        theta = (thi_value if use_incident_theta else ths_value) * np.pi / 180.0
 
         # Add offset
         theta += template_data.angle_offset * np.pi / 180.0

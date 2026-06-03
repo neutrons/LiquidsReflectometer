@@ -8,7 +8,7 @@ import numpy as np
 from mantid.simpleapi import logger
 
 from lr_reduction.mantid_utils import SampleLogValues
-from lr_reduction.theta_selection import theta_log_name
+from lr_reduction.theta_selection import is_earth_centered_geometry
 from lr_reduction.types import MantidWorkspace
 
 
@@ -39,7 +39,7 @@ class DataType(IntEnum):
         value = cls.REFLECTED_BEAM
         try:
             # Determine whether this is a direct beam based on the geometry
-            if theta_log_name(sample_logs) == "thi":
+            if is_earth_centered_geometry(sample_logs):
                 # Earth-centered coordinate system
                 thi = sample_logs["thi"]
                 tthd = sample_logs["tthd"]

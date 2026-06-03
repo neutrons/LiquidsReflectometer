@@ -2,47 +2,80 @@
 Shared theta log selection rules for Liquids Reflectometer reduction.
 """
 
-_MISSING = object()
+from typing import Any, Protocol
+
+from lr_reduction.mantid_utils import SampleLogValues
+from lr_reduction.types import MantidWorkspace
 
 
-def _has_log(log_source, log_name: str) -> bool:
-    return log_name in log_source
+class SampleLogSource(Protocol):
+    """Value-oriented sample log accessor."""
+
+    def __contains__(self, log_name: str) -> bool: ...
+
+    def __getitem__(self, log_name: str) -> Any: ...
 
 
-def _read_log(log_source, log_name: str, default=_MISSING):
+def _sample_logs(log_source: MantidWorkspace | SampleLogSource) -> SampleLogSource:
     """
-    Read a sample log value from either a Mantid run object or a mapping-like log source.
-    """
-    if hasattr(log_source, "getProperty"):
-        if log_name in log_source:
-            prop = log_source.getProperty(log_name)
-            if hasattr(prop, "size"):
-                return prop.value[-1]
-            return prop.value
-    elif log_name in log_source:
-        return log_source[log_name]
+    Normalize workspace and mapping inputs to a value-based sample-log accessor.
 
-    if default is not _MISSING:
-        return default
-    raise KeyError(log_name)
+    Parameters
+    ----------
+    log_source : MantidWorkspace | SampleLogSource
+        Workspace or mapping-like object containing sample log values.
+
+    Returns
+    -------
+    SampleLogSource
+        Sample-log accessor that returns values instead of Mantid property objects.
+    """
+    if hasattr(log_source, "getRun") or isinstance(log_source, str):
+        return SampleLogValues(log_source)
+    return log_source
 
 
-def uses_incident_theta(log_source) -> bool:
+def is_earth_centered_geometry(log_source: MantidWorkspace | SampleLogSource) -> bool:
     """
-    Return True when theta should be derived from `thi` instead of `ths`.
+    Determine whether the run used earth-centered geometry.
+
+    Parameters
+    ----------
+    log_source : MantidWorkspace | SampleLogSource
+        Workspace or mapping-like object containing the coordinate-mode and
+        operating-mode logs used to determine the beamline geometry.
+
+    Returns
+    -------
+    bool
+        True for earth-centered geometry, False for beam-centered geometry.
+        When the coordinate-mode log is unavailable, falls back to the legacy
+        operating-mode log and treats ``"Free Liquid"`` as earth-centered.
     """
-    if _has_log(log_source, "BL4B:CS:Mode:Coordinates"):
-        coordinates_mode = _read_log(log_source, "BL4B:CS:Mode:Coordinates")
+    sample_logs = _sample_logs(log_source)
+
+    if "BL4B:CS:Mode:Coordinates" in sample_logs:
+        coordinates_mode = sample_logs["BL4B:CS:Mode:Coordinates"]
         try:
             return int(coordinates_mode) == 0
         except (TypeError, ValueError):
             return False
 
-    return _read_log(log_source, "BL4B:CS:ExpPl:OperatingMode", default="") == "Free Liquid"
+    return "BL4B:CS:ExpPl:OperatingMode" in sample_logs and sample_logs["BL4B:CS:ExpPl:OperatingMode"] == "Free Liquid"
 
 
-def theta_log_name(log_source) -> str:
+def theta_log_name(log_source: MantidWorkspace | SampleLogSource) -> str:
     """
     Return the sample log name that should be used for theta.
+
+    Parameters
+    ----------
+    log_source : MantidWorkspace | SampleLogSource
+        Workspace or mapping-like object containing the relevant sample log values.
+
+    Returns
+    -------
+    str
+        ``"thi"`` for earth-centered geometry and ``"ths"`` otherwise.
     """
-    return "thi" if uses_incident_theta(log_source) else "ths"
+    return "thi" if is_earth_centered_geometry(log_source) else "ths"
