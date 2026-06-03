@@ -2,6 +2,7 @@ from enum import IntEnum
 
 import numpy as np
 
+from lr_reduction.theta_selection import is_earth_centered_geometry
 from lr_reduction.types import MantidWorkspace
 from lr_reduction.utils import workspace_handle
 
@@ -91,18 +92,13 @@ def _theta_in(workspace: MantidWorkspace) -> float:
         The calculated incident angle (theta_in) in degrees.
     """
     ws = workspace_handle(workspace)
-    run = ws.getRun()
-
     # Angle calculated from thi and a flag on earth-centered vs beam-centered
+    run = ws.getRun()
     thi = _log_value(run, "BL4B:Mot:thi.RBV")
-    if "BL4B:CS:Mode:Coordinates" in run:
-        if _log_value(run, "BL4B:CS:Mode:Coordinates") == 0:  # Earth-centered=0
-            theta_in = thi
-        else:
-            theta_in = thi - 4.0  # Beamline optics gives -4 deg incline. In future will have PV.
-    elif _log_value(run, "BL4B:CS:ExpPl:OperatingMode", default="") == "Free Liquid":
+    if is_earth_centered_geometry(ws):
         theta_in = thi
     else:
+        # Beamline optics gives -4 deg incline. In future will have PV
         theta_in = thi - 4.0
     return abs(theta_in)
 
