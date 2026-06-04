@@ -137,7 +137,7 @@ jobs:
           label: ${{ github.ref == 'refs/heads/exp' && 'exp' || '' }}
 
       - name: Remove old packages
-        if: github.ref == 'refs/heads/next'
+        if: github.ref == 'refs/heads/next' || github.ref == 'refs/heads/exp'
         uses: neutrons/conda-actions/pkg-remove@v1
         with:
           anaconda_token: ${{ secrets.ANACONDA_TOKEN }}
