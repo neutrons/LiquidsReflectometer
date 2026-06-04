@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
   push:
-    branches: [next, qa, main, new_workflow]  # Temporarily include 'new_workflow' to enable publishing from that branch
+    branches: [next, qa, main, exp]  # Temporarily include 'exp' to enable publishing from that branch
     tags: ["v*"]
 
 env:
@@ -111,7 +111,7 @@ jobs:
   publish:
     runs-on: ubuntu-24.04
     needs: [build]
-    if:  startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/next' || github.ref == 'refs/heads/new_workflow'
+    if:  startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/next' || github.ref == 'refs/heads/exp'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -132,9 +132,9 @@ jobs:
           anaconda-token: ${{ secrets.ANACONDA_TOKEN }}
           organization: neutrons
           package-path: ${{ env.PKG_NAME }}-*.conda
-          # Publish from 'new_workflow' under the 'exp' label; otherwise use the default
+          # Publish from 'exp' under the 'exp' label; otherwise use the default
           # label (empty string) which maps to 'dev', 'rc', or 'main' based on the branch.
-          label: ${{ github.ref == 'refs/heads/new_workflow' && 'exp' || '' }}
+          label: ${{ github.ref == 'refs/heads/exp' && 'exp' || '' }}
 
       - name: Remove old packages
         if: github.ref == 'refs/heads/next'
@@ -178,7 +178,7 @@ jobs:
   deploy-exp:
     runs-on: ubuntu-latest
     needs: [build, publish]
-    if: github.ref == 'refs/heads/new_workflow'
+    if: github.ref == 'refs/heads/exp'
     steps:
       - name: Trigger Exp Deploy
         # use https://github.com/eic/trigger-gitlab-ci/pull/14 until merged
