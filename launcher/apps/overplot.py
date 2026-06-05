@@ -68,9 +68,9 @@ class Overplot(QWidget):
         folder_row = QHBoxLayout()
         self.choose_folder_btn = QPushButton("Choose folder")
         folder_row.addWidget(self.choose_folder_btn)
-        self.folder_label = QLabel(self)
-        self.folder_label.setText(FOLDER_DIRECTIVE)
-        folder_row.addWidget(self.folder_label)
+        self.folder_edit = QLineEdit(self)
+        self.folder_edit.setPlaceholderText(FOLDER_DIRECTIVE)
+        folder_row.addWidget(self.folder_edit)
         controls.addLayout(folder_row)
 
         # Filter box
@@ -159,6 +159,7 @@ class Overplot(QWidget):
         self.filter_edit.textChanged.connect(self.apply_filter)
         self.select_all_btn.clicked.connect(self.select_all)
         self.deselect_all_btn.clicked.connect(self.deselect_all)
+        self.folder_edit.editingFinished.connect(self.folder_changed)
 
         # Populate from previous session
         self.read_settings()
@@ -166,7 +167,7 @@ class Overplot(QWidget):
     def read_settings(self):
         _folder = self.settings.value("overplot_folder", "")
         if _folder and os.path.isdir(_folder):
-            self.folder_label.setText(_folder)
+            self.folder_edit.setText(_folder)
             self.populate_file_list(_folder)
 
         _xscale = self.settings.value("overplot_xscale", "linear")
@@ -177,13 +178,13 @@ class Overplot(QWidget):
             self.ytransform_combo.setCurrentText(_ytransform)
 
     def save_settings(self):
-        self.settings.setValue("overplot_folder", self.folder_label.text())
+        self.settings.setValue("overplot_folder", self.folder_edit.text())
         self.settings.setValue("overplot_xscale", self.xscale_combo.currentText())
 
     def choose_folder(self):
         _dir = QFileDialog.getExistingDirectory(None, "Select a folder:", os.path.expanduser("~"), QFileDialog.ShowDirsOnly)
         if os.path.isdir(_dir):
-            self.folder_label.setText(_dir)
+            self.folder_edit.setText(_dir)
             self.populate_file_list(_dir)
             self.save_settings()
 
@@ -227,6 +228,19 @@ class Overplot(QWidget):
             item = self.file_list.item(i)
             item.setCheckState(QtCore.Qt.Unchecked)
             item.setSelected(False)
+
+    def folder_changed(self):
+        folder = self.folder_edit.text().strip()
+
+        if not folder:
+            return
+        if os.path.isdir(folder):
+            self.populate_file_list(folder)
+            self.save_settings()
+        else:
+            QMessageBox.warning(self, "Invalid folder", f"Folder does not exist:\n{folder}")
+
+    
     def _prepare_data(self, path, transform):
         try:
             data = np.loadtxt(path)
@@ -297,7 +311,7 @@ class Overplot(QWidget):
             QMessageBox.warning(self, "No files", "No files selected to plot")
             return
 
-        folder = self.folder_label.text()
+        folder = self.folder_edit.text().strip()
         if not os.path.isdir(folder):
             QMessageBox.critical(self, "Invalid folder", "The selected folder is not valid")
             return
