@@ -18,6 +18,7 @@ from lr_reduction.data_info import DataType
 from lr_reduction.mantid_utils import SampleLogValues
 from lr_reduction.reduction_template_reader import ReductionParameters
 from lr_reduction.types import MantidWorkspace
+from lr_reduction import __version__ as VERSION
 import lr_reduction.new_reduction_from_file as nrff
 
 XY_PLOT_ZOOM_X_RANGE = [25, 225]
@@ -211,6 +212,7 @@ def generate_report_sections(
 
     logger.notice(f"  - generating report [{number_events}]")
 
+    config = None
     if data_type == DataType.REFLECTED_BEAM:
         #TODO: work on separating these better?
         if isinstance(template_file, str):
@@ -219,7 +221,6 @@ def generate_report_sections(
             template_data = template_file
         if config_in is not None:
             # Get the parameters from the settings instead
-            config = None
             report, config = generate_report_section_reduction_parameters_new(config_in, workspace, sequence_number)
         # Read template if needed
         elif template_file is not None:
@@ -349,7 +350,10 @@ def generate_report_section_reduction_parameters(workspace: MantidWorkspace, tem
         template_data.stitching_configuration.normalize_first_angle
     )
 
-    meta += "<tr><td>Report time:</td><td>%s</td></tr>" % time.ctime()
+    meta += "<tr><td>Report time:</td><td><b>%s</b></td><td><b>Reduction version: %s</b></td></tr>" % (
+        time.ctime(),
+        VERSION,
+    )
     meta += "</table>\n"
 
     meta += "<table style='width:100%'>"
@@ -428,7 +432,10 @@ def generate_report_section_reduction_parameters_new(config, workspace: MantidWo
     meta += "<tr><td>Auto-scaling:</td><td>%s</td></tr>" % (config.AutoScale)
     meta += "<tr><td>Calc Theta:</td><td>%s</td></tr>" % (config.useCalcTheta)
 
-    meta += "<tr><td>Report time:</td><td>%s</td></tr>" % time.ctime()
+    meta += "<tr><td>Report time:</td><td><b>%s</b></td><td><b>Reduction version: %s</b></td></tr>" % (
+        time.ctime(),
+        VERSION,
+    )
     meta += "</table>\n"
 
     if config.ThetaShift:
@@ -479,7 +486,10 @@ def generate_report_section_direct_beam_parameters(workspace: MantidWorkspace) -
         sample_logs["sequence_number"],
         sample_logs["sequence_total"],
     )
-    meta += "<tr><td>Report time:</td><td>%s</td></tr>" % time.ctime()
+    meta += "<tr><td>Report time:</td><td><b>%s</b></td><td><b>Reduction version: %s</b></td></tr>" % (
+        time.ctime(),
+        VERSION,
+    )
     meta += "</table>\n"
 
     return meta
