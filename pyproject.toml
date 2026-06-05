@@ -52,12 +52,12 @@ method = "git"
 default-tag = "0.0.1"
 
 [tool.versioningit.next-version]
-method = "minor"
+method = "minor-release"
 
 [tool.versioningit.format]
-distance = "{next_version}.dev{distance}"
-dirty = "{version}"
-distance-dirty = "{next_version}.dev{distance}"
+distance = "{version}+{distance}.{vcs}{rev}"
+dirty = "{version}+{distance}.{vcs}{rev}.dirty"
+distance-dirty = "{version}+{distance}.{vcs}{rev}"
 
 [tool.versioningit.write]
 file = "src/lr_reduction/_version.py"
