@@ -52,12 +52,19 @@ method = "git"
 default-tag = "0.0.1"
 
 [tool.versioningit.next-version]
-method = "minor-release"
+# "minor" bumps v2.9.0rc1 -> next_version 2.10.0 (drops the rc and increments the
+# minor); "minor-release" would only strip the rc -> 2.9.0, which sorts LOWER.
+method = "minor"
 
+# Dev builds MUST be derived from {next_version} (the bumped 2.10.0), not the raw
+# {version} tag (2.9.0rc1): a 2.9.0rc1+N string sorts BELOW an already-published
+# 2.10.0.devN, so `lr_reduction = {version="*"}` in the pixi-deploy env would never
+# select it (the autodeploy break of 2026-06-05). {vcs}{rev} keeps the git hash for
+# provenance. See tasking/plan/lr_reduction_exp/autodeploy-investigation.md.
 [tool.versioningit.format]
-distance = "{version}+{distance}.{vcs}{rev}"
-dirty = "{version}+{distance}.{vcs}{rev}.dirty"
-distance-dirty = "{version}+{distance}.{vcs}{rev}"
+distance = "{next_version}.dev{distance}+{vcs}{rev}"
+dirty = "{version}+{vcs}{rev}.dirty"
+distance-dirty = "{next_version}.dev{distance}+{vcs}{rev}.dirty"
 
 [tool.versioningit.write]
 file = "src/lr_reduction/_version.py"
