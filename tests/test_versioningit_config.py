@@ -76,3 +76,34 @@ def test_computed_version_does_not_regress():
         f"computed version {raw!r} (release {v.release}) regressed below the published "
         "2.10.0.dev80 baseline; dev builds would be un-selectable by `version=\"*\"`."
     )
+
+
+def test_match_glob_present():
+    """The agentic workflow pushes lightweight coordination tags (qa/*, review/*,
+    triage/*, analysis/*). Without a release-tag allow-list, `git describe` could feed
+    one of those to versioningit -> InvalidVersionError at build/env-prep time. A
+    positive match glob keeps only release tags as version candidates. See
+    tasking/plan/lr_reduction_exp/findings.md F3."""
+    vcs = _versioningit_cfg()["vcs"]
+    assert "match" in vcs, (
+        "[tool.versioningit.vcs].match is required so versioningit ignores the workflow's "
+        "qa/*, review/*, triage/*, analysis/* coordination tags."
+    )
+    assert any("v" in g and "[0-9]" in g for g in vcs["match"]), (
+        f"unexpected match glob {vcs['match']!r}; expected a release-tag glob like ['v[0-9]*']."
+    )
+
+
+def test_match_glob_finds_a_release_tag():
+    """Sanity: the configured glob matches at least one tag reachable from HEAD, so
+    versioning still resolves (catches a future glob typo)."""
+    import re
+    import subprocess
+
+    globs = _versioningit_cfg()["vcs"]["match"]
+    cmd = ["git", "describe", "--tags", *(f"--match={g}" for g in globs), "HEAD"]
+    out = subprocess.run(cmd, capture_output=True, text=True, cwd=os.path.join(_HERE, os.pardir))
+    assert out.returncode == 0, f"git describe with match={globs} failed: {out.stderr!r}"
+    assert re.match(r"^v\d", out.stdout.strip()), (
+        f"git describe returned {out.stdout.strip()!r}; expected a v-prefixed release tag."
+    )

@@ -50,6 +50,13 @@ packages = ["src/lr_reduction", "src/lr_autoreduce"]
 [tool.versioningit.vcs]
 method = "git"
 default-tag = "0.0.1"
+# Only release tags (v1, v2.3, v2.10.0rc1, ...) are version candidates. Without
+# this, `git describe` (and thus versioningit) would pick up ANY tag at HEAD --
+# including the lightweight coordination tags the agentic workflow pushes
+# (qa/*, review/*, triage/*, analysis/*). A non-PEP440 tag like qa/cd-dialog-resize
+# then raises InvalidVersionError at build/env-prep time (looks like a "test infra"
+# failure). The match glob makes versioningit ignore every non-release tag.
+match = ["v[0-9]*"]
 
 [tool.versioningit.next-version]
 # "minor" bumps v2.9.0rc1 -> next_version 2.10.0 (drops the rc and increments the
