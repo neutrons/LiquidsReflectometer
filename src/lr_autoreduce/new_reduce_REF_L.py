@@ -89,7 +89,7 @@ def parse_command_arguments():
         "--no_publish",
         dest="no_publish",
         action="store_true",
-        help="Do not upload the HTML report to the livedata server.",
+        help="Do not upload the HTML report to the livedata server or confirm data available.",
     )
     parser.add_argument("settings_file",nargs="?", default=None, type=str, help="Path to the settings JSON file.")
 
@@ -196,9 +196,8 @@ def autoreduce_new(
     save_report(report, os.path.join(output_dir, f'REF_L_{run_number}_new.html'))
     if publish:
         upload_report(report, run_number=run_number)
-
-    # Confirm data availability
-    confirm_data_availability(sample_logs)
+        # Confirm data availability
+        confirm_data_availability(sample_logs)
 
 
 def confirm_data_availability(sample_logs: SampleLogValues) -> None:
@@ -246,17 +245,19 @@ def generate_ref_plot(output, run_nums):
 if __name__ == "__main__":
     args = parse_command_arguments()
 
+    # positional parameters
     events_file_arg = args.events_file
     output_dir_arg = args.output_dir
 
+    # optional (keyword) parameters
     settings_file_arg = args.settings_file
     template_file_arg = args.template_file
-
-    publish_arg = True
-    if args.no_publish:
-        publish_arg = False
+    publish_arg = not args.no_publish
 
     print("Running new reduction")
     autoreduce_new(
-        events_file_arg, output_dir_arg, settings_file_arg,template_file_arg, publish_arg
+        events_file_arg, output_dir_arg,
+        setting_file=settings_file_arg,
+        template_file=template_file_arg,
+        publish=publish_arg
     )
