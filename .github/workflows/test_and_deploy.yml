@@ -188,7 +188,7 @@ jobs:
           url: https://code.ornl.gov
           project_id: 21175
           ref_name: main
-          token: ${{ secrets.GITLAB_DEPLOY_TOKEN }}
+          token: ${{ secrets.GITLAB_EXP_DEPLOY_TOKEN }}
 
       - name: Annotate commit
         uses: peter-evans/commit-comment@v4
