@@ -50,10 +50,22 @@ packages = ["src/lr_reduction", "src/lr_autoreduce"]
 [tool.versioningit.vcs]
 method = "git"
 default-tag = "0.0.1"
+# Only release tags (v1, v2.3, v2.10.0rc1, ...) are version candidates. Without
+# this, `git describe` (and thus versioningit) would pick up ANY tag at HEAD --
+# including the lightweight coordination tags the agentic workflow pushes
+# (qa/*, review/*, triage/*, analysis/*). A non-PEP440 tag like qa/cd-dialog-resize
+# then raises InvalidVersionError at build/env-prep time (looks like a "test infra"
+# failure). The match glob makes versioningit ignore every non-release tag.
+match = ["v[0-9]*"]
 
 [tool.versioningit.next-version]
+# "minor" bumps (e.g. v2.9.0rc1) -> next_version (e.g. 2.10.0) which drops the rc
+# "minor-release" would only strip the rc -> 2.9.0, which sorts LOWER.
 method = "minor"
 
+# Dev builds MUST be derived from {next_version}, not the raw {version} tag
+# so `lr_reduction = {version="*"}` in the pixi-deploy env would never deploy
+# appending {vcs}{rev} keeps the git hash for provenance.
 [tool.versioningit.format]
 distance = "{next_version}.dev{committer_date:%Y%m%d%H%M%S}+{vcs}{rev}"
 dirty = "{version}"
