@@ -2,13 +2,13 @@
 
 # import library to do the real work
 # shellcheck disable=SC1091
-#. "$(dirname "$(realpath "$0")")/nsd-app-wrap.sh" \
-#  || . /bin/nsd-app-wrap.sh
-. /bin/nsd-app-wrap.sh
+. "$(dirname "$(realpath "$0")")/nsd-app-wrap.sh" \
+  || . /bin/nsd-app-wrap.sh
 
 
 # put together arguments - env, application, argv
-args=("refred" "python /SNS/REF_L/shared/launcher/launcher.py" "$@")
+args=("lr_reduction_exp" "python /SNS/REF_L/shared/launcher/launcher.py" "$@")
 # launch the tool
-# BUG: needs to be in the /SNS/REF_L/shared/launcher/ when starting
-( cd /SNS/REF_L/shared/launcher && pixi_launch "${args[@]}" )
+pixi_launch "${args[@]}"
+# BUG: previously needed to be in the /SNS/REF_L/shared/launcher/ when starting
+#( cd /SNS/REF_L/shared/launcher && pixi_launch "${args[@]}" )

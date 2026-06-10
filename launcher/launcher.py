@@ -1,5 +1,11 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 import sys
+
+# NB: expects to be run from an 'lr_reduction' deployment
+# NB: currently only 'lr_reduction_exp' contains the needed dependencies
+# nsd-conda-wrap.sh lr_reduction_exp --classic <path-to-launcher.py>
+# NB: would like this to be (and use the <path-to-launcher.py> deployed with the environment
+# nsd-conda-wrap.sh lr_reduction_exp launcher
 
 from apps.dynamic_30Hz import Dynamic30Hz
 from apps.dynamic_60Hz import Dynamic60Hz
@@ -27,8 +33,8 @@ class ReductionInterface(QTabWidget):
 
         # Batch reduction
         tab_id = 0
-        self.time_60Hz_tab = Reduction()
-        self.addTab(self.time_60Hz_tab, "Batch reduction")
+        self.batch_tab = Reduction()
+        self.addTab(self.batch_tab, "Batch reduction")
         self.setTabText(tab_id, "Batch reduction")
 
         # 60Hz time-resolved

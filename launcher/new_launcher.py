@@ -7,6 +7,7 @@ from apps.roi_selector import ROISelector
 from apps.sld_calculator import SLD
 from apps.template_batch import TemplateBatchTab
 from apps.file_batch import FileBatchTab
+#from apps.json_settings_builder import JSONSettingsBuilderTab
 from qtpy import QtCore
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 
@@ -40,13 +41,12 @@ class ReductionInterface(QTabWidget):
         self.file_batch_tab = FileBatchTab()
         self.addTab(self.file_batch_tab, "Batch file")
         self.setTabText(tab_id, "Batch file")
-        
-        
-        # ROI selector
-        tab_id += 1
-        self.roi_tab = ROISelector()
-        self.addTab(self.roi_tab, "ROI selector")
-        self.setTabText(tab_id, "ROI selector")
+
+        ## ROI selector
+        #tab_id += 1
+        #self.roi_tab = ROISelector()
+        #self.addTab(self.roi_tab, "ROI selector")
+        #self.setTabText(tab_id, "ROI selector")
 
         # SLD calculator
         tab_id += 1
@@ -54,11 +54,11 @@ class ReductionInterface(QTabWidget):
         self.addTab(self.sld_tab, "SLD calculator")
         self.setTabText(tab_id, "SLD calculator")
 
-        # Batch template reduction tab
-        tab_id += 1
-        self.template_batch_tab = TemplateBatchTab()
-        self.addTab(self.template_batch_tab, "Batch template")
-        self.setTabText(tab_id, "Batch template")
+        ## Batch template reduction tab
+        #tab_id += 1
+        #self.template_batch_tab = TemplateBatchTab()
+        #self.addTab(self.template_batch_tab, "Batch template")
+        #self.setTabText(tab_id, "Batch template")
 
 if __name__ == "__main__":
     app = QApplication([])
