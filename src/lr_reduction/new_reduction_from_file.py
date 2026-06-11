@@ -226,7 +226,7 @@ def group_runs(run_array, experiment_id, datapath):
 
 def find_priors(updated_config, eight_col, run_nums):
     pattern = re.compile(
-                rf"^{re.escape(updated_config.Sname)}_(\d+)_(\d+){'_8col' if eight_col else ''}{re.escape(updated_config.subname)}.dat$"
+                rf"^{re.escape(updated_config.Sname)}_(\d+)_(\d+){re.escape(updated_config.subname)}{'_8col' if eight_col else ''}.dat$"
                     )
     #print(f"Looking for files with pattern: {pattern.pattern} in {updated_config.Spath}")
     file_list = sorted(os.listdir(updated_config.Spath))

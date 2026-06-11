@@ -170,12 +170,13 @@ def assemble_report(reflectivity_plot_div: str | None = None, report_sections: R
 
 def generate_report_sections(
     workspace: MantidWorkspace,
-    template_file: str | ReductionParameters | None,
+    template_file: str | ReductionParameters | None = None,
     meta_data: dict = None,
     config_in = None
 ) -> ReportSections:
     """
     Generate diagnostics plots and report metadata from a reduction workspace.
+    Either a template file or a config must be provided.
 
     Parameters
     ----------
@@ -214,23 +215,24 @@ def generate_report_sections(
 
     config = None
     if data_type == DataType.REFLECTED_BEAM:
-        #TODO: work on separating these better?
-        if isinstance(template_file, str):
-            template_data = template.read_template(template_file, sequence_number)
-        else:
-            template_data = template_file
         if config_in is not None:
             # Get the parameters from the settings instead
-            report, config = generate_report_section_reduction_parameters_new(config_in, workspace, sequence_number)
+            config = config_in
+            report = generate_report_section_reduction_parameters_new(config_in, workspace, sequence_number)
+            template_data = None
         # Read template if needed
         elif template_file is not None:
+            if isinstance(template_file, str):
+                template_data = template.read_template(template_file, sequence_number)
+            else:
+                template_data = template_file
             report = generate_report_section_reduction_parameters(workspace, template_data, meta_data)
         else:
             logger.error("Reflected beam type requires a template or setting file to be provided")
 
     elif data_type == DataType.DIRECT_BEAM:
         report = generate_report_section_direct_beam_parameters(workspace)
-        template_data = None
+        template_data = None # Always can ignore the template for the DB output.
     else:
         logger.error("Invalid data type for report: %s", data_type.name)
         return ReportSections("", [], "")
@@ -238,7 +240,8 @@ def generate_report_sections(
     run_meta_data = generate_report_section_run_meta_data(workspace)
 
     try:
-        plots = generate_report_plots(workspace, template_data, data_type, config_settings=config, sequence_number=sequence_number)
+        # Can except template or config to be None but needs one to be present.
+        plots = generate_report_plots(workspace, data_type, template_data=template_data, config_settings=config, sequence_number=sequence_number)
     except Exception as e:  # noqa: BLE001
         logger.notice(f"Could not generate plots: {e}")
         logger.error("Could not generate plots", exc_info=True)
@@ -373,16 +376,16 @@ def generate_report_section_reduction_parameters(workspace: MantidWorkspace, tem
 
 # TODO: fix this...
 def generate_report_section_reduction_parameters_new(config, workspace: MantidWorkspace, sequence_number: int) -> str:
-    """Generate HTML report from a reduced workspace and template data
+    """Generate HTML report from a reduced workspace and config settings
 
     Parameters
     ----------
+    config: 
+        Settings from reduction config object
     workspace: MantidWorkspace
         Reflected beam workspace
-    template_data
-        Reduction parameters
-    meta_data
-        Reduction metadata
+    sequence_number: int
+        Sequence number of reduction set
 
     Returns
     -------
@@ -391,9 +394,6 @@ def generate_report_section_reduction_parameters_new(config, workspace: MantidWo
     """
     # TODO: work out if need the separate meta_data input.
     logger.notice("  - generating reduction parameters")
-
-    #file_load = nrff.load_from_file(setting_file)
-    #config = nrff.json_to_config(file_load["config"])
 
     sample_logs = SampleLogValues(workspace)
     direct_beam = config.DBname[sequence_number-1]
@@ -443,6 +443,7 @@ def generate_report_section_reduction_parameters_new(config, workspace: MantidWo
     else:
         theta_shift = 0
 
+    # TODO: add pull through from output of theta values.
     meta += "<table style='width:100%'>"
     meta += "<tr><th>Wavelength</th><th>Q</th><th>dqbin</th><th>Thi</th><th>Ths</th><th>Offset</th><th>tthd</th></tr>"  # noqa E501
     meta += "<tr><td>%6.4g - %6.4g</td><td>%6.4g - %6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td></tr>\n" % (
@@ -458,8 +459,9 @@ def generate_report_section_reduction_parameters_new(config, workspace: MantidWo
         #meta_data["theta"] * 180.0 / np.pi,
     )
     meta += "</table>\n"
-    return meta, config
+    return meta
 
+# TODO: Check if this overlaps with RB one. 
 def generate_report_section_direct_beam_parameters(workspace: MantidWorkspace) -> str:
     """Generate HTML report from a direct beam workspace
 
@@ -495,7 +497,7 @@ def generate_report_section_direct_beam_parameters(workspace: MantidWorkspace) -
     return meta
 
 
-def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionParameters, data_type: DataType, config_settings = None, sequence_number = None) -> list[str]:
+def generate_report_plots(workspace: MantidWorkspace, data_type: DataType, template_data: ReductionParameters = None, config_settings = None, sequence_number = None) -> list[str]:
     """
     Generate diagnostic plots from the event workspace
 
@@ -531,7 +533,6 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
         tof_range_ms = None
         tof_zoom_range = None
     else:
-        print('here')
         if config_settings is not None:
             # TODO: need to feed an index...
             if sequence_number is None:
@@ -546,13 +547,15 @@ def generate_report_plots(workspace: MantidWorkspace, template_data: ReductionPa
             # convert to ms and add margins
             tof_zoom_range = [config_settings.tof_min[idx]/1000.0 - 5.0, config_settings.tof_max[idx]/1000.0 + 5.0]
 
-        else:    
+        elif template_data is not None:    
             scatt_peak = template_data.data_peak_range
             scatt_low_res = template_data.data_x_range
             scatt_bck = template_data.background_roi
             tof_range_ms = [t / 1000.0 for t in template_data.tof_range]
             # convert to ms and add margins
             tof_zoom_range = [template_data.tof_range[0]/1000.0 - 5.0, template_data.tof_range[1]/1000.0 + 5.0]
+        else:
+            logger.error("Report plot requires a template or setting file to be provided")
 
     # X-Y plot
     xy_plot = None

@@ -97,15 +97,39 @@ def example_with_search_savepdf():
 
     return output
 
+def example_with_8col():
+    run_list = [227164,227165,227166]
+    setting_file = "/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/REFL_227158_settings.json"
+    experiment_id = "IPTS-36776"
+    Spath = Path('/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/')
+    subname = "eight_test"
+    override_params = {'Spath': Spath, "subname": subname, "save8col": True}
+    output = reduction.reduce_from_file(run_list, setting_file, experiment_id, override_params=override_params, plot=True, save_json=False, check_for_prior=False, save_pdf_summary=True)
+
+    return output
+
+def example_with_8col_search():
+    run_list = [227165]
+    setting_file = "/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/REFL_227158_settings.json"
+    experiment_id = "IPTS-36776"
+    Spath = Path('/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/')
+    subname = "eight_test"
+    override_params = {'Spath': Spath, "subname": subname, "save8col": True}
+    output = reduction.reduce_from_file(run_list, setting_file, experiment_id, override_params=override_params, plot=True, save_json=False, check_for_prior=True, save_pdf_summary=True)
+
+    return output
+
 if __name__ == '__main__':
     # Run examples
     #example_from_dat()
     #example_from_json()
     #example_wrong_order()
     #example_one_missing()
-    example_with_search()
-    example_with_savepdf()
-    example_with_savepdf_noshow()
-    example_with_search_savepdf()
+    #example_with_search()
+    #example_with_savepdf()
+    #example_with_savepdf_noshow()
+    #example_with_search_savepdf()
+    example_with_8col()
+    example_with_8col_search()
 
 
