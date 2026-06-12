@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 import sys
 
-from apps.direct_beam import DirectBeamTab
-from apps.overplot import Overplot
-from apps.roi_selector import ROISelector
-from apps.sld_calculator import SLD
-from apps.template_batch import TemplateBatchTab
-from apps.file_batch import FileBatchTab
-#from apps.json_settings_builder import JSONSettingsBuilderTab
+from launcher.apps.direct_beam import DirectBeamTab
+from launcher.apps.overplot import Overplot
+from launcher.apps.roi_selector import ROISelector
+from launcher.apps.sld_calculator import SLD
+from launcher.apps.template_batch import TemplateBatchTab
+from launcher.apps.file_batch import FileBatchTab
+#from launcher.apps.json_settings_builder import JSONSettingsBuilderTab
 from qtpy import QtCore
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 
@@ -60,8 +60,12 @@ class ReductionInterface(QTabWidget):
         #self.addTab(self.template_batch_tab, "Batch template")
         #self.setTabText(tab_id, "Batch template")
 
-if __name__ == "__main__":
+# referenced by pyproject.toml, part of the GUI system
+def main():
     app = QApplication([])
     window = ReductionInterface()
     window.show()
     sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()

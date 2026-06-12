@@ -18,6 +18,10 @@ homepage = "https://github.com/neutrons/LiquidsReflectometer"
 repository = "https://github.com/neutrons/LiquidsReflectometer"
 documentation = "https://lr-reduction.readthedocs.io/latest/index.html"
 
+[project.gui-scripts]
+launcher = "launcher.launcher:main"
+new_launcher = "launcher.new_launcher:main"
+
 #####################################
 #  BUILDING FROM SOURCES WITH HATCH
 #####################################
@@ -174,9 +178,6 @@ conda-build = { depends-on = ["sync-version", "conda-builder", "reset-version"],
 conda-clean = { cmd = "rm -f *.conda", description = "Clean the local .conda build artifacts" }
 # Testing
 test-reduction = { cmd = "cd tests/ && python -m pytest -vv --cov=../src --cov-report=xml --cov-report=term"}
-# Launcher UIs
-launcher = { cmd = "cd launcher/ && python launcher.py" }
-new_launcher = { cmd = "cd launcher/ && python new_launcher.py" }
 # Misc
 clean-all = { description = "Clean all build artifacts", depends-on = ["docs-clean", "conda-clean"] }
 sync-version = { cmd = 'version=$(python -m versioningit); toml set tool.pixi.package.version "$version" --toml-path pyproject.toml', description = "Sync pyproject.toml version with Git version" }
