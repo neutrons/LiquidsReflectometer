@@ -7,13 +7,13 @@ import sys
 # NB: would like this to be (and use the <path-to-launcher.py> deployed with the environment
 # nsd-conda-wrap.sh lr_reduction_exp launcher
 
-from apps.dynamic_30Hz import Dynamic30Hz
-from apps.dynamic_60Hz import Dynamic60Hz
-from apps.off_spec import OffSpec
-from apps.quick_reduce import QuickReduce
-from apps.reduction import Reduction
-from apps.sld_calculator import SLD
-from apps.xrr import XRR
+from launcher.apps.dynamic_30Hz import Dynamic30Hz
+from launcher.apps.dynamic_60Hz import Dynamic60Hz
+from launcher.apps.off_spec import OffSpec
+from launcher.apps.quick_reduce import QuickReduce
+from launcher.apps.reduction import Reduction
+from launcher.apps.sld_calculator import SLD
+from launcher.apps.xrr import XRR
 from qtpy import QtCore
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 
@@ -97,9 +97,12 @@ class ReductionInterface(QTabWidget):
         # self.setTabText(tab_id, "Refraction analysis")
         '''
 
-
-if __name__ == "__main__":
+# referenced by pyproject.toml, part of the GUI system
+def main():
     app = QApplication([])
     window = ReductionInterface()
     window.show()
     sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()
