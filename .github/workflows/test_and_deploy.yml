@@ -105,11 +105,10 @@ jobs:
           extra-channels: neutrons mantid
 
       - name: Verify Conda Package
-        uses: neutrons/conda-actions/pkg-verify@v1
+        uses: neutrons/conda-actions/pkg-verify@v2
         with:
-          python-version: "3.11"
-          local-channel: /tmp/local-channel
-          package-name: ${{ env.PKG_NAME }}=${{ env.PKG_VERSION }} # install exact version
+          package-name: ${{ env.PKG_NAME }}
+          conda-env-name: ${{ steps.install.outputs.conda_env }}
           extra-commands: |
             python -c "import lr_reduction"
             python -c "import lr_autoreduce"
