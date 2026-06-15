@@ -84,6 +84,14 @@ class NR_Reduction:
             if method not in valid_methods:
                 raise ValueError(f"Invalid method: {method}. Use one of {valid_methods}")
 
+        # Check method for useCalcTheta and deal with legacy use of "True"
+        valid_calc_theta = ['detector_angle', 'sample_angle']
+        if self.config.useCalcTheta:
+            if self.config.useCalcTheta == True:
+                self.config.useCalcTheta = 'detector_angle'
+            self.config.useCalcTheta = self.config.useCalcTheta.lower()
+            if self.config.useCalcTheta not in valid_calc_theta:
+                raise ValueError(f"Invalid calc theta method: {self.config.useCalcTheta}. Use one of {valid_calc_theta}")
 
         # Set defaults for optional arrays
         if not self.config.ThetaShift:
@@ -506,12 +514,9 @@ class NR_Reduction:
         RBpixel = par[1]
         dPix = RBpixel - DBpixel
         dMM = dPix * self.settings['pixel_width']
-        ThetaCalc = np.arcsin(dMM / self.settings['sample_detector_distance']) * 180 / np.pi
-        ThetaCalc = ThetaCalc + (self.log_values['tthd'] - DBtthd) / 2
-        if self.config.useCalcTheta:
-            print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta correction applied: {np.round(ThetaCalc - ThCen, 3)}')
-        else:
-            print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta difference: {np.round(ThetaCalc - ThCen, 3)} (not applied)')
+        alpha = np.arcsin(dMM / self.settings['sample_detector_distance']) * 180 / np.pi
+        ThetaCalc = alpha * 0.5 + (self.log_values['tthd'] - DBtthd) / 2
+        
         # TODO: Alter the function to do the calculation once and apply different angle offsets
         # Calculate expected beam profile on detector using logs
         Icalc_nonfit = tools.calc_beam_on_detector(Yfit, DBpixel, self.log_values['siY'], self.log_values['s1Y'],
@@ -519,18 +524,26 @@ class NR_Reduction:
                                          self.settings['sample_detector_distance'], self.settings['pixel_width'],
                                          self.config.DetSigma, self.config.DetResFn)
 
+        if not self.config.useCalcTheta:
+            print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta difference: {np.round(ThetaCalc - ThCen, 3)} (not applied)')
+            RBpixel = DBpixel
+            Icalc = Icalc_nonfit
+
         # Use calculated value if flag
-        if self.config.useCalcTheta:
-            ThCen = ThetaCalc
-            self.log_values['ThCen'] = ThCen
+        else:
+            if self.config.useCalcTheta == 'detector_angle':
+                print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta correction applied: {np.round(ThetaCalc - ThCen, 3)}') 
+                ThCen = ThetaCalc
+            else:
+                print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta correction applied: {np.round(ThetaCalc - ThCen, 3)}')         ## TODO: Work out fixing the print statement here.    
+                ThCen = self.log_values['ths']
+            self.log_values['ThCen'] = ThCen            
+
             # Calculate expected beam profile on detector using logs
             Icalc = tools.calc_beam_on_detector(Yfit, RBpixel, self.log_values['siY'], self.log_values['s1Y'],
                                         self.settings['interslit_distance'], self.settings['si_sample_distance'],
                                         self.settings['sample_detector_distance'], self.settings['pixel_width'],
                                         self.config.DetSigma, self.config.DetResFn)
-        else:
-            RBpixel = DBpixel
-            Icalc = Icalc_nonfit
 
         Icalc = (Icalc * par[0]) + bkg
         Icalc_nonfit = (Icalc_nonfit * par[0]) + bkg
