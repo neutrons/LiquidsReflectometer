@@ -89,50 +89,56 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
             # Look in folder for files of correct format
             dict_output, combine_results, scaling_factors, matched_files, sorted_run_nums, angle_logs = find_combine_priors(config_final, group_output_sorted["run_nums"], results, group_output_sorted, eight_col)
 
-            # check dictionaries and arrays aren't empty and pass if they are
-            if not dict_output:
-                continue
-            if not combine_results:
-                continue
-            if not scaling_factors:
-                continue
-            if not matched_files:
-                continue
+            # check dictionaries and arrays aren't empty - they're empty if no priors found
+            if dict_output:
+                # update the config scaling factors
+                config_final.ScaleFactor = scaling_factors
 
-            # update the config scaling factors
-            config_final.ScaleFactor = scaling_factors
-
-            # TODO: Need to read in the used_theta_vals
-            #used_theta_vals = {"thi":[], "ths":[], "ThCen":[], "title": []}
-            used_theta_vals = {k: angle_logs.get(k, []) + logs_out.get(k, []) for k in angle_logs.keys() | logs_out.keys()}
-            # save files
-            # non-concatenated
-            # TODO: this is resaving them. Think this is the best option.
-            for i in range(len(dict_output)):
-                save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{sorted_run_nums[i]}{config_final.subname}")
-                if eight_col:
-                    save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{sorted_run_nums[i]}{config_final.subname}", eight_column=True)
-            # Always make the final plot, only show it if plot is True
-            new_plot = plot_reflectivity(dict_output, RQ4=False, show_fig=plot)
-            figures_out.append(new_plot)
-            output_figures.append(new_plot)
-            # concatenated
-            try:
-                save_fn.save_results(combine_results, config_final, used_theta_vals, full=True, sname=f"{config_final.Sname}_combined{config_final.subname}")
-            except KeyError as e:
-                print(f"Warning: combined results missing expected key {e}; skipping save_results for combined output")
-            if eight_col:
+                # TODO: Need to read in the used_theta_vals
+                #used_theta_vals = {"thi":[], "ths":[], "ThCen":[], "title": []}
+                used_theta_vals = {k: angle_logs.get(k, []) + logs_out.get(k, []) for k in angle_logs.keys() | logs_out.keys()}
+                # save files
+                # non-concatenated
+                # TODO: this is resaving them. Think this is the best option.
+                for i in range(len(dict_output)):
+                    save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{sorted_run_nums[i]}{config_final.subname}")
+                    if eight_col:
+                        save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=f"{config_final.Sname}_{i+1}_{sorted_run_nums[i]}{config_final.subname}", eight_column=True)
+                # Always make the final plot, only show it if plot is True
+                new_plot = plot_reflectivity(dict_output, RQ4=False, show_fig=plot)
+                figures_out.append(new_plot)
+                output_figures.append(new_plot)
+                # concatenated
                 try:
-                    save_fn.save_results(combine_results, config_final, used_theta_vals, eight_column=True, full=True, sname=f"{config_final.Sname}_combined{config_final.subname}")
+                    save_fn.save_results(combine_results, config_final, used_theta_vals, full=True, sname=f"{config_final.Sname}_combined{config_final.subname}")
                 except KeyError as e:
-                    print(f"Warning: combined results missing expected key {e}; skipping save_results (8col) for combined output")
+                    print(f"Warning: combined results missing expected key {e}; skipping save_results for combined output")
+                if eight_col:
+                    try:
+                        save_fn.save_results(combine_results, config_final, used_theta_vals, eight_column=True, full=True, sname=f"{config_final.Sname}_combined{config_final.subname}")
+                    except KeyError as e:
+                        print(f"Warning: combined results missing expected key {e}; skipping save_results (8col) for combined output")
 
-            if save_pdf_summary and plot:
-                # Overwrite output with new plot if created
-                save_fn.save_plot_pdf_summary(config_final.Spath, f"{config_final.Sname}{config_final.subname}", figures_out)
+                if save_pdf_summary and plot:
+                    # Overwrite output with new plot if created
+                    save_fn.save_plot_pdf_summary(config_final.Spath, f"{config_final.Sname}{config_final.subname}", figures_out)
 
-            all_results.append(dict_output)
+                all_results.append(dict_output)
+            else:
+                # when no priors found
+                # TODO: handling of other missing return parts from no priors found
+                print("No prior runs found")
+                for val in range(len(results["Q_per_run"])):
+                    to_add = {"Q": results["Q_per_run"][val],
+                              "R": results["R_per_run"][val],
+                              "dR": results["dR_per_run"][val],
+                              "dQ": results["dQ_per_run"][val]}
+
+                    all_results.append(to_add)
+                sorted_run_nums = group_output['run_nums'][idx]
+                all_results = [all_results]
         else:
+            # TODO: This should be made consistent with the searching for prior return too
             all_results.append(results)
             sorted_run_nums = group_output['run_nums'][idx]
         all_figures.extend(figures_out)
@@ -387,6 +393,8 @@ def find_combine_priors(updated_config, run_nums, results, group_output_sorted, 
                 print('Scaling factor:', np.round(scale, 3))
                 scaling_factors.append(scale)
                 position = sorted_seq_num[run] - 1
+                if position == len(initial_scalefactors):
+                    initial_scalefactors.append(1)
                 initial_scalefactors[position] *= scale
 
             Q.append(result[0, :])
