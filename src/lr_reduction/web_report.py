@@ -533,8 +533,25 @@ def generate_report_plots(workspace: MantidWorkspace, data_type: DataType, templ
             scatt_bck = config_settings.BkgROI[idx]
             # TODO: might be better to have these as wavelength and convert?
             tof_range_ms = [t / 1000.0 for t in [config_settings.tof_min[idx], config_settings.tof_max[idx]]]
+            try:
+                lam_range = [config_settings.LambdaMin[idx], config_settings.LambdaMax[idx]]
+            except:
+                # TODO: work out pulling from the config defaults
+                lam_range = [None, None]
+            if lam_range[1] is not None:
+                # calc into tof_range
+                # TODO pull distance properly.
+                #factor = settings['source_detector_distance'] / 3956
+                factor = 15.75 * 1000 / 3956
+                tof_from_lam = [lam_range[0] *  factor, lam_range[1] * factor]
+                # check for extremes
+                tof_use = [max(tof_from_lam[0], tof_range_ms[0]), min(tof_from_lam[1], tof_range_ms[1])]
+            else:
+                tof_use = tof_range_ms
+            tof_range_ms = tof_use
             # convert to ms and add margins
-            tof_zoom_range = [config_settings.tof_min[idx]/1000.0 - 5.0, config_settings.tof_max[idx]/1000.0 + 5.0]
+            #tof_zoom_range = [config_settings.tof_min[idx]/1000.0 - 5.0, config_settings.tof_max[idx]/1000.0 + 5.0]
+            tof_zoom_range = [tof_use[0] - 5.0, tof_use[1] + 5.0]
 
         elif template_data is not None:    
             scatt_peak = template_data.data_peak_range
