@@ -167,7 +167,9 @@ def autoreduce_new(
         # Ensure output directory exists
         Path(savepath).mkdir(parents=True, exist_ok=True)
         override_params = {"Spath": savepath, "subname": subname}
-        output, plots, run_number_list, config_out = nrff.reduce_from_file([run_number], setting_file, experiment_id, plot=False,
+        run_number = int(run_number)
+        print('run_number_input', run_number, type(run_number))
+        output, plots, run_number_list, config_out = nrff.reduce_from_file([run_number], setting_file, experiment_id, plot=False, 
                 override_params = override_params, check_for_prior=True, save_pdf_summary=False)
         print('config out', vars(config_out))
         # Now have the config so can feed that in later...
