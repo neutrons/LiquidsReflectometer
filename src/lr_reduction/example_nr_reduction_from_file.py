@@ -119,6 +119,17 @@ def example_with_8col_search():
 
     return output
 
+def test_for_autoreduction():
+    run_list = [230395]
+    setting_file = "/SNS/REF_L/IPTS-35331/shared/autoreduce/reduce_settings_down.json"
+    experiment_id = "IPTS-35331"
+    Spath = Path('/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/')
+    subname = "autoreduction"
+    override_params = {'Spath': Spath, "subname": subname}
+    output = reduction.reduce_from_file(run_list, setting_file, experiment_id, override_params=override_params, plot=True, save_json=False, check_for_prior=True, save_pdf_summary=False)
+
+    return output
+
 if __name__ == '__main__':
     # Run examples
     #example_from_dat()
@@ -129,7 +140,8 @@ if __name__ == '__main__':
     #example_with_savepdf()
     #example_with_savepdf_noshow()
     #example_with_search_savepdf()
-    example_with_8col()
-    example_with_8col_search()
+    #example_with_8col()
+    #example_with_8col_search()
+    test_for_autoreduction()
 
 
