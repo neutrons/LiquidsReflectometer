@@ -1,13 +1,19 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 import sys
 
-from apps.dynamic_30Hz import Dynamic30Hz
-from apps.dynamic_60Hz import Dynamic60Hz
-from apps.off_spec import OffSpec
-from apps.quick_reduce import QuickReduce
-from apps.reduction import Reduction
-from apps.sld_calculator import SLD
-from apps.xrr import XRR
+# NB: expects to be run from an 'lr_reduction' deployment
+# NB: currently only 'lr_reduction_exp' contains the needed dependencies
+# nsd-conda-wrap.sh lr_reduction_exp --classic <path-to-launcher.py>
+# NB: would like this to be (and use the <path-to-launcher.py> deployed with the environment
+# nsd-conda-wrap.sh lr_reduction_exp launcher
+
+from launcher.apps.dynamic_30Hz import Dynamic30Hz
+from launcher.apps.dynamic_60Hz import Dynamic60Hz
+from launcher.apps.off_spec import OffSpec
+from launcher.apps.quick_reduce import QuickReduce
+from launcher.apps.reduction import Reduction
+from launcher.apps.sld_calculator import SLD
+from launcher.apps.xrr import XRR
 from qtpy import QtCore
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 
@@ -27,8 +33,8 @@ class ReductionInterface(QTabWidget):
 
         # Batch reduction
         tab_id = 0
-        self.time_60Hz_tab = Reduction()
-        self.addTab(self.time_60Hz_tab, "Batch reduction")
+        self.batch_tab = Reduction()
+        self.addTab(self.batch_tab, "Batch reduction")
         self.setTabText(tab_id, "Batch reduction")
 
         # 60Hz time-resolved
@@ -91,9 +97,12 @@ class ReductionInterface(QTabWidget):
         # self.setTabText(tab_id, "Refraction analysis")
         '''
 
-
-if __name__ == "__main__":
+# referenced by pyproject.toml, part of the GUI system
+def main():
     app = QApplication([])
     window = ReductionInterface()
     window.show()
     sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()

@@ -2,6 +2,7 @@
 src/lr_reduction/_version.py
 
 # Files written by tests
+tests/data/REFL_198382_7_198388_partial.txt
 tests/data/REFL_198382_combined_data_auto.txt
 tests/data/REFL_198409_combined_data_auto.txt
 tests/data/REFL_201282_1_201282_partial.txt
