@@ -149,16 +149,23 @@ def autoreduce_new(
     run_number = match.group(1)
     #run_number = sample_logs["entry_identifier"]
 
+    # Setting or template file only needed for reflected beam type
     # Determine which setting file to use
     if setting_file is None:
-        setting_file = get_default_setting_file(output_dir, sample_logs["tthd"])
-    logger.notice(f"Using settings from: {setting_file}")
+        try:
+            setting_file = get_default_setting_file(output_dir, sample_logs["tthd"])
+            logger.notice(f"Using settings from: {setting_file}")
+        except ValueError:
+            logger.notice("No setting config file found, looking for template.")
 
-    # TODO: separate from template if can?
-    # Determine which template to use
-    if template_file is None:
-        template_file = get_default_template_file(output_dir, sample_logs["tthd"])
-    logger.notice(f"Using template: {template_file}")
+    # Determine which template to use if setting file not provided.
+    elif template_file is None:
+        try:
+            template_file = get_default_template_file(output_dir, sample_logs["tthd"])
+            logger.notice(f"Using template: {template_file}")
+        except ValueError:
+            logger.notice("No template or config settings file found, falling back to DIRECTBEAM processing to show plots")
+            data_type = DataType.DIRECT_BEAM
 
     if data_type == DataType.REFLECTED_BEAM:
         # Run the reduction
@@ -168,21 +175,16 @@ def autoreduce_new(
         Path(savepath).mkdir(parents=True, exist_ok=True)
         override_params = {"Spath": savepath, "subname": subname}
         run_number = int(run_number)
-        print('run_number_input', run_number, type(run_number))
-        output, plots, run_number_list, config_out = nrff.reduce_from_file([run_number], setting_file, experiment_id, plot=False, 
+        #print('run_number_input', run_number, type(run_number))
+        output, plots, run_number_list, config_out = nrff.reduce_from_file([run_number], setting_file, experiment_id, plot=False,
                 override_params = override_params, check_for_prior=True, save_pdf_summary=False)
-        print('config out', vars(config_out))
-        # Now have the config so can feed that in later...
         plot_out = generate_ref_plot(output[0], run_number_list)
-        # TODO: Add the meta_data part
-        # TODO: here for the config input...
-        report_sections = generate_report_sections(ws,template_file, meta_data = None, config_in=config_out)
+
+        report_sections = generate_report_sections(ws,template_file=template_file, meta_data = None, config_in=config_out)
         report = assemble_report(plot_out, report_sections)
     elif data_type == DataType.DIRECT_BEAM:
-        # TODO: Fix the DB part...
-
         # Generate simple report
-        report_sections = generate_report_sections(ws, template_file)
+        report_sections = generate_report_sections(ws, template_file=template_file)
         report = assemble_report(None, report_sections)
     elif data_type == DataType.UNKNOWN:
         logger.notice(f"Data type {data_type} not supported for autoreduction.")
