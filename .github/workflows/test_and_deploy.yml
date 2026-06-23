@@ -4,11 +4,12 @@ on:
   workflow_dispatch:
   pull_request:
   push:
-    branches: [next, qa, main]
-    tags: ["v*"]
+    branches: [reduction-rewrite] # revert back to next, qa, main once branch is ready
+    tags: ["v3*"] # same as above, back to just v*
 
 env:
   PKG_NAME: lr_reduction
+  CONDA_LABEL: beta
 
 jobs:
   #################
@@ -33,13 +34,13 @@ jobs:
         uses: prefix-dev/setup-pixi@v0.9.6
         with:
           manifest-path: pyproject.toml
-          
+
       - name: Configure Git credentials for code.ornl.gov
         env:
           TOKEN: ${{ secrets.DATA_READ_TOKEN }}
         run: |
           git config --global url."https://gitlab-ci-token:${TOKEN}@code.ornl.gov/".insteadOf "https://code.ornl.gov/"
-          
+
       - name: Download test data
         run: |
           git submodule update --init
@@ -130,7 +131,7 @@ jobs:
   publish:
     runs-on: ubuntu-24.04
     needs: [tests, build]
-    if:  startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/next'
+    if:  startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/next' || github.ref == 'refs/heads/reduction-rewrite'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -151,9 +152,10 @@ jobs:
           anaconda-token: ${{ secrets.ANACONDA_TOKEN }}
           organization: neutrons
           package-path: ${{ env.PKG_NAME }}-*.conda
+          label: ${{ env.CONDA_LABEL }}
 
       - name: Remove old packages
-        if: github.ref == 'refs/heads/next'
+        if: github.ref == 'refs/heads/reduction-rewrite' # revert to /next once rewrite is complete and back into next
         uses: neutrons/conda-actions/pkg-remove@v1
         with:
           anaconda_token: ${{ secrets.ANACONDA_TOKEN }}
