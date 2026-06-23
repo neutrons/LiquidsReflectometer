@@ -7,6 +7,11 @@ on:
     branches: [reduction-rewrite] # revert back to next, qa, main once branch is ready
     tags: ["v*"]
 
+# cancel previous job if new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PKG_NAME: lr_reduction
   CONDA_LABEL: beta
