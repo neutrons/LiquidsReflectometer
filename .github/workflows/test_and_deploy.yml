@@ -5,7 +5,7 @@ on:
   pull_request:
   push:
     branches: [reduction-rewrite] # revert back to next, qa, main once branch is ready
-    tags: ["v3*"] # same as above, back to just v*
+    tags: ["v*"]
 
 env:
   PKG_NAME: lr_reduction
