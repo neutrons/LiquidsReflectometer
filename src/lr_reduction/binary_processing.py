@@ -171,6 +171,7 @@ def get_log_values(fname):
     log_values['title'] = f['entry/title'].asstr()[0]
 
     log_values["op_mode"] = f['entry/DASlogs/BL4B:CS:ExpPl:OperatingMode/value'][0] # This is one that can say "Free Liquid"
+    log_values["op_mode"] = log_values["op_mode"][0].decode("utf-8")
     try:
         log_values["coordinates"] = f['entry/DASlogs/BL4B:CS:Mode:Coordinates/value'][0] # This is one that shows earth vs beam center 0=earth; 1=beam
     except:
