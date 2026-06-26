@@ -132,16 +132,16 @@ def test_for_autoreduction():
 
 if __name__ == '__main__':
     # Run examples
-    #example_from_dat()
-    #example_from_json()
-    #example_wrong_order()
-    #example_one_missing()
-    #example_with_search()
-    #example_with_savepdf()
-    #example_with_savepdf_noshow()
-    #example_with_search_savepdf()
-    #example_with_8col()
-    #example_with_8col_search()
+    example_from_dat()
+    example_from_json()
+    example_wrong_order()
+    example_one_missing()
+    example_with_search()
+    example_with_savepdf()
+    example_with_savepdf_noshow()
+    example_with_search_savepdf()
+    example_with_8col()
+    example_with_8col_search()
     test_for_autoreduction()
 
 
