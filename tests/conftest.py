@@ -1,7 +1,5 @@
-# standard imports
 from pathlib import Path
 
-# third-party imports
 import pytest
 
 
