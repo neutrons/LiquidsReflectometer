@@ -12,7 +12,8 @@ import mantid.simpleapi as api
 import numpy as np
 from scipy.optimize import brentq
 
-from lr_reduction.legacy import background, dead_time_correction
+from lr_reduction import dead_time_correction
+from lr_reduction.legacy import background
 from lr_reduction.legacy.gravity_correction import GravityDirection, gravity_correction
 from lr_reduction.legacy.instrument_settings import InstrumentSettings
 from lr_reduction.legacy.utils import mantid_algorithm_exec

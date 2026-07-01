@@ -2,8 +2,8 @@ import os
 
 import mantid.simpleapi as mtd_api
 
+from lr_reduction.dead_time_correction import SingleReadoutDeadTimeCorrection
 from lr_reduction.legacy import template
-from lr_reduction.legacy.dead_time_correction import SingleReadoutDeadTimeCorrection
 from lr_reduction.legacy.utils import amend_config
 
 mtd_api.config["default.facility"] = "SNS"

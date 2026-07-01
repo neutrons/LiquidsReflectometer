@@ -31,7 +31,7 @@ from mantid.simpleapi import (
 )
 
 from lr_reduction import __version__ as lr_reduction_version
-from lr_reduction.legacy import dead_time_correction
+from lr_reduction import dead_time_correction
 from lr_reduction.legacy.utils import mantid_algorithm_exec
 
 
