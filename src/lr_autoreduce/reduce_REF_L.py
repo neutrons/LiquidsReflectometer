@@ -43,11 +43,11 @@ from pathlib import Path
 from mantid import logger
 from mantid.simpleapi import LoadEventNexus
 
-from lr_reduction import workflow
-from lr_reduction.data_info import DataType
-from lr_reduction.mantid_utils import SampleLogValues
-from lr_reduction.template import get_default_template_file
-from lr_reduction.web_report import assemble_report, generate_report_sections, save_report, upload_report
+from lr_reduction.legacy import workflow
+from lr_reduction.legacy.data_info import DataType
+from lr_reduction.legacy.mantid_utils import SampleLogValues
+from lr_reduction.legacy.template import get_default_template_file
+from lr_reduction.legacy.web_report import assemble_report, generate_report_sections, save_report, upload_report
 
 # Name of the conda environment to use - required by autoreduction
 CONDA_ENV = "lr_reduction"

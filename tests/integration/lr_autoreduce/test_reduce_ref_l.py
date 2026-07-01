@@ -3,8 +3,8 @@ import os
 import pytest
 
 from lr_autoreduce.reduce_REF_L import autoreduce
-from lr_reduction import template
-from lr_reduction.utils import amend_config
+from lr_reduction.legacy import template
+from lr_reduction.legacy.utils import amend_config
 
 
 @pytest.mark.datarepo
