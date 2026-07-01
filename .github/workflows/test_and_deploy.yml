@@ -106,7 +106,7 @@ jobs:
         uses: neutrons/gh-actions/pkg-install@v1
         with:
           package-name: ${{ env.PKG_NAME }}
-          local-channel: /tmp/local-channel
+          local-channel: ./local-channel
           extra-channels: neutrons mantid
 
       - name: Verify Conda Package
