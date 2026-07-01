@@ -2,7 +2,6 @@
 Dead time correction algorithm for single-readout detectors.
 """
 
-# TODO: Wildcard imports need to be removed (Glass)
 import numpy as np
 import scipy
 from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, MatrixWorkspaceProperty, PropertyMode, PythonAlgorithm
@@ -23,7 +22,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
     def summary(self):
         return "Single read-out dead time correction calculation"
 
-    def PyInit(self): # noqa: N802
+    def PyInit(self):  # noqa: N802
         self.declareProperty(
             IEventWorkspaceProperty("InputWorkspace", "", Direction.Input),
             "Input workspace use to compute dead time correction",
@@ -54,7 +53,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         )
         self.declareProperty(MatrixWorkspaceProperty("OutputWorkspace", "", Direction.Output), "Output workspace")
 
-    def PyExec(self): # noqa: N802
+    def PyExec(self):  # noqa: N802
         # Event data must include error events (all triggers on the detector)
         ws_event_data = self.getProperty("InputWorkspace").value
         ws_error_events = self.getProperty("InputErrorEventsWorkspace").value
