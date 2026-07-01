@@ -498,13 +498,22 @@ class NR_Reduction:
             (Yfit, Ifit, RBpixel, Icalc, ThCen, tthd)
         """
         # Find pixel range to fit based on run Ymin/max values and the background parameters.
-        sorted_bkgdROI = self._background_roi_sorter(self.config.BkgROI[i], self.config.RB_Ymin[i], self.config.RB_Ymax[i])
-        p1 = tools.find_pixel_index(ypix, sorted_bkgdROI[0]) + int(self.config.peak_pad)
-        p0 = tools.find_pixel_index(ypix, sorted_bkgdROI[3]) - int(self.config.peak_pad)
+        if self.config.useBS[i]:
+            sorted_bkgdROI = self._background_roi_sorter(self.config.BkgROI[i], self.config.RB_Ymin[i], self.config.RB_Ymax[i])
+            p1 = tools.find_pixel_index(ypix, sorted_bkgdROI[0]) + int(self.config.peak_pad)
+            p0 = tools.find_pixel_index(ypix, sorted_bkgdROI[3]) - int(self.config.peak_pad)
+        else:
+            # if BS not used then just want to take the RB_Ymin and RB_Ymax values
+            p1 = tools.find_pixel_index(ypix, np.min([self.config.RB_Ymin[i], self.config.RB_Ymax[i]])) + int(self.config.peak_pad)
+            p0 = tools.find_pixel_index(ypix, np.max([self.config.RB_Ymin[i], self.config.RB_Ymax[i]])) - int(self.config.peak_pad)
 
-        Ydata = ypix[p0:p1]
+        # Need to make sure  the cropped range includes the DBpixel for the later calculation
+        p1_max = np.max([p1, int(DBpixel) + int(self.config.peak_pad)])
+        p0_min = np.min([p0, int(DBpixel) - int(self.config.peak_pad)])
+
+        Ydata = ypix[p0_min:p1_max]
         # Collapse intensity per pixel
-        Idata = np.sum(RB[p0:p1, :], axis=1)
+        Idata = np.sum(RB[p0_min:p1_max, :], axis=1)
         # Fit the peak and extract parameters
         par, fit, bkg = tools.fit_peak(Ydata, Idata, peaktype=self.config.peak_type, bkgtype='linear')
         Yfit = fit[:, 0]
@@ -516,13 +525,18 @@ class NR_Reduction:
         dMM = dPix * self.settings['pixel_width']
         alpha = np.arcsin(dMM / self.settings['sample_detector_distance']) * 180 / np.pi
         ThetaCalc = alpha * 0.5 + (self.log_values['tthd'] - DBtthd) / 2
-        
+
         # TODO: Alter the function to do the calculation once and apply different angle offsets
         # Calculate expected beam profile on detector using logs
         Icalc_nonfit = tools.calc_beam_on_detector(Yfit, DBpixel, self.log_values['siY'], self.log_values['s1Y'],
                                             self.settings['interslit_distance'], self.settings['si_sample_distance'],
                                          self.settings['sample_detector_distance'], self.settings['pixel_width'],
                                          self.config.DetSigma, self.config.DetResFn)
+        
+        if not self.config.useCalcTheta:
+            print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta difference: {np.round(ThetaCalc - ThCen, 3)} (not applied)')
+            RBpixel = DBpixel
+            Icalc = Icalc_nonfit
 
         if not self.config.useCalcTheta:
             print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta difference: {np.round(ThetaCalc - ThCen, 3)} (not applied)')
@@ -626,7 +640,6 @@ class NR_Reduction:
             dTheta: Theta sigma
         """
         # calculate the mean theta from slits
-        print(method)
         if method == 'meantheta':
             # Calculate mean theta from slits
             MeanTheta, dTheta = self.calc_mean_theta(ymmRB, self.log_values['s1Y'], self.log_values['siY'],
