@@ -277,6 +277,41 @@ def rebin_counts(x, xp, fp):
 
     return new_counts
 
+def rebin_histogram(x_old, y_old, x_new):
+    """
+    Conserves total counts, independent of binning.
+    """
+
+    x_old = np.asarray(x_old)
+    y_old = np.asarray(y_old)
+    x_new = np.asarray(x_new)
+
+    # build old edges
+    dx_old = np.diff(x_old)
+    dx_old = np.append(dx_old, dx_old[-1])
+    old_edges = np.concatenate([[x_old[0] - dx_old[0]/2],
+                                x_old + dx_old/2])
+
+    # build new edges
+    dx_new = np.diff(x_new)
+    dx_new = np.append(dx_new, dx_new[-1])
+    new_edges = np.concatenate([[x_new[0] - dx_new[0]/2],
+                                x_new + dx_new/2])
+
+    out = np.zeros_like(x_new, dtype=float)
+
+    for i in range(len(x_old)):
+        left = old_edges[i]
+        right = old_edges[i+1]
+
+        overlap = np.maximum(0,
+                    np.minimum(right, new_edges[1:]) -
+                    np.maximum(left, new_edges[:-1]))
+
+        out += y_old[i] * (overlap / (right - left))
+
+    return out
+
 def calc_beam_geometry_from_slits(si_H, s1_H, d_s1_si, d_si_sam, d_sam_det, radians=True):
     # TODO: fix the descrepancies so the radians tag isn't needed.
     # based on slits and instrument geometry, calculate beam profile

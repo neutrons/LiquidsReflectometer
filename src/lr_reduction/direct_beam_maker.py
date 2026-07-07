@@ -20,15 +20,15 @@ class Direct_Beam:
         # paths when explicit paths are not supplied.
         self.experiment_id = None
         # apply constructor overrides: explicit NEXUSpath/savepath or experiment_id
-        if NEXUSpath is not None:
-            self.NEXUSpath = NEXUSpath
-        if savepath is not None:
-            self.savepath = savepath
         if experiment_id:
             self.experiment_id = self._normalize_experiment_id(experiment_id)
             # override the paths using convention when experiment_id provided
             self.NEXUSpath = f"/SNS/REF_L/{self.experiment_id}/nexus/"
             self.savepath = f"/SNS/REF_L/{self.experiment_id}/shared/transmission/"
+        if NEXUSpath is not None:
+            self.NEXUSpath = NEXUSpath
+        if savepath is not None:
+            self.savepath = savepath
         #self.Cd_foils = [57.5, 126.5, 123.0]      #microns for 50, 100A, 100B Cd foils
         self.Cd = [57.5,
             126.5,
@@ -45,6 +45,11 @@ class Direct_Beam:
         self.low_res = [75,190]           # x pixels to include in the direct beam spectrum
         self.n_y = 304
         self.n_x = 256
+        self.tofbin=50
+        self.tofmax=100000
+        self.tofmin=0
+        self.deadtime=4.2
+        self.tof_step=100
 
     def _normalize_experiment_id(self, expid):
         """Normalize experiment id to form 'IPTS-XXXX'. Accepts numeric or 'IPTS-XXXX' strings."""
@@ -95,6 +100,7 @@ class Direct_Beam:
             plt.figure()
         # determine which NEXUS and save paths to use for this create_db call.
         # precedence: explicit experiment_id argument -> instance experiment_id set in __init__ -> instance NEXUSpath/savepath
+        # TODO: need to explictly add ability to specify savepath separate from the nexuspath
         nexus_base = None
         save_base = None
         if experiment_id:
@@ -116,7 +122,8 @@ class Direct_Beam:
             # get header info from Nexus: atten and chop2 phase
             fname = os.path.join(nexus_base, f'REF_L_{run}.nxs.h5')
 
-            tof_array, y_tof_corr, error_array_corr, log_values, DTC_corr = BP.convert_to_binary(fname, self.low_res, collapse_x = True, tofbin=50, tofmax=100000, tofmin=0, deadtime=4.2, tof_step=100)
+            tof_array, y_tof_corr, error_array_corr, log_values, DTC_corr = BP.convert_to_binary(fname, self.low_res, collapse_x = True, tofbin=self.tofbin, tofmax=self.tofmax, 
+                                                                                                 tofmin=self.tofmin, deadtime=self.deadtime, tof_step=self.tof_step)
             T = tof_array * 1000
             DTC = DTC_corr
             y_tof_corr = np.flipud(y_tof_corr) # flip the y-axis to match the orientation of the detector
@@ -280,17 +287,29 @@ class Direct_Beam:
 
     def _trim_and_chop(self, T, I, E, DTC, chop2_phase, lowest = False):
 
+        T = np.asarray(T, dtype=float)
+        I = np.asarray(I, dtype=float)
+        E = np.asarray(E, dtype=float)
+        DTC = np.asarray(DTC, dtype=float)
+
         # trim off points that drop below the intensity threshold
-        p = np.where(I >= self.Icut)
+        I = np.nan_to_num(I, nan=0.0, posinf=0.0, neginf=0.0)
+
+        p = np.where(I >= self.Icut)[0]
+        if p.size == 0:
+            raise ValueError(f"No data points remain after intensity cut (Icut={self.Icut}, max(I)={I.max():.3g}).")
+            
         T=T[p]
         I=I[p]
         E=E[p]
         DTC=DTC[p]
 
         #trim based on chop2 phase
-        TCut = self._get_chop2_cut(chop2_phase)
-        TCut = TCut * 1000
-        p = np.where(T >= TCut)
+        TCut = self._get_chop2_cut(chop2_phase) * 1000
+        p = np.where(T >= TCut)[0]
+        if p.size == 0:
+            raise ValueError(f"No data points remain after chop2 cut (Tcut={TCut:.3f}).")
+
         T=T[p]
         I=I[p]
         E=E[p]
@@ -306,6 +325,9 @@ class Direct_Beam:
         else:
             p0 = above[-1]
             p = np.where(DTC[p0+1:] < DTC_threshold)[0] + p0 +1
+
+        if p.size == 0:
+            raise ValueError(f"No data points remain after DTC cut (threshold={DTC_threshold}).")
 
         T=T[p]
         I=I[p]

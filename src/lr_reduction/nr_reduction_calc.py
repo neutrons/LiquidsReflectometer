@@ -393,6 +393,7 @@ class NR_Reduction:
 
         # Read in pre-processed direct beam file and extract header information from pre-process step.
         lDB, iDB, eDB, metaDB = tools.load_db_file(self.config.DBpath, self.config.DBname[i])
+
         DBpixel = float(metaDB['db_pixel']) # TODO: Add handling for if this doesn't exist.
         DBtthd = float(metaDB['tthd'])
         # add these to the logs
@@ -453,11 +454,11 @@ class NR_Reduction:
         if self.create_figures:        
             ax.plot(lDB, iDB, label='DB')
             ax.plot(LAMBDA, np.sum(RB, axis=0), label='post mask')
-            
+
         # Rebin DB lambda to match new RB binning
         iDB = tools.rebin_counts(LAMBDA, lDB, iDB)
         eDB = np.sqrt(tools.rebin_counts(LAMBDA, lDB, eDB**2))
-        
+
         if self.create_figures:        
             ax.plot(LAMBDA, iDB, label='DB rebin')
             ax.legend()
@@ -525,7 +526,6 @@ class NR_Reduction:
         dMM = dPix * self.settings['pixel_width']
         alpha = np.arcsin(dMM / self.settings['sample_detector_distance']) * 180 / np.pi
         ThetaCalc = alpha * 0.5 + (self.log_values['tthd'] - DBtthd) / 2
-
         # TODO: Alter the function to do the calculation once and apply different angle offsets
         # Calculate expected beam profile on detector using logs
         Icalc_nonfit = tools.calc_beam_on_detector(Yfit, DBpixel, self.log_values['siY'], self.log_values['s1Y'],
@@ -533,11 +533,6 @@ class NR_Reduction:
                                          self.settings['sample_detector_distance'], self.settings['pixel_width'],
                                          self.config.DetSigma, self.config.DetResFn)
         
-        if not self.config.useCalcTheta:
-            print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta difference: {np.round(ThetaCalc - ThCen, 3)} (not applied)')
-            RBpixel = DBpixel
-            Icalc = Icalc_nonfit
-
         if not self.config.useCalcTheta:
             print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta difference: {np.round(ThetaCalc - ThCen, 3)} (not applied)')
             RBpixel = DBpixel
@@ -979,13 +974,6 @@ class NR_Reduction:
         if self.config.method_per_run[i] == "constanttof":
             iRB = np.sum(Rarr, axis=0)
             eRB = np.sqrt(np.sum(REarr**2, axis=0))
-            # Remove zeros
-            mask = (iDB != 0) & (iRB != 0)
-            LAMBDA = LAMBDA[mask]
-            iDB = iDB[mask]
-            eDB = eDB[mask]
-            iRB = iRB[mask]
-            eRB = eRB[mask]
             # for continuity, probably needs clearing up:
             Rarr = iRB
             REarr = eRB
