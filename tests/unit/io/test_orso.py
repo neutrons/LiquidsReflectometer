@@ -43,3 +43,6 @@ def test_write_orso(template_dir):
     # Check that the ORSO file was created
     orso_file = f"{template_dir}/REF_L_test_sequence_1.ort"
     assert os.path.exists(orso_file)
+
+    # Clean up the created ORSO file
+    os.remove(orso_file)
