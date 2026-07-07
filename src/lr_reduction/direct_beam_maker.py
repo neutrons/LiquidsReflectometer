@@ -20,15 +20,15 @@ class Direct_Beam:
         # paths when explicit paths are not supplied.
         self.experiment_id = None
         # apply constructor overrides: explicit NEXUSpath/savepath or experiment_id
-        if NEXUSpath is not None:
-            self.NEXUSpath = NEXUSpath
-        if savepath is not None:
-            self.savepath = savepath
         if experiment_id:
             self.experiment_id = self._normalize_experiment_id(experiment_id)
             # override the paths using convention when experiment_id provided
             self.NEXUSpath = f"/SNS/REF_L/{self.experiment_id}/nexus/"
             self.savepath = f"/SNS/REF_L/{self.experiment_id}/shared/transmission/"
+        if NEXUSpath is not None:
+            self.NEXUSpath = NEXUSpath
+        if savepath is not None:
+            self.savepath = savepath
         #self.Cd_foils = [57.5, 126.5, 123.0]      #microns for 50, 100A, 100B Cd foils
         self.Cd = [57.5,
             126.5,
@@ -100,6 +100,7 @@ class Direct_Beam:
             plt.figure()
         # determine which NEXUS and save paths to use for this create_db call.
         # precedence: explicit experiment_id argument -> instance experiment_id set in __init__ -> instance NEXUSpath/savepath
+        # TODO: need to explictly add ability to specify savepath separate from the nexuspath
         nexus_base = None
         save_base = None
         if experiment_id:

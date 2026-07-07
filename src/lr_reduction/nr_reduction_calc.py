@@ -393,6 +393,7 @@ class NR_Reduction:
 
         # Read in pre-processed direct beam file and extract header information from pre-process step.
         lDB, iDB, eDB, metaDB = tools.load_db_file(self.config.DBpath, self.config.DBname[i])
+
         DBpixel = float(metaDB['db_pixel']) # TODO: Add handling for if this doesn't exist.
         DBtthd = float(metaDB['tthd'])
         # add these to the logs
@@ -453,11 +454,11 @@ class NR_Reduction:
         if self.create_figures:        
             ax.plot(lDB, iDB, label='DB')
             ax.plot(LAMBDA, np.sum(RB, axis=0), label='post mask')
-            
+
         # Rebin DB lambda to match new RB binning
         iDB = tools.rebin_counts(LAMBDA, lDB, iDB)
         eDB = np.sqrt(tools.rebin_counts(LAMBDA, lDB, eDB**2))
-        
+
         if self.create_figures:        
             ax.plot(LAMBDA, iDB, label='DB rebin')
             ax.legend()
@@ -973,13 +974,6 @@ class NR_Reduction:
         if self.config.method_per_run[i] == "constanttof":
             iRB = np.sum(Rarr, axis=0)
             eRB = np.sqrt(np.sum(REarr**2, axis=0))
-            # Remove zeros
-            mask = (iDB != 0) & (iRB != 0)
-            LAMBDA = LAMBDA[mask]
-            iDB = iDB[mask]
-            eDB = eDB[mask]
-            iRB = iRB[mask]
-            eRB = eRB[mask]
             # for continuity, probably needs clearing up:
             Rarr = iRB
             REarr = eRB
