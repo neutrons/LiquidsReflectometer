@@ -610,7 +610,7 @@ def maybe_index(value, idx=None):
         return value[idx]
     except (TypeError, IndexError, KeyError):
         return value
-    
+
 def clean_log_value(x):
     arr = np.asarray(x)
 

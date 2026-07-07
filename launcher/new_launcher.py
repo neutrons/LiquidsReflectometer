@@ -1,15 +1,14 @@
 #!/usr/bin/env python
 import sys
 
-from launcher.apps.direct_beam import DirectBeamTab
-from launcher.apps.overplot import Overplot
-from launcher.apps.roi_selector import ROISelector
-from launcher.apps.sld_calculator import SLD
-from launcher.apps.template_batch import TemplateBatchTab
-from launcher.apps.file_batch import FileBatchTab
 #from launcher.apps.json_settings_builder import JSONSettingsBuilderTab
 from qtpy import QtCore
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
+
+from launcher.apps.direct_beam import DirectBeamTab
+from launcher.apps.file_batch import FileBatchTab
+from launcher.apps.overplot import Overplot
+from launcher.apps.sld_calculator import SLD
 
 #REFERENCE_DIRECTIVE = "Click to choose a 60Hz reference R(Q) file"
 #TEMPLATE_DIRECTIVE = "Click to choose a 30Hz template"

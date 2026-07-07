@@ -1,10 +1,11 @@
-from pathlib import Path
 import json
+from pathlib import Path
+
+import numpy as np
+from matplotlib.backends.backend_pdf import PdfPages
 
 import lr_reduction.nr_tools as tools
-import numpy as np
-from lr_reduction.nr_reduction_config import NRReductionConfig
-from matplotlib.backends.backend_pdf import PdfPages
+
 
 def save_results(results, config_header, log_values, sname = None, full=True, eight_column=False, sequence=None):
     """
@@ -28,9 +29,9 @@ def save_results(results, config_header, log_values, sname = None, full=True, ei
                                         results['L'], results['dL'], results['T'], results['dT']))
     else:
         array = np.column_stack((results['Q'], results['R'], results['dR'], results['dQ']))
-        
+
     head = _build_header(full=full, eight_column=eight_column, config_header=config_header, sequence=sequence, log_values=log_values)
-    
+
     if not sname:
         output_file = config_header.Spath / f"{config_header.Sname}"
     else:
@@ -128,7 +129,7 @@ def make_json_safe(obj):
             return repr(obj)
     else:
         return obj
-    
+
 # TODO: link this up to store the figures and save them out.
 def save_plot_pdf_summary(savepath, savename, fig_list):
 
@@ -137,8 +138,3 @@ def save_plot_pdf_summary(savepath, savename, fig_list):
         for fig in fig_list:
             pdf.savefig(fig)
     print(f"Saved plot summary {output_path}.")
-
-
-
-
-

@@ -4,13 +4,14 @@ Example usage of the unified NR reduction class
 
 Demonstrates how to configure and run reductions using both constantQ, constantTOF and MeanTheta methods
 """
-from pathlib import Path
 import json
+from pathlib import Path
+
 import numpy as np
 
+import lr_reduction.save_reduced_data as save_fn
 from lr_reduction.nr_reduction_calc import NR_Reduction
 from lr_reduction.nr_reduction_config import NRReductionConfig
-import lr_reduction.save_reduced_data as save_fn
 
 
 def example_mean_theta_reduction():
@@ -34,7 +35,7 @@ def example_mean_theta_reduction():
     config.RBnum=[227147,227148,227149]
     config.RB_Ymin=[143,142,138]
     config.RB_Ymax=[157,157,159]
-    
+
     # Path needs to be setup for these tests but should be able to turn off later.
     config.Spath = '/SNS/REF_L/IPTS-36681/shared/EBW_reduced/'
     #config.NEXUSpathRB = # Append path if required.
@@ -45,9 +46,9 @@ def example_mean_theta_reduction():
     config.DBname = ['DB_A1_Cd.txt', 'DB_A2_Cd.txt', 'DB_A3_Cd.txt']
     config.RBnum=[228220,228221,228222]
     config.RB_Ymin=[143,142,138]
-    config.RB_Ymax=[157,157,159]  
-    
-    
+    config.RB_Ymax=[157,157,159]
+
+
     config.ThetaShift = [0, 0, 0]
     config.useBS = [1, 1, 1]
     config.ScaleFactor = [1, 1, 1]
@@ -119,9 +120,9 @@ def example_constant_tof_reduction():
     config.DBname = ['DB_A1_Cd.txt', 'DB_A2_Cd.txt', 'DB_A3_Cd.txt']
     config.RBnum=[228220,228221,228222]
     config.RB_Ymin=[143,142,138]
-    config.RB_Ymax=[157,157,159]  
-    
-    
+    config.RB_Ymax=[157,157,159]
+
+
     config.ThetaShift = [0, 0, 0]
     config.useBS = [1, 1, 1]
     config.ScaleFactor = [1, 1, 1]
@@ -178,7 +179,7 @@ def example_mean_theta_reduction_8col():
     config.RBnum=[227147,227148,227149]
     config.RB_Ymin=[143,142,138]
     config.RB_Ymax=[157,157,159]
-    
+
     config.ThetaShift = [0, 0, 0]
     config.useBS = [1, 1, 1]
     config.ScaleFactor = [1, 1, 1]
@@ -213,7 +214,7 @@ def example_mean_theta_reduction_8col():
 
     print(f"\nReduced {len(config.RBnum)} runs with repeat averaging")
     print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
-    
+
     save_json = True
     if save_json:
         filepath_out = Path(config.Spath / f"{config.Sname}_settings.json")
@@ -246,7 +247,7 @@ def example_mean_theta_reduction_savepdf():
     config.RBnum=[227147,227148,227149]
     config.RB_Ymin=[143,142,138]
     config.RB_Ymax=[157,157,159]
-    
+
     config.ThetaShift = [0, 0, 0]
     config.useBS = [1, 1, 1]
     config.ScaleFactor = [1, 1, 1]
@@ -283,7 +284,7 @@ def example_mean_theta_reduction_savepdf():
     print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
 
     print(f"Test figure output: contains {len(results['figures'])} figures")
-    
+
     save_json = True
     if save_json:
         filepath_out = Path(config.Spath / f"{config.Sname}_settings.json")
@@ -316,7 +317,7 @@ def example_mean_theta_reduction_savepdf_noshow():
     config.RBnum=[227147,227148,227149]
     config.RB_Ymin=[143,142,138]
     config.RB_Ymax=[157,157,159]
-    
+
     config.ThetaShift = [0, 0, 0]
     config.useBS = [1, 1, 1]
     config.ScaleFactor = [1, 1, 1]
@@ -353,7 +354,7 @@ def example_mean_theta_reduction_savepdf_noshow():
     print(f"Q range: {results['Q'].min():.4f} - {results['Q'].max():.4f} Å⁻¹")
 
     print(f"Test figure output: contains {len(results['figures'])} figures")
-    
+
     return results
 
 if __name__ == '__main__':
@@ -363,5 +364,3 @@ if __name__ == '__main__':
     #example_mean_theta_reduction_8col()
     example_mean_theta_reduction_savepdf()
     example_mean_theta_reduction_savepdf_noshow()
-
-

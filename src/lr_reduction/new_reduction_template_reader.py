@@ -23,10 +23,10 @@ LIST OF PARAMS TO ADD:
 import time
 import xml.dom.minidom
 
+from lr_reduction import __version__ as VERSION
+
 #from lr_reduction.gravity_correction import GravityDirection
 from lr_reduction.instrument_settings import InstrumentSettings
-
-from lr_reduction import __version__ as VERSION
 
 # Get the mantid version being used, if available
 #try:
@@ -168,7 +168,7 @@ class ReductionParameters:
 
         # Emission time correction
         _xml += "<use_emission_time>%s</use_emission_time>\n" % str(self.use_emission_time)
-        
+
         # Instrument settings
         _xml += "<apply_instrument_settings>%s</apply_instrument_settings>\n" % str(self.apply_instrument_settings)
         if not self.use_emission_time:

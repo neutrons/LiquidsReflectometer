@@ -240,7 +240,7 @@ class Overplot(QWidget):
         else:
             QMessageBox.warning(self, "Invalid folder", f"Folder does not exist:\n{folder}")
 
-    
+
     def _prepare_data(self, path, transform):
         try:
             data = np.loadtxt(path)
