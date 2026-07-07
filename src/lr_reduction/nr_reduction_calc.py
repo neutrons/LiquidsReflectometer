@@ -525,7 +525,6 @@ class NR_Reduction:
         dMM = dPix * self.settings['pixel_width']
         alpha = np.arcsin(dMM / self.settings['sample_detector_distance']) * 180 / np.pi
         ThetaCalc = alpha * 0.5 + (self.log_values['tthd'] - DBtthd) / 2
-
         # TODO: Alter the function to do the calculation once and apply different angle offsets
         # Calculate expected beam profile on detector using logs
         Icalc_nonfit = tools.calc_beam_on_detector(Yfit, DBpixel, self.log_values['siY'], self.log_values['s1Y'],
@@ -533,11 +532,6 @@ class NR_Reduction:
                                          self.settings['sample_detector_distance'], self.settings['pixel_width'],
                                          self.config.DetSigma, self.config.DetResFn)
         
-        if not self.config.useCalcTheta:
-            print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta difference: {np.round(ThetaCalc - ThCen, 3)} (not applied)')
-            RBpixel = DBpixel
-            Icalc = Icalc_nonfit
-
         if not self.config.useCalcTheta:
             print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta difference: {np.round(ThetaCalc - ThCen, 3)} (not applied)')
             RBpixel = DBpixel
