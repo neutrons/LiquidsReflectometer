@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 import sys
 
+from qtpy import QtCore
+from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
+
 # NB: expects to be run from an 'lr_reduction' deployment
 # NB: currently only 'lr_reduction_exp' contains the needed dependencies
 # nsd-conda-wrap.sh lr_reduction_exp --classic <path-to-launcher.py>
 # NB: would like this to be (and use the <path-to-launcher.py> deployed with the environment
 # nsd-conda-wrap.sh lr_reduction_exp launcher
-
 from launcher.apps.dynamic_30Hz import Dynamic30Hz
 from launcher.apps.dynamic_60Hz import Dynamic60Hz
 from launcher.apps.off_spec import OffSpec
@@ -14,8 +16,6 @@ from launcher.apps.quick_reduce import QuickReduce
 from launcher.apps.reduction import Reduction
 from launcher.apps.sld_calculator import SLD
 from launcher.apps.xrr import XRR
-from qtpy import QtCore
-from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 
 REFERENCE_DIRECTIVE = "Click to choose a 60Hz reference R(Q) file"
 TEMPLATE_DIRECTIVE = "Click to choose a 30Hz template"

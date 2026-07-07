@@ -7,14 +7,16 @@ For now, it assumes a pre-processed DB file.
 """
 import os
 
-import lr_reduction.binary_processing as BP
 import matplotlib.pyplot as plt
-import lr_reduction.nr_tools as tools
 import numpy as np
 from matplotlib.colors import LogNorm
 from scipy.ndimage import gaussian_filter1d, uniform_filter1d
-from lr_reduction.user_defined_function import UserDefinedFunction
+
+import lr_reduction.binary_processing as BP
+import lr_reduction.nr_tools as tools
 import lr_reduction.save_reduced_data as save_fn
+from lr_reduction.user_defined_function import UserDefinedFunction
+
 
 class NR_Reduction:
     """
@@ -124,7 +126,7 @@ class NR_Reduction:
         L, T, dL, dT = [], [], [], []
         if not eight_col:
             eight_col = self.config.save8col
-        
+
         if plot is not None:
             self.config.plotON = plot
 
@@ -146,7 +148,7 @@ class NR_Reduction:
                 print("No run completed at sequence ID", i+1)
                 non_specified.append(i)
                 continue
-            
+
             result, config_out, log_vals = self._reduce_single_run(i, rb_num)
             print("Completed reduction for run", rb_num)
             # TODO: add better autoscaling options.
@@ -435,7 +437,7 @@ class NR_Reduction:
         LAMBDA = 3956 * (tRB) / self.settings['source_detector_distance']
         LAMBDA = 3956 * (tRB - (t0[0] + t0[1] * LAMBDA)) / self.settings['source_detector_distance']
         LambdaBinSize = abs(LAMBDA[1] - LAMBDA[0])
-        
+
         if self.create_figures:
             fig, ax = plt.subplots()
             ax.plot(LAMBDA, np.sum(RB, axis=0), label='pre-mask')
@@ -450,15 +452,15 @@ class NR_Reduction:
         # iDB = np.interp(LAMBDA, lDB, iDB)
         # eDB = np.interp(LAMBDA, lDB, eDB)
 
-        if self.create_figures:        
+        if self.create_figures:
             ax.plot(lDB, iDB, label='DB')
             ax.plot(LAMBDA, np.sum(RB, axis=0), label='post mask')
-            
+
         # Rebin DB lambda to match new RB binning
         iDB = tools.rebin_counts(LAMBDA, lDB, iDB)
         eDB = np.sqrt(tools.rebin_counts(LAMBDA, lDB, eDB**2))
-        
-        if self.create_figures:        
+
+        if self.create_figures:
             ax.plot(LAMBDA, iDB, label='DB rebin')
             ax.legend()
             ax.set_yscale('log')
@@ -531,7 +533,7 @@ class NR_Reduction:
                                             self.settings['interslit_distance'], self.settings['si_sample_distance'],
                                          self.settings['sample_detector_distance'], self.settings['pixel_width'],
                                          self.config.DetSigma, self.config.DetResFn)
-        
+
         if not self.config.useCalcTheta:
             print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta difference: {np.round(ThetaCalc - ThCen, 3)} (not applied)')
             RBpixel = DBpixel
@@ -540,12 +542,12 @@ class NR_Reduction:
         # Use calculated value if flag
         else:
             if self.config.useCalcTheta == 'detector_angle':
-                print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta correction applied: {np.round(ThetaCalc - ThCen, 3)}') 
+                print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta correction applied: {np.round(ThetaCalc - ThCen, 3)}')
                 ThCen = ThetaCalc
             else:
-                print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta correction applied: {np.round(ThetaCalc - ThCen, 3)}')         ## TODO: Work out fixing the print statement here.    
+                print(f'Calculated theta: {np.round(ThetaCalc, 3)}, Theta correction applied: {np.round(ThetaCalc - ThCen, 3)}')         ## TODO: Work out fixing the print statement here.
                 ThCen = self.log_values['ths']
-            self.log_values['ThCen'] = ThCen            
+            self.log_values['ThCen'] = ThCen
 
             # Calculate expected beam profile on detector using logs
             Icalc = tools.calc_beam_on_detector(Yfit, RBpixel, self.log_values['siY'], self.log_values['s1Y'],
@@ -985,7 +987,7 @@ class NR_Reduction:
             REarr = eRB
 
         # Normalize by incident spectrum & propagate error
-        R0 = Rarr.copy()    
+        R0 = Rarr.copy()
         Rarr, REarr = tools.divide_propagate_error(R0, REarr, iDB, eDB)
 
         # Remove NaNs

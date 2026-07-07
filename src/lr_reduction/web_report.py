@@ -13,13 +13,12 @@ import requests
 from mantid.simpleapi import Integration, Rebin, RefRoi, SumSpectra, Transpose, logger
 from plot_publisher import publish_plot
 
+from lr_reduction import __version__ as VERSION
 from lr_reduction import template
 from lr_reduction.data_info import DataType
 from lr_reduction.mantid_utils import SampleLogValues
 from lr_reduction.reduction_template_reader import ReductionParameters
 from lr_reduction.types import MantidWorkspace
-from lr_reduction import __version__ as VERSION
-import lr_reduction.new_reduction_from_file as nrff
 
 XY_PLOT_ZOOM_X_RANGE = [25, 225]
 XY_PLOT_ZOOM_Y_RANGE = [100, 200]
@@ -380,7 +379,7 @@ def generate_report_section_reduction_parameters_new(config, workspace: MantidWo
 
     Parameters
     ----------
-    config: 
+    config:
         Settings from reduction config object
     workspace: MantidWorkspace
         Reflected beam workspace
@@ -461,7 +460,7 @@ def generate_report_section_reduction_parameters_new(config, workspace: MantidWo
     meta += "</table>\n"
     return meta
 
-# TODO: Check if this overlaps with RB one. 
+# TODO: Check if this overlaps with RB one.
 def generate_report_section_direct_beam_parameters(workspace: MantidWorkspace) -> str:
     """Generate HTML report from a direct beam workspace
 
@@ -564,7 +563,7 @@ def generate_report_plots(workspace: MantidWorkspace, data_type: DataType, templ
             #tof_zoom_range = [config_settings.tof_min[idx]/1000.0 - 5.0, config_settings.tof_max[idx]/1000.0 + 5.0]
             tof_zoom_range = [tof_use[0] - 5.0, tof_use[1] + 5.0]
 
-        elif template_data is not None:    
+        elif template_data is not None:
             scatt_peak = template_data.data_peak_range
             scatt_low_res = template_data.data_x_range
             scatt_bck = template_data.background_roi
@@ -887,7 +886,7 @@ def _plot2d(
                 ),
             )
             plotly_objects.append(y_line)
-        '''    
+        '''
         y_left = go.Scatter(
             name="",
             y=[y_bck_range[0], y_bck_range[0]],
@@ -1053,11 +1052,11 @@ def _plot1d(
                 color="rgba(152, 152, 152, .8)",
             ),
         )
-        
+
         data.append(x_left)
         data.append(x_right)
         '''
-        
+
     x_layout = dict(
         title=x_label,
         zeroline=False,
@@ -1141,4 +1140,3 @@ def _plotText(text, title=""):
     plot = pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
 
     return plot
-

@@ -5,9 +5,10 @@ Example usage of the unified NR reduction class
 Demonstrates how to configure and run reductions using both constantQ, constantTOF and MeanTheta methods
 """
 
-import numpy as np
 from pathlib import Path
+
 import lr_reduction.new_reduction_from_file as reduction
+
 
 def example_from_dat():
     run_list = [227158,227159,227160]
@@ -143,5 +144,3 @@ if __name__ == '__main__':
     example_with_8col()
     example_with_8col_search()
     test_for_autoreduction()
-
-

@@ -6,6 +6,7 @@ Demonstrates how to configure and run reductions using both constantQ, constantT
 """
 
 import numpy as np
+
 from lr_reduction.nr_reduction_calc import NR_Reduction
 from lr_reduction.nr_reduction_config import NRReductionConfig
 
@@ -159,5 +160,3 @@ if __name__ == '__main__':
     # Run examples
     #test_mean_theta_reduction()
     test_constant_tof_reduction()
-
-

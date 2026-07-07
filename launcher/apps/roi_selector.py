@@ -2263,6 +2263,3 @@ class ROISelector(QWidget):
             QMessageBox.information(self, "Saved", f"Combined template saved to {path}")
         except Exception as e:
             QMessageBox.critical(self, "Save error", f"Failed to save combined template: {e}")
-
-
-

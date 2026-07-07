@@ -1,10 +1,11 @@
 import os
 from pathlib import Path
 
-import lr_reduction.binary_processing as BP
-import lr_reduction.nr_tools as tools
 import numpy as np
 from matplotlib import pyplot as plt
+
+import lr_reduction.binary_processing as BP
+import lr_reduction.nr_tools as tools
 
 
 class Direct_Beam:
@@ -121,7 +122,7 @@ class Direct_Beam:
             # get header info from Nexus: atten and chop2 phase
             fname = os.path.join(nexus_base, f'REF_L_{run}.nxs.h5')
 
-            tof_array, y_tof_corr, error_array_corr, log_values, DTC_corr = BP.convert_to_binary(fname, self.low_res, collapse_x = True, tofbin=self.tofbin, tofmax=self.tofmax, 
+            tof_array, y_tof_corr, error_array_corr, log_values, DTC_corr = BP.convert_to_binary(fname, self.low_res, collapse_x = True, tofbin=self.tofbin, tofmax=self.tofmax,
                                                                                                  tofmin=self.tofmin, deadtime=self.deadtime, tof_step=self.tof_step)
             T = tof_array * 1000
             DTC = DTC_corr
@@ -297,7 +298,7 @@ class Direct_Beam:
         p = np.where(I >= self.Icut)[0]
         if p.size == 0:
             raise ValueError(f"No data points remain after intensity cut (Icut={self.Icut}, max(I)={I.max():.3g}).")
-            
+
         T=T[p]
         I=I[p]
         E=E[p]

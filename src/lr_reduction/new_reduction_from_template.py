@@ -3,17 +3,18 @@ import os
 from pathlib import Path
 
 import h5py
-import lr_reduction.new_reduction_template_reader as reduction_template_reader
-import lr_reduction.nr_tools as tools
 import numpy as np
 from matplotlib import pyplot as plt
+
+import lr_reduction.new_reduction_template_reader as reduction_template_reader
+import lr_reduction.nr_tools as tools
+import lr_reduction.save_reduced_data as save_fn
 from lr_reduction.new_reduction_template_reader import ReductionParameters
 
 #import template
 from lr_reduction.nr_reduction_calc import NR_Reduction  # TODO: Fix names of files!!
 from lr_reduction.nr_reduction_config import NRReductionConfig
-import lr_reduction.save_reduced_data as save_fn
-import lr_reduction.new_reduction_from_file as nrff
+
 
 def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True, eight_col=None, save_pdf_summary=False):
     """
@@ -93,7 +94,7 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
         result = {'Q': results['q'], 'R': results['r'], 'dR': results['dr'], 'dQ': results['dq'],
                 'T': result['t'], 'L': result['l'], 'dT': result['dt'], 'dL': result['dl']}
     else:
-        result = {'Q': results['q'], 'R': results['r'], 'dR': results['dr'], 'dQ': results['dq']}       
+        result = {'Q': results['q'], 'R': results['r'], 'dR': results['dr'], 'dQ': results['dq']}
 
     # Save data
     if config.subname:
