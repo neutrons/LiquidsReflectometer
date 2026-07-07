@@ -14,7 +14,7 @@ from lr_reduction.legacy import event_reduction, peak_finding, reduction_templat
 from lr_reduction.legacy.instrument_settings import InstrumentSettings
 from lr_reduction.legacy.reduction_template_reader import ReductionParameters
 from lr_reduction.legacy.theta_selection import is_earth_centered_geometry, theta_log_name
-from lr_reduction.legacy.types import MantidWorkspace
+from lr_reduction.types import MantidWorkspace
 
 TOLERANCE = 0.07
 OUTPUT_NORM_DATA = False
