@@ -260,6 +260,21 @@ class DirectBeamTab(QWidget):
         self.CutOffset_spin.setValue(1)
         form.addRow('Chopper Cut Offset:', self.CutOffset_spin)
 
+        self.tofbin_spin = QDoubleSpinBox(self)
+        self.tofbin_spin.setRange(5.0, 2000.0)
+        self.tofbin_spin.setValue(50)
+        form.addRow('TOF bin:', self.tofbin_spin)
+
+        self.tofmin_spin = QDoubleSpinBox(self)
+        self.tofmin_spin.setRange(0.0, 100000.0)
+        self.tofmin_spin.setValue(0)
+        form.addRow('TOF min:', self.tofmin_spin)
+
+        self.tofmax_spin = QDoubleSpinBox(self)
+        self.tofmax_spin.setRange(5.0, 2000000.0)
+        self.tofmax_spin.setValue(100000)
+        form.addRow('TOF max:', self.tofmax_spin)
+
         # y_ROI and low_res as simple text inputs (two ints comma separated)
         self.yroi_edit = QLineEdit(self)
         self.yroi_edit.setText('130,170')
@@ -428,6 +443,9 @@ class DirectBeamTab(QWidget):
         db.DTCcut_config1 = float(self.DTCcut1_spin.value())
         db.Icut = float(self.Icut_spin.value())
         db.CutOffset = float(self.CutOffset_spin.value())
+        db.tofbin=float(self.tofbin_spin.value())
+        db.tofmax=float(self.tofmax_spin.value())
+        db.tofmin=float(self.tofmin_spin.value())
         # parse y_roi and low_res
         def parse_pair(s, default):
             try:
