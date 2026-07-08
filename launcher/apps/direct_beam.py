@@ -557,4 +557,3 @@ class DirectBeamTab(QWidget):
                 plt.ylabel('I')
                 plt.tight_layout()
                 plt.show()
-

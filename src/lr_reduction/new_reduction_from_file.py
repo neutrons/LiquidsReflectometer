@@ -1,20 +1,21 @@
-import copy
-import os
-from pathlib import Path
 import json
+import os
 import re
+from pathlib import Path
 
 import h5py
 import numpy as np
 from matplotlib import pyplot as plt
 
+import lr_reduction.nr_tools as tools
+import lr_reduction.save_reduced_data as save_fn
+
 #import template
 from lr_reduction.nr_reduction_calc import NR_Reduction  # TODO: Fix names of files!!
 from lr_reduction.nr_reduction_config import NRReductionConfig
-import lr_reduction.save_reduced_data as save_fn
-import lr_reduction.nr_tools as tools
 
-def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = None, override_params: dict = None, plot=True, 
+
+def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = None, override_params: dict = None, plot=True,
                      save_json=False, check_for_prior=False, save_pdf_summary=False):
     """
     Wrapper function to reduce a single run with reading of parameters from the header of a file or a saved json file, instead of the xml.
@@ -56,7 +57,7 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
         group_output_sorted = sort_runs(group_output, idx)
 
         # TODO: validate check that config is long enough?
-        
+
         config_new.RBnum = group_output_sorted["run_nums"]
         config_new.experiment_id = experiment_id
 
@@ -181,9 +182,9 @@ def sort_runs(group_output, idx):
                             "seq_nums": base_aligned,
                             "seq_ids": list3_aligned
                             }
-    
+
     return group_output_sorted
-        
+
 def group_runs(run_array, experiment_id, datapath):
     current_seq_id = None
 
@@ -219,7 +220,7 @@ def group_runs(run_array, experiment_id, datapath):
             run_num_subset.append(runno)
             seq_num_subset.append(seq_num)
             seq_id_subset.append(seq_id)
-        
+
             current_seq_id = seq_id
 
     # add the last ones
@@ -353,7 +354,7 @@ def find_combine_priors(updated_config, run_nums, results, group_output_sorted, 
     initial_run_nums = group_output_sorted["run_nums"]
 
     if len(matched_files) > 0:
-        
+
         print(f"Found {len(matched_files)} to combine")
         sorted_data, sorted_seq_num, sorted_run_num, angle_logs = load_prior_data(results, matched_files, updated_config, initial_seq, initial_run_nums)
         # TODO: quite a bit is a duplicate of in the calc file. Can be smarter here.
@@ -434,7 +435,7 @@ def find_combine_priors(updated_config, run_nums, results, group_output_sorted, 
 
         #print(combine_results)
         return dict_output, combine_results, initial_scalefactors, matched_files, sorted_run_num, angle_logs
-    
+
     else:
         # TODO: fix this...
         return {}, {}, [], [], [], {}
@@ -448,7 +449,7 @@ def json_to_config(json_input):
             setattr(config_init, key, value)
         else:
             raise AttributeError(f"{key} is not a valid config parameter")
-        
+
     return config_init
 
 def load_from_file(filepath):

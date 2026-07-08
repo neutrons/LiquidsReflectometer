@@ -7,6 +7,7 @@ import json
 import numpy as np
 from plot_publisher import plot1d
 
+from lr_reduction import __version__ as VERSION
 from lr_reduction.scaling_factors.calculate import (
     OverlapScalingFactor,
     ReducedData,
@@ -14,8 +15,6 @@ from lr_reduction.scaling_factors.calculate import (
     StitchingType,
     scaling_factor_critical_edge,
 )
-
-from lr_reduction import __version__ as VERSION
 
 
 class RunCollection:

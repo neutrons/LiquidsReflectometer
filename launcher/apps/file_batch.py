@@ -1,18 +1,17 @@
 #!/usr/bin/python3
 import os
-from pdb import run
 import threading
 from pathlib import Path
 
 from qtpy import QtCore, QtWidgets
 from qtpy.QtWidgets import (
+    QCheckBox,
     QFileDialog,
     QGridLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QCheckBox,
     QSpinBox,
     QWidget,
 )
@@ -29,7 +28,6 @@ except Exception:
     except Exception:
         plt = None
 
-from matplotlib.backends.backend_pdf import PdfPages
 
 try:
     import new_reduction_from_file as new_file
