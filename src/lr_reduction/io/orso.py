@@ -16,7 +16,6 @@ from orsopy.fileio import (
     Sample,
     Software,
     Value,
-    ValueRange,
 )
 
 from lr_reduction import __version__ as lr_reduction_version
