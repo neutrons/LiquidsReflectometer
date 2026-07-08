@@ -8,6 +8,13 @@ FORMAT = "%(asctime)s | %(levelname)-4s | %(name)-8s | %(message)s"
 DATEFMT = "%Y-%m-%d %H:%M:%S"
 LOG_FMT = logging.Formatter(fmt=FORMAT, datefmt=DATEFMT)
 
+# Shorten level names to 4 characters for better log formatting
+logging.addLevelName(logging.DEBUG, "DBUG")
+logging.addLevelName(logging.INFO, "INFO")
+logging.addLevelName(logging.WARNING, "WARN")
+logging.addLevelName(logging.ERROR, "ERR")
+logging.addLevelName(logging.CRITICAL, "CRIT")
+
 
 def set_log_config(level: Union[str, int] = logging.INFO):
     """Sets basic logging config and format for the root logger and all existing loggers,
@@ -46,13 +53,6 @@ def get_logger(name: str, level: Union[str, int] = logging.INFO) -> logging.Logg
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.propagate = False
-
-    # Shorten level names to 4 characters for better log formatting
-    logging.addLevelName(logging.DEBUG, "DBUG")
-    logging.addLevelName(logging.INFO, "INFO")
-    logging.addLevelName(logging.WARNING, "WARN")
-    logging.addLevelName(logging.ERROR, "ERR")
-    logging.addLevelName(logging.CRITICAL, "CRIT")
 
     if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
         stream_handler = logging.StreamHandler(sys.stdout)
@@ -125,9 +125,10 @@ def remove_log_fh(logger: logging.Logger, logfile: str | None = None) -> int:
 @contextmanager
 def log_to_file(logger: logging.Logger, logfile: str) -> Iterator[logging.Handler]:
     """Temporarily attach a file handler and close it on exit."""
-
+    original_level = logger.level
     handler = add_log_fh(logger, logfile)
     try:
         yield handler
     finally:
         remove_log_fh(logger, logfile)
+        logger.setLevel(original_level)

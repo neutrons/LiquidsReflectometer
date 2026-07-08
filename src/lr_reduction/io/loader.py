@@ -7,6 +7,14 @@ from lr_reduction.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+def _get_sequence_id_from_path(path: Path) -> str:
+    """Extracts the sequence ID from the configuration file path."""
+    try:
+        return path.stem.split("_")[1]
+    except IndexError:
+        raise ValueError(f"Invalid configuration file name: {path.name}")
+
+
 def load(config: str) -> ReductionConfig:
     """Load a ReductionConfig from the specified path."""
     path = Path(config)
@@ -24,7 +32,7 @@ def load(config: str) -> ReductionConfig:
 
 def load_config(path: Path) -> ReductionConfig:
     """Load a ReductionConfig from a configuration file."""
-    sequence_id = path.stem.split("_")[1]
+    sequence_id = _get_sequence_id_from_path(path)
     dbs = DirectBeamConfig(name="PLACEHOLDER NAME", db_runs=["PLACEHOLDER DB RUNS"])
     refs = ReflectedRunConfig(run_id="PLACEHOLDER REF RUN", direct_beam=dbs.name)
     return ReductionConfig(
@@ -36,7 +44,7 @@ def load_config(path: Path) -> ReductionConfig:
 
 def load_orso(path: Path) -> ReductionConfig:
     """Load a ReductionConfig from an ORSO file."""
-    sequence_id = path.stem.split("_")[1]
+    sequence_id = _get_sequence_id_from_path(path)
     dbs = DirectBeamConfig(name="PLACEHOLDER NAME", db_runs=["PLACEHOLDER DB RUNS"])
     refs = ReflectedRunConfig(run_id="PLACEHOLDER REF RUN", direct_beam=dbs.name)
     return ReductionConfig(
@@ -49,7 +57,7 @@ def load_orso(path: Path) -> ReductionConfig:
 @deprecated("XML config files are deprecated. Please use YAML or ORSO format instead.")
 def load_xml(path: Path) -> ReductionConfig:
     """Legacy method to load a ReductionConfig from an XML file, for backward compatibility."""
-    sequence_id = path.stem.split("_")[1]
+    sequence_id = _get_sequence_id_from_path(path)
     dbs = DirectBeamConfig(name="PLACEHOLDER NAME", db_runs=["PLACEHOLDER DB RUNS"])
     refs = ReflectedRunConfig(run_id="PLACEHOLDER REF RUN", direct_beam=dbs.name)
     return ReductionConfig(
