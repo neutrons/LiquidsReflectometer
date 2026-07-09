@@ -8,7 +8,7 @@ lr_reduction package
    :depth: 1
 
 lr_reduction.dead_time_correction
------------------------
+---------------------------------
 
 .. automodule:: lr_reduction.dead_time_correction
    :members:

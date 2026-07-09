@@ -67,6 +67,11 @@ intersphinx_mapping = {
 }
 intersphinx_disabled_domains = ["std"]
 
+# Suppress warnings for references that can't be resolved due to mocked imports
+suppress_warnings = [
+    "ref.class",  # Suppress class reference warnings for mocked modules like mantid
+]
+
 templates_path = ["_templates"]
 exclude_patterns = ["_build"]
 pygments_style = "sphinx"
@@ -78,17 +83,11 @@ source_suffix = {
 
 # MyST parser configuration
 myst_enable_extensions = [
-    "colon_fence",
     "deflist",
     "dollarmath",
-    "fieldlist",
+    "smartquotes",
     "html_admonition",
     "html_image",
-    "replacements",
-    "smartquotes",
-    "strikethrough",
-    "substitution",
-    "tasklist",
 ]
 
 # Allow heading anchors
