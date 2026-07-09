@@ -1,9 +1,9 @@
-from lr_reduction.io.interfaces import ConfigLoaderInterface, Loader, RunLoaderInterface
+from lr_reduction.io.config_loader import ConfigLoader
 from lr_reduction.io.run_data import RunData
+from lr_reduction.io.run_loader import RunLoader
 
 __all__ = [
-    "ConfigLoaderInterface",
-    "Loader",
+    "ConfigLoader",
     "RunData",
-    "RunLoaderInterface",
+    "RunLoader",
 ]
