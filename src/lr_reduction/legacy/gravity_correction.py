@@ -3,8 +3,8 @@ from enum import IntEnum
 import numpy as np
 
 from lr_reduction.legacy.theta_selection import is_earth_centered_geometry
-from lr_reduction.legacy.types import MantidWorkspace
 from lr_reduction.legacy.utils import workspace_handle
+from lr_reduction.types import MantidWorkspace
 
 
 def _log_value(run, log_name: str, default=None):

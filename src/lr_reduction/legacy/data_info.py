@@ -9,7 +9,7 @@ from mantid.simpleapi import logger
 
 from lr_reduction.legacy.mantid_utils import SampleLogValues
 from lr_reduction.legacy.theta_selection import is_earth_centered_geometry
-from lr_reduction.legacy.types import MantidWorkspace
+from lr_reduction.types import MantidWorkspace
 
 
 class DataType(IntEnum):

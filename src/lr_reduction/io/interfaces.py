@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from pathlib import Path
 
 from lr_reduction.config.model import ReductionConfig
 from lr_reduction.io.run_data import RunData
@@ -29,11 +28,11 @@ class ConfigLoaderInterface(Loader):
     """
     Abstract loader for a reduction configuration file.
 
-    Accepts a file-system path and returns a validated ReductionConfig.
+    Accepts a file-path and returns a validated ReductionConfig.
     Concrete implementations may support different file formats (YAML, JSON,
     XML legacy template, …) while sharing this interface.
     """
 
     @abstractmethod
-    def load(self, path: Path) -> ReductionConfig:
+    def load(self, path: str) -> ReductionConfig:
         """Parse the configuration file at *path* and return a ReductionConfig."""

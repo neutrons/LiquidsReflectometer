@@ -32,6 +32,8 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
     "sphinx.ext.coverage",
+    # myst_parser enables markdown support
+    "myst_parser",
 ]
 
 autodoc_mock_imports = [
@@ -65,9 +67,31 @@ intersphinx_mapping = {
 }
 intersphinx_disabled_domains = ["std"]
 
+# Suppress warnings for references that can't be resolved due to mocked imports
+suppress_warnings = [
+    "ref.class",  # Suppress class reference warnings for mocked modules like mantid
+]
+
 templates_path = ["_templates"]
 exclude_patterns = ["_build"]
 pygments_style = "sphinx"
+
+source_suffix = {
+    ".rst": "restructuredtext",
+    ".md": "markdown",
+}
+
+# MyST parser configuration
+myst_enable_extensions = [
+    "deflist",
+    "dollarmath",
+    "smartquotes",
+    "html_admonition",
+    "html_image",
+]
+
+# Allow heading anchors
+myst_heading_anchors = 3
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

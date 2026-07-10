@@ -4,7 +4,7 @@ Shared theta log selection rules for Liquids Reflectometer reduction.
 
 
 from lr_reduction.legacy.mantid_utils import SampleLogValues
-from lr_reduction.legacy.types import MantidWorkspace
+from lr_reduction.types import MantidWorkspace
 
 
 def is_earth_centered_geometry(log_source: MantidWorkspace) -> bool:
