@@ -9,8 +9,8 @@ import numpy as np
 from mantid.simpleapi import LoadEventNexus, logger
 
 from lr_reduction.legacy import event_reduction, output, reduction_template_reader, template
-from lr_reduction.legacy.types import MantidWorkspace
 from lr_reduction.legacy.web_report import assemble_report, generate_report_sections
+from lr_reduction.types import MantidWorkspace
 
 
 def reduce(

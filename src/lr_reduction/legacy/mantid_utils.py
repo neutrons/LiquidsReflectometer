@@ -1,5 +1,5 @@
-from lr_reduction.legacy.types import MantidWorkspace
 from lr_reduction.legacy.utils import workspace_handle
+from lr_reduction.types import MantidWorkspace
 
 
 class SampleLogValues:

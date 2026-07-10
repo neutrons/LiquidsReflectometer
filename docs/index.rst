@@ -9,6 +9,7 @@ User Guide
 .. toctree::
    :titlesonly:
 
+   user/glossary
    user/workflow
    user/event_processing
    user/dead_time_correction
@@ -32,7 +33,6 @@ API
 .. toctree::
    :titlesonly:
 
-   api/lr_autoreduce
    api/lr_reduction
 
 Developer Guide
