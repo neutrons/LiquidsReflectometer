@@ -1,9 +1,11 @@
 from pathlib import Path
 
-from lr_reduction.config.model import DirectBeamConfig, ReductionConfig, ReflectedRunConfig
+from lr_reduction.config.model import ReductionConfig
 from lr_reduction.io.interfaces import ConfigLoaderInterface
 from lr_reduction.io.orso import read_config as read_orso_config
-from lr_reduction.utils import deprecated, get_logger, get_sequence_id_from_path
+from lr_reduction.io.xml import read_config as read_xml_config
+from lr_reduction.io.yaml import read_config as read_yaml_config
+from lr_reduction.utils import deprecated, get_logger
 
 logger = get_logger(__name__)
 
@@ -27,19 +29,11 @@ class ConfigLoader(ConfigLoaderInterface):
         if not loader:
             raise ValueError(f"Unsupported configuration file format: {fp.suffix}")
 
-        sequence_id = get_sequence_id_from_path(fp)
-        return loader(sequence_id)
+        return loader(str(fp))
 
     def _load_config(self, path: str) -> ReductionConfig:
-        """Load a ReductionConfig from a configuration file."""
-        sequence_id = get_sequence_id_from_path(path)
-        dbs = DirectBeamConfig(name="PLACEHOLDER NAME", db_runs=["PLACEHOLDER DB RUNS"])
-        refs = ReflectedRunConfig(run_id="PLACEHOLDER REF RUN", direct_beam=dbs.name)
-        return ReductionConfig(
-            sequence_id=sequence_id,
-            direct_beams=[dbs],
-            reflected_runs=[refs],
-        )
+        """Load a ReductionConfig from a YAML configuration file."""
+        return read_yaml_config(path)
 
     def _load_orso(self, path: str) -> ReductionConfig:
         """Load a ReductionConfig from an ORSO file."""
@@ -48,11 +42,4 @@ class ConfigLoader(ConfigLoaderInterface):
     @deprecated("XML config files are deprecated. Please use YAML or ORSO format instead.")
     def _load_xml(self, path: str) -> ReductionConfig:
         """Legacy method to load a ReductionConfig from an XML file, for backward compatibility."""
-        sequence_id = get_sequence_id_from_path(path)
-        dbs = DirectBeamConfig(name="PLACEHOLDER NAME", db_runs=["PLACEHOLDER DB RUNS"])
-        refs = ReflectedRunConfig(run_id="PLACEHOLDER REF RUN", direct_beam=dbs.name)
-        return ReductionConfig(
-            sequence_id=sequence_id,
-            direct_beams=[dbs],
-            reflected_runs=[refs],
-        )
+        return read_xml_config(path)
