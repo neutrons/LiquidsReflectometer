@@ -1,7 +1,5 @@
 """ORSO format I/O module."""
 
-from pathlib import Path
-
 from orsopy import fileio
 
 from lr_reduction.config.model import DirectBeamConfig, ReductionConfig, ReflectedRunConfig
@@ -35,4 +33,7 @@ def read_partials(partial_dir: str, sequence_id: int) -> list[SingleRunResult]:
     ...
 
 
-def write(results: SingleRunResult | SequenceResult, output_dir: str | Path = "."): ...
+def write(result: SingleRunResult | SequenceResult, output_dir: str = ".") -> str:
+    """Persist *result* as an ORSO file under *output_dir* and return the path written."""
+    logger.info(f"Writing ORSO reduced data for {type(result).__name__} to {output_dir}")
+    ...
