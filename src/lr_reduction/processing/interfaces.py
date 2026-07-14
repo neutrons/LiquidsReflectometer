@@ -1,16 +1,17 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-InT = TypeVar("InT")
-OutT = TypeVar("OutT", None)
+DataT = TypeVar("DataT")
+ConfigT = TypeVar("ConfigT")
+OutT = TypeVar("OutT")
 
 
-class OperationInterface(ABC, Generic[InT, OutT]):
+class OperationInterface(ABC, Generic[DataT, ConfigT, OutT]):
     """Abstract base class for operations that can be executed with a configuration and data."""
 
-    def __init__(self, data: InT) -> None:
+    def __init__(self, data: DataT, config: ConfigT) -> None:
         self.data = data
-        self.result: OutT | None = None
+        self.config = config
 
     @abstractmethod
     def validate_input(self) -> None:
@@ -30,6 +31,6 @@ class OperationInterface(ABC, Generic[InT, OutT]):
     def execute(self) -> OutT:
         """Execute the operation and return the result."""
         self.validate_input()
-        self.result = self.process()
+        result = self.process()
         self.cleanup()
-        return self.result
+        return result
