@@ -12,11 +12,11 @@ import mantid.simpleapi as api
 import numpy as np
 from scipy.optimize import brentq
 
-from lr_reduction import dead_time_correction
 from lr_reduction.legacy import background
 from lr_reduction.legacy.gravity_correction import GravityDirection, gravity_correction
 from lr_reduction.legacy.instrument_settings import InstrumentSettings
 from lr_reduction.legacy.utils import mantid_algorithm_exec
+from lr_reduction.processing.algorithms import dead_time_correction
 
 PLANCK_CONSTANT = 6.626e-34  # m^2 kg s^-1
 NEUTRON_MASS = 1.675e-27  # kg

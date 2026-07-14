@@ -7,10 +7,10 @@ lr_reduction package
    :local:
    :depth: 1
 
-lr_reduction.dead_time_correction
----------------------------------
+lr_reduction.processing.algorithms.dead_time_correction
+-------------------------------------------------------
 
-.. automodule:: lr_reduction.dead_time_correction
+.. automodule:: lr_reduction.processing.algorithms.dead_time_correction
    :members:
    :undoc-members:
    :show-inheritance:
