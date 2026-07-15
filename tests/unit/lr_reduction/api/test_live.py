@@ -1,4 +1,5 @@
 import pytest
+from mantid.simpleapi import CreateSampleWorkspace
 
 from lr_reduction.api.live import LiveEntrypoint, reduce_live
 from lr_reduction.types import SingleRunResult
@@ -6,8 +7,7 @@ from lr_reduction.types import SingleRunResult
 
 @pytest.fixture
 def reflected_run():
-    mantid_simpleapi = pytest.importorskip("mantid.simpleapi")
-    ws = mantid_simpleapi.CreateSampleWorkspace(WorkspaceType="Event")
+    ws = CreateSampleWorkspace(WorkspaceType="Event")
     ws.getRun().addProperty("run_number", "54321", True)
     return ws
 

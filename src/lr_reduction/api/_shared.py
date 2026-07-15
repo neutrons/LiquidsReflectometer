@@ -1,4 +1,4 @@
-"""Helpers shared Entrypoint leaves.
+"""Helpers shared by entrypoint leaves.
 
 Both groups here stand in for logic that doesn't exist yet (§6.4, §1.2): locating a
 run's standard configuration, and fabricating a placeholder result until Op 1/Op 2/Op 3
@@ -42,6 +42,14 @@ def locate_configuration_relative_to(output_directory: Path) -> Path:
     """
     logger.info(f"Resolving configuration relative to output directory {output_directory}")
     return Path(output_directory) / "config_0.yaml"
+
+
+def parse_numeric_identifier(identifier: str | int, *, field_name: str) -> int:
+    """Convert an identifier to int and raise a field-specific error when conversion fails."""
+    try:
+        return int(identifier)
+    except ValueError as error:
+        raise ValueError(f"{field_name} must be an integer, got {identifier!r}") from error
 
 
 def placeholder_single_run_result(config: ReductionConfig, sequence_number: int = 0) -> SingleRunResult:

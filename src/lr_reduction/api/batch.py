@@ -14,7 +14,7 @@ from lr_reduction.utils import get_logger
 logger = get_logger(__name__)
 
 
-def reduce_batch(experiment_id: str, first_run: int, last_run: int, output_dir: Path, **overrides) -> None:
+def reduce_batch(experiment_id: str, first_run: int, last_run: int, output_dir: str | Path, **overrides) -> None:
     """Batch driver (§6.4.9, §11.6.6).
 
     Re-invokes the single-run reduction (via the autoreduction path) for each existing

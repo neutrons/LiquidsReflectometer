@@ -10,7 +10,11 @@ import argparse
 import re
 from pathlib import Path
 
-from lr_reduction.api._shared import locate_configuration_relative_to, placeholder_sequence_result
+from lr_reduction.api._shared import (
+    locate_configuration_relative_to,
+    parse_numeric_identifier,
+    placeholder_sequence_result,
+)
 from lr_reduction.api.interfaces import Entrypoint
 from lr_reduction.api.manual import reduce_run
 from lr_reduction.config.model import ReductionConfig
@@ -29,7 +33,7 @@ _NEXUS_RUN_NUMBER_RE = re.compile(r"REF_L_(\d+)")
 class FromDiskSequence(Entrypoint[SequenceResult]):
     """Assembles a sequence from its on-disk partial ORSO files (§2.4.1.a)."""
 
-    def __init__(self, output_directory: Path, **overrides):
+    def __init__(self, output_directory: str | Path, **overrides):
         self.output_directory = Path(output_directory)
         self.overrides = overrides
         self._config_loader = ConfigLoader()
@@ -39,7 +43,8 @@ class FromDiskSequence(Entrypoint[SequenceResult]):
         return self._config_loader.load(str(config_path))
 
     def load_data(self, config: ReductionConfig):
-        return read_partials(str(self.output_directory), config.sequence_id)
+        sequence_id = parse_numeric_identifier(config.sequence_id, field_name="sequence_id")
+        return read_partials(str(self.output_directory), sequence_id)
 
     def call_operations(self, config: ReductionConfig, _data) -> SequenceResult:
         # Placeholder until Op 3 (assemble-only) exists.
@@ -58,7 +63,7 @@ def _run_number_from_nexus_path(nexus_file_path: Path) -> int:
     return int(match.group(1))
 
 
-def reduce_autoreduce(nexus_file_path: Path, output_directory_path: Path, **overrides) -> SequenceResult:
+def reduce_autoreduce(nexus_file_path: str | Path, output_directory_path: str | Path, **overrides) -> SequenceResult:
     """Autoreduction (on-disk assembly) (§6.4.1, §11.6.1).
 
     A thin wrapper (§6.4.3): reduces the newly-arrived run, writes its partial, then
