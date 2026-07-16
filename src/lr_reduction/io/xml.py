@@ -1,6 +1,6 @@
 """Legacy XML I/O module. Reads legacy RefRed XML templates as configuration input."""
 
-from lr_reduction.config.model import DirectBeamConfig, ReductionConfig, ReflectedRunConfig
+from lr_reduction.models.config import DirectBeamConfig, ReductionConfig, ReflectedRunConfig
 from lr_reduction.utils import get_logger, get_sequence_id_from_path
 
 logger = get_logger(__name__)

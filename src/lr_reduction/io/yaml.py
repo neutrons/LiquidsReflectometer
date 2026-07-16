@@ -1,6 +1,6 @@
 """YAML I/O module. YAML is the native configuration format."""
 
-from lr_reduction.config.model import DirectBeamConfig, ReductionConfig, ReflectedRunConfig
+from lr_reduction.models.config import DirectBeamConfig, ReductionConfig, ReflectedRunConfig
 from lr_reduction.utils import get_logger, get_sequence_id_from_path
 
 logger = get_logger(__name__)
