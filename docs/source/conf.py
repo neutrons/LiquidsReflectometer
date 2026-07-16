@@ -9,7 +9,7 @@ import sys
 import versioningit
 from packaging.version import Version
 
-sys.path.insert(0, os.path.abspath("../src/lr_reduction"))
+sys.path.insert(0, os.path.abspath("../../src/lr_reduction"))
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.abspath("../src/lr_reduction"))
 project = "lr_reduction"
 copyright = "2024, ORNL"  # noqa A001
 author = "ORNL"
-version = versioningit.get_version("../")
+version = versioningit.get_version("../../")
 # The full version (major.minor.patch) without pre-/post-release metadata
 release = Version(version).base_version
 
