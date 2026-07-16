@@ -149,7 +149,7 @@ docs = {features = ["installer", "docs"], solve-group = "default"}  # readthedoc
 
 [tool.pixi.tasks]
 # Documentation
-docs-build = { cmd = 'sphinx-build --keep-going -n -T -b html docs/source  docs/build/html && $echo "### DOCS point your browser to file://$(pwd)/build/html/index.html"', description = "Build the documentation" }
+docs-build = { cmd = 'sphinx-build --keep-going -n -T -b html docs/source  docs/build/html && echo "### DOCS point your browser to file://$(pwd)/docs/build/html/index.html"', description = "Build the documentation" }
 docs-clean = { cmd = "rm -rf docs/build", description = "Clean the documentation build artifacts" }
 # Packaging
 conda-builder = { cmd = "pixi publish --target-channel ./local-channel", description = "Command that creates the conda package" }
