@@ -36,6 +36,24 @@ extensions = [
     "myst_parser",
 ]
 
+# MyST parser configuration
+myst_enable_extensions = [
+    # "colon_fence",
+    "deflist",
+    "dollarmath",
+    # "fieldlist",
+    "html_admonition",
+    "html_image",
+    # "replacements",
+    "smartquotes",
+    # "strikethrough",
+    # "substitution",
+    # "tasklist",
+]
+
+# Allow heading anchors
+myst_heading_anchors = 3
+
 autodoc_mock_imports = [
     "mantid",
     "mantid.api",
@@ -89,18 +107,6 @@ source_suffix = {
     ".rst": "restructuredtext",
     ".md": "markdown",
 }
-
-# MyST parser configuration
-myst_enable_extensions = [
-    "deflist",
-    "dollarmath",
-    "smartquotes",
-    "html_admonition",
-    "html_image",
-]
-
-# Allow heading anchors
-myst_heading_anchors = 3
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

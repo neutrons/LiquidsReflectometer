@@ -6,7 +6,7 @@ from lr_reduction.types import CompositeDirectBeam
 
 class DirectBeamComposition(OperationInterface[list[RunData], DirectBeamConfig, CompositeDirectBeam]):
     """
-    A single run reduction operation.
+    Class for composing direct beam data from multiple runs into a single composite direct beam result.
     """
 
     def __init__(self, data: list[RunData], config: DirectBeamConfig):
