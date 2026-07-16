@@ -1,5 +1,5 @@
 from lr_reduction.models.results import SequenceResult, SingleRunResult
-from lr_reduction.processing.interfaces import OperationInterface
+from lr_reduction.operations.interfaces import OperationInterface
 
 
 # TODO: Change config type to AssemblyConfig when it is implemented

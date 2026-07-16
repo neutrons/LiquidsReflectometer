@@ -1,12 +1,11 @@
 from lr_reduction.models.config import DirectBeamConfig
 from lr_reduction.models.run_data import RunData
-from lr_reduction.processing.interfaces import OperationInterface
+from lr_reduction.operations.interfaces import OperationInterface
 from lr_reduction.types import CompositeDirectBeam
 
 
 class DirectBeamComposition(OperationInterface[list[RunData], DirectBeamConfig, CompositeDirectBeam]):
     """
-    Class for composing direct beam data from multiple runs into a single composite direct beam result.
     """
 
     def __init__(self, data: list[RunData], config: DirectBeamConfig):

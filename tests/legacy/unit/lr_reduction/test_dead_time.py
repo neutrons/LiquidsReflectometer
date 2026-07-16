@@ -4,7 +4,7 @@ import mantid.simpleapi as mtd_api
 
 from lr_reduction.legacy import template
 from lr_reduction.legacy.utils import amend_config
-from lr_reduction.processing.algorithms.dead_time_correction import SingleReadoutDeadTimeCorrection
+from lr_reduction.operations.algorithms.dead_time_correction import SingleReadoutDeadTimeCorrection
 
 mtd_api.config["default.facility"] = "SNS"
 mtd_api.config["default.instrument"] = "REF_L"

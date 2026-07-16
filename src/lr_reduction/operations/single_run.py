@@ -1,7 +1,7 @@
 from lr_reduction.models.config import ReflectedRunConfig
 from lr_reduction.models.results import SingleRunResult
 from lr_reduction.models.run_data import RunData
-from lr_reduction.processing.interfaces import OperationInterface
+from lr_reduction.operations.interfaces import OperationInterface
 
 
 class SingleRunReduction(OperationInterface[RunData, ReflectedRunConfig, SingleRunResult]):
