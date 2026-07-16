@@ -1,7 +1,7 @@
 .. _developer-contributing:
 
-Guide to Contributing
-=====================
+Contributing Guide
+===================
 
 Contributions to this project are welcome. All contributors agree to the following:
 

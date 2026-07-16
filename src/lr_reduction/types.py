@@ -1,9 +1,9 @@
-from typing import TypeAlias
+from typing import TypeAlias, Union
 
 from mantid.api import Workspace
 from mantid.dataobjects import EventWorkspace
 
-MantidWorkspace = str | Workspace
+MantidWorkspace = Union[str, Workspace]
 
 """
 The assembled direct beam produced by Op 1 (§2.2)

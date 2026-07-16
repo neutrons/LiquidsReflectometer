@@ -1,16 +1,31 @@
 .. _api_lr_reduction:
 
-lr_reduction package
-====================
+API Reference
+=============
 
 .. contents::
    :local:
    :depth: 1
 
-lr_reduction.processing.algorithms.dead_time_correction
--------------------------------------------------------
+Subpackages
+-----------
 
-.. automodule:: lr_reduction.processing.algorithms.dead_time_correction
+.. toctree::
+   :maxdepth: 1
+
+   lr_reduction.io
+   lr_reduction.models
+   lr_reduction.processing
+   lr_reduction.properties
+   lr_reduction.utils
+
+Submodules
+----------
+
+lr_reduction.types
++++++++++++++++++++
+
+.. automodule:: lr_reduction.types
    :members:
    :undoc-members:
    :show-inheritance:

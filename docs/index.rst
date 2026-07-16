@@ -3,16 +3,39 @@
 Liquids Reflectometer Reduction
 ===============================
 
-User Guide
-----------
-
 .. toctree::
+   :caption: User Guide
    :titlesonly:
 
    user/glossary
-   user/workflow
-   user/event_processing
-   user/dead_time_correction
+   user/workflow_index
+
+Developers
+----------
+
+.. toctree::
+   :caption: Developers
+   :titlesonly:
+
+   developer/contributing
+   developer/developer
+
+API
+---
+
+.. toctree::
+   :caption: API Reference
+   :titlesonly:
+
+   api/lr_reduction
+
+Release Notes
+-------------
+
+.. toctree::
+   :caption: Release Notes
+   :titlesonly:
+
    release_notes
 
 Contacting the Team
@@ -26,20 +49,3 @@ A change needs to be in the form of a:
 
 - Story for any enhancement request
 - Defect for any bug fix request.
-
-API
----
-
-.. toctree::
-   :titlesonly:
-
-   api/lr_reduction
-
-Developer Guide
----------------
-
-.. toctree::
-   :titlesonly:
-
-   developer/contributing
-   developer/developer

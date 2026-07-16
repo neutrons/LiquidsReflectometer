@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from lr_reduction.io.run_data import RunData
 from lr_reduction.models.config import ReductionConfig
+from lr_reduction.models.run_data import RunData
 
 
 class Loader(ABC):

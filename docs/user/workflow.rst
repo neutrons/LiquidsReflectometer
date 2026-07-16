@@ -1,6 +1,6 @@
 .. _workflow:
 
-Specular reflectivity reduction workflow
+Specular Reflectivity Reduction Workflow
 ========================================
 
 The specular reflectivity data reduction is build around the ``event_reduction.EventReflectivity`` class, which

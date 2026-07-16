@@ -9,7 +9,7 @@ import sys
 import versioningit
 from packaging.version import Version
 
-sys.path.insert(0, os.path.abspath("../reduction"))
+sys.path.insert(0, os.path.abspath("../src/lr_reduction"))
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -72,6 +72,15 @@ suppress_warnings = [
     "ref.class",  # Suppress class reference warnings for mocked modules like mantid
 ]
 
+# Nitpicky mode (-n) reports unresolvable references as warnings. TypeVars used
+# in Generic[...] base classes are rendered as py:obj cross-references by autodoc
+# but are not documented objects themselves, so ignore them explicitly here.
+nitpick_ignore = [
+    ("py:obj", "lr_reduction.processing.interfaces.DataT"),
+    ("py:obj", "lr_reduction.processing.interfaces.ConfigT"),
+    ("py:obj", "lr_reduction.processing.interfaces.OutT"),
+]
+
 templates_path = ["_templates"]
 exclude_patterns = ["_build"]
 pygments_style = "sphinx"
@@ -98,6 +107,12 @@ myst_heading_anchors = 3
 
 html_theme = "sphinx_rtd_theme"  # pylint: disable=C0103
 
-html_theme_options = {"style_nav_header_background": "#472375"}
+# collapse_navigation=False keeps nested toctree entries (e.g. the "Workflow"
+# sub-group) expanded in the sidebar at all times, instead of only expanding
+# them when browsing a page within that section.
+html_theme_options = {
+    "style_nav_header_background": "#472375",
+    "collapse_navigation": False,
+}
 
 epub_show_urls = "footnote"  # pylint: disable=C0103

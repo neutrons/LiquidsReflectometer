@@ -1,5 +1,5 @@
 from lr_reduction.io.interfaces import RunLoaderInterface
-from lr_reduction.io.run_data import RunData
+from lr_reduction.models.run_data import RunData
 from lr_reduction.utils.logging import get_logger
 
 logger = get_logger(__name__)

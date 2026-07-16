@@ -1,6 +1,6 @@
 .. _event_processing:
 
-Event processing
+Event Processing
 ================
 
 The BL4B instrument leverages the concept of weighted events for several aspects of

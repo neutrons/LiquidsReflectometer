@@ -1,7 +1,7 @@
 .. _dead_time_correction:
 
-SingleReadoutDeadTimeCorrection
-===============================
+Single Readout Dead Time Correction
+===================================
 
 Dead time is the time after an event that a detector is not able to detect another event.
 For a paralyzable detector, an event that happens during the dead time restarts the dead time. For
