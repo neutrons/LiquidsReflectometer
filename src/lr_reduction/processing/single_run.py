@@ -4,7 +4,7 @@ from lr_reduction.models.run_data import RunData
 from lr_reduction.processing.interfaces import OperationInterface
 
 
-class SingleRun(OperationInterface[RunData, ReflectedRunConfig, SingleRunResult]):
+class SingleRunReduction(OperationInterface[RunData, ReflectedRunConfig, SingleRunResult]):
     """
     A single run reduction operation.
     """
