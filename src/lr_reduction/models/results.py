@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -10,7 +9,7 @@ from orsopy.fileio import Software
 @dataclass
 class ReductionResult:
     """Result of reducing data from a single run.
-    
+
     Attributes
     ----------
     TBD
