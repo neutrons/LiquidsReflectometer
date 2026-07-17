@@ -15,7 +15,7 @@ Subpackages
 
    lr_reduction.io
    lr_reduction.models
-   lr_reduction.processing
+   lr_reduction.operations
    lr_reduction.properties
    lr_reduction.utils
 

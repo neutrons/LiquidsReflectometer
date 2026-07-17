@@ -1,6 +1,6 @@
-(event-processing)=
+(event-operations)=
 
-# Event Processing
+# Event operations
 
 The BL4B instrument leverages the concept of weighted events for several aspects of
 the reduction process. Following this approach, each event is treated separately and is

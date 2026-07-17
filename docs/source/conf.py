@@ -94,9 +94,9 @@ suppress_warnings = [
 # in Generic[...] base classes are rendered as py:obj cross-references by autodoc
 # but are not documented objects themselves, so ignore them explicitly here.
 nitpick_ignore = [
-    ("py:obj", "lr_reduction.processing.interfaces.DataT"),
-    ("py:obj", "lr_reduction.processing.interfaces.ConfigT"),
-    ("py:obj", "lr_reduction.processing.interfaces.OutT"),
+    ("py:obj", "lr_reduction.operations.interfaces.DataT"),
+    ("py:obj", "lr_reduction.operations.interfaces.ConfigT"),
+    ("py:obj", "lr_reduction.operations.interfaces.OutT"),
 ]
 
 templates_path = ["_templates"]

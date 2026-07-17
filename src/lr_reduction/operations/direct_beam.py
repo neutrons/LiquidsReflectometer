@@ -20,7 +20,7 @@ class DirectBeamComposition(OperationInterface[list[RunData], DirectBeamConfig, 
 
     def process(self) -> CompositeDirectBeam:
         """
-        Perform the single run reduction processing and return the result.
+        Perform the single run reduction operations and return the result.
         """
         # Implement processing logic here
         ...

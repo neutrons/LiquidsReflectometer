@@ -22,7 +22,7 @@ class CombineResults(OperationInterface[list[ReductionResult], AssemblyConfig, C
 
     def process(self) -> CombinedReductionResult:
         """
-        Perform the reflectivity assembly processing and return the result.
+        Perform the reflectivity assembly operations and return the result.
         """
         # Implement processing logic here
         ...
