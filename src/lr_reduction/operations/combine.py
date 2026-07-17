@@ -1,16 +1,16 @@
-from lr_reduction.models.results import SequenceResult, SingleRunResult
+from lr_reduction.models.config import AssemblyConfig
+from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 from lr_reduction.operations.interfaces import OperationInterface
 
 
-# TODO: Change config type to AssemblyConfig when it is implemented
-class ReflectivityAssembly(OperationInterface[list[SingleRunResult], None, SequenceResult]):
+class CombineResults(OperationInterface[list[ReductionResult], AssemblyConfig, CombinedReductionResult]):
     """
     A class for assembling reflectivity data from multiple runs.
 
     Performs scaling and stitching of multiple partial reflectivity runs into a single composite reflectivity dataset.
     """
 
-    def __init__(self, data: list[SingleRunResult], config: None):
+    def __init__(self, data: list[ReductionResult], config: AssemblyConfig):
         super().__init__(data, config)
 
     def validate_input(self) -> None:
@@ -20,7 +20,7 @@ class ReflectivityAssembly(OperationInterface[list[SingleRunResult], None, Seque
         # Implement validation logic here
         pass
 
-    def process(self) -> SequenceResult:
+    def process(self) -> CombinedReductionResult:
         """
         Perform the reflectivity assembly processing and return the result.
         """

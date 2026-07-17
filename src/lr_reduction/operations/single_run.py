@@ -1,10 +1,10 @@
 from lr_reduction.models.config import ReflectedRunConfig
-from lr_reduction.models.results import SingleRunResult
+from lr_reduction.models.results import ReductionResult
 from lr_reduction.models.run_data import RunData
 from lr_reduction.operations.interfaces import OperationInterface
 
 
-class SingleRunReduction(OperationInterface[RunData, ReflectedRunConfig, SingleRunResult]):
+class SingleRunReduction(OperationInterface[RunData, ReflectedRunConfig, ReductionResult]):
     """
     A single run reduction operation.
     """
@@ -19,7 +19,7 @@ class SingleRunReduction(OperationInterface[RunData, ReflectedRunConfig, SingleR
         # Implement validation logic here
         pass
 
-    def process(self) -> SingleRunResult:
+    def process(self) -> ReductionResult:
         """
         Perform the single run reduction processing and return the result.
         """

@@ -5,6 +5,8 @@ import numpy as np
 import numpy.typing as npt
 from orsopy.fileio import Software
 
+from lr_reduction.models.config import AssemblyConfig, ReductionConfig
+
 
 @dataclass
 class ReductionResult:
@@ -14,20 +16,23 @@ class ReductionResult:
     ----------
     TBD
     """
+
     reflectivity: npt.NDArray[np.float64]
     reduction_config: ReductionConfig
     html_report: str | None
     # Reduction metadata
-    lr_reduction_info: Software         # lr_reduction package information
-    mantid_info: Software               # mantid package information
-    reduction_timestamp: datetime       # orsopy.fileio.reduction.timestamp
+    lr_reduction_info: Software  # lr_reduction package information
+    mantid_info: Software  # mantid package information
+    reduction_timestamp: datetime  # orsopy.fileio.reduction.timestamp
+
 
 @dataclass
-class CombinedReductionResult(ReductionBase):
+class CombinedReductionResult(ReductionResult):
     """Result of assembling reduced data from multiple runs.
 
     Attributes
     ----------
     TBD
     """
+
     assembly_config: AssemblyConfig

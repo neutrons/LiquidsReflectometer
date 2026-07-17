@@ -18,10 +18,10 @@ Subpackages
 Submodules
 ----------
 
-lr_reduction.processing.assembly
+lr_reduction.processing.combine
 ++++++++++++++++++++++++++++++++++
 
-.. automodule:: lr_reduction.processing.assembly
+.. automodule:: lr_reduction.processing.combine
    :members:
    :undoc-members:
    :show-inheritance:
