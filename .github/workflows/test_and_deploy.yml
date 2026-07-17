@@ -1,3 +1,4 @@
+
 name: Tests, Packaging, and Deployment
 
 on:
@@ -23,14 +24,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0 # Fetch all history for accurate versioning
           fetch-tags: true # Fetch tags to ensure versioning works correctly
           submodules: recursive
 
       - name: Set up Pixi
-        uses: prefix-dev/setup-pixi@v0.9.6
+        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
         with:
           manifest-path: pyproject.toml
 
@@ -51,7 +52,7 @@ jobs:
           pixi run test-reduction
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         if: github.actor != 'dependabot[bot]'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -77,38 +78,38 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 100
           fetch-tags: true
           ref: ${{ github.ref }}
 
       - name: Setup Pixi
-        uses: prefix-dev/setup-pixi@v0.9.6
+        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
 
       - name: Build conda package
         run: |
           pixi run conda-build
-          mkdir -p /tmp/local-channel/noarch
-          cp *.conda /tmp/local-channel/noarch/
-          # extract version from the package file name "lr_reduction-<version>-<build>.conda"
-          echo "PKG_VERSION=$(ls *.conda | cut -d'-' -f2)" >> $GITHUB_ENV
+
+          # Copy conda package to workspace root so it can be uploaded as an artifact.
+          find local-channel -name "*.conda" -exec cp {} . \;
 
       # pkg-verify requires a conda env that already has the package
-      # installed (and micromamba on PATH); pkg-install sets both up.
+      # installed (and micromamba on PATH); pkg-install sets both up,
+      # and exposes the install directory for the Grype scan below.
       - name: Install built conda package
         id: install
-        uses: neutrons/conda-actions/pkg-install@v2
+        uses: neutrons/gh-actions/pkg-install@eb7a7c6fcfd0cda1a7b238329afc0afd09a4f4af # v2
         with:
           package-name: ${{ env.PKG_NAME }}
-          local-channel: /tmp/local-channel
+          local-channel: ./local-channel
           extra-channels: neutrons mantid
 
       - name: Verify Conda Package
-        uses: neutrons/conda-actions/pkg-verify@v2
+        uses: neutrons/gh-actions/pkg-verify@eb7a7c6fcfd0cda1a7b238329afc0afd09a4f4af # v2
         with:
           package-name: ${{ env.PKG_NAME }}
-          conda-env-name: ${{ steps.install.outputs.conda_env }}
+          conda-env-name: ${{ steps.install.outputs.conda-env }}
           extra-commands: |
             python -c "import lr_reduction"
             python -c "import lr_autoreduce"
@@ -117,9 +118,9 @@ jobs:
       # Audit the dependencies of the conda package we just installed. SARIF
       # results are uploaded to GitHub code scanning by the grype action.
       - name: Scan installed environment with Grype
-        uses: neutrons/conda-actions/grype@v2
+        uses: neutrons/gh-actions/grype@eb7a7c6fcfd0cda1a7b238329afc0afd09a4f4af # v2
         with:
-          path: ${{ steps.install.outputs.conda_install_dir }}
+          path: ${{ steps.install.outputs.conda-install-dir }}
 
       - name: upload conda package as artifact
         uses: actions/upload-artifact@v7
@@ -133,12 +134,12 @@ jobs:
     if:  startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/next'
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.ref }}
 
       - name: Setup Pixi
-        uses: prefix-dev/setup-pixi@v0.9.6
+        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
 
       - name: Download conda package artifact
         uses: actions/download-artifact@v8
@@ -146,7 +147,7 @@ jobs:
           name: artifact-conda-package
 
       - name: Upload package to anaconda
-        uses: neutrons/conda-actions/publish@v1
+        uses: neutrons/gh-actions/publish@eb7a7c6fcfd0cda1a7b238329afc0afd09a4f4af # v2
         with:
           anaconda-token: ${{ secrets.ANACONDA_TOKEN }}
           organization: neutrons
@@ -154,11 +155,11 @@ jobs:
 
       - name: Remove old packages
         if: github.ref == 'refs/heads/next'
-        uses: neutrons/conda-actions/pkg-remove@v1
+        uses: neutrons/gh-actions/pkg-remove@eb7a7c6fcfd0cda1a7b238329afc0afd09a4f4af # v2
         with:
-          anaconda_token: ${{ secrets.ANACONDA_TOKEN }}
+          anaconda-token: ${{ secrets.ANACONDA_TOKEN }}
           organization: neutrons
-          package_name: ${{ env.PKG_NAME }}
+          package-name: ${{ env.PKG_NAME }}
           label: ${{ env.CONDA_LABEL }}
           keep: 5
 
@@ -169,14 +170,13 @@ jobs:
     if: github.ref == 'refs/heads/next'
     steps:
       - name: Get Environment Name
-        uses: neutrons/branch-mapper@main
+        uses: neutrons/gh-actions/branch-mapper@eb7a7c6fcfd0cda1a7b238329afc0afd09a4f4af # v2
         id: env_name
         with:
           prefix: lr_reduction
 
       - name: Trigger Dev Deploy
-        # use https://github.com/eic/trigger-gitlab-ci/pull/14 until merged
-        uses: eic/trigger-gitlab-ci@d984d8d53d871d2fdc1325639d94322da6e8747f
+        uses: eic/trigger-gitlab-ci@v3.3
         id: trigger
         with:
           url: https://code.ornl.gov
