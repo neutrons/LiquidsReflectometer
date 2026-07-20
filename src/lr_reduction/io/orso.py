@@ -18,9 +18,11 @@ header = fileio.orso.Orso.empty()
 
 def read_config(filepath: str) -> ReductionConfig:
     """Read a prior ORSO output file and return the ReductionConfig embedded in its header (§3.3.8.1(b), §4.2.3)."""
-    # Placeholder implementation; read the CONFIG_HEADER_KEY block from the ORSO header via
-    # orsopy.fileio.load_orso(filepath)[...].info.user_data and construct a ReductionConfig
-    ...
+    datasets = fileio.load_orso(filepath)
+    config_dict = datasets[0].info.user_data.get(CONFIG_HEADER_KEY)
+    if config_dict is None:
+        raise ValueError(f"{filepath} has no embedded '{CONFIG_HEADER_KEY}' configuration block")
+    return ReductionConfig(**config_dict)
 
 
 def read_single_run(filepath: str) -> ReductionResult:
