@@ -3,7 +3,7 @@
 from orsopy import fileio
 
 from lr_reduction.models.config import DirectBeamConfig, ReductionConfig, ReflectedRunConfig
-from lr_reduction.models.results import SequenceResult, SingleRunResult
+from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 from lr_reduction.utils import get_logger, get_sequence_id_from_path
 
 logger = get_logger(__name__)
@@ -23,17 +23,17 @@ def read_config(filepath: str) -> ReductionConfig:
     )
 
 
-def read_single_run(filepath: str) -> SingleRunResult:
-    """Read an ORSO file and return a SingleRunResult populated with data from the ORSO file."""
+def read_single_run(filepath: str) -> ReductionResult:
+    """Read an ORSO file and return a ReductionResult populated with data from the ORSO file."""
     ...
 
 
-def read_partials(partial_dir: str, sequence_id: int) -> list[SingleRunResult]:
+def read_partials(partial_dir: str, sequence_id: int) -> list[ReductionResult]:
     """Discover and load partial ORSO files for a given sequence ID."""
     ...
 
 
-def write(result: SingleRunResult | SequenceResult, output_dir: str = ".") -> str:
+def write(result: ReductionResult | CombinedReductionResult, output_dir: str = ".") -> str:
     """Persist *result* as an ORSO file under *output_dir* and return the path written."""
     logger.info(f"Writing ORSO reduced data for {type(result).__name__} to {output_dir}")
     ...
