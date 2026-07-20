@@ -83,10 +83,11 @@ config = ConfigLoader().load("config.yaml")
 config = ConfigLoader().load("reduced_output.ort")
 ```
 
-The dispatch-by-extension shown above is already wired up; the format-specific readers
-(`lr_reduction.io.yaml`, `lr_reduction.io.orso`, `lr_reduction.io.xml`) are stubs at this stage —
-this page documents the target interface and configuration structure ahead of that
-implementation work, so the design can be reviewed and iterated on first.
+A legacy XML template can also be loaded this way (`ConfigLoader().load("template.xml")`) for
+backward compatibility during the coexistence period, but that path is deprecated: the new
+workflow's own input forms are just YAML and a prior ORSO output, per (a)/(b) above. Converting a
+legacy template to YAML first (see Migrating a legacy XML template, below) is the sanctioned way
+to bring it into the new workflow.
 
 ### Single-run extraction
 
@@ -126,11 +127,12 @@ config = apply_overrides(config, {"assembly": {"q_norm": 0.02}})
 
 ## Provenance
 
-The complete configuration used to reduce a run is intended to be embedded in the reduced
-output's ORSO header (mirroring `ReductionResult.reduction_config`,
-{class}`lr_reduction.models.results.ReductionResult`), so a reduced file is self-describing and
-can be handed back to `ConfigLoader` to reproduce or re-run the reduction (§4.2.3). The write/read
-paths for this are not yet implemented.
+The complete configuration used to reduce a run is embedded in the reduced output's ORSO header
+(mirroring `ReductionResult.reduction_config`, {class}`lr_reduction.models.results.ReductionResult`),
+so a reduced file is self-describing and can be handed back to `ConfigLoader` to reproduce or
+re-run the reduction (§4.2.3). Reading it back (`lr_reduction.io.orso.read_config`) is implemented;
+writing it out in the first place depends on the reduction/assembly operations that produce a
+`ReductionResult`, which are still stubs, so `lr_reduction.io.orso.write` is too.
 
 ## Migrating a legacy XML template
 
@@ -146,5 +148,4 @@ $ lr-xml-to-yaml template.xml config.yaml
 
 or, from a repository checkout without installing the package first,
 `python -m lr_reduction.io.xml_to_yaml template.xml config.yaml`. Both the command-line entry
-point and the `lr_reduction.io.xml_to_yaml.convert()` library call are wired up; the conversion
-logic itself is a stub at this stage.
+point and the `lr_reduction.io.xml_to_yaml.convert()` library call are implemented.
