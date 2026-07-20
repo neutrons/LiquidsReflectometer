@@ -1,7 +1,14 @@
-"""Legacy XML I/O module. Reads legacy RefRed XML templates as configuration input."""
+"""Legacy XML I/O module.
 
-from lr_reduction.models.config import DirectBeamConfig, ReductionConfig, ReflectedRunConfig
-from lr_reduction.utils import get_logger, get_sequence_id_from_path
+Reads legacy RefRed XML templates and converts them to a `ReductionConfig`, kept here for
+backward compatibility during the coexistence period (this branch is `@deprecated`, see
+`io/config_loader.py`). Per §3.3.10 the new workflow itself shall not read XML — the sanctioned
+path from a legacy template into the new workflow is a standalone conversion utility (§3.3.10.2:
+each legacy single direct-beam run is wrapped as a one-run composite direct beam).
+"""
+
+from lr_reduction.models.config import ReductionConfig
+from lr_reduction.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -9,11 +16,6 @@ logger = get_logger(__name__)
 def read_config(filepath: str) -> ReductionConfig:
     """Read a legacy XML template and convert it to a ReductionConfig."""
     logger.info(f"Reading legacy XML configuration from {filepath}")
-    sequence_id = get_sequence_id_from_path(filepath)
-    dbs = DirectBeamConfig(name="PLACEHOLDER NAME", db_runs=["PLACEHOLDER DB RUNS"])
-    refs = ReflectedRunConfig(run_id="PLACEHOLDER REF RUN", direct_beam=dbs.name)
-    return ReductionConfig(
-        sequence_id=sequence_id,
-        direct_beams=[dbs],
-        reflected_runs=[refs],
-    )
+    # Placeholder implementation; map legacy_reduction_template_reader.from_xml() output
+    # (a list of ReductionParameters) onto ReflectedRunConfig/DirectBeamConfig entries
+    ...
