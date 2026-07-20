@@ -15,12 +15,16 @@ checkout without installing the package first:
 
 import argparse
 
+import yaml
+
+from lr_reduction.io.xml import read_config
+
 
 def convert(input_path: str, output_path: str) -> None:
     """Read a legacy XML template from *input_path* and write it as YAML to *output_path*."""
-    # Placeholder implementation; read the template with lr_reduction.io.xml.read_config()
-    # (or the shared legacy-mapping helper it will expose) and yaml.safe_dump() the result
-    ...
+    config = read_config(input_path)
+    with open(output_path, "w") as f:
+        yaml.safe_dump(config.model_dump(exclude_none=True), f, sort_keys=False)
 
 
 def main() -> None:
