@@ -127,8 +127,8 @@ config = apply_overrides(config, {"assembly": {"q_norm": 0.02}})
 ## Provenance
 
 The complete configuration used to reduce a run is intended to be embedded in the reduced
-output's ORSO header (mirroring `SingleRunResult.configuration_yaml`,
-{class}`lr_reduction.models.results.SingleRunResult`), so a reduced file is self-describing and
+output's ORSO header (mirroring `ReductionResult.reduction_config`,
+{class}`lr_reduction.models.results.ReductionResult`), so a reduced file is self-describing and
 can be handed back to `ConfigLoader` to reproduce or re-run the reduction (§4.2.3). The write/read
 paths for this are not yet implemented.
 
