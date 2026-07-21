@@ -1,3 +1,7 @@
+########################
+### Project Metadata ###
+########################
+
 [project]
 name = "lr_reduction"
 authors = [{ name = "Mat", email = "m2d@ornl.gov" }]
@@ -18,13 +22,13 @@ homepage = "https://github.com/neutrons/LiquidsReflectometer"
 repository = "https://github.com/neutrons/LiquidsReflectometer"
 documentation = "https://lr-reduction.readthedocs.io/latest/index.html"
 
-#####################################
-#  BUILDING FROM SOURCES WITH HATCH
-#####################################
+####################
+### Build config ###
+####################
+
 [build-system]
 build-backend = "hatchling.build"
-requires = ["hatchling>=1.27.0", "toml", "versioningit"]
-
+requires = ["hatchling","versioningit"]
 
 [tool.hatch.version]
 source = "versioningit"
@@ -44,9 +48,6 @@ artifacts = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/lr_reduction", "src/lr_autoreduce"]
 
-#################
-#  VERSIONINGIT
-#################
 [tool.versioningit.vcs]
 method = "git"
 default-tag = "0.0.1"
@@ -62,18 +63,22 @@ distance-dirty = "{next_version}.dev{committer_date:%Y%m%d%H%M%S}"
 [tool.versioningit.write]
 file = "src/lr_reduction/_version.py"
 
-####################################################################
-#  CREATING CONDA ENVIRONMENT AND BUILDING CONDA PACKAGE WITH PIXI
-####################################################################
+###################
+### Pixi config ###
+###################
+
 [tool.pixi.workspace]
-preview = ["pixi-build"]
+platforms = ["linux-64"]
 channels = [
   "conda-forge",
   "mantid",
   "neutrons",
   "https://prefix.dev/pixi-build-backends"
 ]
-platforms = ["linux-64"]  # add additional platforms as needed
+# Required until the build feature becomes stable
+preview = ["pixi-build"]
+
+### Dependency tables
 
 # Conda packages to be installed in the environments. Includes all the run-dependencies.
 [tool.pixi.dependencies]
@@ -88,10 +93,21 @@ plot-publisher = ">=1.0,<2.0"
 pyqt = ">=5,<6"
 qtpy = ">=2.4.3"
 
-# Pypi packages to be installed in the environments with `pip`
 [tool.pixi.pypi-dependencies]
 lr_reduction = { path = ".", editable = true }  # editable install of lr_reduction
-toml-cli = "*"
+
+### Pixi build configuration
+
+[tool.pixi.package.build]
+backend = { name = "pixi-build-python", version = "0.8.*" }
+
+[tool.pixi.package.build-dependencies]
+hatchling = "*"
+versioningit = "*"
+
+[tool.pixi.package.host-dependencies]
+hatchling= ">=1.27.0,<2"
+versioningit = "*"
 
 # Conda packages (no PyPi) to be enumerated within the conda package to be built.
 [tool.pixi.package.run-dependencies]
@@ -107,41 +123,33 @@ qtpy = ">=2.4.3"
 name = "lr_reduction"
 version = "0.0.0"  # a placeholder overwritten when Pixi task "sync-version" is executed
 
-[tool.pixi.package.build]
-backend = { name = "pixi-build-python", version = ">=0.2,<1" }
+### Environments and features
 
-[tool.pixi.package.host-dependencies]
-hatchling= ">=1.27.0,<2"
-versioningit = "*"
+[tool.pixi.environments]
+default = { features = [
+    "build",
+    "dev",
+    "docs",
+  ], solve-group = "default" }
+docs = {features = ["build", "docs"], solve-group = "default"}  # readthedocs.org uses this environment
 
+[tool.pixi.feature.build.dependencies]
+versioningit = ">=3.2.0"
 
-###################################
-#  PIXI FEATURES AND ENVIRONMENTS
-###################################
-[tool.pixi.feature.installer.dependencies]  # necessary to install and inspect
-hatch= "*"
-pip = "*"
-versioningit = "*"
-conda-tree = "*"
+[tool.pixi.feature.build.pypi-dependencies]
+toml-cli = "*"
 
-[tool.pixi.feature.developer.dependencies]  # necessary for development and testing
+[tool.pixi.feature.dev.dependencies]  # necessary for development and testing
 pre-commit = "*"
 ruff = "*"
 codecov = "*"
 pytest = "*"
 pytest-cov = "*"
 
-[tool.pixi.feature.package.dependencies]  # necessary to build the conda package
-anaconda-client = ">=1.13.0,<2"
-
-[tool.pixi.feature.docs.dependencies]  # necessary for building the documentation
+[tool.pixi.feature.docs.dependencies]
 sphinx = "*"
 sphinx_rtd_theme = "*"
 myst-parser = "*"
-
-[tool.pixi.environments]
-default = {features = ["installer", "developer", "package", "docs"], solve-group = "default"}  # created by `pixi install`
-docs = {features = ["installer", "docs"], solve-group = "default"}  # readthedocs.org uses this environment
 
 ###############
 #  PIXI TASKS
@@ -152,9 +160,15 @@ docs = {features = ["installer", "docs"], solve-group = "default"}  # readthedoc
 docs-build = { cmd = 'sphinx-build --keep-going -n -T -b html docs  docs/build/html && echo -e "##########\n DOCS point your browser to file://$(pwd)/build/html/index.html\n##########"', description = "Build the documentation" }
 docs-clean = { cmd = "rm -rf docs/build", description = "Clean the documentation build artifacts" }
 # Packaging
-conda-builder = { cmd = "pixi build", description = "Command that creates the conda package" }
-conda-build = { depends-on = ["sync-version", "conda-builder", "reset-version"], description = "Build the conda package" }
-conda-clean = { cmd = "rm -f *.conda", description = "Clean the local .conda build artifacts" }
+conda-build-command = { cmd = "pixi publish --target-channel ./local-channel", description = "Build the conda package command" }
+conda-build = { description = "Build the conda package", depends-on = [
+    "sync-version",
+    "conda-build-command",
+    "reset-version",
+] }
+conda-publish = { cmd = "pixi upload anaconda --owner neutrons *.conda", description = "Publish the .conda package to anaconda.org", depends-on = [
+    "conda-build",
+] }
 # Testing
 test-reduction = { cmd = "cd tests/ && python -m pytest -vv --cov=../src --cov-report=xml --cov-report=term"}
 # Misc
@@ -162,18 +176,16 @@ clean-all = { description = "Clean all build artifacts", depends-on = ["docs-cle
 sync-version = { cmd = 'version=$(python -m versioningit); toml set tool.pixi.package.version "$version" --toml-path pyproject.toml', description = "Sync pyproject.toml version with Git version" }
 reset-version = { cmd = "toml set tool.pixi.package.version \"0.0.0\" --toml-path pyproject.toml", description = "Reset the package version to 0.0.0" }
 
-#############
-#  COVERAGE
-#############
+##########################
+### Pytest and CodeCov ###
+##########################
+
 [tool.coverage.run]
 branch = true
 
 [tool.coverage.report]
 skip_empty = true
 
-###########
-#  PYTEST
-###########
 [tool.pytest.ini_options]
 pythonpath = [
   ".",
@@ -196,15 +208,16 @@ markers = [
 ]
 addopts = "--import-mode=importlib"  # to allow a unit test and integration test with the same module name
 
-#########
-#  RUFF
-#########
+############
+### Ruff ###
+############
+
 [tool.ruff]
 line-length = 120
 exclude = ["notebooks/**", "**/*.ipynb", "scripts/**", "tests/data/**"]
 
 [tool.ruff.lint]
-select = ["A", "ARG","ASYNC","BLE", "E", "F", "FURB", "I", "N", "UP032", "W"]
+select = ["A", "ARG","ASYNC","BLE", "E", "F", "FURB", "I", "N", "UP032", "W",]
 
 [tool.ruff.lint.isort]
 known-first-party = ["lr_reduction"]
