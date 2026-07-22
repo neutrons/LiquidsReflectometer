@@ -1,7 +1,7 @@
 """Pydantic schema for the reduction workflow configuration (§3.3).
 
-Sequence-wide parameters and per-run parameters are modeled separately (§3.3.1): a single
-`RunParameters` bundle is used both as the sequence-wide `defaults` block and, with every field
+Global parameters and per-run parameters are modeled separately (§3.3.1): a single
+`RunParameters` bundle is used both as the global `defaults` block and, with every field
 optional, as per-run overrides on `DirectBeamConfig`/`ReflectedRunConfig` (§3.3.6) — `None` means
 "inherit from defaults". Composite direct beams live in their own named key space (§3.3.3) and are
 referenced by name from reflected runs (§3.3.4); referential integrity is enforced at load (§3.3.5).
@@ -170,7 +170,7 @@ class RunFilter(BaseModel):
 class RunParameters(BaseModel):
     """The §3.3.6 per-run-capable scientific parameters.
 
-    Used both as the sequence-wide `defaults` block and, with every field optional, as per-run
+    Used both as the global `defaults` block and, with every field optional, as per-run
     overrides on `DirectBeamConfig`/`ReflectedRunConfig` (`None` means "inherit from defaults").
     """
 
@@ -197,7 +197,7 @@ class DirectBeamConfig(RunParameters):
 
     Inherits `RunParameters` (rather than carrying only `db_runs`) because the direct beam has
     its own peak/background/low-res characterization window, distinct from any reflected run
-    that references it, and should inherit from the same sequence-wide `defaults`.
+    that references it, and should inherit from the same global `defaults`.
     """
 
     db_runs: list[int] = Field(min_length=1)
@@ -208,7 +208,7 @@ class DirectBeamConfig(RunParameters):
 class ReflectedRunConfig(RunParameters):
     """One reflected run keyed by sequence_number (§3.3.4).
 
-    Inherits the optional `RunParameters` fields as per-run overrides atop the sequence
+    Inherits the optional `RunParameters` fields as per-run overrides atop the global
     `defaults`, and carries the run's source data (§3.3.6.1) and optional filter (§3.3.6.2).
     """
 
@@ -238,7 +238,7 @@ class ReflectedRunConfig(RunParameters):
         return list(self.source_runs) if self.source_runs else [self.run_number]
 
 
-# --------------------------------------------------------------------- sequence-wide containers ----
+# --------------------------------------------------------------------------- global containers ----
 
 
 class OutputConfig(BaseModel):
@@ -275,21 +275,17 @@ class AssemblyConfig(BaseModel):
 
 
 class ReductionConfig(BaseModel):
-    """Sequence-wide configuration (§3.3.1)."""
+    """Global configuration (§3.3.1)."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
-    # sequence-wide identity
+    # global settings
     instrument: str = "BL4B"
-    sequence_id: int
-    experiment_id: Optional[str] = None  # OPEN: may be resolvable from NeXus logs instead of required
-
-    # sequence-wide behavior
     output: OutputConfig = Field(default_factory=OutputConfig)
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
     assembly: AssemblyConfig = Field(default_factory=AssemblyConfig)
 
-    # per-run defaults inherited by every run (§3.3.1 sequence-wide vs. per-run split)
+    # per-run defaults inherited by every run (§3.3.1 global vs. per-run split)
     defaults: RunParameters = Field(default_factory=RunParameters)
 
     # the two per-run key spaces (§3.3.2/.3/.4)
@@ -312,7 +308,7 @@ class ReductionConfig(BaseModel):
         return self
 
     def for_run(self, sequence_number: int) -> ReductionConfig:
-        """Extract a valid one-run config (§3.3.8): same sequence-wide settings, only the
+        """Extract a valid one-run config (§3.3.8): same global settings, only the
         selected run and the direct beam it references. Re-validated like any other config,
         so no separate single-run format exists."""
         try:

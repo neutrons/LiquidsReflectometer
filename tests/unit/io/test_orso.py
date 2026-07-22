@@ -31,7 +31,6 @@ def _write_orso_file(path, configuration_yaml=None):
 
 def _example_config_dict():
     return ReductionConfig(
-        sequence_id=12340,
         direct_beams={"db_8mm": {"db_runs": [12345]}},
         runs=[{"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 111}],
     ).model_dump()
@@ -43,7 +42,6 @@ def test_read_config(tmp_path):
 
     config = read_config(str(path))
 
-    assert config.sequence_id == 12340
     assert set(config.direct_beams) == {"db_8mm"}
     assert config.runs[0].run_number == 111
 

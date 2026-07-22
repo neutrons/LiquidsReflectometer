@@ -1,7 +1,5 @@
 # Example native YAML configuration (§3.3), mirroring the non-normative skeleton in the spec.
 instrument: BL4B
-sequence_id: 12340
-experiment_id: IPTS-12345
 
 defaults:
   q_binning:

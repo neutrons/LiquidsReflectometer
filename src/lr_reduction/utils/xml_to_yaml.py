@@ -1,12 +1,22 @@
-"""Legacy XML I/O module.
+"""Convert a legacy RefRed XML reduction template into the new-workflow YAML configuration format (§3.3.10).
 
-Reads legacy RefRed XML templates and converts them to a `ReductionConfig`, kept here for
-backward compatibility during the coexistence period (this branch is `@deprecated`, see
-`io/config_loader.py`). Per §3.3.10 the new workflow itself shall not read XML — the sanctioned
-path from a legacy template into the new workflow is a standalone conversion utility (§3.3.10.2:
-each legacy single direct-beam run is wrapped as a one-run composite direct beam), which reuses
-the field-mapping helpers below so the ~40-field mapping logic lives in exactly one place.
+This is the sanctioned way to bring a legacy XML template into the new workflow: the new
+workflow's own loader (`lr_reduction.io.config_loader.ConfigLoader`) does not read XML directly
+for that purpose — its `.xml` support is a separate, deprecated backward-compatibility path that
+reuses the field-mapping logic below, so the ~40-field mapping logic lives in exactly one place.
+Run this utility first, then pass the resulting YAML file to the new workflow.
+
+Available both as a library call and as a command-line entry point — the installed
+`lr-xml-to-yaml` console script, or `python -m lr_reduction.utils.xml_to_yaml` from a repository
+checkout without installing the package first:
+
+    >>> from lr_reduction.utils.xml_to_yaml import convert
+    >>> convert("template.xml", "config.yaml")
 """
+
+import argparse
+
+import yaml
 
 from lr_reduction.legacy.reduction_template_reader import ReductionParameters, from_xml
 from lr_reduction.models.config import (
@@ -24,7 +34,7 @@ from lr_reduction.models.config import (
     ReductionConfig,
     ReflectedRunConfig,
 )
-from lr_reduction.utils import get_logger, get_sequence_id_from_path
+from lr_reduction.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -51,7 +61,6 @@ def read_config(filepath: str) -> ReductionConfig:
     assembly = _assembly_config_from_legacy(data_sets[0]) if data_sets else AssemblyConfig()
 
     return ReductionConfig(
-        sequence_id=int(get_sequence_id_from_path(filepath)),
         direct_beams=direct_beams,
         runs=runs,
         assembly=assembly,
@@ -133,10 +142,10 @@ def _run_config_from_legacy(
 
 
 def _assembly_config_from_legacy(params: ReductionParameters) -> AssemblyConfig:
-    """Map the sequence-wide stitching configuration.
+    """Map the global stitching configuration.
 
     Legacy repeats the same stitching configuration on every per-run block (a parallel-array
-    artifact); it is genuinely sequence-wide, so only the first block's value is used.
+    artifact); it is genuinely global, so only the first block's value is used.
     """
     stitching = params.stitching_configuration
     return AssemblyConfig(
@@ -144,3 +153,22 @@ def _assembly_config_from_legacy(params: ReductionParameters) -> AssemblyConfig:
         scale_factor_q_range=(stitching.scale_factor_qmin, stitching.scale_factor_qmax),
         normalize_first_angle=stitching.normalize_first_angle,
     )
+
+
+def convert(input_path: str, output_path: str) -> None:
+    """Read a legacy XML template from *input_path* and write it as YAML to *output_path*."""
+    config = read_config(input_path)
+    with open(output_path, "w") as f:
+        yaml.safe_dump(config.model_dump(exclude_none=True), f, sort_keys=False)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("input", help="Path to the legacy XML reduction template")
+    parser.add_argument("output", help="Path to write the converted YAML configuration to")
+    args = parser.parse_args()
+    convert(args.input, args.output)
+
+
+if __name__ == "__main__":
+    main()

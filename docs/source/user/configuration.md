@@ -4,18 +4,18 @@ This describes the new, configuration-driven reduction workflow, which is separa
 legacy RefRed/XML-template workflow described in {ref}`workflow`. The two workflows have separate
 entry points and coexist during a transition period; this page covers only the new one.
 
-## Sequence-wide vs. per-run parameters
+## Global vs. per-run parameters
 
-A configuration file describes an entire sequence of runs (identified by `sequence_id`), and
-distinguishes:
+A configuration file describes a set of runs to reduce — not necessarily all from the same
+sequence — and distinguishes:
 
-- **Sequence-wide parameters** — the same for every run in the sequence (e.g. `instrument`,
+- **Global parameters** — the same for every run in the configuration (e.g. `instrument`,
   `assembly` stitching options, `output` settings).
 - **Per-run parameters** — the scientific parameters that can vary per run (peak/background pixel
   ranges, Q binning, corrections, etc.), modeled by `RunParameters`
   ({class}`lr_reduction.models.config.RunParameters`).
 
-Per-run parameters use an inheritance model: a sequence-wide `defaults` block sets the values
+Per-run parameters use an inheritance model: a global `defaults` block sets the values
 shared by every run, and each run may override any subset of those fields (`None` means "inherit
 from defaults"). A typical configuration is therefore short: most runs only override
 `direct_beam`, `peak`, and maybe `background`. `ReductionConfig.effective()` resolves the final,
@@ -29,8 +29,6 @@ direct beam by name, and the same direct beam may be referenced by more than one
 
 ```yaml
 instrument: BL4B
-sequence_id: 12340
-experiment_id: IPTS-12345
 
 defaults:
   q_binning:
@@ -83,15 +81,9 @@ config = ConfigLoader().load("config.yaml")
 config = ConfigLoader().load("reduced_output.ort")
 ```
 
-A legacy XML template can also be loaded this way (`ConfigLoader().load("template.xml")`) for
-backward compatibility during the coexistence period, but that path is deprecated: the new
-workflow's own input forms are just YAML and a prior ORSO output, per (a)/(b) above. Converting a
-legacy template to YAML first (see Migrating a legacy XML template, below) is the sanctioned way
-to bring it into the new workflow.
-
 ### Single-run extraction
 
-Selecting one run from a sequence configuration yields a valid, self-contained one-run
+Selecting one run from a configuration yields a valid, self-contained one-run
 configuration — there is no separate single-run format:
 
 ```python
@@ -147,5 +139,5 @@ $ lr-xml-to-yaml template.xml config.yaml
 ```
 
 or, from a repository checkout without installing the package first,
-`python -m lr_reduction.io.xml_to_yaml template.xml config.yaml`. Both the command-line entry
-point and the `lr_reduction.io.xml_to_yaml.convert()` library call are implemented.
+`python -m lr_reduction.utils.xml_to_yaml template.xml config.yaml`. Both the command-line entry
+point and the `lr_reduction.utils.xml_to_yaml.convert()` library call are implemented.

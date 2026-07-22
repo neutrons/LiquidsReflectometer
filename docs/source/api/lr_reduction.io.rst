@@ -55,22 +55,6 @@ lr_reduction.io.run_loader
    :undoc-members:
    :show-inheritance:
 
-lr_reduction.io.xml
-+++++++++++++++++++++
-
-.. automodule:: lr_reduction.io.xml
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-lr_reduction.io.xml_to_yaml
-++++++++++++++++++++++++++++
-
-.. automodule:: lr_reduction.io.xml_to_yaml
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 lr_reduction.io.yaml
 ++++++++++++++++++++++
 
