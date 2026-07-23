@@ -13,7 +13,7 @@ runs (§3.3.4); referential integrity is enforced at load (§3.3.5).
 
 from __future__ import annotations
 
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -42,15 +42,23 @@ class AcceptanceWindow(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
-    wavelength: Optional[tuple[float, float]] = None  # (lambda_min, lambda_max), Angstrom
-    tof: Optional[tuple[float, float]] = None  # (tof_min, tof_max), microseconds
+    wavelength: tuple[float, float] | None = None  # (lambda_min, lambda_max), Angstrom
+    tof: tuple[float, float] | None = None  # (tof_min, tof_max), microseconds
 
     @model_validator(mode="after")
     def _ordered(self) -> AcceptanceWindow:
-        if self.wavelength is not None and self.wavelength[1] < self.wavelength[0]:
-            raise ValueError(f"wavelength max ({self.wavelength[1]}) < min ({self.wavelength[0]})")
-        if self.tof is not None and self.tof[1] < self.tof[0]:
-            raise ValueError(f"tof max ({self.tof[1]}) < min ({self.tof[0]})")
+        if self.wavelength is not None:
+            lo, hi = self.wavelength
+            if lo <= 0:
+                raise ValueError(f"wavelength min ({lo}) must be positive")
+            if hi < lo:
+                raise ValueError(f"wavelength max ({hi}) < min ({lo})")
+        if self.tof is not None:
+            lo, hi = self.tof
+            if lo < 0:
+                raise ValueError(f"tof min ({lo}) must be non-negative")
+            if hi < lo:
+                raise ValueError(f"tof max ({hi}) < min ({lo})")
         return self
 
 
@@ -80,8 +88,8 @@ class BackgroundConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
     apply: bool = True
-    region: Optional[PixelRange] = None
-    region2: Optional[PixelRange] = None  # legacy `two_backgrounds` secondary side window
+    region: PixelRange | None = None
+    region2: PixelRange | None = None  # legacy `two_backgrounds` secondary side window
     mode: Literal["side", "functional"] = "side"
 
 
@@ -95,7 +103,7 @@ class AngleConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
     use_calculated_theta: bool = False  # False: use motor angle; True: fit/calculate theta
     theta_offset: float = 0.0  # degrees
-    theta_offset_error: Optional[float] = None  # degrees
+    theta_offset_error: float | None = Field(default=None, ge=0)  # degrees
 
 
 class DeadTimeConfig(BaseModel):
@@ -103,10 +111,10 @@ class DeadTimeConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
     apply: bool = True
-    value: float = 4.2
+    value: float = Field(4.2, ge=0)
     tof_step: float = Field(50, gt=0)
     paralyzable: bool = True
-    threshold: Optional[float] = None
+    threshold: float | None = Field(default=None, gt=0)
 
 
 class EmissionTimeConfig(BaseModel):
@@ -118,7 +126,13 @@ class EmissionTimeConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
     apply: bool = True
-    coefficients: Optional[list[float]] = None
+    coefficients: list[float] | None = None
+
+    @model_validator(mode="after")
+    def _coefficients_non_empty(self) -> EmissionTimeConfig:
+        if self.coefficients is not None and not self.coefficients:
+            raise ValueError("`coefficients` must not be empty when provided")
+        return self
 
 
 class Corrections(BaseModel):
@@ -156,19 +170,19 @@ class GeometryOverride(BaseModel):
     """Instrument-geometry overrides; unset fields default to the IDF value (§2.1.4.3)."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
-    l1: Optional[float] = None  # source-to-sample distance, meters
-    l2: Optional[float] = None  # sample-to-detector distance, meters
+    l1: float | None = Field(default=None, gt=0)  # source-to-sample distance, meters
+    l2: float | None = Field(default=None, gt=0)  # sample-to-detector distance, meters
 
 
 class RunFilter(BaseModel):
     """Time and/or log-value filter applied when loading a source run (§3.1.4)."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
-    start_time: Optional[float] = None  # seconds, relative to run start
-    stop_time: Optional[float] = None
-    log_name: Optional[str] = None
-    log_min: Optional[float] = None
-    log_max: Optional[float] = None
+    start_time: float | None = None  # seconds, relative to run start
+    stop_time: float | None = None
+    log_name: str | None = None
+    log_min: float | None = None
+    log_max: float | None = None
 
     @model_validator(mode="after")
     def _has_criterion(self) -> RunFilter:
@@ -176,6 +190,14 @@ class RunFilter(BaseModel):
         has_log = self.log_name is not None
         if not (has_time or has_log):
             raise ValueError("RunFilter requires at least one time or log-value criterion")
+        return self
+
+    @model_validator(mode="after")
+    def _ordered(self) -> RunFilter:
+        if self.start_time is not None and self.stop_time is not None and self.stop_time <= self.start_time:
+            raise ValueError(f"stop_time ({self.stop_time}) must exceed start_time ({self.start_time})")
+        if self.log_min is not None and self.log_max is not None and self.log_max <= self.log_min:
+            raise ValueError(f"log_max ({self.log_max}) must exceed log_min ({self.log_min})")
         return self
 
 
@@ -190,9 +212,9 @@ class RunParameters(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
-    peak: Optional[PixelRange] = None
-    background: Optional[BackgroundConfig] = None
-    low_res: Optional[PixelRange] = None  # low-resolution-direction pixel range
+    peak: PixelRange | None = None
+    background: BackgroundConfig | None = None
+    low_res: PixelRange | None = None  # low-resolution-direction pixel range
 
 
 class ReflectedRunParameters(RunParameters):
@@ -204,14 +226,20 @@ class ReflectedRunParameters(RunParameters):
     "inherit from defaults").
     """
 
-    acceptance: Optional[AcceptanceWindow] = None
-    q_binning: Optional[QBinning] = None
-    angle: Optional[AngleConfig] = None
-    peak_fit: Optional[PeakFitConfig] = None
-    resolution: Optional[ResolutionConfig] = None
-    geometry: Optional[GeometryOverride] = None
-    scale_factor: Optional[float] = None  # manual stitch scale override
-    trim: Optional[tuple[int, int]] = None  # (pre_cut, post_cut) points trimmed from curve ends
+    acceptance: AcceptanceWindow | None = None
+    q_binning: QBinning | None = None
+    angle: AngleConfig | None = None
+    peak_fit: PeakFitConfig | None = None
+    resolution: ResolutionConfig | None = None
+    geometry: GeometryOverride | None = None
+    scale_factor: float | None = None  # manual stitch scale override
+    trim: tuple[int, int] | None = None  # (pre_cut, post_cut) points trimmed from curve ends
+
+    @model_validator(mode="after")
+    def _trim_non_negative(self) -> ReflectedRunParameters:
+        if self.trim is not None and (self.trim[0] < 0 or self.trim[1] < 0):
+            raise ValueError(f"trim values must be non-negative, got {self.trim}")
+        return self
 
 
 # --- the two run kinds ------------------------------------------------------
@@ -227,7 +255,7 @@ class DirectBeamConfig(RunParameters):
 
     db_runs: list[int] = Field(min_length=1)
     # OPEN: not explicitly specified for DB runs; included for symmetry with reflected runs (§3.1.4)
-    filter: Optional[RunFilter] = None
+    filter: RunFilter | None = None
 
 
 class ReflectedRunConfig(ReflectedRunParameters):
@@ -241,11 +269,11 @@ class ReflectedRunConfig(ReflectedRunParameters):
     direct_beam: str  # named DB reference (§3.3.4)
 
     # Exactly one of these identifies the reflected run's source data (§3.3.6.1).
-    run_number: Optional[int] = None  # OPEN: could instead be resolved from NeXus logs by sequence_number
+    run_number: int | None = None  # OPEN: could instead be resolved from NeXus logs by sequence_number
     source_runs: list[int] | None = None  # multiple runs to sum, reflected only (hard-fail
     # on mismatched conditions is enforced at the summing operation, not at schema load)
 
-    filter: Optional[RunFilter] = None  # §3.3.6.2
+    filter: RunFilter | None = None  # §3.3.6.2
 
     @model_validator(mode="after")
     def _one_source(self) -> ReflectedRunConfig:
@@ -270,8 +298,8 @@ class ReflectedRunConfig(ReflectedRunParameters):
 
 class OutputConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
-    stem: str = "reduction_output"
-    subtitle: Optional[str] = None
+    stem: str = Field("reduction_output", min_length=1)
+    subtitle: str | None = None
     eight_column: bool = False  # legacy 8-column output format (T, L, dT, dL)
 
 
@@ -293,8 +321,18 @@ class AssemblyConfig(BaseModel):
     q_norm: float = Field(0.015, gt=0)
     autoscale: bool = False
     stitching_type: Literal["manual", "automatic_average", "absolute_normalization"] = "manual"
-    scale_factor_q_range: Optional[tuple[float, float]] = None
+    scale_factor_q_range: tuple[float, float] | None = None
     normalize_first_angle: bool = False
+
+    @model_validator(mode="after")
+    def _ordered(self) -> AssemblyConfig:
+        if self.scale_factor_q_range is not None:
+            q_min, q_max = self.scale_factor_q_range
+            if q_min <= 0:
+                raise ValueError(f"scale_factor_q_range min ({q_min}) must be positive")
+            if q_max <= q_min:
+                raise ValueError(f"scale_factor_q_range max ({q_max}) must exceed min ({q_min})")
+        return self
 
 
 # ------------------------------------------------------------------------------- top level ----
@@ -350,7 +388,7 @@ class ReductionConfig(BaseModel):
         data["direct_beams"] = {run.direct_beam: self.direct_beams[run.direct_beam].model_dump()}
         return ReductionConfig(**data)
 
-    def effective(self, run: Union[ReflectedRunConfig, DirectBeamConfig]) -> RunParameters:
+    def effective(self, run: ReflectedRunConfig | DirectBeamConfig) -> RunParameters:
         """The effective per-run parameters: `defaults` merged with `run`'s own overrides.
 
         A `DirectBeamConfig` only draws on the shared `RunParameters` fields; a
