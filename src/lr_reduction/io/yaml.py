@@ -13,4 +13,6 @@ def read_config(filepath: str) -> ReductionConfig:
     logger.info(f"Reading YAML configuration from {filepath}")
     with open(filepath) as f:
         data = yaml.safe_load(f)
+    if not isinstance(data, dict):
+        raise ValueError(f"{filepath}: expected a YAML mapping, got {type(data).__name__}")
     return ReductionConfig(**data)

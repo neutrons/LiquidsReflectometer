@@ -3,7 +3,8 @@
 Global parameters and per-run parameters are modeled separately (§3.3.1). `RunParameters` holds
 the ROI-selection fields (`peak`, `background`, `low_res`) shared by both direct beam and
 reflected runs; `ReflectedRunParameters` extends it with the fields that only make sense for a
-reflected run (acceptance window, Q binning, corrections, etc.). With every field optional, each
+reflected run (acceptance window, Q binning, etc.); global-only settings such as `Corrections`
+live directly on `ReductionConfig`. With every field optional, each
 is used both as the global `defaults` block and as per-run overrides on
 `DirectBeamConfig`/`ReflectedRunConfig` (§3.3.6) — `None` means "inherit from defaults". Composite
 direct beams live in their own named key space (§3.3.3) and are referenced by name from reflected
@@ -43,6 +44,14 @@ class AcceptanceWindow(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
     wavelength: Optional[tuple[float, float]] = None  # (lambda_min, lambda_max), Angstrom
     tof: Optional[tuple[float, float]] = None  # (tof_min, tof_max), microseconds
+
+    @model_validator(mode="after")
+    def _ordered(self) -> AcceptanceWindow:
+        if self.wavelength is not None and self.wavelength[1] < self.wavelength[0]:
+            raise ValueError(f"wavelength max ({self.wavelength[1]}) < min ({self.wavelength[0]})")
+        if self.tof is not None and self.tof[1] < self.tof[0]:
+            raise ValueError(f"tof max ({self.tof[1]}) < min ({self.tof[0]})")
+        return self
 
 
 class QBinning(BaseModel):
@@ -113,7 +122,11 @@ class EmissionTimeConfig(BaseModel):
 
 
 class Corrections(BaseModel):
-    """Correction enable flags and parameters (§3.3.6)."""
+    """Correction enable flags and parameters (§3.3.6), applied globally to every run.
+
+    Background subtraction is not modeled here: unlike these corrections, it varies per run and
+    is carried by `RunParameters.background` instead.
+    """
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
     dead_time: DeadTimeConfig = Field(default_factory=DeadTimeConfig)
@@ -121,7 +134,6 @@ class Corrections(BaseModel):
     # OPEN: legacy `GravityDirection` supports UP/DOWN/OFF; §3.3.6 only asks for an enable flag.
     # Confirm whether direction reversal is still operationally needed.
     gravity: bool = True
-    background: BackgroundConfig = Field(default_factory=BackgroundConfig)
 
 
 class PeakFitConfig(BaseModel):
@@ -187,15 +199,14 @@ class ReflectedRunParameters(RunParameters):
     """The §3.3.6 per-run-capable scientific parameters that only make sense for a reflected run.
 
     Extends `RunParameters` with the fields a direct beam has no use for (acceptance window,
-    Q binning, angle/corrections, stitch scale, curve trimming, …). Used both as the global
-    `defaults` block and, with every field optional, as per-run overrides on `ReflectedRunConfig`
-    (`None` means "inherit from defaults").
+    Q binning, angle, stitch scale, curve trimming, …). Used both as the global `defaults` block
+    and, with every field optional, as per-run overrides on `ReflectedRunConfig` (`None` means
+    "inherit from defaults").
     """
 
     acceptance: Optional[AcceptanceWindow] = None
     q_binning: Optional[QBinning] = None
     angle: Optional[AngleConfig] = None
-    corrections: Optional[Corrections] = None
     peak_fit: Optional[PeakFitConfig] = None
     resolution: Optional[ResolutionConfig] = None
     geometry: Optional[GeometryOverride] = None
@@ -231,7 +242,7 @@ class ReflectedRunConfig(ReflectedRunParameters):
 
     # Exactly one of these identifies the reflected run's source data (§3.3.6.1).
     run_number: Optional[int] = None  # OPEN: could instead be resolved from NeXus logs by sequence_number
-    source_runs: Optional[list[int]] = None  # multiple runs to sum, reflected only (hard-fail
+    source_runs: list[int] | None = None  # multiple runs to sum, reflected only (hard-fail
     # on mismatched conditions is enforced at the summing operation, not at schema load)
 
     filter: Optional[RunFilter] = None  # §3.3.6.2
@@ -239,11 +250,13 @@ class ReflectedRunConfig(ReflectedRunParameters):
     @model_validator(mode="after")
     def _one_source(self) -> ReflectedRunConfig:
         has_run_number = self.run_number is not None
-        has_source_runs = bool(self.source_runs)
+        has_source_runs = self.source_runs is not None
         if has_run_number == has_source_runs:
             raise ValueError(
                 f"sequence_number={self.sequence_number}: exactly one of `run_number` or `source_runs` must be set"
             )
+        if has_source_runs and not self.source_runs:
+            raise ValueError(f"sequence_number={self.sequence_number}: `source_runs` must not be empty")
         return self
 
     @property
@@ -260,7 +273,6 @@ class OutputConfig(BaseModel):
     stem: str = "reduction_output"
     subtitle: Optional[str] = None
     eight_column: bool = False  # legacy 8-column output format (T, L, dT, dL)
-    directory: Optional[str] = None  # override; else IPTS-derived
 
 
 class DiagnosticsConfig(BaseModel):
@@ -293,11 +305,14 @@ class ReductionConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
+    schema_version: Literal["1.0"] = "1.0"
+
     # global settings
     instrument: str = "BL4B"
     output: OutputConfig = Field(default_factory=OutputConfig)
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
     assembly: AssemblyConfig = Field(default_factory=AssemblyConfig)
+    corrections: Corrections = Field(default_factory=Corrections)
 
     # per-run defaults inherited by every run (§3.3.1 global vs. per-run split); the superset
     # type since a reflected run's defaults may cover fields a direct beam has no use for
@@ -343,9 +358,9 @@ class ReductionConfig(BaseModel):
         """
         param_cls = ReflectedRunParameters if isinstance(run, ReflectedRunConfig) else RunParameters
         fields = set(param_cls.model_fields)
-        merged = {k: v for k, v in self.defaults.model_dump(exclude_none=True).items() if k in fields}
-        merged.update(run.model_dump(include=fields, exclude_none=True))
-        return param_cls(**merged)
+        defaults = {k: v for k, v in self.defaults.model_dump(exclude_none=True).items() if k in fields}
+        overrides = run.model_dump(include=fields, exclude_none=True)
+        return param_cls(**_deep_merge(defaults, overrides))
 
 
 def apply_overrides(config: ReductionConfig, overrides: dict) -> ReductionConfig:

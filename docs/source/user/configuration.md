@@ -10,11 +10,12 @@ A configuration file describes a set of runs to reduce — not necessarily all f
 sequence — and distinguishes:
 
 - **Global parameters** — the same for every run in the configuration (e.g. `instrument`,
-  `assembly` stitching options, `output` settings).
+  `assembly` stitching options, `output` settings, `corrections` such as dead-time and
+  emission-time).
 - **Per-run parameters** — the scientific parameters that can vary per run. ROI-selection
   parameters (peak/background pixel ranges) are shared by direct beam and reflected runs alike and
   modeled by `RunParameters` ({class}`lr_reduction.models.config.RunParameters`); parameters that
-  only make sense for a reflected run (Q binning, corrections, etc.) are modeled by
+  only make sense for a reflected run (Q binning, acceptance window, etc.) are modeled by
   `ReflectedRunParameters` ({class}`lr_reduction.models.config.ReflectedRunParameters`), which
   extends `RunParameters`.
 
