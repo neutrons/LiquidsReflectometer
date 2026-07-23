@@ -1,10 +1,13 @@
 """Pydantic schema for the reduction workflow configuration (§3.3).
 
-Global parameters and per-run parameters are modeled separately (§3.3.1): a single
-`RunParameters` bundle is used both as the global `defaults` block and, with every field
-optional, as per-run overrides on `DirectBeamConfig`/`ReflectedRunConfig` (§3.3.6) — `None` means
-"inherit from defaults". Composite direct beams live in their own named key space (§3.3.3) and are
-referenced by name from reflected runs (§3.3.4); referential integrity is enforced at load (§3.3.5).
+Global parameters and per-run parameters are modeled separately (§3.3.1). `RunParameters` holds
+the ROI-selection fields (`peak`, `background`, `low_res`) shared by both direct beam and
+reflected runs; `ReflectedRunParameters` extends it with the fields that only make sense for a
+reflected run (acceptance window, Q binning, corrections, etc.). With every field optional, each
+is used both as the global `defaults` block and as per-run overrides on
+`DirectBeamConfig`/`ReflectedRunConfig` (§3.3.6) — `None` means "inherit from defaults". Composite
+direct beams live in their own named key space (§3.3.3) and are referenced by name from reflected
+runs (§3.3.4); referential integrity is enforced at load (§3.3.5).
 """
 
 from __future__ import annotations
@@ -168,16 +171,27 @@ class RunFilter(BaseModel):
 
 
 class RunParameters(BaseModel):
-    """The §3.3.6 per-run-capable scientific parameters.
+    """ROI-selection parameters shared by both direct beam and reflected runs (§3.3.6).
 
-    Used both as the global `defaults` block and, with every field optional, as per-run
-    overrides on `DirectBeamConfig`/`ReflectedRunConfig` (`None` means "inherit from defaults").
+    Used both as part of the global `defaults` block and, with every field optional, as per-run
+    overrides on `DirectBeamConfig` (`None` means "inherit from defaults").
     """
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
     peak: Optional[PixelRange] = None
     background: Optional[BackgroundConfig] = None
     low_res: Optional[PixelRange] = None  # low-resolution-direction pixel range
+
+
+class ReflectedRunParameters(RunParameters):
+    """The §3.3.6 per-run-capable scientific parameters that only make sense for a reflected run.
+
+    Extends `RunParameters` with the fields a direct beam has no use for (acceptance window,
+    Q binning, angle/corrections, stitch scale, curve trimming, …). Used both as the global
+    `defaults` block and, with every field optional, as per-run overrides on `ReflectedRunConfig`
+    (`None` means "inherit from defaults").
+    """
+
     acceptance: Optional[AcceptanceWindow] = None
     q_binning: Optional[QBinning] = None
     angle: Optional[AngleConfig] = None
@@ -205,10 +219,10 @@ class DirectBeamConfig(RunParameters):
     filter: Optional[RunFilter] = None
 
 
-class ReflectedRunConfig(RunParameters):
+class ReflectedRunConfig(ReflectedRunParameters):
     """One reflected run keyed by sequence_number (§3.3.4).
 
-    Inherits the optional `RunParameters` fields as per-run overrides atop the global
+    Inherits the optional `ReflectedRunParameters` fields as per-run overrides atop the global
     `defaults`, and carries the run's source data (§3.3.6.1) and optional filter (§3.3.6.2).
     """
 
@@ -285,8 +299,9 @@ class ReductionConfig(BaseModel):
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
     assembly: AssemblyConfig = Field(default_factory=AssemblyConfig)
 
-    # per-run defaults inherited by every run (§3.3.1 global vs. per-run split)
-    defaults: RunParameters = Field(default_factory=RunParameters)
+    # per-run defaults inherited by every run (§3.3.1 global vs. per-run split); the superset
+    # type since a reflected run's defaults may cover fields a direct beam has no use for
+    defaults: ReflectedRunParameters = Field(default_factory=ReflectedRunParameters)
 
     # the two per-run key spaces (§3.3.2/.3/.4)
     direct_beams: dict[str, DirectBeamConfig]
@@ -321,10 +336,16 @@ class ReductionConfig(BaseModel):
         return ReductionConfig(**data)
 
     def effective(self, run: Union[ReflectedRunConfig, DirectBeamConfig]) -> RunParameters:
-        """The effective per-run parameters: `defaults` merged with `run`'s own overrides."""
-        merged = self.defaults.model_dump(exclude_none=True)
-        merged.update(run.model_dump(include=set(RunParameters.model_fields), exclude_none=True))
-        return RunParameters(**merged)
+        """The effective per-run parameters: `defaults` merged with `run`'s own overrides.
+
+        A `DirectBeamConfig` only draws on the shared `RunParameters` fields; a
+        `ReflectedRunConfig` draws on the full `ReflectedRunParameters` set.
+        """
+        param_cls = ReflectedRunParameters if isinstance(run, ReflectedRunConfig) else RunParameters
+        fields = set(param_cls.model_fields)
+        merged = {k: v for k, v in self.defaults.model_dump(exclude_none=True).items() if k in fields}
+        merged.update(run.model_dump(include=fields, exclude_none=True))
+        return param_cls(**merged)
 
 
 def apply_overrides(config: ReductionConfig, overrides: dict) -> ReductionConfig:

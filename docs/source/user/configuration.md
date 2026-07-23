@@ -11,9 +11,12 @@ sequence — and distinguishes:
 
 - **Global parameters** — the same for every run in the configuration (e.g. `instrument`,
   `assembly` stitching options, `output` settings).
-- **Per-run parameters** — the scientific parameters that can vary per run (peak/background pixel
-  ranges, Q binning, corrections, etc.), modeled by `RunParameters`
-  ({class}`lr_reduction.models.config.RunParameters`).
+- **Per-run parameters** — the scientific parameters that can vary per run. ROI-selection
+  parameters (peak/background pixel ranges) are shared by direct beam and reflected runs alike and
+  modeled by `RunParameters` ({class}`lr_reduction.models.config.RunParameters`); parameters that
+  only make sense for a reflected run (Q binning, corrections, etc.) are modeled by
+  `ReflectedRunParameters` ({class}`lr_reduction.models.config.ReflectedRunParameters`), which
+  extends `RunParameters`.
 
 Per-run parameters use an inheritance model: a global `defaults` block sets the values
 shared by every run, and each run may override any subset of those fields (`None` means "inherit
@@ -68,17 +71,13 @@ therefore carried into provenance and re-applied on re-reduction.
 
 ## Loading a configuration
 
-`lr_reduction.io.config_loader.ConfigLoader` is designed to accept either form below, both
-resolving to a `ReductionConfig`, so a caller need not distinguish between them:
+`lr_reduction.io.config_loader.ConfigLoader` loads a native YAML configuration file and resolves
+it to a `ReductionConfig`:
 
 ```python
 from lr_reduction.io.config_loader import ConfigLoader
 
-# (a) a native YAML configuration file
 config = ConfigLoader().load("config.yaml")
-
-# (b) a prior ORSO output file, whose header carries the recorded configuration (see Provenance)
-config = ConfigLoader().load("reduced_output.ort")
 ```
 
 ### Single-run extraction
@@ -116,28 +115,3 @@ from lr_reduction.models.config import apply_overrides
 
 config = apply_overrides(config, {"assembly": {"q_norm": 0.02}})
 ```
-
-## Provenance
-
-The complete configuration used to reduce a run is embedded in the reduced output's ORSO header
-(mirroring `ReductionResult.reduction_config`, {class}`lr_reduction.models.results.ReductionResult`),
-so a reduced file is self-describing and can be handed back to `ConfigLoader` to reproduce or
-re-run the reduction (§4.2.3). Reading it back (`lr_reduction.io.orso.read_config`) is implemented;
-writing it out in the first place depends on the reduction/assembly operations that produce a
-`ReductionResult`, which are still stubs, so `lr_reduction.io.orso.write` is too.
-
-## Migrating a legacy XML template
-
-The new workflow does not read legacy RefRed XML templates directly (§3.3.10). A standalone
-utility, kept separate from `ConfigLoader` so the new workflow's own loader never reads XML,
-converts an XML reduction template into this YAML format — injecting schema defaults for
-parameters the XML doesn't describe, and wrapping each legacy single direct-beam run as a one-run
-composite direct beam (§3.3.10.1–.2):
-
-```bash
-$ lr-xml-to-yaml template.xml config.yaml
-```
-
-or, from a repository checkout without installing the package first,
-`python -m lr_reduction.utils.xml_to_yaml template.xml config.yaml`. Both the command-line entry
-point and the `lr_reduction.utils.xml_to_yaml.convert()` library call are implemented.

@@ -23,14 +23,6 @@ lr_reduction.io.interfaces
    :undoc-members:
    :show-inheritance:
 
-lr_reduction.io.orso
-++++++++++++++++++++++
-
-.. automodule:: lr_reduction.io.orso
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 lr_reduction.io.plotting
 ++++++++++++++++++++++++++
 

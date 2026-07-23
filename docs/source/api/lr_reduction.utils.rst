@@ -30,11 +30,3 @@ lr_reduction.utils.logging
    :members:
    :undoc-members:
    :show-inheritance:
-
-lr_reduction.utils.xml_to_yaml
-++++++++++++++++++++++++++++++++
-
-.. automodule:: lr_reduction.utils.xml_to_yaml
-   :members:
-   :undoc-members:
-   :show-inheritance:
