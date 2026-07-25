@@ -19,7 +19,7 @@ CLI Arguments
         (Optional) Not used, kept for compatibility with existing scripts.
     ``theta_offset``
         (Optional) Theta offset value.
-    ``--no_publish``
+    ``--no-publish`` (alias: ``--no_publish``)
         (Optional) If provided, do not upload HTML report to monitor.sns.gov.
 
 Usage
@@ -29,7 +29,7 @@ Usage
 
     python reduce_REF_L.py <events_file> <output_dir> [old_version_flag] \
 [template_file] [avg_overlap] [const_q] [fit_first_peak] [theta_offset] \
-[--no_publish]
+[--no-publish]
 
 """
 
@@ -77,8 +77,17 @@ def parse_command_arguments():
     parser.add_argument("const_q", nargs="?", default="false")
     parser.add_argument("fit_first_peak", nargs="?", default="false")
     parser.add_argument("theta_offset", nargs="?", default="0")
-    # Optional arguments
-    parser.add_argument("--no_publish", action="store_true", help="Do not upload HTML report to the livedata server.")
+    # Optional flag. Kebab-case (--no-publish) is the argparse convention for
+    # optional arguments; the snake_case --no_publish is kept as an alias so
+    # already-deployed callers (e.g. REF_L/shared autoreduce) keep working.
+    # Both map to dest "no_publish", so args.no_publish is unchanged.
+    parser.add_argument(
+        "--no-publish",
+        "--no_publish",
+        dest="no_publish",
+        action="store_true",
+        help="Do not upload the HTML report to the livedata server.",
+    )
 
     return parser.parse_args()
 

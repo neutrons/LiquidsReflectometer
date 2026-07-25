@@ -19,7 +19,7 @@ CLI Arguments
         (Optional) Not used, kept for compatibility with existing scripts.
     ``theta_offset``
         (Optional) Theta offset value.
-    ``--no_publish``
+    ``--no-publish`` (alias: ``--no_publish``)
         (Optional) If provided, do not upload HTML report to monitor.sns.gov.
 
 Usage
@@ -29,7 +29,7 @@ Usage
 
     python reduce_REF_L.py <events_file> <output_dir> [old_version_flag] \
 [template_file] [avg_overlap] [const_q] [fit_first_peak] [theta_offset] \
-[--no_publish]
+[--no-publish]
 
 """
 
@@ -41,14 +41,15 @@ from pathlib import Path
 
 from mantid import logger
 from mantid.simpleapi import LoadEventNexus
+from plot_publisher import plot1d
+
+import lr_reduction.new_reduction_from_file as nrff
 
 #from lr_reduction import workflow
 from lr_reduction.data_info import DataType
 from lr_reduction.mantid_utils import SampleLogValues
 from lr_reduction.template import get_default_template_file
 from lr_reduction.web_report import assemble_report, generate_report_sections, save_report, upload_report
-import lr_reduction.new_reduction_from_file as nrff
-from plot_publisher import plot1d
 
 # Name of the conda environment to use - required by autoreduction
 #CONDA_ENV = "lr_reduction"
@@ -79,8 +80,17 @@ def parse_command_arguments():
     parser.add_argument("const_q", nargs="?", default="false")
     parser.add_argument("fit_first_peak", nargs="?", default="false")
     parser.add_argument("theta_offset", nargs="?", default="0")
-    # Optional arguments
-    parser.add_argument("--no_publish", action="store_true", help="Do not upload HTML report to the livedata server.")
+    # Optional flag. Kebab-case (--no-publish) is the argparse convention for
+    # optional arguments; the snake_case --no_publish is kept as an alias so
+    # already-deployed callers (e.g. REF_L/shared autoreduce) keep working.
+    # Both map to dest "no_publish", so args.no_publish is unchanged.
+    parser.add_argument(
+        "--no-publish",
+        "--no_publish",
+        dest="no_publish",
+        action="store_true",
+        help="Do not upload the HTML report to the livedata server or confirm data available.",
+    )
     parser.add_argument("settings_file",nargs="?", default=None, type=str, help="Path to the settings JSON file.")
 
     return parser.parse_args()
@@ -116,21 +126,21 @@ def get_default_setting_file(output_dir: str, tthd: float) -> str:
     return setting_file
 
 def autoreduce_new(
-	events_file,
-	output_dir,
-	setting_file = None,
+    events_file,
+    output_dir,
+    setting_file = None,
     template_file = None,
-	publish = True):
+    publish = True):
 
     # Ensure output directory exists
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-    
+
     # KEEP MANTID LOGIC HERE FOR NOW
     # Load workspace and sample logs
     ws = LoadEventNexus(Filename=events_file)
     sample_logs = SampleLogValues(ws)
     data_type = DataType.from_workspace(ws)
-    
+
     experiment_id = sample_logs["experiment_identifier"]
 
     match = re.search(r'REF_L_(\d+)', events_file)
@@ -139,16 +149,23 @@ def autoreduce_new(
     run_number = match.group(1)
     #run_number = sample_logs["entry_identifier"]
 
+    # Setting or template file only needed for reflected beam type
     # Determine which setting file to use
     if setting_file is None:
-        setting_file = get_default_setting_file(output_dir, sample_logs["tthd"])
-    logger.notice(f"Using settings from: {setting_file}")
+        try:
+            setting_file = get_default_setting_file(output_dir, sample_logs["tthd"])
+            logger.notice(f"Using settings from: {setting_file}")
+        except ValueError:
+            logger.notice("No setting config file found, looking for template.")
 
-    # TODO: separate from template if can?
-    # Determine which template to use
-    if template_file is None:
-        template_file = get_default_template_file(output_dir, sample_logs["tthd"])
-    logger.notice(f"Using template: {template_file}")
+    # Determine which template to use if setting file not provided.
+    elif template_file is None:
+        try:
+            template_file = get_default_template_file(output_dir, sample_logs["tthd"])
+            logger.notice(f"Using template: {template_file}")
+        except ValueError:
+            logger.notice("No template or config settings file found, falling back to DIRECTBEAM processing to show plots")
+            data_type = DataType.DIRECT_BEAM
 
     if data_type == DataType.REFLECTED_BEAM:
         # Run the reduction
@@ -158,28 +175,23 @@ def autoreduce_new(
         Path(savepath).mkdir(parents=True, exist_ok=True)
         override_params = {"Spath": savepath, "subname": subname}
         run_number = int(run_number)
-        print('run_number_input', run_number, type(run_number))
-        output, plots, run_number_list, config_out = nrff.reduce_from_file([run_number], setting_file, experiment_id, plot=False, 
+        #print('run_number_input', run_number, type(run_number))
+        output, plots, run_number_list, config_out = nrff.reduce_from_file([run_number], setting_file, experiment_id, plot=False,
                 override_params = override_params, check_for_prior=True, save_pdf_summary=False)
-        print('config out', vars(config_out))
-        # Now have the config so can feed that in later...
         plot_out = generate_ref_plot(output[0], run_number_list)
-        # TODO: Add the meta_data part
-        # TODO: here for the config input...
-        report_sections = generate_report_sections(ws,template_file, meta_data = None, config_in=config_out)
+
+        report_sections = generate_report_sections(ws,template_file=template_file, meta_data = None, config_in=config_out)
         report = assemble_report(plot_out, report_sections)
     elif data_type == DataType.DIRECT_BEAM:
-        # TODO: Fix the DB part...
-
         # Generate simple report
-        report_sections = generate_report_sections(ws, template_file)
+        report_sections = generate_report_sections(ws, template_file=template_file)
         report = assemble_report(None, report_sections)
     elif data_type == DataType.UNKNOWN:
         logger.notice(f"Data type {data_type} not supported for autoreduction.")
         return
     else:
         raise ValueError(f"Unhandled data type: {data_type}")
-        
+
     # Save to disk and (optionally) upload the HTML report
     match = re.search(r'REF_L_(\d+)', events_file)
     if not match:
@@ -188,9 +200,8 @@ def autoreduce_new(
     save_report(report, os.path.join(output_dir, f'REF_L_{run_number}_new.html'))
     if publish:
         upload_report(report, run_number=run_number)
-
-    # Confirm data availability
-    confirm_data_availability(sample_logs)
+        # Confirm data availability
+        confirm_data_availability(sample_logs)
 
 
 def confirm_data_availability(sample_logs: SampleLogValues) -> None:
@@ -238,19 +249,19 @@ def generate_ref_plot(output, run_nums):
 if __name__ == "__main__":
     args = parse_command_arguments()
 
+    # positional parameters
     events_file_arg = args.events_file
     output_dir_arg = args.output_dir
 
+    # optional (keyword) parameters
     settings_file_arg = args.settings_file
     template_file_arg = args.template_file
-
-    publish_arg = True
-    if args.no_publish:
-        publish_arg = False
+    publish_arg = not args.no_publish
 
     print("Running new reduction")
     autoreduce_new(
-        events_file_arg, output_dir_arg, settings_file_arg,template_file_arg, publish_arg 
+        events_file_arg, output_dir_arg,
+        setting_file=settings_file_arg,
+        template_file=template_file_arg,
+        publish=publish_arg
     )
-
-
