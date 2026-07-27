@@ -8,21 +8,12 @@ from lr_reduction.utils import get_logger
 
 logger = get_logger(__name__)
 
-# the custom Orso header attribute (via Orso.__init__'s **user_data) that carries the complete
-# configuration used for the reduction, for reproducibility (§4.2.3); mirrors
-# ReductionResult.reduction_config
-CONFIG_HEADER_KEY = "configuration_yaml"
-
 header = fileio.orso.Orso.empty()
 
 
 def read_config(filepath: str) -> ReductionConfig:
-    """Read a prior ORSO output file and return the ReductionConfig embedded in its header (§3.3.8.1(b), §4.2.3)."""
-    datasets = fileio.load_orso(filepath)
-    config_dict = datasets[0].info.user_data.get(CONFIG_HEADER_KEY)
-    if config_dict is None:
-        raise ValueError(f"{filepath} has no embedded '{CONFIG_HEADER_KEY}' configuration block")
-    return ReductionConfig(**config_dict)
+    """Read an ORSO file and return a ReductionConfig populated with metadata from the ORSO file."""
+    ...
 
 
 def read_single_run(filepath: str) -> ReductionResult:

@@ -250,7 +250,9 @@ class ReflectedRunParameters(RunParameters):
         return self
 
 
-# --- the two run kinds ------------------------------------------------------
+#################
+### Run types ###
+#################
 
 
 class DirectBeamConfig(RunParameters):
@@ -268,7 +270,7 @@ class DirectBeamConfig(RunParameters):
     filter: RunFilter | None = Field(None)
 
 
-class ReflectedRunConfig(RunParameters):
+class ReflectedRunConfig(ReflectedRunParameters):
     """One reflected run keyed by sequence_number."""
 
     sequence_number: ID = Field(..., ge=1)
@@ -296,7 +298,10 @@ class ReflectedRunConfig(RunParameters):
     @property
     def resolved_source_runs(self) -> list[ID]:
         """The run(s) to load and (if more than one) sum for this reflected run."""
-        return list(self.source_runs) if self.source_runs else [self.run_number]
+        if self.source_runs:
+            return list(self.source_runs)
+        assert self.run_number is not None
+        return [self.run_number]
 
 
 ################################
@@ -367,7 +372,7 @@ class ReductionConfig(BaseModel):
     corrections: Corrections = Field(default_factory=Corrections)
 
     # per-run defaults inherited by every run
-    defaults: RunParameters = Field(default_factory=RunParameters)
+    defaults: ReflectedRunParameters = Field(default_factory=ReflectedRunParameters)
 
     # the two per-run key spaces (§3.3.2/.3/.4)
     direct_beams: dict[str, DirectBeamConfig] = Field(default_factory=dict)

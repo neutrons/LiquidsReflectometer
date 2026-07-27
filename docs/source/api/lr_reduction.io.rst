@@ -63,14 +63,6 @@ lr_reduction.io.xml
    :undoc-members:
    :show-inheritance:
 
-lr_reduction.io.xml_to_yaml
-++++++++++++++++++++++++++++
-
-.. automodule:: lr_reduction.io.xml_to_yaml
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 lr_reduction.io.yaml
 ++++++++++++++++++++++
 
