@@ -18,9 +18,6 @@ homepage = "https://github.com/neutrons/LiquidsReflectometer"
 repository = "https://github.com/neutrons/LiquidsReflectometer"
 documentation = "https://lr-reduction.readthedocs.io/latest/index.html"
 
-[project.scripts]
-lr-xml-to-yaml = "lr_reduction.io.xml_to_yaml:main"
-
 #####################################
 #  BUILDING FROM SOURCES WITH HATCH
 #####################################
