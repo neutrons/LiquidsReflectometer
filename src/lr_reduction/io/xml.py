@@ -89,7 +89,7 @@ def _run_config_from_legacy(
 
     geometry = None
     if params.apply_instrument_settings:
-        # OPEN: legacy `source_detector_distance` is moderator-to-detector, not source-to-sample;
+        # TODO: legacy `source_detector_distance` is moderator-to-detector, not source-to-sample;
         # l1 is derived here rather than copied directly. Confirm with instrument scientists.
         geometry = GeometryOverride(
             l1=params.source_detector_distance - params.sample_detector_distance,
@@ -122,7 +122,7 @@ def _run_config_from_legacy(
                 threshold=(params.dead_time_threshold if params.use_dead_time_threshold else None),
             ),
             emission_time=EmissionTimeConfig(apply=params.use_emission_time),
-            # OPEN: legacy `GravityDirection` also carries UP/DOWN; only the enable flag survives here.
+            # TODO: legacy `GravityDirection` also carries UP/DOWN; only the enable flag survives here.
             gravity=params.gravity_direction is not None,
         ),
         geometry=geometry,
