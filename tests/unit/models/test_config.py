@@ -6,7 +6,6 @@ from lr_reduction.models.config import PixelRange, QBinning, ReductionConfig, ap
 
 def _minimal_config(**overrides):
     data = dict(
-        sequence_id=12340,
         direct_beams={"db_8mm": {"db_runs": [12345, 12346, 12347]}},
         runs=[
             {"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 111},
@@ -19,7 +18,6 @@ def _minimal_config(**overrides):
 
 def test_minimal_config_is_valid():
     config = _minimal_config()
-    assert config.sequence_id == 12340
     assert len(config.runs) == 2
 
 
@@ -101,7 +99,7 @@ def test_effective_merges_defaults_with_run_overrides():
         ],
     )
     effective = config.effective(config.runs[0])
-    # run-level override wins over the sequence-wide default
+    # run-level override wins over the global default
     assert effective.peak.min == 100
     assert effective.peak.max == 110
     # fields not overridden by the run are inherited from defaults
