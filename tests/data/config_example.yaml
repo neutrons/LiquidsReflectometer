@@ -1,0 +1,28 @@
+# Example native YAML configuration (§3.3), mirroring the non-normative skeleton in the spec.
+instrument: BL4B
+
+defaults:
+  q_binning:
+    q_min: 0.005
+    q_max: 0.5
+    q_step: 0.01
+    method: constantQ
+
+direct_beams:
+  db_8mm:
+    db_runs: [12345, 12346, 12347]
+  db_20mm:
+    db_runs: [12350, 12351]
+
+runs:
+  - sequence_number: 1
+    direct_beam: db_8mm
+    run_number: 12360
+    peak: { min: 140, max: 150 }
+  - sequence_number: 2
+    direct_beam: db_20mm
+    run_number: 12361
+    peak: { min: 138, max: 152 }
+  - sequence_number: 3
+    direct_beam: db_8mm
+    run_number: 12362

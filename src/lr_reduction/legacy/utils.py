@@ -60,17 +60,17 @@ def amend_config(
     modified_keys = list()
     backup = dict()
     config = ConfigService.Instance()
-    if new_config is not None:
-        search_archive = "datasearch.searcharchive"
-        if search_archive not in new_config:
-            new_config[search_archive] = "hfir, sns"
-        default_facility = "default.facility"
-        if default_facility not in new_config:
-            new_config[default_facility] = "SNS"
-        for key, val in new_config.items():
-            backup[key] = config[key]
-            config[key] = val  # config does not have an 'update' method
-            modified_keys.append(key)
+    new_config = dict(new_config) if new_config is not None else {}
+    search_archive = "datasearch.searcharchive"
+    if search_archive not in new_config:
+        new_config[search_archive] = "hfir, sns"
+    default_facility = "default.facility"
+    if default_facility not in new_config:
+        new_config[default_facility] = "SNS"
+    for key, val in new_config.items():
+        backup[key] = config[key]
+        config[key] = val  # config does not have an 'update' method
+        modified_keys.append(key)
     if data_dir is not None:
         data_dirs = (
             [
