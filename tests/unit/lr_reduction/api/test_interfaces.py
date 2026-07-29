@@ -1,7 +1,7 @@
 import pytest
 
 from lr_reduction.api.interfaces import Entrypoint
-from lr_reduction.config.model import ReductionConfig
+from lr_reduction.models.config import ReductionConfig
 
 
 def test_entrypoint_cannot_be_instantiated_directly():

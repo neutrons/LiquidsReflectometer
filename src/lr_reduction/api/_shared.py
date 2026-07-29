@@ -16,8 +16,8 @@ import numpy as np
 from orsopy.fileio import Software
 
 from lr_reduction import __version__
-from lr_reduction.config.model import ReductionConfig
-from lr_reduction.types import SequenceResult, SingleRunResult
+from lr_reduction.models.config import ReductionConfig
+from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 from lr_reduction.utils import get_logger
 
 logger = get_logger(__name__)
@@ -44,34 +44,26 @@ def locate_configuration_relative_to(output_directory: Path) -> Path:
     return Path(output_directory) / "config_0.yaml"
 
 
-def parse_numeric_identifier(identifier: str | int, *, field_name: str) -> int:
-    """Convert an identifier to int and raise a field-specific error when conversion fails."""
-    try:
-        return int(identifier)
-    except ValueError as error:
-        raise ValueError(f"{field_name} must be an integer, got {identifier!r}") from error
-
-
-def placeholder_single_run_result(config: ReductionConfig, sequence_number: int = 0) -> SingleRunResult:
-    """Fabricate a SingleRunResult until Op 1 (direct beam) / Op 2 (single-run reduce) exist (§1.2)."""
-    return SingleRunResult(
-        reduction_output=np.empty((0, 4)),
-        sequence_id=config.sequence_id,
-        sequence_number=sequence_number,
+def placeholder_single_run_result(config: ReductionConfig) -> ReductionResult:
+    """Fabricate a ReductionResult until Op 1 (direct beam) / Op 2 (single-run reduce) exist (§1.2)."""
+    return ReductionResult(
+        reflectivity=np.empty((0, 4)),
+        reduction_config=config,
+        html_report=None,
         lr_reduction_info=_LR_REDUCTION_SOFTWARE,
         mantid_info=_MANTID_SOFTWARE,
         reduction_timestamp=datetime.now(),
-        experiment_id="PLACEHOLDER EXPERIMENT ID",
-        configuration_yaml={},
     )
 
 
-def placeholder_sequence_result(config: ReductionConfig, reflected_runs: list[str]) -> SequenceResult:
-    """Fabricate a SequenceResult until Op 3 (assembly) exists (§1.2)."""
-    return SequenceResult(
-        sequence_id=config.sequence_id,
-        reflected_runs=reflected_runs,
-        assembly_result=np.empty((0, 4)),
-        stitching_scale_factors=[1.0] * len(reflected_runs),
-        html_report="",
+def placeholder_sequence_result(config: ReductionConfig) -> CombinedReductionResult:
+    """Fabricate a CombinedReductionResult until Op 3 (assembly) exists (§1.2)."""
+    return CombinedReductionResult(
+        reflectivity=np.empty((0, 4)),
+        reduction_config=config,
+        html_report=None,
+        lr_reduction_info=_LR_REDUCTION_SOFTWARE,
+        mantid_info=_MANTID_SOFTWARE,
+        reduction_timestamp=datetime.now(),
+        assembly_config=config.assembly,
     )

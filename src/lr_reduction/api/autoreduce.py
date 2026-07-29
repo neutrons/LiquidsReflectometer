@@ -10,19 +10,15 @@ import argparse
 import re
 from pathlib import Path
 
-from lr_reduction.api._shared import (
-    locate_configuration_relative_to,
-    parse_numeric_identifier,
-    placeholder_sequence_result,
-)
+from lr_reduction.api._shared import locate_configuration_relative_to, placeholder_sequence_result
 from lr_reduction.api.interfaces import Entrypoint
 from lr_reduction.api.manual import reduce_run
-from lr_reduction.config.model import ReductionConfig
 from lr_reduction.io import ConfigLoader
 from lr_reduction.io.orso import read_partials
 from lr_reduction.io.orso import write as write_orso
 from lr_reduction.io.report import html_report
-from lr_reduction.types import SequenceResult
+from lr_reduction.models.config import ReductionConfig
+from lr_reduction.models.results import CombinedReductionResult
 from lr_reduction.utils import get_logger
 
 logger = get_logger(__name__)
@@ -30,7 +26,7 @@ logger = get_logger(__name__)
 _NEXUS_RUN_NUMBER_RE = re.compile(r"REF_L_(\d+)")
 
 
-class FromDiskSequence(Entrypoint[SequenceResult]):
+class FromDiskSequence(Entrypoint[CombinedReductionResult]):
     """Assembles a sequence from its on-disk partial ORSO files (§2.4.1.a)."""
 
     def __init__(self, output_directory: str | Path, **overrides):
@@ -42,16 +38,17 @@ class FromDiskSequence(Entrypoint[SequenceResult]):
         config_path = locate_configuration_relative_to(self.output_directory)
         return self._config_loader.load(str(config_path))
 
-    def load_data(self, config: ReductionConfig):
-        sequence_id = parse_numeric_identifier(config.sequence_id, field_name="sequence_id")
+    def load_data(self, config: ReductionConfig): # noqa: ARG002
+        # Placeholder: ReductionConfig does not yet carry a sequence_id (§3.3.1); a real
+        # identifier will come from the acquired run's metadata (§3.1.2.1) once available.
+        sequence_id = 0
         return read_partials(str(self.output_directory), sequence_id)
 
-    def call_operations(self, config: ReductionConfig, _data) -> SequenceResult:
+    def call_operations(self, config: ReductionConfig, _data) -> CombinedReductionResult:
         # Placeholder until Op 3 (assemble-only) exists.
-        reflected_runs = [reflected_run.run_id for reflected_run in config.reflected_runs]
-        return placeholder_sequence_result(config, reflected_runs)
+        return placeholder_sequence_result(config)
 
-    def save_output(self, result: SequenceResult) -> None:
+    def save_output(self, result: CombinedReductionResult) -> None:
         result.html_report = html_report()
         write_orso(result, output_dir=str(self.output_directory))
 
@@ -63,7 +60,9 @@ def _run_number_from_nexus_path(nexus_file_path: Path) -> int:
     return int(match.group(1))
 
 
-def reduce_autoreduce(nexus_file_path: str | Path, output_directory_path: str | Path, **overrides) -> SequenceResult:
+def reduce_autoreduce(
+    nexus_file_path: str | Path, output_directory_path: str | Path, **overrides
+) -> CombinedReductionResult:
     """Autoreduction (on-disk assembly) (§6.4.1, §11.6.1).
 
     A thin wrapper (§6.4.3): reduces the newly-arrived run, writes its partial, then
