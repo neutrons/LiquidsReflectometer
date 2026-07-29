@@ -162,7 +162,7 @@ jobs:
           label: ${{ env.CONDA_LABEL }}
 
       - name: Remove old packages
-        if: github.ref == 'refs/heads/next'
+        if: github.ref == 'refs/heads/reduction-rewrite' # revert to /next once rewrite is complete and back into next
         uses: neutrons/gh-actions/pkg-remove@eb7a7c6fcfd0cda1a7b238329afc0afd09a4f4af # v2
         with:
           anaconda-token: ${{ secrets.ANACONDA_TOKEN }}
