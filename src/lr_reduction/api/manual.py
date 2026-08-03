@@ -5,7 +5,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from lr_reduction.api._shared import placeholder_sequence_result, placeholder_single_run_result
+from lr_reduction.api._shared import placeholder_sequence_result
+from lr_reduction.api._single_run import SingleRunReduction
 from lr_reduction.api.interfaces import Entrypoint
 from lr_reduction.io import ConfigLoader, RunData, RunLoader
 from lr_reduction.io.orso import write as write_orso
@@ -14,14 +15,13 @@ from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 
 
-class ManualSingleRun(Entrypoint[ReductionResult]):
+class ManualSingleRun(SingleRunReduction):
     """Manual reduction of a single run, by run number (§6.4.7, §11.6.5)."""
 
     def __init__(self, run_number: int, configuration: str | Path, **overrides):
+        super().__init__(**overrides)
         self.run_number = run_number
         self.configuration = Path(configuration)
-        self.overrides = overrides
-        self._config_loader = ConfigLoader()
         self._run_loader = RunLoader()
 
     def load_configuration(self) -> ReductionConfig:
@@ -29,13 +29,6 @@ class ManualSingleRun(Entrypoint[ReductionResult]):
 
     def load_data(self, _config: ReductionConfig) -> RunData:
         return self._run_loader.load(self.run_number)
-
-    def call_operations(self, config: ReductionConfig, _data: RunData) -> ReductionResult:
-        # Placeholder until Op 1 (build composite direct beam) / Op 2 (single-run reduce) exist.
-        return placeholder_single_run_result(config)
-
-    def save_output(self, result: ReductionResult) -> None:
-        write_orso(result, output_dir=self.overrides.get("output_dir", "."))
 
 
 class ManualRunSequence(Entrypoint[CombinedReductionResult]):

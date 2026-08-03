@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from lr_reduction.api.autoreduce import reduce_autoreduce
+from lr_reduction.api.autoreduce import reduce_auto
 from lr_reduction.utils import get_logger
 
 logger = get_logger(__name__)
@@ -28,7 +28,7 @@ def reduce_batch(experiment_id: str, first_run: int, last_run: int, output_dir: 
             logger.warning(f"File does not exist: {nexus_file_path}")
             continue
         logger.info(f"Processing {nexus_file_path}")
-        reduce_autoreduce(nexus_file_path, output_dir, **overrides)
+        reduce_auto(nexus_file_path, output_dir, **overrides)
 
 
 def main(argv: list[str] | None = None) -> None:

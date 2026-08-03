@@ -7,13 +7,12 @@ Re-grows the sequence's on-disk assembly (§6.4.4, §2.4.1.a).
 from __future__ import annotations
 
 import argparse
-import re
 from pathlib import Path
 
 from lr_reduction.api._shared import locate_configuration_relative_to, placeholder_sequence_result
+from lr_reduction.api._single_run import SingleRunReduction
 from lr_reduction.api.interfaces import Entrypoint
-from lr_reduction.api.manual import reduce_run
-from lr_reduction.io import ConfigLoader
+from lr_reduction.io import ConfigLoader, RunData, RunLoader
 from lr_reduction.io.orso import read_partials
 from lr_reduction.io.orso import write as write_orso
 from lr_reduction.io.report import html_report
@@ -23,7 +22,26 @@ from lr_reduction.utils import get_logger
 
 logger = get_logger(__name__)
 
-_NEXUS_RUN_NUMBER_RE = re.compile(r"REF_L_(\d+)")
+
+class AutoreduceSingleRun(SingleRunReduction):
+    """Single run from a NeXus path, configuration relative to the output directory (§6.4.1)."""
+
+    def __init__(self, nexus_file_path: str | Path, output_directory: str | Path, **overrides):
+        super().__init__(**overrides)
+        self.nexus_file_path = Path(nexus_file_path)
+        self._output_directory = Path(output_directory)
+        self._run_loader = RunLoader()
+
+    def load_configuration(self) -> ReductionConfig:
+        config_path = locate_configuration_relative_to(self._output_directory)
+        return self._config_loader.load(str(config_path))
+
+    def load_data(self, _config: ReductionConfig) -> RunData:
+        return self._run_loader.load_from_path(self.nexus_file_path)
+
+    @property
+    def output_directory(self) -> Path:
+        return self._output_directory
 
 
 class FromDiskSequence(Entrypoint[CombinedReductionResult]):
@@ -53,16 +71,7 @@ class FromDiskSequence(Entrypoint[CombinedReductionResult]):
         write_orso(result, output_dir=str(self.output_directory))
 
 
-def _run_number_from_nexus_path(nexus_file_path: Path) -> int:
-    match = _NEXUS_RUN_NUMBER_RE.search(nexus_file_path.name)
-    if not match:
-        raise ValueError(f"Could not extract run number from nexus file path: {nexus_file_path}")
-    return int(match.group(1))
-
-
-def reduce_autoreduce(
-    nexus_file_path: str | Path, output_directory_path: str | Path, **overrides
-) -> CombinedReductionResult:
+def reduce_auto(nexus_file_path: str | Path, output_directory_path: str | Path, **overrides) -> CombinedReductionResult:
     """Autoreduction (on-disk assembly) (§6.4.1, §11.6.1).
 
     A thin wrapper (§6.4.3): reduces the newly-arrived run, writes its partial, then
@@ -70,11 +79,8 @@ def reduce_autoreduce(
     """
     nexus_file_path = Path(nexus_file_path)
     output_directory_path = Path(output_directory_path)
-    run_number = _run_number_from_nexus_path(nexus_file_path)
-    config_path = locate_configuration_relative_to(output_directory_path)
-
-    logger.info(f"Autoreducing run {run_number} into {output_directory_path}")
-    reduce_run(run_number, config_path, output_dir=str(output_directory_path), **overrides)
+    logger.info(f"Autoreducing {nexus_file_path.name} into {output_directory_path}")
+    AutoreduceSingleRun(nexus_file_path, output_directory_path, **overrides).execute()
     return FromDiskSequence(output_directory_path, **overrides).execute()
 
 
@@ -84,7 +90,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("nexus_file_path", type=Path)
     parser.add_argument("output_directory_path", type=Path)
     args = parser.parse_args(argv)
-    reduce_autoreduce(args.nexus_file_path, args.output_directory_path)
+    reduce_auto(args.nexus_file_path, args.output_directory_path)
 
 
 if __name__ == "__main__":

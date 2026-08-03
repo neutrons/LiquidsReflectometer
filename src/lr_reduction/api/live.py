@@ -7,22 +7,19 @@ import argparse
 
 from mantid.dataobjects import EventWorkspace
 
-from lr_reduction.api._shared import locate_standard_configuration, placeholder_single_run_result
-from lr_reduction.api.interfaces import Entrypoint
-from lr_reduction.io import ConfigLoader
-from lr_reduction.io.orso import write as write_orso
+from lr_reduction.api._shared import locate_standard_configuration
+from lr_reduction.api._single_run import SingleRunReduction
 from lr_reduction.io.plotting import diagnostic_plot
 from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import ReductionResult
 
 
-class LiveEntrypoint(Entrypoint[ReductionResult]):
+class LiveEntrypoint(SingleRunReduction):
     """Live reduction of one in-memory reflected-run workspace (§6.4.5)."""
 
     def __init__(self, reflected_run: EventWorkspace, **overrides):
+        super().__init__(**overrides)
         self.reflected_run = reflected_run
-        self.overrides = overrides
-        self._config_loader = ConfigLoader()
 
     def load_configuration(self) -> ReductionConfig:
         # Configuration is discovered from the run number carried by the workspace (§6.4.5.1),
@@ -34,12 +31,7 @@ class LiveEntrypoint(Entrypoint[ReductionResult]):
     def load_data(self, _config: ReductionConfig) -> EventWorkspace:
         return self.reflected_run
 
-    def call_operations(self, config: ReductionConfig, _data: EventWorkspace) -> ReductionResult:
-        # Placeholder until Op 1 (build composite direct beam) / Op 2 (single-run reduce) exist.
-        return placeholder_single_run_result(config)
-
-    def save_output(self, result: ReductionResult) -> None:
-        write_orso(result, output_dir=self.overrides.get("output_dir", "."))
+    def publish(self, _result: ReductionResult) -> None:
         diagnostic_plot()
 
 
