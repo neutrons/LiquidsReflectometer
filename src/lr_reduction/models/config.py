@@ -274,14 +274,14 @@ class ReflectedRunConfig(ReflectedRunParameters):
     """One reflected run keyed by sequence_number."""
 
     sequence_number: ID = Field(..., ge=1)
-    direct_beam: str = Field(..., description="named DB reference (§3.3.4)")
+    direct_beam: str = Field(..., description="Name of direct beam reference")
 
     # Only one of these two fields is set: either a single run number, or a list of source runs to sum.
     run_number: ID | None = Field(None)  # TODO: could instead be resolved from NeXus logs by sequence_number
     source_runs: list[ID] | None = Field(None, min_length=1, description="List of reflected runs to sum")
     # NOTE: hard-fail on mismatched conditions is enforced at the summing operation, not at schema load
 
-    filter: RunFilter | None = Field(None, description="§3.3.6.2")
+    filter: RunFilter | None = Field(None, description="Optional time and/or log-value filter")
 
     @model_validator(mode="after")
     def _one_source(self) -> ReflectedRunConfig:
@@ -360,7 +360,7 @@ class AssemblyConfig(BaseModel):
 
 
 class ReductionConfig(BaseModel):
-    """Global configuration (§3.3.1)."""
+    """Global reduction configuration."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
@@ -380,7 +380,7 @@ class ReductionConfig(BaseModel):
 
     @model_validator(mode="after")
     def _referential_integrity(self) -> ReductionConfig:
-        """Enforce §3.3.5: every reflected run's `direct_beam` reference must resolve."""
+        """Every reflected run's `direct_beam` reference must resolve."""
         names = set(self.direct_beams)
         for run in self.runs:
             if run.direct_beam not in names:
@@ -394,9 +394,12 @@ class ReductionConfig(BaseModel):
         return self
 
     def for_run(self, sequence_number: int) -> ReductionConfig:
-        """Extract a valid one-run config (§3.3.8): same global settings, only the
-        selected run and the direct beam it references. Re-validated like any other config,
-        so no separate single-run format exists."""
+        """
+        Extract a valid one-run config.
+
+        Same global settings, only the selected run and the direct beam it references.
+        Re-validated like any other config, so no separate single-run format exists.
+        """
         try:
             run = next(r for r in self.runs if r.sequence_number == sequence_number)
         except StopIteration:
@@ -420,11 +423,11 @@ class ReductionConfig(BaseModel):
 
 
 def apply_overrides(config: ReductionConfig, overrides: dict) -> ReductionConfig:
-    """Apply caller-supplied overrides on top of `config` for a single invocation (§3.3.7).
+    """Apply caller-supplied overrides on top of `config` for a single invocation.
 
     `config` itself is never mutated; overrides take precedence over every value in `config`
     (file < overrides), applied as a deep merge over the full configuration dict, then the whole
-    tree is re-validated — including cross-field checks like referential integrity (§3.3.5).
+    tree is re-validated — including cross-field checks like referential integrity.
 
     For a single override, setting an attribute directly on a loaded config (or a nested value
     within it, e.g. `config.assembly.q_norm = 0.02`) is simpler and is still validated: every
