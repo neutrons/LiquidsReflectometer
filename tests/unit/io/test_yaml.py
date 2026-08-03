@@ -13,3 +13,20 @@ def test_read_config(template_dir):
     # a run may inherit global defaults instead of overriding them
     assert config.runs[2].peak is None
     assert config.effective(config.runs[2]).q_binning.q_max == 0.5
+
+
+def test_read_config_preserves_zero_padded_run_number(tmp_path):
+    # an unquoted, zero-padded run number must not be misread as octal (e.g. 012345 -> 5349)
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(
+        "direct_beams:\n"
+        "  db_8mm:\n"
+        "    db_runs: [012345]\n"
+        "runs:\n"
+        "  - sequence_number: 1\n"
+        "    direct_beam: db_8mm\n"
+        "    run_number: 012345\n"
+    )
+    config = read_config(str(config_file))
+    assert config.direct_beams["db_8mm"].db_runs == [12345]
+    assert config.runs[0].run_number == 12345
