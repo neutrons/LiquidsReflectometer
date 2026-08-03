@@ -9,13 +9,18 @@ from mantid.dataobjects import EventWorkspace
 
 from lr_reduction.api._shared import locate_standard_configuration
 from lr_reduction.api._single_run import SingleRunReduction
+from lr_reduction.api.autoreduce import FromDiskSequence
 from lr_reduction.io.plotting import diagnostic_plot
 from lr_reduction.models.config import ReductionConfig
-from lr_reduction.models.results import ReductionResult
+from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 
 
 class LiveEntrypoint(SingleRunReduction):
-    """Live reduction of one in-memory reflected-run workspace (§6.4.5)."""
+    """Live reduction of one in-memory reflected-run workspace; the single-run leaf (§6.4.5).
+
+    Sequence assembly is driven by `reduce_live`, exactly as `reduce_auto` drives
+    `FromDiskSequence` around `AutoreduceSingleRun` (§6.4.4).
+    """
 
     def __init__(self, reflected_run: EventWorkspace, **overrides):
         super().__init__(**overrides)
@@ -35,9 +40,15 @@ class LiveEntrypoint(SingleRunReduction):
         diagnostic_plot()
 
 
-def reduce_live(reflected_run: EventWorkspace, **overrides) -> ReductionResult:
-    """Live reduction (in-memory single run) (§6.4.5, §11.6.3)."""
-    return LiveEntrypoint(reflected_run, **overrides).execute()
+def reduce_live(reflected_run: EventWorkspace, **overrides) -> CombinedReductionResult:
+    """Live reduction (§6.4.5, §11.6.3).
+
+    Mirrors autoreduction (§6.4.4): reduces the run in-memory, writes its partial, then
+    re-assembles the sequence from all partials on disk (§2.4.1.a).
+    """
+    entrypoint = LiveEntrypoint(reflected_run, **overrides)
+    entrypoint.execute()
+    return FromDiskSequence(entrypoint.output_directory, **overrides).execute()
 
 
 def main(argv: list[str] | None = None) -> None:

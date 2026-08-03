@@ -3,7 +3,7 @@ from mantid.simpleapi import CreateSampleWorkspace
 
 from lr_reduction.api.live import LiveEntrypoint, reduce_live
 from lr_reduction.models.config import DirectBeamConfig, ReductionConfig, ReflectedRunConfig
-from lr_reduction.models.results import ReductionResult
+from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 
 
 @pytest.fixture
@@ -23,11 +23,12 @@ def _config_loader(monkeypatch):
 
 
 def test_reduce_live_executes_end_to_end(reflected_run, tmp_path, monkeypatch):
+    """Mirrors autoreduction (§6.4.4): reduces the run, then assembles from on-disk partials."""
     monkeypatch.chdir(tmp_path)
 
     result = reduce_live(reflected_run)
 
-    assert isinstance(result, ReductionResult)
+    assert isinstance(result, CombinedReductionResult)
 
 
 def test_reduce_live_uses_live_entrypoint(reflected_run, tmp_path, monkeypatch):
