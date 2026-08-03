@@ -23,6 +23,10 @@ class RunLoaderInterface(Loader):
     def load(self, run_number: int) -> RunData:
         """Load raw event data for *run_number* and return it as RunData."""
 
+    @abstractmethod
+    def load_from_path(self, nexus_file_path: str) -> RunData:
+        """Load raw event data directly from a NeXus file path and return it as RunData."""
+
 
 class ConfigLoaderInterface(Loader):
     """
