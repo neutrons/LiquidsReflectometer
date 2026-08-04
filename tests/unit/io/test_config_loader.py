@@ -4,6 +4,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from lr_reduction.io.config_loader import (
+    ConfigFileTypeError,
     ConfigLoader,
     ConfigNotFoundError,
     ConfigParseError,
@@ -39,10 +40,10 @@ def test_load_raises_not_found_for_missing_file(tmp_path):
     assert exc_info.value.filepath == str(missing)
 
 
-def test_load_raises_not_found_for_unsupported_extension(tmp_path):
+def test_load_raises_file_type_error_for_unsupported_extension(tmp_path):
     unsupported = tmp_path / "config.json"
     unsupported.touch()
-    with pytest.raises(ConfigNotFoundError, match="Unsupported"):
+    with pytest.raises(ConfigFileTypeError, match="Unsupported"):
         ConfigLoader().load(str(unsupported))
 
 

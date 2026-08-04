@@ -27,7 +27,11 @@ class ConfigError(Exception):
 
 
 class ConfigNotFoundError(ConfigError):
-    """The configuration file does not exist, or its format is not recognized."""
+    """The configuration file does not exist."""
+
+
+class ConfigFileTypeError(ConfigError):
+    """The file's extension is not a recognized configuration format."""
 
 
 class ConfigParseError(ConfigError):
@@ -76,7 +80,9 @@ class ConfigLoader(ConfigLoaderInterface):
         Raises
         ------
         ConfigNotFoundError
-            if the file does not exist, or its extension is not a recognized format.
+            if the file does not exist.
+        ConfigFileTypeError
+            if the file's extension is not a recognized configuration format.
         ConfigParseError
             if the file exists but cannot be parsed (invalid YAML, not a mapping, …).
         ConfigValidationError
@@ -86,7 +92,7 @@ class ConfigLoader(ConfigLoaderInterface):
         fp = Path(path)
         loader = self._loaders.get(fp.suffix)
         if not loader:
-            raise ConfigNotFoundError(f"Unsupported configuration file format: {fp.suffix!r}", filepath=path)
+            raise ConfigFileTypeError(f"Unsupported configuration file format: {fp.suffix!r}", filepath=path)
         if not fp.is_file():
             raise ConfigNotFoundError(f"Configuration file not found: {path}", filepath=path)
 

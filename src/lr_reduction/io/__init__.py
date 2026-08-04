@@ -1,5 +1,6 @@
 from lr_reduction.io.config_loader import (
     ConfigError,
+    ConfigFileTypeError,
     ConfigLoader,
     ConfigNotFoundError,
     ConfigParseError,
@@ -10,6 +11,7 @@ from lr_reduction.models.run_data import RunData
 
 __all__ = [
     "ConfigError",
+    "ConfigFileTypeError",
     "ConfigLoader",
     "ConfigNotFoundError",
     "ConfigParseError",
