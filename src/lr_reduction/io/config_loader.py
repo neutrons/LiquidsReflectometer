@@ -5,7 +5,6 @@ from pydantic import ValidationError
 from lr_reduction.exceptions.config import (
     ConfigFileTypeError,
     ConfigNotFoundError,
-    ConfigParseError,
     ConfigValidationError,
 )
 from lr_reduction.io.interfaces import ConfigLoaderInterface
@@ -76,9 +75,6 @@ class ConfigLoader(ConfigLoaderInterface):
         except FileNotFoundError as exc:
             logger.error(f"Configuration file not found: {path}")
             raise ConfigNotFoundError(f"Configuration file not found: {path}", filepath=path) from exc
-        except ValueError as exc:
-            logger.error(f"Failed to parse {path}: {exc}")
-            raise ConfigParseError(str(exc), filepath=path) from exc
 
     def _load_config(self, path: str) -> ReductionConfig:
         """Load a ReductionConfig from a YAML configuration file."""

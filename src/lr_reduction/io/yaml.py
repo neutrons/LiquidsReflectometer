@@ -14,6 +14,15 @@ def read_config(filepath: str) -> ReductionConfig:
 
     Uses `yaml.BaseLoader` so every scalar stays a string and Pydantic -- not PyYAML's
     YAML-1.1 heuristics -- decides its type (avoids e.g. `012345` silently becoming octal 5349).
+
+    Raises
+    ------
+    OSError
+        if `filepath` does not exist or cannot be opened (e.g. `FileNotFoundError`).
+    ConfigParseError
+        if the file's contents are not valid YAML, or do not parse to a mapping.
+    pydantic.ValidationError
+        if the parsed data fails `ReductionConfig`'s schema/range/referential validation.
     """
     logger.info(f"Reading YAML configuration from {filepath}")
     with open(filepath) as f:

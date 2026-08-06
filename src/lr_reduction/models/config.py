@@ -14,7 +14,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from lr_reduction.exceptions.base import NotFoundError
 from lr_reduction.types import ID
 
 ###################
@@ -401,7 +400,7 @@ class ReductionConfig(BaseModel):
         try:
             run = next(r for r in self.runs if r.sequence_number == sequence_number)
         except StopIteration:
-            raise NotFoundError(f"no run with sequence_number={sequence_number}") from None
+            raise ValueError(f"no run with sequence_number={sequence_number}") from None
         data = self.model_dump()
         data["runs"] = [run.model_dump()]
         data["direct_beams"] = {run.direct_beam: self.direct_beams[run.direct_beam].model_dump()}

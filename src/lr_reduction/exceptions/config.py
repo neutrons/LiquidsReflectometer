@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from lr_reduction.exceptions.base import (
     LrReductionError,
+    LrValidationError,
     NotFoundError,
     ParseError,
     UnsupportedFormatError,
-    ValidationError,
 )
 
 
@@ -36,7 +36,7 @@ class ConfigParseError(ConfigError, ParseError):
     """The file could not be parsed: invalid YAML, not a mapping, or otherwise malformed."""
 
 
-class ConfigValidationError(ConfigError, ValidationError):
+class ConfigValidationError(ConfigError, LrValidationError):
     """The parsed configuration failed Pydantic schema/range/referential validation.
 
     `errors` carries the raw Pydantic error dicts (`pydantic.ValidationError.errors()`) so a

@@ -18,7 +18,7 @@ class ParseError(LrReductionError):
     """Input could not be parsed: malformed, wrong type, or otherwise unreadable."""
 
 
-class ValidationError(LrReductionError):
+class LrValidationError(LrReductionError):
     """Parsed input failed schema, range, or referential-integrity validation."""
 
 
