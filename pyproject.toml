@@ -22,6 +22,11 @@ homepage = "https://github.com/neutrons/LiquidsReflectometer"
 repository = "https://github.com/neutrons/LiquidsReflectometer"
 documentation = "https://lr-reduction.readthedocs.io/latest/index.html"
 
+[project.scripts]
+lr-reduce-run = "lr_reduction.api.manual:main"
+lr-reduce-autoreduce = "lr_reduction.api.autoreduce:main"
+lr-reduce-batch = "lr_reduction.api.batch:main"
+
 ####################
 ### Build config ###
 ####################

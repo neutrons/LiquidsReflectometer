@@ -28,7 +28,12 @@ logger = get_logger(__name__)
 
 
 def read_config(filepath: str) -> ReductionConfig:
-    """Read an ORSO file and return a ReductionConfig populated with metadata from the ORSO file."""
+    """Read an ORSO file and return a ReductionConfig populated with metadata from the ORSO file.
+
+    Placeholder: real metadata extraction from the ORSO header's recorded configuration
+    (§3.3.8.1) is not yet implemented; this fabricates a minimal valid single-run config from
+    the run number embedded in the filename.
+    """
     ...
 
 
@@ -167,17 +172,8 @@ def write(
 
     dataset = fileio.orso.OrsoDataset(info=orso_class, data=np.array([q, r, dr, dq]).T)
 
-    # >>>>> GLASS DEBUG BLOCK >>>>>
-    rn = results.reduction_config.runs[0].run_number
-    sn = results.reduction_config.runs[0].sequence_number
-    if type(results) is ReductionResult:
-        fn = Path(output_dir) / f"glass-test_{rn}_{sn}_partial.ort"
+    if isinstance(results, ReductionResult):
+        fn = Path(output_dir) / f"REF_L_{results.sequence_id}_{results.sequence_number}.ort"
     else:  # CombinedReductionResult
-        fn = Path(output_dir) / f"glass-test_{rn}_{sn}_combined.ort"
-    # <<<<< GLASS DEBUG BLOCK <<<<<
-
-    # if isinstance(results, ReductionResult):
-    #     fn = Path(output_dir) / f"REF_L_{results.sequence_id}_{results.sequence_number}.ort"
-    # else:  # CombinedReductionResult
-    #     fn = Path(output_dir) / f"REF_L_{results.sequence_id}.ort"
+        fn = Path(output_dir) / f"REF_L_{results.sequence_id}.ort"
     fileio.orso.save_orso(datasets=[dataset], fname=str(fn))
