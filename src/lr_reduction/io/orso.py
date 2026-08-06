@@ -16,12 +16,13 @@ from orsopy.fileio import (
     Sample,
     Software,
     Value,
+    # ValueRange  # TODO: use Value/ValueRange instead when we start implementing
 )
+from orsopy.fileio.orso import OrsoDataset, save_orso
 
 from lr_reduction import __version__ as lr_reduction_version
 from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
-from lr_reduction.types import MantidWorkspace
 from lr_reduction.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -47,15 +48,6 @@ def read_partials(partial_dir: str, sequence_id: int) -> list[ReductionResult]:
     ...
 
 
-# TODO: Update this function to extract relevant Mantid logs and return the ORSO metadata fields accordingly.
-def _get_mantid_logs(workspace: MantidWorkspace) -> dict[str, str]:
-    """Extract Mantid logs from a Mantid workspace and return them as a dictionary."""
-    logs = {}
-    for log in workspace.getRun().getLogData():
-        logs[log.name()] = log.value()
-    return logs
-
-
 # TODO:
 #   - Double check comment/metadata and fields/values/units with CISes
 #   - Parse Results, ReductionConfig, and Nexus logs for info to populate ORSO fields
@@ -68,7 +60,7 @@ def write(
     results: ReductionResult | CombinedReductionResult,
     output_dir: str | Path = ".",
     title: str | None = None,
-) -> str:
+) -> None:
     """Write reduction results to an ORSO format file and return the path of the written file."""
 
     logger.info(f"Writing ORSO reduced data for {type(results).__name__} to {output_dir}")
@@ -170,7 +162,7 @@ def write(
         # comment=f"metadata={metadata}",
     )
 
-    dataset = fileio.orso.OrsoDataset(info=orso_class, data=np.array([q, r, dr, dq]).T)
+    dataset = OrsoDataset(info=orso_class, data=np.array([q, r, dr, dq]).T)
 
     fn = "PLACEHOLDER_FILENAME.ort"
-    fileio.orso.save_orso(datasets=[dataset], fname=str(fn))
+    save_orso(datasets=[dataset], fname=str(fn))
