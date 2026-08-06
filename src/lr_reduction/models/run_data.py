@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lr_reduction.types import MantidWorkspace
-
 
 @dataclass
 class RunData:
@@ -12,5 +10,3 @@ class RunData:
 
     Returned by a RunLoaderInterface instance.
     """
-
-    data: MantidWorkspace
