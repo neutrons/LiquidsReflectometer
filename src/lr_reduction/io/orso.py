@@ -172,8 +172,5 @@ def write(
 
     dataset = fileio.orso.OrsoDataset(info=orso_class, data=np.array([q, r, dr, dq]).T)
 
-    if isinstance(results, ReductionResult):
-        fn = Path(output_dir) / f"REF_L_{results.sequence_id}_{results.sequence_number}.ort"
-    else:  # CombinedReductionResult
-        fn = Path(output_dir) / f"REF_L_{results.sequence_id}.ort"
+    fn = "PLACEHOLDER_FILENAME.ort"
     fileio.orso.save_orso(datasets=[dataset], fname=str(fn))
