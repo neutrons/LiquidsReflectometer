@@ -1,8 +1,13 @@
 from pathlib import Path
 
-import yaml
 from pydantic import ValidationError
 
+from lr_reduction.exceptions.config import (
+    ConfigFileTypeError,
+    ConfigNotFoundError,
+    ConfigParseError,
+    ConfigValidationError,
+)
 from lr_reduction.io.interfaces import ConfigLoaderInterface
 from lr_reduction.io.orso import read_config as read_orso_config
 from lr_reduction.io.xml import read_config as read_xml_config
@@ -11,44 +16,6 @@ from lr_reduction.models.config import ReductionConfig
 from lr_reduction.utils import deprecated, get_logger
 
 logger = get_logger(__name__)
-
-
-class ConfigError(Exception):
-    """Base for any failure loading/validating a reduction configuration.
-
-    Callers outside this package (notably the GUI) should catch this family instead of the
-    exceptions native to a specific format's loader (`yaml.YAMLError`, `pydantic.ValidationError`,
-    …), so they don't need to know which loader handled a given file.
-    """
-
-    def __init__(self, message: str, *, filepath: str | None = None):
-        self.filepath = filepath
-        super().__init__(message)
-
-
-class ConfigNotFoundError(ConfigError):
-    """The configuration file does not exist."""
-
-
-class ConfigFileTypeError(ConfigError):
-    """The file's extension is not a recognized configuration format."""
-
-
-class ConfigParseError(ConfigError):
-    """The file could not be parsed: invalid YAML, not a mapping, or otherwise malformed."""
-
-
-class ConfigValidationError(ConfigError):
-    """The parsed configuration failed Pydantic schema/range/referential validation.
-
-    `errors` carries the raw Pydantic error dicts (`pydantic.ValidationError.errors()`) so a
-    caller that wants structured per-field detail (e.g. a GUI form) doesn't have to re-parse
-    the message string.
-    """
-
-    def __init__(self, message: str, *, filepath: str | None = None, errors: list[dict] | None = None):
-        self.errors = errors or []
-        super().__init__(message, filepath=filepath)
 
 
 def _validation_error_fields(exc: ValidationError) -> str:
@@ -106,9 +73,6 @@ class ConfigLoader(ConfigLoaderInterface):
                 filepath=path,
                 errors=exc.errors(),
             ) from exc
-        except yaml.YAMLError as exc:
-            logger.error(f"Failed to parse YAML in {path}: {exc}")
-            raise ConfigParseError(f"{path}: invalid YAML ({exc})", filepath=path) from exc
         except FileNotFoundError as exc:
             logger.error(f"Configuration file not found: {path}")
             raise ConfigNotFoundError(f"Configuration file not found: {path}", filepath=path) from exc

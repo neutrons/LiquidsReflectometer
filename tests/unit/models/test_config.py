@@ -1,6 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
+from lr_reduction.exceptions.base import NotFoundError
 from lr_reduction.models.config import PixelRange, QBinning, ReductionConfig, apply_overrides
 
 
@@ -82,7 +83,7 @@ def test_for_run_extracts_single_run_and_referenced_direct_beam():
 
 def test_for_run_raises_for_unknown_sequence_number():
     config = _minimal_config()
-    with pytest.raises(ValueError, match="no run with sequence_number"):
+    with pytest.raises(NotFoundError, match="no run with sequence_number"):
         config.for_run(999)
 
 

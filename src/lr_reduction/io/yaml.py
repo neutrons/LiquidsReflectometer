@@ -2,6 +2,7 @@
 
 import yaml
 
+from lr_reduction.exceptions.config import ConfigParseError
 from lr_reduction.models.config import ReductionConfig
 from lr_reduction.utils import get_logger
 
@@ -16,7 +17,13 @@ def read_config(filepath: str) -> ReductionConfig:
     """
     logger.info(f"Reading YAML configuration from {filepath}")
     with open(filepath) as f:
-        data = yaml.load(f, Loader=yaml.BaseLoader)
+        try:
+            data = yaml.load(f, Loader=yaml.BaseLoader)
+        except yaml.YAMLError as exc:
+            logger.error(f"Failed to parse YAML in {filepath}: {exc}")
+            raise ConfigParseError(f"{filepath}: invalid YAML ({exc})", filepath=filepath) from exc
     if not isinstance(data, dict):
-        raise ValueError(f"{filepath}: expected a YAML mapping, got {type(data).__name__}")
+        raise ConfigParseError(
+            f"{filepath}: expected a YAML mapping, got {type(data).__name__}", filepath=filepath
+        )
     return ReductionConfig(**data)

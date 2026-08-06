@@ -3,13 +3,13 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from lr_reduction.io.config_loader import (
+from lr_reduction.exceptions.config import (
     ConfigFileTypeError,
-    ConfigLoader,
     ConfigNotFoundError,
     ConfigParseError,
     ConfigValidationError,
 )
+from lr_reduction.io.config_loader import ConfigLoader
 from lr_reduction.models.config import ReductionConfig
 
 
