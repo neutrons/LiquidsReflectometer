@@ -5,7 +5,9 @@ import numpy as np
 import numpy.typing as npt
 from orsopy.fileio import Software
 
+from lr_reduction.exceptions import IncompleteDataError, MalformedDataError
 from lr_reduction.models.config import ReductionConfig
+from lr_reduction.types import ID
 
 
 @dataclass
@@ -50,7 +52,7 @@ class ReflectivityCurve:
         if any(column is not None for column in optional_columns) and not all(
             column is not None for column in optional_columns
         ):
-            raise ValueError("theta, lam, dtheta, dlam must be provided together")
+            raise IncompleteDataError("theta, lam, dtheta, dlam must be provided together")
 
         columns = [
             self.q,
@@ -60,9 +62,9 @@ class ReflectivityCurve:
             *(column for column in optional_columns if column is not None),
         ]
         if any(column.ndim != 1 for column in columns):
-            raise ValueError("reflectivity curve columns must be one-dimensional")
+            raise MalformedDataError("reflectivity curve columns must be one-dimensional")
         if len({len(column) for column in columns}) != 1:
-            raise ValueError("reflectivity curve columns must have equal lengths")
+            raise MalformedDataError("reflectivity curve columns must have equal lengths")
 
     @property
     def is_eight_column(self) -> bool:
@@ -108,9 +110,9 @@ class ReductionResult:
     """
 
     curve: ReflectivityCurve
-    run_numbers: list[int]
-    sequence_id: int
-    sequence_number: int
+    run_numbers: list[ID]
+    sequence_id: ID
+    sequence_number: ID
     reduction_config: ReductionConfig
     lr_reduction_info: Software
     mantid_info: Software

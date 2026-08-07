@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from lr_reduction.exceptions import IncompleteDataError, MalformedDataError
 from lr_reduction.models.results import ReflectivityCurve
 
 
@@ -42,8 +43,22 @@ def test_to_array_eight_column_order():
 
 
 def test_partial_eight_column_rejected():
-    with pytest.raises(ValueError, match="provided together"):
+    with pytest.raises(IncompleteDataError, match="provided together"):
         ReflectivityCurve(**_four_columns(), theta=np.array([0.6, 0.6]))
+
+
+def test_multidimensional_column_rejected():
+    columns = _four_columns()
+    columns["r"] = np.ones((2, 2))
+    with pytest.raises(MalformedDataError, match="one-dimensional"):
+        ReflectivityCurve(**columns)
+
+
+def test_mismatched_column_length_rejected():
+    columns = _four_columns()
+    columns["dq"] = np.array([0.001, 0.002, 0.003])
+    with pytest.raises(MalformedDataError, match="equal lengths"):
+        ReflectivityCurve(**columns)
 
 
 def test_empty_curve():
