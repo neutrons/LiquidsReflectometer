@@ -46,11 +46,23 @@ class ReflectivityCurve:
     dlam: npt.NDArray[np.float64] | None = None
 
     def __post_init__(self):
-        eight_column = [self.theta, self.lam, self.dtheta, self.dlam]
-        if any(column is not None for column in eight_column) and not all(
-            column is not None for column in eight_column
+        optional_columns = [self.theta, self.lam, self.dtheta, self.dlam]
+        if any(column is not None for column in optional_columns) and not all(
+            column is not None for column in optional_columns
         ):
             raise ValueError("theta, lam, dtheta, dlam must be provided together")
+
+        columns = [
+            self.q,
+            self.r,
+            self.dr,
+            self.dq,
+            *(column for column in optional_columns if column is not None),
+        ]
+        if any(column.ndim != 1 for column in columns):
+            raise ValueError("reflectivity curve columns must be one-dimensional")
+        if len({len(column) for column in columns}) != 1:
+            raise ValueError("reflectivity curve columns must have equal lengths")
 
     @property
     def is_eight_column(self) -> bool:
