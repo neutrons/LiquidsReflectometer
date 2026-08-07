@@ -60,7 +60,7 @@ def write(
     results: ReductionResult | CombinedReductionResult,
     output_dir: str | Path = ".",
     title: str | None = None,
-) -> None:
+) -> Path:
     """Write reduction results to an ORSO format file and return the path of the written file."""
 
     logger.info(f"Writing ORSO reduced data for {type(results).__name__} to {output_dir}")
@@ -165,4 +165,7 @@ def write(
     dataset = OrsoDataset(info=orso_class, data=np.array([q, r, dr, dq]).T)
 
     fn = "PLACEHOLDER_FILENAME.ort"
-    save_orso(datasets=[dataset], fname=str(fn))
+    output = Path(output_dir) / fn
+    save_orso(datasets=[dataset], fname=str(output))
+
+    return output
