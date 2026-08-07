@@ -12,12 +12,11 @@ from datetime import datetime
 from pathlib import Path
 
 import mantid
-import numpy as np
 from orsopy.fileio import Software
 
 from lr_reduction import __version__
 from lr_reduction.models.config import ReductionConfig
-from lr_reduction.models.results import CombinedReductionResult, ReductionResult
+from lr_reduction.models.results import CombinedReductionResult, ReductionResult, ReflectivityCurve
 from lr_reduction.utils import get_logger
 
 logger = get_logger(__name__)
@@ -45,11 +44,17 @@ def locate_configuration_relative_to(output_directory: Path) -> Path:
 
 
 def placeholder_single_run_result(config: ReductionConfig) -> ReductionResult:
-    """Fabricate a ReductionResult until Op 1 (direct beam) / Op 2 (single-run reduce) exist (§1.2)."""
+    """Fabricate a ReductionResult until Op 1 (direct beam) / Op 2 (single-run reduce) exist (§1.2).
+
+    Identity fields are zeroed: the real values come from the run's NeXus logs (§3.1.2),
+    which the placeholder never sees.
+    """
     return ReductionResult(
-        reflectivity=np.empty((0, 4)),
+        curve=ReflectivityCurve.empty(),
+        run_numbers=[],
+        sequence_id=0,
+        sequence_number=0,
         reduction_config=config,
-        html_report=None,
         lr_reduction_info=_LR_REDUCTION_SOFTWARE,
         mantid_info=_MANTID_SOFTWARE,
         reduction_timestamp=datetime.now(),
@@ -59,11 +64,9 @@ def placeholder_single_run_result(config: ReductionConfig) -> ReductionResult:
 def placeholder_sequence_result(config: ReductionConfig) -> CombinedReductionResult:
     """Fabricate a CombinedReductionResult until Op 3 (assembly) exists (§1.2)."""
     return CombinedReductionResult(
-        reflectivity=np.empty((0, 4)),
+        curve=ReflectivityCurve.empty(),
         reduction_config=config,
-        html_report=None,
         lr_reduction_info=_LR_REDUCTION_SOFTWARE,
         mantid_info=_MANTID_SOFTWARE,
         reduction_timestamp=datetime.now(),
-        assembly_config=config.assembly,
     )
