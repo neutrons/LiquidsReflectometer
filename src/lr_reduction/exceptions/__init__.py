@@ -12,6 +12,11 @@ from lr_reduction.exceptions.config import (
     ConfigParseError,
     ConfigValidationError,
 )
+from lr_reduction.exceptions.results import (
+    IncompleteDataError,
+    MalformedDataError,
+    ResultError,
+)
 
 __all__ = [
     "ConfigError",
@@ -19,9 +24,12 @@ __all__ = [
     "ConfigNotFoundError",
     "ConfigParseError",
     "ConfigValidationError",
+    "IncompleteDataError",
     "LrReductionError",
     "LrValidationError",
+    "MalformedDataError",
     "NotFoundError",
     "ParseError",
+    "ResultError",
     "UnsupportedFormatError",
 ]
