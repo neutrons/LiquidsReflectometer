@@ -15,7 +15,7 @@ def test_read_partials(template_dir): ...
 
 
 # TODO: read output file and check contents
-def test_write_orso(_template_dir, tmp_path):
+def test_write_orso(tmp_path):
     """Test writing an ORSO file from a ReductionResult."""
     config = ReductionConfig()
     reduction_result = ReductionResult(
