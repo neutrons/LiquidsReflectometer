@@ -85,7 +85,7 @@ class NRReductionConfig:
         self.xi_ref = None  # xi=0 reference distance
         self.dS1Samp = None  # slit S1 to sample distance
 
-        self.IncidentTheta = 4.0  # degrees Angle of the beamline relative to earth. Positive is downwards. Will become PV.
+        self.IncidentTheta = None  # degrees Angle of the beamline relative to earth. Positive is downwards. Reads from PV if not provided or defaults to 4.0 for older runs.
         self.emission_coefficients = None  # TOF emission time coefficients
         self.use_emission_time = True # Toggles application of the emission time correction and which distance is to be used.
 
