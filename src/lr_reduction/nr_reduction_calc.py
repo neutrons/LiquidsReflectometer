@@ -389,6 +389,10 @@ class NR_Reduction:
         else:
             self.config.LambdaMaxUse = self.config.LambdaMax[i]
 
+        # Allow override of IncidentTheta if provided
+        if self.config.IncidentTheta is None:
+            self.config.IncidentTheta = self.log_values['incident_theta']
+
         # Flip the arrays to give detector pixel ascending.
         RB = np.flipud(nRB)
         RBE = np.flipud(nRBE)
