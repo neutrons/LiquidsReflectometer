@@ -25,7 +25,7 @@ class Entrypoint(ABC, Generic[T]):
         """Obtain the run data this entrypoint operates on, given its configuration."""
 
     @abstractmethod
-    def call_operations(self, config: ReductionConfig, data: Any) -> T:
+    def call_operations(self, data: Any, config: ReductionConfig) -> T:
         """Drive the operations of §1.2 and return their result. No I/O."""
 
     @abstractmethod
@@ -36,6 +36,6 @@ class Entrypoint(ABC, Generic[T]):
         """Invariant skeleton: configuration, then data, then operations, then output."""
         config = self.load_configuration()
         data = self.load_data(config)
-        result = self.call_operations(config, data)
+        result = self.call_operations(data, config)
         self.save_output(result)
         return result

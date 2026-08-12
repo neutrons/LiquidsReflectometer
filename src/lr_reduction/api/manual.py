@@ -51,15 +51,15 @@ class ManualRunSequence(Entrypoint[CombinedReductionResult]):
             for run_number in reflected_run.resolved_source_runs
         ]
 
-    def call_operations(self, config: ReductionConfig, _data: list[RunData]) -> CombinedReductionResult:
+    def call_operations(self, data: list[RunData], config: ReductionConfig) -> CombinedReductionResult:
         _results: list[ReductionResult] = []
-        for data in _data:
-            op = SingleRunReductionOperation(data, config)
+        for d in data:
+            op = SingleRunReductionOperation(d, config)
             op.validate_input()
             result = op.process()
             op.cleanup()
             _results.append(result)
-        combine_op = CombineResultsOperation(_results, config.assembly)
+        combine_op = CombineResultsOperation(_results, config)
         combine_op.validate_input()
         combined_result = combine_op.process()
         combine_op.cleanup()

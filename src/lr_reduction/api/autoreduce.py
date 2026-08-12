@@ -62,7 +62,7 @@ class FromDiskSequence(Entrypoint[CombinedReductionResult]):
         sequence_id = 0
         return read_partials(str(self.output_directory), sequence_id)
 
-    def call_operations(self, config: ReductionConfig, data: list[ReductionResult]) -> CombinedReductionResult:
+    def call_operations(self, data: list[ReductionResult], config: ReductionConfig) -> CombinedReductionResult:
         op = CombineResultsOperation(data, config)
         op.validate_input()
         result = op.process()

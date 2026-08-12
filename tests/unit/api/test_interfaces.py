@@ -21,8 +21,8 @@ def test_execute_calls_steps_in_order():
             calls.append(("load_data", config))
             return "data"
 
-        def call_operations(self, config, data):
-            calls.append(("call_operations", config, data))
+        def call_operations(self, data, config):
+            calls.append(("call_operations", data, config))
             return "result"
 
         def save_output(self, result) -> None:
@@ -34,6 +34,6 @@ def test_execute_calls_steps_in_order():
     assert calls == [
         "load_configuration",
         ("load_data", "config"),
-        ("call_operations", "config", "data"),
+        ("call_operations", "data", "config"),
         ("save_output", "result"),
     ]
