@@ -5,18 +5,18 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from lr_reduction.api._shared import placeholder_sequence_result
 from lr_reduction.api._single_run import SingleRunReduction
 from lr_reduction.api.interfaces import Entrypoint
 from lr_reduction.io import ConfigLoader, RunData, RunLoader
-from lr_reduction.io.orso import write as write_orso
+from lr_reduction.io.orso import write_orso
 from lr_reduction.io.report import html_report
 from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
+from lr_reduction.operations import CombineResultsOperation, SingleRunReductionOperation
 
 
 class ManualSingleRun(SingleRunReduction):
-    """Manual reduction of a single run, by run number (§6.4.7, §11.6.5)."""
+    """Manual reduction of a single run, by run number."""
 
     def __init__(self, run_number: int, configuration: str | Path, **overrides):
         super().__init__(**overrides)
@@ -32,7 +32,7 @@ class ManualSingleRun(SingleRunReduction):
 
 
 class ManualRunSequence(Entrypoint[CombinedReductionResult]):
-    """Manual reduction of a full run sequence, assembled in-memory (§6.4.6, §11.6.4)."""
+    """Manual reduction of a full run sequence, assembled in-memory."""
 
     def __init__(self, sequence_id: int, configuration: str | Path, **overrides):
         self.sequence_id = sequence_id
@@ -52,8 +52,18 @@ class ManualRunSequence(Entrypoint[CombinedReductionResult]):
         ]
 
     def call_operations(self, config: ReductionConfig, _data: list[RunData]) -> CombinedReductionResult:
-        # Placeholder until Op 1 / Op 2 x N / Op 3 (in-memory assembly, §2.4.1.b) exist.
-        return placeholder_sequence_result(config)
+        _results: list[ReductionResult] = []
+        for data in _data:
+            op = SingleRunReductionOperation(data, config)
+            op.validate_input()
+            result = op.process()
+            op.cleanup()
+            _results.append(result)
+        combine_op = CombineResultsOperation(_results, config.assembly)
+        combine_op.validate_input()
+        combined_result = combine_op.process()
+        combine_op.cleanup()
+        return combined_result
 
     def save_output(self, result: CombinedReductionResult) -> None:
         result.html_report = html_report()

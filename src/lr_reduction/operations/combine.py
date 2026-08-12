@@ -1,9 +1,21 @@
+from datetime import datetime
+
+from mantid import __version__ as mantid_version
+from orsopy.fileio import Software
+
+from lr_reduction import __version__ as lr_reduction_version
 from lr_reduction.models.config import AssemblyConfig
-from lr_reduction.models.results import CombinedReductionResult, ReductionResult
+from lr_reduction.models.results import CombinedReductionResult, ReductionResult, ReflectivityCurve
 from lr_reduction.operations.interfaces import OperationInterface
+from lr_reduction.utils import get_logger
+
+logger = get_logger(__name__)
+
+_LR_REDUCTION_SOFTWARE = Software(name="lr_reduction", version=lr_reduction_version)
+_MANTID_SOFTWARE = Software(name="mantid", version=mantid_version)
 
 
-class CombineResults(OperationInterface[list[ReductionResult], AssemblyConfig, CombinedReductionResult]):
+class CombineResultsOperation(OperationInterface[list[ReductionResult], AssemblyConfig, CombinedReductionResult]):
     """
     A class for assembling reflectivity data from multiple runs.
 
@@ -17,19 +29,28 @@ class CombineResults(OperationInterface[list[ReductionResult], AssemblyConfig, C
         """
         Validate the input data and configuration for the reflectivity assembly.
         """
-        # Implement validation logic here
+        # TODO: Implement validation logic here
         pass
 
     def process(self) -> CombinedReductionResult:
         """
         Perform the reflectivity assembly operations and return the result.
         """
-        # Implement processing logic here
-        ...
+        # TODO: Implement processing logic here
+        return CombinedReductionResult(
+            curve=ReflectivityCurve.empty(),
+            reduction_config=self.config,
+            lr_reduction_info=_LR_REDUCTION_SOFTWARE,
+            mantid_info=_MANTID_SOFTWARE,
+            reduction_timestamp=datetime.now(),
+            partials=[],
+            scale_factors=[],
+            html_report=None,
+        )
 
     def cleanup(self) -> None:
         """
         Perform any necessary cleanup after processing.
         """
-        # Implement cleanup logic here
+        # TODO: Implement cleanup logic here
         pass

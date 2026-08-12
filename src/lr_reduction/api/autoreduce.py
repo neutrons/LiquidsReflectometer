@@ -9,15 +9,15 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from lr_reduction.api._shared import locate_configuration_relative_to, placeholder_sequence_result
+from lr_reduction.api._shared import locate_configuration_relative_to
 from lr_reduction.api._single_run import SingleRunReduction
 from lr_reduction.api.interfaces import Entrypoint
 from lr_reduction.io import ConfigLoader, RunData, RunLoader
-from lr_reduction.io.orso import read_partials
-from lr_reduction.io.orso import write as write_orso
+from lr_reduction.io.orso import read_partials, write_orso
 from lr_reduction.io.report import html_report
 from lr_reduction.models.config import ReductionConfig
-from lr_reduction.models.results import CombinedReductionResult
+from lr_reduction.models.results import CombinedReductionResult, ReductionResult
+from lr_reduction.operations import CombineResultsOperation
 from lr_reduction.utils import get_logger
 
 logger = get_logger(__name__)
@@ -56,15 +56,18 @@ class FromDiskSequence(Entrypoint[CombinedReductionResult]):
         config_path = locate_configuration_relative_to(self.output_directory)
         return self._config_loader.load(str(config_path))
 
-    def load_data(self, config: ReductionConfig): # noqa: ARG002
+    def load_data(self, config: ReductionConfig):  # noqa: ARG002
         # Placeholder: ReductionConfig does not yet carry a sequence_id (§3.3.1); a real
         # identifier will come from the acquired run's metadata (§3.1.2.1) once available.
         sequence_id = 0
         return read_partials(str(self.output_directory), sequence_id)
 
-    def call_operations(self, config: ReductionConfig, _data) -> CombinedReductionResult:
-        # Placeholder until Op 3 (assemble-only) exists.
-        return placeholder_sequence_result(config)
+    def call_operations(self, config: ReductionConfig, data: list[ReductionResult]) -> CombinedReductionResult:
+        op = CombineResultsOperation(data, config)
+        op.validate_input()
+        result = op.process()
+        op.cleanup()
+        return result
 
     def save_output(self, result: CombinedReductionResult) -> None:
         result.html_report = html_report()

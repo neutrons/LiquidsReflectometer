@@ -3,7 +3,7 @@ from datetime import datetime
 import numpy as np
 from orsopy.fileio import Software
 
-from lr_reduction.io.orso import write
+from lr_reduction.io.orso import write_orso
 from lr_reduction.models import ReductionConfig, ReductionResult, ReflectivityCurve
 
 
@@ -32,5 +32,5 @@ def test_write_orso(tmp_path):
         mantid_info=Software(name="mantid", version="1.0.0"),
         reduction_timestamp=datetime.fromisoformat("2024-01-01T12:00:00"),
     )
-    result = write(results=reduction_result, output_dir=tmp_path, title="Test ORSO Output")
+    result = write_orso(results=reduction_result, output_dir=tmp_path, title="Test ORSO Output")
     assert result.exists()

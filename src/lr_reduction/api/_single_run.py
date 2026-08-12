@@ -9,12 +9,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lr_reduction.api._shared import placeholder_single_run_result
 from lr_reduction.api.interfaces import Entrypoint
 from lr_reduction.io import ConfigLoader
-from lr_reduction.io.orso import write as write_orso
-from lr_reduction.models.config import ReductionConfig
-from lr_reduction.models.results import ReductionResult
+from lr_reduction.io.orso import write_orso
+from lr_reduction.models import ReductionConfig, ReductionResult, RunData
+from lr_reduction.operations import SingleRunReductionOperation
 
 
 class SingleRunReduction(Entrypoint[ReductionResult]):
@@ -27,9 +26,13 @@ class SingleRunReduction(Entrypoint[ReductionResult]):
         self.overrides = overrides
         self._config_loader = ConfigLoader()
 
-    def call_operations(self, config: ReductionConfig, _data) -> ReductionResult:
-        # Placeholder until Op 1 (composite direct beam) / Op 2 (single-run reduce) exist (§1.2).
-        return placeholder_single_run_result(config)
+    def call_operations(self, data: RunData, config: ReductionConfig) -> ReductionResult:
+        """Perform the single-run reduction operations."""
+        op = SingleRunReductionOperation(data, config)
+        op.validate_input()
+        result = op.process()
+        op.cleanup()
+        return result
 
     def save_output(self, result: ReductionResult) -> None:
         write_orso(result, output_dir=str(self.output_directory))
