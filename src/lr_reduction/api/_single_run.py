@@ -16,7 +16,7 @@ from lr_reduction.models import ReductionConfig, ReductionResult, RunData
 from lr_reduction.operations import SingleRunReductionOperation
 
 
-class SingleRunReduction(Entrypoint[ReductionResult]):
+class SingleRunReduction(Entrypoint[RunData, ReductionResult]):
     """Shared machinery for the single-run surfaces (§2.3).
 
     Leaves differ only in load_configuration / load_data.

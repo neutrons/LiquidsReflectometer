@@ -44,7 +44,7 @@ class AutoreduceSingleRun(SingleRunReduction):
         return self._output_directory
 
 
-class FromDiskSequence(Entrypoint[CombinedReductionResult]):
+class FromDiskSequence(Entrypoint[list[ReductionResult], CombinedReductionResult]):
     """Assembles a sequence from its on-disk partial ORSO files (§2.4.1.a)."""
 
     def __init__(self, output_directory: str | Path, **overrides):

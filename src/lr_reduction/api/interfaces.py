@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
 from lr_reduction.models.config import ReductionConfig
 
-T = TypeVar("T")
+T = TypeVar("T")  # Generic input data type
+S = TypeVar("S")  # Generic return type (results)
 
 
-class Entrypoint(ABC, Generic[T]):
+class Entrypoint(ABC, Generic[T, S]):
     """
-    Template Method skeleton shared by every reduction invocation surface (§6.4, §8).
+    Template Method skeleton shared by every reduction invocation surface.
 
     A fixed :meth:`execute` runs the steps in a guaranteed order; each concrete
     entrypoint overrides only the steps that differ.
@@ -18,21 +19,21 @@ class Entrypoint(ABC, Generic[T]):
 
     @abstractmethod
     def load_configuration(self) -> ReductionConfig:
-        """Resolve and load this entrypoint's configuration (§3.3.8.1)."""
+        """Resolve and load this entrypoint's reduction configuration."""
 
     @abstractmethod
-    def load_data(self, config: ReductionConfig) -> Any:
+    def load_data(self, config: ReductionConfig) -> T:
         """Obtain the run data this entrypoint operates on, given its configuration."""
 
     @abstractmethod
-    def call_operations(self, data: Any, config: ReductionConfig) -> T:
-        """Drive the operations of §1.2 and return their result. No I/O."""
+    def call_operations(self, data: T, config: ReductionConfig) -> S:
+        """Drive the operations and return their result. No I/O."""
 
     @abstractmethod
-    def save_output(self, result: T) -> None:
-        """Persist (and/or publish) *result*."""
+    def save_output(self, result: S) -> None:
+        """Persist (and/or publish) `result`."""
 
-    def execute(self) -> T:
+    def execute(self) -> S:
         """Invariant skeleton: configuration, then data, then operations, then output."""
         config = self.load_configuration()
         data = self.load_data(config)

@@ -56,6 +56,6 @@ def test_manual_run_sequence_loads_every_configured_run(tmp_path, monkeypatch):
 
     monkeypatch.setattr("lr_reduction.api.manual.RunLoader.load", _capture_run_number)
 
-    ManualRunSequence(999, tmp_path / "seq_999.yaml").execute()
+    ManualRunSequence(999, tmp_path / "seq_999.yaml", output_dir=str(tmp_path)).execute()
 
     assert loaded_run_numbers == [54321]

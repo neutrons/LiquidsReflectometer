@@ -10,12 +10,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from lr_reduction.types import ID
 from lr_reduction.utils import get_logger
 
 logger = get_logger(__name__)
 
 
-def locate_standard_configuration(run_number: int) -> Path:
+def locate_standard_configuration(run_number: ID) -> Path:
     """Resolve the standard configuration path for *run_number* (§6.4.5.1).
 
     Placeholder: the beamline's standard directory-layout convention is not yet defined.

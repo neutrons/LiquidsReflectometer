@@ -31,7 +31,7 @@ class ManualSingleRun(SingleRunReduction):
         return self._run_loader.load(self.run_number)
 
 
-class ManualRunSequence(Entrypoint[CombinedReductionResult]):
+class ManualRunSequence(Entrypoint[list[RunData], CombinedReductionResult]):
     """Manual reduction of a full run sequence, assembled in-memory."""
 
     def __init__(self, sequence_id: int, configuration: str | Path, **overrides):
