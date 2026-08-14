@@ -13,7 +13,7 @@ from lr_reduction.api.interfaces import Entrypoint
 from lr_reduction.io import ConfigLoader
 from lr_reduction.io.orso import write_orso
 from lr_reduction.models import ReductionConfig, ReductionResult, RunData
-from lr_reduction.operations import SingleRunReductionOperation
+from lr_reduction.operations import DirectBeamCompositionOperation, SingleRunReductionOperation
 
 
 class SingleRunReduction(Entrypoint[RunData, ReductionResult]):
@@ -28,10 +28,15 @@ class SingleRunReduction(Entrypoint[RunData, ReductionResult]):
 
     def call_operations(self, data: RunData, config: ReductionConfig) -> ReductionResult:
         """Perform the single-run reduction operations."""
-        op = SingleRunReductionOperation(data, config)
-        op.validate_input()
-        result = op.process()
-        op.cleanup()
+        db_name= config.runs[0].direct_beam
+        db_op = DirectBeamCompositionOperation(
+            data=[data],
+            config = config.direct_beams[db_name],
+        )
+        comp_db = db_op.execute()
+        single_run_config = config.for_run(config.runs[0].sequence_number)
+        op = SingleRunReductionOperation(data, single_run_config, comp_db)
+        result = op.execute()
         return result
 
     def save_output(self, result: ReductionResult) -> None:

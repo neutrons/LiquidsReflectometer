@@ -4,10 +4,11 @@ from mantid import __version__ as mantid_version
 from orsopy.fileio import Software
 
 from lr_reduction import __version__ as lr_reduction_version
-from lr_reduction.models.config import ReflectedRunConfig
+from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import ReductionResult, ReflectivityCurve
 from lr_reduction.models.run_data import RunData
 from lr_reduction.operations.interfaces import OperationInterface
+from lr_reduction.types import CompositeDirectBeam
 from lr_reduction.utils import get_logger
 
 logger = get_logger(__name__)
@@ -16,13 +17,17 @@ _LR_REDUCTION_SOFTWARE = Software(name="lr_reduction", version=lr_reduction_vers
 _MANTID_SOFTWARE = Software(name="mantid", version=mantid_version)
 
 
-class SingleRunReductionOperation(OperationInterface[RunData, ReflectedRunConfig, ReductionResult]):
+class SingleRunReductionOperation(OperationInterface[RunData, ReductionConfig, ReductionResult]):
     """
     A single run reduction operation.
+
+    `config` is the self-contained one-run configuration (`ReductionConfig.for_run`), so it can be
+    embedded as-is in the result's ORSO header.
     """
 
-    def __init__(self, data: RunData, config: ReflectedRunConfig):
+    def __init__(self, data: RunData, config: ReductionConfig, composite_direct_beam: CompositeDirectBeam):
         super().__init__(data, config)
+        self.composite_direct_beam = composite_direct_beam
 
     def validate_input(self) -> None:
         """

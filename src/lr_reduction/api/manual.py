@@ -12,7 +12,8 @@ from lr_reduction.io.orso import write_orso
 from lr_reduction.io.report import html_report
 from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
-from lr_reduction.operations import CombineResultsOperation, SingleRunReductionOperation
+from lr_reduction.operations import CombineResultsOperation, DirectBeamCompositionOperation, SingleRunReductionOperation
+from lr_reduction.types import CompositeDirectBeam
 
 
 class ManualSingleRun(SingleRunReduction):
@@ -53,12 +54,23 @@ class ManualRunSequence(Entrypoint[list[RunData], CombinedReductionResult]):
 
     def call_operations(self, data: list[RunData], config: ReductionConfig) -> CombinedReductionResult:
         _results: list[ReductionResult] = []
-        for d in data:
-            op = SingleRunReductionOperation(d, config)
+        _comp_dbs: dict[str, CompositeDirectBeam] = {}
+        for idx, d in enumerate(data):
+            # Compose the direct beam for this run
+            db_name = config.runs[idx].direct_beam
+            db_op = DirectBeamCompositionOperation(data=[d], config=config.direct_beams[db_name])
+            comp_db = db_op.execute()
+            _comp_dbs[db_name] = comp_db
+
+            # Perform the single-run reduction for this run
+            single_run_config = config.for_run(config.runs[idx].sequence_number)
+            op = SingleRunReductionOperation(d, single_run_config, comp_db)
             op.validate_input()
             result = op.process()
             op.cleanup()
             _results.append(result)
+
+        # Combine the results
         combine_op = CombineResultsOperation(_results, config)
         combine_op.validate_input()
         combined_result = combine_op.process()
