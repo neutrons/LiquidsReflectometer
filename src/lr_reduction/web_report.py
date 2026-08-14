@@ -446,8 +446,8 @@ def generate_report_section_reduction_parameters_new(config, workspace: MantidWo
     meta += "<table style='width:100%'>"
     meta += "<tr><th>Wavelength</th><th>Q</th><th>dqbin</th><th>Thi</th><th>Ths</th><th>Offset</th><th>tthd</th></tr>"  # noqa E501
     meta += "<tr><td>%6.4g - %6.4g</td><td>%6.4g - %6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td></tr>\n" % (
-        config.LambdaMin[sequence_number-1],
-        config.LambdaMax[sequence_number-1],
+        config.LambdaMinUse,
+        config.LambdaMaxUse,
         config.qmin,
         config.qmax,
         config.dqbin,
