@@ -119,6 +119,20 @@ class Direct_Beam:
         if not nexus_base or not save_base:
             raise ValueError('NEXUSpath/savepath not set: provide experiment_id or supply NEXUSpath/savepath when constructing Direct_Beam or call create_db with experiment_id')
 
+        # Pre-sort the runs into order by Cd amount in case run in a different order
+        for run in run_list:
+            fname = os.path.join(nexus_base, f'REF_L_{run}.nxs.h5')
+            log_values = BP.get_log_values(fname)             # Just need the Atten log value at this point. But can use existing function
+
+            # Need to split some parts out into separate functions if the logic is correct.
+            Cd_thickness = self._extract_cd_values(log_values, flip_atten)
+            print(f'Run {run}: Cd thickness = {Cd_thickness:.5f} cm')
+            Cd_values.append(Cd_thickness)
+
+        # Sort the Cd_values by value - increasing Cd
+        sorted_idx = np.argsort(np.array(Cd_values))
+        Cd_values = np.array(Cd_values)[sorted_idx]
+        run_list = np.array(run_list)[sorted_idx]
         for i, run in enumerate(run_list):
             # get header info from Nexus: atten and chop2 phase
             fname = os.path.join(nexus_base, f'REF_L_{run}.nxs.h5')
@@ -152,10 +166,7 @@ class Direct_Beam:
             # read in Cd linear attenuation coefficient data
             L_ENDF, mu_ENDF = np.loadtxt(mu_file, unpack=True, skiprows=1)
 
-            # Need to split some parts out into separate functions if the logic is correct.
-            Cd_thickness = self._extract_cd_values(log_values, flip_atten)
-            print(f'Run {run}: Cd thickness = {Cd_thickness:.5f} cm')
-            Cd_values.append(Cd_thickness)
+            Cd_thickness = Cd_values[i]
 
             if run == run_list[-1]: low_tag = True
             else: low_tag = False
