@@ -686,7 +686,7 @@ class TemplateBatchTab(QWidget):
                         # prevent the reduction from calling a blocking plt.show()
                         orig_show = getattr(plt, 'show', None)
                         try:
-                            plt.show = lambda *args, **kwargs: None
+                            plt.show = lambda *_args, **_kwargs: None
                         except Exception:
                             orig_show = None
 

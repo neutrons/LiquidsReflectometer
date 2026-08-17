@@ -243,6 +243,15 @@ ignore = [
   "N999", # invalid module name
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# The launcher GUI's pervasive `except Exception:` handlers are its
+# deliberate error-boundary idiom (Qt slots/callbacks must not raise;
+# failures surface as dialogs/log lines instead of crashing the app) —
+# 303 pre-existing sites as of 2026-08-17. BLE001 stays enforced for
+# the library code under src/, where the few blind excepts carry
+# per-line noqa with the reason.
+"launcher/**" = ["BLE001"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["lr_reduction"]
 

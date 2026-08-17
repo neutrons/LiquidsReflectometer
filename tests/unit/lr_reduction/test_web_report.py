@@ -71,17 +71,33 @@ def meta_data(workspace_sc, workspace_db, template_data):
 
 def test_generate_report_section_reduction_parameters(workspace_sc, template_data, meta_data):
     report = generate_report_section_reduction_parameters(workspace_sc, template_data, meta_data)
-    assert len(report) == 942
+    # Structural checks rather than a byte-length assertion: the length
+    # varies with the versioningit dev-version string embedded in the
+    # report, and grows whenever a row is added (the old 942-byte
+    # expectation predated the #155/#156 Q-binning row).
+    assert report.count("<table") == 2
+    assert report.count("</table>") == 2
+    assert "<td>Run:</td><td><b>201288</b></td>" in report
+    for label in (
+        "Q-binning:",
+        "Peak range:",
+        "Background:",
+        "X range:",
+        "Stitching Type:",
+        "Report time:",
+        "Reduction version:",
+    ):
+        assert label in report
 
 
 def test_generate_report_plots_reflected_beam(workspace_sc, template_data):
-    html_plots = generate_report_plots(workspace_sc, template_data, DataType.REFLECTED_BEAM)
+    html_plots = generate_report_plots(workspace_sc, DataType.REFLECTED_BEAM, template_data=template_data)
     assert len(html_plots) == 5
     assert None not in html_plots
 
 
 def test_generate_report_plots_direct_beam(workspace_db, template_data):
-    html_plots = generate_report_plots(workspace_db, template_data, DataType.DIRECT_BEAM)
+    html_plots = generate_report_plots(workspace_db, DataType.DIRECT_BEAM, template_data=template_data)
     assert len(html_plots) == 5
     assert None not in html_plots
 

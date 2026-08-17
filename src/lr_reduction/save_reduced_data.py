@@ -125,7 +125,7 @@ def make_json_safe(obj):
         # Convert functions/methods to a readable string to avoid JSON serialization errors
         try:
             return str(obj)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- serialization fallback must absorb any str() failure
             return repr(obj)
     else:
         return obj
