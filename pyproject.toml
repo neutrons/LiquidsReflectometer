@@ -178,8 +178,8 @@ conda-builder = { cmd = "pixi build", description = "Command that creates the co
 conda-build = { depends-on = ["sync-version", "conda-builder", "reset-version"], description = "Build the conda package" }
 conda-clean = { cmd = "rm -f *.conda", description = "Clean the local .conda build artifacts" }
 # Testing
-test-reduction = { cmd = "cd tests/ && python -m pytest -vv --cov=../src --cov-report=xml --cov-report=term"}
-test-launcher = { cmd = "python -m pytest -vv --timeout=120 launcher/tests/", description = "Run launcher UI tests (headless Qt)" }
+test-reduction = { cmd = "cd tests/ && python -m pytest -vv --cov=../src --cov-report=xml --cov-report=term", depends-on = ["test-launcher"]}
+test-launcher = { cmd = "python -m pytest -vv --timeout=120 --timeout-method=thread launcher/tests/", description = "Run launcher UI tests (headless Qt)" }
 # Misc
 clean-all = { description = "Clean all build artifacts", depends-on = ["docs-clean", "conda-clean"] }
 sync-version = { cmd = 'version=$(python -m versioningit); toml set tool.pixi.package.version "$version" --toml-path pyproject.toml', description = "Sync pyproject.toml version with Git version" }
