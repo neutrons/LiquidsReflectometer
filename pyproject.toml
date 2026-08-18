@@ -151,6 +151,7 @@ ruff = "*"
 codecov = "*"
 pytest = "*"
 pytest-cov = "*"
+pytest-timeout = ">=2.4.0,<3"
 
 [tool.pixi.feature.package.dependencies]  # necessary to build the conda package
 anaconda-client = ">=1.13.0,<2"
@@ -178,6 +179,7 @@ conda-build = { depends-on = ["sync-version", "conda-builder", "reset-version"],
 conda-clean = { cmd = "rm -f *.conda", description = "Clean the local .conda build artifacts" }
 # Testing
 test-reduction = { cmd = "cd tests/ && python -m pytest -vv --cov=../src --cov-report=xml --cov-report=term"}
+test-launcher = { cmd = "python -m pytest -vv --timeout=120 launcher/tests/", description = "Run launcher UI tests (headless Qt)" }
 # Misc
 clean-all = { description = "Clean all build artifacts", depends-on = ["docs-clean", "conda-clean"] }
 sync-version = { cmd = 'version=$(python -m versioningit); toml set tool.pixi.package.version "$version" --toml-path pyproject.toml', description = "Sync pyproject.toml version with Git version" }
