@@ -5,12 +5,23 @@
 # document to be understood): analysis.sns.gov runs a pixi older than 0.68 and
 # cannot read lock-format v7. pixi >= 0.68 writes only v7, and no newer pixi can
 # write v6 — so a lock regenerated on an unpinned machine is unusable at the
-# facility. (Provenance: campaign exp-settings-roi, charter amendment 14.)
+# facility. The version test itself lives in scripts/check_lock_format.sh.
 #
 # CONTRACT: a push never carries a non-v6 lock, and never carries dependency
 # drift. "The working tree is never dirty" is NOT the contract — ordinary pixi
 # activity restamps the self-package record, and the standing discipline is to
 # restore rather than stage that.
+#
+# KNOWN LIMIT: at the pre-push stage these hooks inspect the working tree, not
+# the ref being pushed, so `git push <remote> other-branch:main` validates the
+# wrong artifact. The CI format check is the structural backstop for that case,
+# which is most of why it exists.
+#
+# RETIREMENT — when analysis.sns.gov's pixi is upgraded to >= 0.68, delete this
+# guard in ONE commit touching:
+#     scripts/pixi_lock_check.sh, scripts/check_lock_format.sh,
+#     .pre-commit-config.yaml, .github/workflows/test_and_deploy.yml
+# (the campaign control plane's amendment 14 tracks the upgrade trigger).
 #
 # What is known about `pixi lock --check`, stated exactly:
 #
@@ -38,15 +49,24 @@ PATH="$HOME/.pixi/bin:$PATH"
 # Always operate on the repository root: pre-commit may invoke this from a
 # subdirectory, and pixi searches parent directories for a manifest — so a
 # relative path would have it rewrite the real lock while restoring nothing.
-cd "$(git rev-parse --show-toplevel)" || exit 1
+# The emptiness test is load-bearing: `cd ""` succeeds as a no-op, so a failed
+# rev-parse would otherwise slip through the `|| exit 1`.
+root=$(git rev-parse --show-toplevel) && [ -n "$root" ] && cd "$root" || exit 1
 [ -f pixi.lock ] || { echo "pixi-lock-check: no pixi.lock at the repository root (failing closed)"; exit 1; }
 
 snap=$(mktemp) || exit 1
-# One restore path, and it survives an interrupt: a Ctrl-C during the network
-# solve would otherwise leave a converted lock behind with the snapshot orphaned
-# in an anonymous temp file.
-trap 'cp "$snap" pixi.lock 2>/dev/null; rm -f "$snap"' EXIT INT TERM
-cp pixi.lock "$snap" || exit 1
+# Snapshot BEFORE arming the trap: an EXIT trap installed over an empty mktemp
+# file would copy that emptiness onto pixi.lock if this cp failed — and a
+# truncated lock whose first line still reads `version: 6` passes every
+# tripwire this guard ships.
+cp pixi.lock "$snap" || { rm -f "$snap"; exit 1; }
+restore() { cp "$snap" pixi.lock 2>/dev/null; rm -f "$snap"; }
+# A bash INT/TERM handler returns to the script unless it exits; without the
+# explicit exits below, an interrupt would restore, delete the snapshot, and
+# then run the classifier against a file that no longer exists.
+trap restore EXIT
+trap 'restore; trap - EXIT; exit 130' INT
+trap 'restore; trap - EXIT; exit 143' TERM
 
 pixi lock --check
 rc=$?
@@ -60,7 +80,7 @@ pixi-lock-check: your pixi wrote lock-format v7 — analysis.sns.gov's pixi
 
     pixi self-update --version 0.67.2
 
-The lock in your working tree has been restored to the committed v6 version.
+Your working-tree pixi.lock will be restored to the committed v6 version.
 MSG
     exit 1
 fi
@@ -93,13 +113,20 @@ strip_self_package_stamp() {
 }
 
 if ! cmp -s pixi.lock "$snap"; then
-    echo "pixi-lock-check: restored pixi.lock (the check mutated it)"
+    echo "pixi-lock-check: pixi.lock will be restored (the check mutated it)"
     hunk=$(diff <(strip_self_package_stamp "$snap") <(strip_self_package_stamp pixi.lock) || true)
     if [ -n "$hunk" ]; then
         echo "pixi-lock-check: pixi.lock does not match pyproject.toml — regenerate it UNDER A pixi <= 0.67.x and commit the result:"
         echo "$hunk"
         exit 1
     fi
+elif [ "$rc" -ne 0 ]; then
+    # The check failed without touching the lock: an unreachable index or a
+    # wedged network, not drift. Name the targeted skip, because the
+    # alternative a blocked developer reaches for is --no-verify, which would
+    # also disable the format tripwire.
+    echo "pixi-lock-check: the check failed but pixi.lock is unchanged and v6 (network or index problem?)." >&2
+    echo "If you must push now, skip this one hook rather than all of them:  SKIP=pixi-lock-check git push" >&2
 fi
 
 exit $rc
