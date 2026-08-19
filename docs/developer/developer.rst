@@ -103,7 +103,19 @@ Activate the hooks by typing in the terminal:
 
    $> cd /path/to/lr_reduction/
    $> pixi shell
-   $> pre-commit install
+   $> pre-commit install --hook-type pre-commit --hook-type pre-push
+
+Both hook types matter: the pre-push hooks are what keep ``pixi.lock`` at
+lock-format v6, which the analysis.sns.gov pixi (< 0.68) requires. If a push
+must go out while the lock check cannot reach the network, skip that one hook
+rather than disabling all of them:
+
+.. code-block:: bash
+
+   $> SKIP=pixi-lock-check git push
+
+``--no-verify`` would also skip the format tripwire, which is the check that
+prevents an unusable lock reaching the facility.
 
 
 Development procedure
