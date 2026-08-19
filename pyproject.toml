@@ -253,6 +253,10 @@ ignore = [
 # the library code under src/, where the few blind excepts carry
 # per-line noqa with the reason.
 "launcher/**" = ["BLE001"]
+# Fixture parameters in a test signature are the pytest idiom; ARG001 would
+# push authors to usefixtures marks instead, where a dropped mark yields a
+# hanging modal rather than a failure.
+"launcher/tests/**" = ["ARG001"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["lr_reduction"]
