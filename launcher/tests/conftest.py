@@ -1,4 +1,6 @@
+import atexit
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -18,6 +20,8 @@ from qtpy import QtCore, QtWidgets
 # QSettings(), but anything constructing NativeFormat explicitly would escape a
 # single-format redirect.
 _SCRATCH_ROOT = tempfile.mkdtemp(prefix="launcher-tests-settings-")
+# Only this process's own root — a concurrent run owns a different one.
+atexit.register(shutil.rmtree, _SCRATCH_ROOT, True)
 QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
 for _format in (QtCore.QSettings.IniFormat, QtCore.QSettings.NativeFormat):
     QtCore.QSettings.setPath(_format, QtCore.QSettings.UserScope, _SCRATCH_ROOT)
@@ -50,6 +54,12 @@ def isolated_qapp(tmp_path, monkeypatch):
     finally:
         # Identity first: a widget that raises during the drain must not cost
         # the next test its isolation.
+        #
+        # On this environment the fixture drops its reference to the
+        # QApplication, so the common case is a fresh one per test rather than
+        # one shared across the session. The drain is therefore cheap
+        # defense-in-depth for the session-scoped case, not the load-bearing
+        # cleanup an earlier version of this comment claimed it was.
         QtCore.QCoreApplication.setOrganizationName(prev_org)
         QtCore.QCoreApplication.setOrganizationDomain(prev_domain)
         QtCore.QCoreApplication.setApplicationName(prev_app)
