@@ -24,8 +24,16 @@ repos:
         exclude: "tests/data/.*"
   - repo: local
     hooks:
+      - id: pixi-lock-format
+        name: pixi-lock-format (lock stays v6 — analysis.sns.gov pixi < 0.68)
+        entry: 'bash -c "head -1 pixi.lock | grep -qx ''version: 6'' || { echo ''pixi.lock is not lock-format v6; the facility pixi cannot read v7 (charter amendment 14)''; exit 1; }"'
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit, pre-push]
       - id: pixi-lock-check
         name: pixi-lock-check
-        entry: bash -c "PATH=$HOME/.pixi/bin:$PATH pixi lock --check"
+        entry: bash scripts/pixi_lock_check.sh
         stages: [pre-push]
         language: system
+        pass_filenames: false
