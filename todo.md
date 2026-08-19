@@ -1,181 +1,183 @@
-# Integrator review gate — `pixi-lock-format-guard` v1 REJECTED
+# Integrator review gate — `pixi-lock-format-guard` v2 REJECTED
+
+Supersedes the v1 rejection recorded in this file at `3c1808b`
+(`git log -- todo.md`).
 
 **Gate: green** (`test-launcher` 2 passed, `test-reduction` 107 passed,
-exit 0, 510.60 s). This rejection is entirely from the review gate.
+exit 0, 526.34 s). **Disposition: blocking, per the plan's own
+declaration** — the Analyst upgraded `design-reviewer` to blocking for
+this attempt ("when the slug's entire deliverable is a guard, the domain
+that judges whether the guard guards must gate it"), and that domain
+returned two blocking findings. No Integrator departure was needed this
+time. Retry budget: **attempt 2; charter N = 3, so v3 is the last.**
 
-**Disposition: blocking — a flagged departure from the plan's advisory
-declaration.** The plan declares `design-reviewer (advisory)`, and I have
-honored advisory declarations throughout this campaign where the findings
-were quality opinions. I am departing here because this slug's *entire
-deliverable is a guard*, and three of the four findings describe the guard
-**permitting, causing, or instructing the exact harm it exists to
-prevent**. All four were verified in source by the Integrator before
-rejecting. Retry budget: attempt 1 of N = 3.
+## All four v1 findings are fixed, and the B4 fix is exemplary
 
-**Analyst override remains cheap and I will not re-litigate it:** re-tag
-`qa/pixi-lock-format-guard` at an unchanged SHA and I will open the draft
-PR with all of this recorded as advisory instead.
+Verified independently, not taken on report:
 
-## What is right, and better than the plan — state this first
+- **B1**: a ≥0.68 shim now yields exit 1 with a v7-specific message naming
+  `pixi self-update --version 0.67.2`; the generic drift path says
+  "regenerate UNDER A pixi <= 0.67.x". Nothing tells anyone to run
+  `pixi lock` any more.
+- **B2**: from a subdirectory → exit 0, **no stray file**, repo lock
+  untouched; outside any repo → exit 1, "failing closed".
+- **B4**: the header now separates MEASURED from UNVERIFIED and adds a
+  durable guard — *"Do not restate this as measured until someone measures
+  it."* The reviewer diffed the real committed lock against the real
+  check-mutated tree and confirmed the documented mutation triple
+  (`version`, `sha256`, `editable: true`) matches line for line. **This is
+  the right way to answer a stated-vs-measured finding** — not by deleting
+  the claim but by scoping it and blocking its recurrence.
+- **The self-package classifier is narrowed** (v1 stripped the whole
+  stanza): `requires_dist` added → blocked; `requires_python` changed →
+  blocked; `name` changed → blocked; benign restamp → passes.
+- **The deviation from the plan's literal wording is correct and flagged**:
+  stripping only `version`/`sha256`, as the plan said, is non-empty on a
+  benign push (`editable: true` alone) and would block every ordinary push.
+  Measured, deviated, flagged — correct-and-flag done right.
+- **CI placement verified** by parsing the YAML: the format check precedes
+  `setup-pixi` in all three pixi jobs, and it checks **format**, not
+  consistency. The escape hatch is the right one: `SKIP=pixi-lock-check`
+  disables only the network-dependent wrapper while the `always_run`
+  format tripwire stays armed.
 
-Two judgment calls here improve on the plan's own sketch, and should
-survive into v2 unchanged:
+## B5 — BLOCKING: the trap is armed over an empty snapshot and can truncate the tracked lock
 
-- **`cp` back rather than `git checkout -- pixi.lock`** (`:48-50`). This is
-  the case most likely to be got wrong, and it is right: a deliberate
-  uncommitted lock edit survives the check byte-for-byte. Verified at
-  review by appending a WIP stanza and running the wrapper against a
-  restamping pixi — the WIP survived.
-- **Deciding from file content rather than from `rc`** (`:41-51`), which is
-  strictly stronger than the plan's rc-trusting design and the correct
-  response to an exit code whose behaviour is unverified.
-- The `awk` self-package strip is precisely scoped (removes exactly the 5
-  stanza lines on the real lock; the two indented `- pypi: ./` environment
-  references survive), and putting the pure-shell tripwire on **both**
-  `pre-commit` and `pre-push` stages is what keeps the guard alive at all
-  (see A2).
-
-## B1 — the failure message prescribes the destructive action
-
-`scripts/pixi_lock_check.sh:45`:
+`scripts/pixi_lock_check.sh:44-49`:
 
 ```
-pixi-lock-check: pixi.lock is out of date with pyproject.toml — run 'pixi lock' and commit the result
+44  snap=$(mktemp) || exit 1
+48  trap 'cp "$snap" pixi.lock 2>/dev/null; rm -f "$snap"' EXIT INT TERM
+49  cp pixi.lock "$snap" || exit 1
 ```
 
-On a machine with pixi ≥ 0.68 — the only machines where the v7 hazard
-exists at all — `pixi lock` produces the v7 rewrite this slug exists to
-prevent. The push is correctly blocked, and then the guard tells the
-maintainer to go and do the thing. Reproduced at review with a ≥0.68 shim:
-the wrapper blocks with `EXIT=1`, prints the `version: 6` → `version: 7`
-hunk, and issues that instruction.
+`mktemp` has already created a **0-byte** file. The trap is armed at `:48`
+**before** `:49` populates it, so any exit in that two-line window copies
+emptiness onto the real repo-root `pixi.lock`. Reproduced twice by the
+reviewer, two independent ways:
 
-**Fix:** after `pixi lock --check`, test `head -1 pixi.lock` and branch to
-a v7-specific message *before* the generic drift path — "your pixi wrote
-lock-format v7; do NOT commit it; pin pixi < 0.68" plus the pin command.
+| Trigger | Result |
+|---|---|
+| snapshot `cp` fails with a healthy repo FS (ENOSPC/quota on `/tmp`) | `pixi.lock` **327276 → 0 bytes**, `M pixi.lock` |
+| `ulimit -f` (shim-free; a full or quota'd TMPDIR) | `pixi.lock` **327276 → 1024 bytes** |
 
-## B2 — the missing-lock path fails OPEN and writes a 0-byte lock
+**This is strictly worse than the v1 defect it replaced.** v1's fail-open
+wrote a 0-byte lock into a *subdirectory*, leaving the real lock intact.
+v2 truncates the **tracked repo-root lock** — and in the partial-truncation
+variant `head -1` still reads `version: 6`, so **all three tripwires this
+slug ships wave the corpse through**: the script's own format check
+(`:56`), the `pixi-lock-format` pre-commit hook
+(`.pre-commit-config.yaml:29`), and the new CI step. The guard can damage
+the very artifact it exists to protect, in a way its own guards cannot see.
 
-`:24-25` does `cp pixi.lock "$snap"` unchecked, and the script has **no
-repo-root assertion** (verified: zero occurrences of `show-toplevel` or a
-`-f pixi.lock` test). Run anywhere `pixi.lock` is not in the cwd and the
-chain is: `cp` fails → `awk` fails → both stripped streams are empty →
-`diff -q` reports them identical → `drift=0` → `cp "$snap" pixi.lock`
-writes the **empty** snapshot → `exit $rc`.
+Failure scenario: `/tmp` fills on a shared facility workstation; the dev
+pushes; the hook silently truncates `pixi.lock`; `git status` shows a
+modification they did not make; a `git commit -am` carries it; pre-commit
+passes; CI's format check passes; the job dies deep inside `setup-pixi` on
+an inscrutable parse error — the exact outcome the CI step was added to
+prevent. The natural recovery instinct is `pixi lock`, which on a ≥0.68
+machine is the v7 rewrite.
 
-Reproduced at review from a subdirectory: `EXIT=0`, and a **0-byte
-`pixi.lock` created in the cwd**. This is the one path where the guard
-silently passes. With real pixi it is worse: pixi searches parent
-directories for the manifest, so it rewrites the *real* `../pixi.lock`
-while the wrapper restores nothing and the push proceeds.
+**Attribution — this is not a Developer slip.** The plan's own v2 fix
+sketch prescribes this exact ordering verbatim. **The plan needs the same
+correction, or v3 reproduces it.**
 
-**Fix:** `cd "$(git rev-parse --show-toplevel)" || exit 1` and
-`[ -f pixi.lock ] || { echo ...; exit 1; }` at the top.
+## B6 — BLOCKING: the INT/TERM handler does not exit, so the script runs on with a deleted snapshot
 
-## B3 — no `trap`, so the file's own contract is false under interrupt
+A bash `trap … INT` handler returns to the interrupted script unless it
+exits. This one restores the lock **and `rm -f "$snap"`**, then execution
+continues at `:52`; by `:95`, `cmp -s pixi.lock "$snap"` compares against a
+file that no longer exists. Measured, SIGINT during the solve with the lock
+already converted to v7:
 
-`:20` states: *"The lock is restored either way, so a push never dirties
-the tree."* There is no `trap` in the file (verified: zero). Reproduced by
-killing the hook mid-check: the tree is left **converted to v7**, `git
-status` shows `M pixi.lock`, and the only backup is an unnamed
-`/tmp/tmp.XXXXXXXX` the developer has no way to identify.
+```
+pixi-lock-check: restored pixi.lock (the check mutated it)
+awk: fatal: cannot open file `/tmp/tmp.i0ueVZZ4k9' for reading
+pixi-lock-check: pixi.lock does not match pyproject.toml — regenerate it UNDER A pixi <= 0.67.x
+0a1,8283
+> version: 6
+… 8,287 lines — the entire lock dumped as a "drift hunk"
+```
 
-This is not a corner case. `pixi lock --check` performs a network solve,
-and this commit's own body reports that solve failing on network in this
-environment today — so a Ctrl-C or a dropped terminal during it is an
-everyday event, and the outcome is the exact state the slug exists to
-prevent, caused by the slug.
+The lock itself **is** correctly restored, so the v2 transcript is accurate
+as far as it measured; what it did not measure is the script's *verdict*
+after the interrupt, which is a fabricated drift accusation. Two
+consequences in this domain: the comment at `:45` ("One restore path, and
+it survives an interrupt") is a documented guarantee only half provided —
+the same stated-vs-measured shape B4 was rejected for, now one line below
+the B4 fix; and a Ctrl-C answered with a false accusation plus 8k lines of
+spew is exactly what drives a maintainer to `--no-verify`, which
+`developer.rst` correctly identifies as the thing that disarms the format
+tripwire.
 
-**Fix:** `trap 'cp "$snap" pixi.lock 2>/dev/null; rm -f "$snap"' EXIT INT TERM`.
+## Fix for both (reviewer-verified, no regressions)
 
-## B4 — the script asserts a measurement the same commit says was never made
+```bash
+snap=$(mktemp) || exit 1
+# Snapshot BEFORE arming the trap: an EXIT trap installed over an empty
+# mktemp file would copy that emptiness onto pixi.lock if this cp failed.
+cp pixi.lock "$snap" || { rm -f "$snap"; exit 1; }
+restore() { cp "$snap" pixi.lock 2>/dev/null; rm -f "$snap"; }
+trap restore EXIT
+trap 'restore; trap - EXIT; exit 130' INT
+trap 'restore; trap - EXIT; exit 143' TERM
+```
 
-`scripts/pixi_lock_check.sh:12-15` states as fact:
+Measured with this patch: snapshot-`cp` failure → lock intact at 327276
+bytes, exit 1; SIGINT → exit 130, **zero output**, lock byte-identical;
+benign / v7 / drift stubs unchanged (0 / 1 / 1). `bash -n` and `shellcheck`
+clean.
 
-> *"Measured on pixi 0.67.2 (2026-08-19): with a dependency added to
-> pyproject.toml and absent from the lock, `pixi lock --check` UPDATED the
-> lock and exited 0."*
+## Advisory — carry into v3
 
-The body of commit `2b04921` states:
+- **`version: 6` is written 5×, `0.67.2` 5×, across 4 files.** No single
+  source; the CI snippet is copy-pasted three times. A
+  `scripts/check_lock_format.sh` invoked by CI (`run:`) and pre-commit
+  (`entry:`) makes retirement one deletion.
+- **Retirement is currently archaeology.** The trigger *condition* is in
+  the script header, but the checklist lives only in the campaign plan on
+  the analysis branch — which the maintainer who eventually lifts the pin
+  will not be reading. Put a five-line "How to retire this" block in the
+  script header naming all four files and the trigger.
+- **`:41` — `cd ""` is a bash no-op returning 0**, so `|| exit 1` never
+  fires if `git rev-parse --show-toplevel` fails; the `[ -f pixi.lock ]`
+  backstop is what actually fails closed. Behavior is right, but not via
+  the guard the code appears to rely on. Use
+  `root=$(git rev-parse --show-toplevel) && [ -n "$root" ] && cd "$root" || exit 1`.
+- **The escape hatch is invisible at the moment it is needed**: on the
+  wedged-network path the script prints only pixi's error. Print the
+  `SKIP=pixi-lock-check` hint when `rc != 0` and the lock is unchanged and
+  v6 — the one path where the developer's next move is otherwise
+  `--no-verify`.
+- **The docs fix is right but not self-enforcing.** Already-onboarded
+  developers will not re-run `pre-commit install`.
+  `default_install_hook_types: [pre-commit, pre-push]` in the config makes
+  plain `pre-commit install` do the right thing and single-sources the fact.
+- **At pre-push the guard checks the working tree, not the pushed ref**
+  (`always_run`/`pass_filenames: false`), so `git push origin featureX:main`
+  from another branch validates the wrong artifact. The new CI format check
+  is the real backstop here — which is an argument that it earns its place
+  beyond the pin.
+- `.pre-commit-config.yaml:33-38` — `pixi-lock-check` lacks
+  `always_run: true` while its sibling has it, so a push whose changed
+  files all fall inside the repo's global `exclude` glob skips the wrapper.
+  Minor (the tripwire still runs), but the asymmetry looks accidental.
+- `:63` prints "has been restored" *before* the restore happens (the trap
+  runs at exit); net effect correct.
 
-> *"I have NOT demonstrated that. Three attempts each hit a different wall
-> … the rc's behaviour under real drift remains unknown here."*
+## Suggested v3 order
 
-Both landed in the same commit. That measurement is the **sole
-justification for the entire content-classifier design**, so this is not a
-comment nit: either the claim is unverified and must not be stated as
-measured, or the measurement happened and the commit body is wrong — and
-per the plan's own pathological row it would then need recording through
-the review loop, which has not happened.
+1. **B5 and B6** — the six-line trap rewrite above. Ask the Analyst to
+   amend the plan's fix sketch at the same time, since it prescribes B5's
+   ordering.
+2. Single-source `version: 6` / `0.67.2` and add the retirement block —
+   together these are what make this guard removable in one commit when the
+   facility upgrades.
+3. The `cd ""` hardening, the SKIP hint on the network path, and
+   `default_install_hook_types`.
 
-This is the campaign's signature defect shape once more — *a documented
-guarantee the code does not provide* — here in the form of a documented
-**measurement that was not taken**. Reconcile it before merge.
-
-## Advisory — carry into v2
-
-- **The CI change is a pin, not a check.** The workflow has no `pre-commit`
-  step at all, so this guard has zero presence in GitHub Actions; pinning
-  `setup-pixi` to `v0.67.2` means a v7 lock breaks CI as an inscrutable
-  parse failure rather than as "your lock is v7". A two-line step placed
-  **before** the first `setup-pixi` closes it properly:
-  `head -1 pixi.lock | grep -qx 'version: 6' || { echo "..."; exit 1; }`.
-- **The documented onboarding never installs the pre-push hook.**
-  `docs/developer/developer.rst:106` says `pre-commit install`, not
-  `--hook-type pre-push`, and this clone has no `.git/hooks/pre-push` — so
-  the wrapper is dead code for anyone following the docs. The dual-stage
-  tripwire rescues the design; the doc line should become
-  `pre-commit install --hook-type pre-commit --hook-type pre-push`.
-- **The classifier's blind spot is the whole stanza, not just the restamp.**
-  Any real change confined to the `- pypi: ./` record is invisible —
-  reproduced by adding a `requires_dist` entry inside it (`EXIT=0`,
-  silently passed). Exposure is low today (deps are conda-side), but
-  `editable: true` lives in that stanza and the plan itself flags its loss
-  as a semantic concern. Strip only the `version:`/`sha256:` lines *within*
-  the stanza rather than the stanza itself.
-- **A network failure wedges the push with no message and no escape.**
-  Fail-closed is right for *format*, but the pure-shell tripwire already
-  covers that offline; a failed network solve blocking a push with only
-  pixi's stderr invites `--no-verify`, which disables the tripwire too.
-  Document `SKIP=pixi-lock-check git push` in `developer.rst`.
-- **The restore is silent.** The plan's
-  `echo "restored pixi.lock (the check mutated it)"` was dropped in
-  implementation, so a developer on an unpinned pixi never learns their
-  toolchain is mutating the lock — and the commit body cites that line as
-  verification output it cannot have produced.
-- **Hard-coded values are not single-sourced.** `version: 6` lives only in
-  `.pre-commit-config.yaml:29` — the wrapper never checks the format at all,
-  which is the mechanical root of B1. `v0.67.2` appears three times in the
-  workflow with no comment. Both failure messages cite "charter amendment
-  14", a document not present in this repository, so the citation is a dead
-  reference for any reader who is not the author. Name the condition inline
-  at each pin site.
-- Nits: `diff` is computed twice (`:43`, `:46`); `head -20` will truncate a
-  real v7 diff misleadingly; the script is unlinted
-  (`.pre-commit-config.yaml:5` excludes `scripts/.*`, and there is no
-  shellcheck hook).
-
-## A design-level observation worth acting on
-
-During this review, `pixi.lock` in the working tree was restamped **with no
-push involved** — most likely an ordinary `pixi install` or direnv's
-`watch_file pixi.lock` activation. A pre-push-only wrapper structurally
-cannot keep the tree clean, because the mutation arrives through everyday
-environment activation. The dual-stage tripwire already acknowledges this;
-the wrapper's own framing ("a push never dirties the tree") does not.
-Worth deciding explicitly in v2 whether the goal is *"pushes never carry a
-v7 lock"* (achievable) or *"the tree is never dirty"* (not achievable at
-this layer).
-
-## Suggested v2 order
-
-1. **B2** and **B3** — the fail-open path and the missing `trap`. Together
-   they are ~4 lines and they are the two ways this guard currently permits
-   or causes the harm.
-2. **B1** — branch on `head -1 pixi.lock` before the generic drift message.
-3. **B4** — reconcile the comment with what was actually measured; if the
-   measurement stands, record it, and if it does not, say so in the comment
-   and keep the content-classifier design on its *other* justification
-   (an unverified rc is reason enough not to trust it).
-4. The CI format check and the `developer.rst` hook-type line — without
-   them the guard does not reach the machines that most need it.
+**Note on scope for the Analyst:** v2 closed every v1 finding and closed
+them well. Both new findings come from the *same* fix (B3's trap) and are
+six lines apart. This is a converging slug, not a floundering one — but v3
+is the last retry, so the trap rewrite should land with the plan
+correction, not ahead of it.
