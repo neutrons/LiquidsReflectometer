@@ -213,12 +213,12 @@ def generate_report_sections(
     logger.notice(f"  - generating report [{number_events}]")
 
     config = None
+    template_data = None
     if data_type == DataType.REFLECTED_BEAM:
         if config_in is not None:
             # Get the parameters from the settings instead
             config = config_in
             report = generate_report_section_reduction_parameters_new(config_in, workspace, sequence_number)
-            template_data = None
         # Read template if needed
         elif template_file is not None:
             if isinstance(template_file, str):
