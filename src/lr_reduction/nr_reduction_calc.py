@@ -534,7 +534,7 @@ class NR_Reduction:
         ThetaCalc = alpha * 0.5 + (self.log_values['tthd'] - DBtthd) / 2
         # TODO: Alter the function to do the calculation once and apply different angle offsets
         # Calculate expected beam profile on detector using logs
-        Icalc_nonfit = tools.calc_beam_on_detector(Yfit, DBpixel, self.log_values['siY'], self.log_values['s1Y'],
+        Icalc_nonfit, Ymm_notfit = tools.calc_beam_on_detector(Yfit, DBpixel, self.log_values['siY'], self.log_values['s1Y'],
                                             self.settings['interslit_distance'], self.settings['si_sample_distance'],
                                          self.settings['sample_detector_distance'], self.settings['pixel_width'],
                                          self.config.DetSigma, self.config.DetResFn)
@@ -555,7 +555,7 @@ class NR_Reduction:
             self.log_values['ThCen'] = ThCen
 
             # Calculate expected beam profile on detector using logs
-            Icalc = tools.calc_beam_on_detector(Yfit, RBpixel, self.log_values['siY'], self.log_values['s1Y'],
+            Icalc, Ymm = tools.calc_beam_on_detector(Yfit, RBpixel, self.log_values['siY'], self.log_values['s1Y'],
                                         self.settings['interslit_distance'], self.settings['si_sample_distance'],
                                         self.settings['sample_detector_distance'], self.settings['pixel_width'],
                                         self.config.DetSigma, self.config.DetResFn)
