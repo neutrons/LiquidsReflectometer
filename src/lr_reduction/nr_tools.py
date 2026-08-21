@@ -382,12 +382,14 @@ def calc_beam_on_detector(Ypix, CenPix, Si, S1, dS1Si, dSiSam, dSamDet, mmpix, D
     if DetResFn == 'rectangular':
         width = DetRes * np.sqrt(12)
         n = max(1, int(np.round(width / dy)))
+        n = min(n, len(I))
         kernel = np.ones(n) / n
         I = np.convolve(I, kernel, mode="same")
 
     # Gaussian kernel half-width (~±4σ)
     elif DetResFn == 'gaussian':
         half_width = int(np.ceil(4 * DetRes / dy))
+        half_width = min(half_width, (len(I) - 1) // 2)
         xk = np.arange(-half_width, half_width + 1) * dy
         kernel = np.exp(-0.5 * (xk / DetRes)**2)
         kernel /= kernel.sum()
@@ -399,9 +401,14 @@ def calc_beam_on_detector(Ypix, CenPix, Si, S1, dS1Si, dSiSam, dSamDet, mmpix, D
     # normalize
     if I.max() <= 0:
         raise ValueError("Maximum I has calculated negative")
+
     else:
         I = I/I.max()
-        return I
+        if len(Ymm) != len(I):
+            raise ValueError(
+                f"Ymm and I have different lengths: {len(Ymm)} vs {len(I)}"
+                )
+        return I, Ymm
 
 def intersect(m1, b1, m2, b2):
     # find intersection of two lines
