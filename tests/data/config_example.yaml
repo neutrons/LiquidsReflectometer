@@ -10,9 +10,9 @@ defaults:
 
 direct_beams:
   db_8mm:
-    db_run_numbers: [12345, 12346, 12347]
+    direct_beam_run_numbers: [12345, 12346, 12347]
   db_20mm:
-    db_run_numbers: [12350, 12351]
+    direct_beam_run_numbers: [12350, 12351]
 
 runs:
   - sequence_number: 1

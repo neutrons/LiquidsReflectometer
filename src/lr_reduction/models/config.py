@@ -258,12 +258,12 @@ class ReflectedRunParameters(RunParameters):
 class DirectBeamConfig(RunParameters):
     """A named composite direct beam: the individual DB runs it is built from.
 
-    Inherits `RunParameters` (rather than carrying only `db_run_numbers`) because the direct beam has
+    Inherits `RunParameters` (rather than carrying only `direct_beam_run_numbers`) because the direct beam has
     its own peak/background/low-res characterization window, distinct from any reflected run
     that references it, and should inherit from the same global `defaults`.
     """
 
-    db_run_numbers: list[ID] = Field(min_length=1)
+    direct_beam_run_numbers: list[ID] = Field(min_length=1)
     # TODO:
     #   Not explicitly specified for DB runs; included for symmetry with reflected runs
     #   Determine whether this is actually needed.

@@ -39,7 +39,7 @@ class LiveEntrypoint(SingleRunReduction):
         # TODO: get sequence_number from sample logs and assign to self.sequence_number
         self.sequence_number = 1  # Placeholder: sequence_number is not yet available
         db_config = get_direct_beam_config(self.sequence_number, config)
-        direct_beams = [self._run_loader.load(run_number) for run_number in db_config.db_run_numbers]
+        direct_beams = [self._run_loader.load(run_number) for run_number in db_config.direct_beam_run_numbers]
         return SingleReductionInput(
             run_data=self.reflected_run, direct_beams=direct_beams, direct_beam_config=db_config
         )

@@ -42,7 +42,7 @@ class AutoreduceSingleRun(SingleRunReduction):
         run = self._run_loader.load_from_path(self.nexus_file_path)
         self.sequence_number = run.sequence_number
         db_config = get_direct_beam_config(run.sequence_number, config)
-        direct_beams = [self._run_loader.load(run_number) for run_number in db_config.db_run_numbers]
+        direct_beams = [self._run_loader.load(run_number) for run_number in db_config.direct_beam_run_numbers]
         return SingleReductionInput(run_data=run, direct_beams=direct_beams, direct_beam_config=db_config)
 
     @property

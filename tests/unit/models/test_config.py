@@ -6,7 +6,7 @@ from lr_reduction.models.config import PixelRange, QBinning, ReductionConfig, ap
 
 def _minimal_config(**overrides):
     data = dict(
-        direct_beams={"db_8mm": {"db_run_numbers": [12345, 12346, 12347]}},
+        direct_beams={"db_8mm": {"direct_beam_run_numbers": [12345, 12346, 12347]}},
         runs={
             1: {"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 111},
             2: {"sequence_number": 2, "direct_beam": "db_8mm", "run_number": 112},
@@ -60,8 +60,8 @@ def test_q_binning_rejects_non_increasing_range():
 def test_for_run_extracts_single_run_and_referenced_direct_beam():
     config = _minimal_config(
         direct_beams={
-            "db_8mm": {"db_run_numbers": [12345]},
-            "db_20mm": {"db_run_numbers": [12350]},
+            "db_8mm": {"direct_beam_run_numbers": [12345]},
+            "db_20mm": {"direct_beam_run_numbers": [12350]},
         },
         runs={
             1: {"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 111},

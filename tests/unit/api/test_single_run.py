@@ -6,7 +6,7 @@ from lr_reduction.models.config import DirectBeamConfig, ReductionConfig, Reflec
 
 def _config() -> ReductionConfig:
     return ReductionConfig(
-        direct_beams={"db": DirectBeamConfig(db_run_numbers=[11111])},
+        direct_beams={"db": DirectBeamConfig(direct_beam_run_numbers=[11111])},
         runs={1: ReflectedRunConfig(sequence_number=1, direct_beam="db", run_number=12345)},
     )
 

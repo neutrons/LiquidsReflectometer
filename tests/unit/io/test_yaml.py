@@ -21,12 +21,12 @@ def test_read_config_preserves_zero_padded_run_number(tmp_path):
     config_file.write_text(
         "direct_beams:\n"
         "  db_8mm:\n"
-        "    db_run_numbers: [012345]\n"
+        "    direct_beam_run_numbers: [012345]\n"
         "runs:\n"
         "  - sequence_number: 1\n"
         "    direct_beam: db_8mm\n"
         "    run_number: 012345\n"
     )
     config = read_config(str(config_file))
-    assert config.direct_beams["db_8mm"].db_run_numbers == [12345]
+    assert config.direct_beams["db_8mm"].direct_beam_run_numbers == [12345]
     assert config.runs[1].run_number == 12345

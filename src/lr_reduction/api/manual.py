@@ -38,7 +38,7 @@ class ManualSingleRun(SingleRunReduction):
             self.sequence_number = 1  # Placeholder: sequence_number is not yet available
         run = self._run_loader.load(self.run_number)
         db_config = get_direct_beam_config(self.sequence_number, config)
-        direct_beams = [self._run_loader.load(run_number) for run_number in db_config.db_run_numbers]
+        direct_beams = [self._run_loader.load(run_number) for run_number in db_config.direct_beam_run_numbers]
         return SingleReductionInput(run_data=run, direct_beams=direct_beams, direct_beam_config=db_config)
 
 
@@ -77,7 +77,7 @@ class ManualRunSequence(Entrypoint[list[SingleReductionInput], CombinedReduction
             run_data.append(
                 SingleReductionInput(
                     run_data=run,
-                    direct_beams=[self._run_loader.load(db) for db in db_config.db_run_numbers],
+                    direct_beams=[self._run_loader.load(db) for db in db_config.direct_beam_run_numbers],
                     direct_beam_config=db_config,
                 )
             )

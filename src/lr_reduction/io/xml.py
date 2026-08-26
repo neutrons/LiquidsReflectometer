@@ -17,6 +17,6 @@ def read_config(filepath: str) -> ReductionConfig:
     run_number = int(get_sequence_id_from_path(filepath))
     direct_beam_name = "PLACEHOLDER_DB"
     return ReductionConfig(
-        direct_beams={direct_beam_name: DirectBeamConfig(db_run_numbers=[run_number])},
+        direct_beams={direct_beam_name: DirectBeamConfig(direct_beam_run_numbers=[run_number])},
         runs={1: ReflectedRunConfig(sequence_number=1, direct_beam=direct_beam_name, run_number=run_number)},
     )

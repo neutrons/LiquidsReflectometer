@@ -8,7 +8,7 @@ from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 
 def _config(run_number: int) -> ReductionConfig:
     return ReductionConfig(
-        direct_beams={"db": DirectBeamConfig(db_run_numbers=[11111])},
+        direct_beams={"db": DirectBeamConfig(direct_beam_run_numbers=[11111])},
         runs={1: ReflectedRunConfig(sequence_number=1, direct_beam="db", run_number=run_number)},
     )
 
