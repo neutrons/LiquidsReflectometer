@@ -16,8 +16,8 @@ def reflected_run():
 @pytest.fixture(autouse=True)
 def _config_loader(monkeypatch):
     config = ReductionConfig(
-        direct_beams={"db": DirectBeamConfig(db_runs=[11111])},
-        runs=[ReflectedRunConfig(sequence_number=1, direct_beam="db", run_number=54321)],
+        direct_beams={"db": DirectBeamConfig(db_run_numbers=[11111])},
+        runs={1: ReflectedRunConfig(sequence_number=1, direct_beam="db", run_number=54321)},
     )
     monkeypatch.setattr("lr_reduction.io.config_loader.ConfigLoader.load", lambda _self, _path: config)
 

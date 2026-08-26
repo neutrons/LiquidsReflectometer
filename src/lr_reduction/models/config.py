@@ -258,12 +258,12 @@ class ReflectedRunParameters(RunParameters):
 class DirectBeamConfig(RunParameters):
     """A named composite direct beam: the individual DB runs it is built from.
 
-    Inherits `RunParameters` (rather than carrying only `db_runs`) because the direct beam has
+    Inherits `RunParameters` (rather than carrying only `db_run_numbers`) because the direct beam has
     its own peak/background/low-res characterization window, distinct from any reflected run
     that references it, and should inherit from the same global `defaults`.
     """
 
-    db_runs: list[ID] = Field(min_length=1)
+    db_run_numbers: list[ID] = Field(min_length=1)
     # TODO:
     #   Not explicitly specified for DB runs; included for symmetry with reflected runs
     #   Determine whether this is actually needed.
@@ -375,24 +375,28 @@ class ReductionConfig(BaseModel):
     defaults: ReflectedRunParameters = Field(default_factory=ReflectedRunParameters)
 
     # the two per-run key spaces (§3.3.2/.3/.4)
-    direct_beams: dict[str, DirectBeamConfig] = Field(default_factory=dict)
-    runs: list[ReflectedRunConfig] = Field(default_factory=list)
+    direct_beams: dict[str, DirectBeamConfig] = Field(default_factory=dict)  # keyed by db name
+    runs: dict[ID, ReflectedRunConfig] = Field(default_factory=dict)  # keyed by sequence_number
 
     @model_validator(mode="after")
     def _referential_integrity(self) -> ReductionConfig:
-        """Every reflected run's `direct_beam` reference must resolve."""
+        """Every reflected run's `direct_beam` reference must resolve, and its dict key must
+        agree with its own `sequence_number` (a dict cannot hold duplicate keys, but key and
+        field can still drift apart independently)."""
         names = set(self.direct_beams)
-        for run in self.runs:
+        for seq_num, run in self.runs.items():
             if run.direct_beam not in names:
                 raise ValueError(
-                    f"run sequence_number={run.sequence_number} references unknown "
+                    f"Run sequence_number={seq_num} references unknown "
                     f"direct_beam '{run.direct_beam}'; defined: {sorted(names)}"
                 )
-        seqs = [r.sequence_number for r in self.runs]
-        if len(seqs) != len(set(seqs)):
-            raise ValueError(f"duplicate sequence_number values: {seqs}")
+            if run.sequence_number != seq_num:
+                raise ValueError(
+                    f"`runs` key {seq_num} does not match its run's sequence_number={run.sequence_number}"
+                )
         return self
 
+    # TODO (Glass): consider removing
     def for_run(self, sequence_number: int) -> ReductionConfig:
         """
         Extract a valid one-run config.
@@ -401,11 +405,11 @@ class ReductionConfig(BaseModel):
         Re-validated like any other config, so no separate single-run format exists.
         """
         try:
-            run = next(r for r in self.runs if r.sequence_number == sequence_number)
-        except StopIteration:
-            raise ValueError(f"no run with sequence_number={sequence_number}") from None
+            run = self.runs[sequence_number]
+        except KeyError:
+            raise ValueError(f"No run with sequence_number={sequence_number}") from None
         data = self.model_dump()
-        data["runs"] = [run.model_dump()]
+        data["runs"] = {sequence_number: run.model_dump()}
         data["direct_beams"] = {run.direct_beam: self.direct_beams[run.direct_beam].model_dump()}
         return ReductionConfig(**data)
 
@@ -434,7 +438,7 @@ def apply_overrides(config: ReductionConfig, overrides: dict) -> ReductionConfig
     model here sets `validate_assignment=True`, so an assignment is checked against that field's
     own constraints (type, range, ordering) immediately. The one thing direct assignment does
     *not* do is re-run a *different* model's validators — e.g. setting
-    `config.runs[0].direct_beam = "..."` re-checks `ReflectedRunConfig`'s own fields but does not
+    `config.runs[1].direct_beam = "..."` re-checks `ReflectedRunConfig`'s own fields but does not
     re-run `ReductionConfig._referential_integrity`, since that validator lives on the parent
     model. Use `apply_overrides` (or `ReductionConfig.model_validate(config.model_dump())` after
     manual edits) when the override could affect cross-model checks.

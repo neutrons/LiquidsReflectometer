@@ -99,8 +99,8 @@ class ReductionResult:
     sequence_number
         1-based position of the run within the sequence
     reduction_config
-        The one-run configuration that reproduces this partial when embedded
-        in its ORSO header
+        The full, multi-run reduction configuration this run was reduced under;
+        `sequence_number` identifies which of its runs this partial corresponds to
     lr_reduction_info
         lr_reduction package information
     mantid_info

@@ -6,11 +6,11 @@ from lr_reduction.models.config import PixelRange, QBinning, ReductionConfig, ap
 
 def _minimal_config(**overrides):
     data = dict(
-        direct_beams={"db_8mm": {"db_runs": [12345, 12346, 12347]}},
-        runs=[
-            {"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 111},
-            {"sequence_number": 2, "direct_beam": "db_8mm", "run_number": 112},
-        ],
+        direct_beams={"db_8mm": {"db_run_numbers": [12345, 12346, 12347]}},
+        runs={
+            1: {"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 111},
+            2: {"sequence_number": 2, "direct_beam": "db_8mm", "run_number": 112},
+        },
     )
     data.update(overrides)
     return ReductionConfig(**data)
@@ -23,33 +23,28 @@ def test_minimal_config_is_valid():
 
 def test_referential_integrity_rejects_unknown_direct_beam():
     with pytest.raises(ValidationError, match="unknown direct_beam"):
-        _minimal_config(runs=[{"sequence_number": 1, "direct_beam": "does_not_exist", "run_number": 111}])
+        _minimal_config(runs={1: {"sequence_number": 1, "direct_beam": "does_not_exist", "run_number": 111}})
 
 
-def test_rejects_duplicate_sequence_number():
-    with pytest.raises(ValidationError, match="duplicate sequence_number"):
-        _minimal_config(
-            runs=[
-                {"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 111},
-                {"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 112},
-            ]
-        )
+def test_rejects_runs_key_sequence_number_mismatch():
+    with pytest.raises(ValidationError, match="does not match"):
+        _minimal_config(runs={1: {"sequence_number": 2, "direct_beam": "db_8mm", "run_number": 111}})
 
 
 def test_reflected_run_requires_exactly_one_source():
     # neither run_number nor source_runs
     with pytest.raises(ValidationError, match="exactly one of"):
-        _minimal_config(runs=[{"sequence_number": 1, "direct_beam": "db_8mm"}])
+        _minimal_config(runs={1: {"sequence_number": 1, "direct_beam": "db_8mm"}})
     # both run_number and source_runs
     with pytest.raises(ValidationError, match="exactly one of"):
         _minimal_config(
-            runs=[{"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 111, "source_runs": [111, 112]}]
+            runs={1: {"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 111, "source_runs": [111, 112]}}
         )
 
 
 def test_reflected_run_source_runs_summing():
-    config = _minimal_config(runs=[{"sequence_number": 1, "direct_beam": "db_8mm", "source_runs": [111, 112, 113]}])
-    assert config.runs[0].resolved_source_runs == [111, 112, 113]
+    config = _minimal_config(runs={1: {"sequence_number": 1, "direct_beam": "db_8mm", "source_runs": [111, 112, 113]}})
+    assert config.runs[1].resolved_source_runs == [111, 112, 113]
 
 
 def test_pixel_range_rejects_inverted_bounds():
@@ -65,16 +60,16 @@ def test_q_binning_rejects_non_increasing_range():
 def test_for_run_extracts_single_run_and_referenced_direct_beam():
     config = _minimal_config(
         direct_beams={
-            "db_8mm": {"db_runs": [12345]},
-            "db_20mm": {"db_runs": [12350]},
+            "db_8mm": {"db_run_numbers": [12345]},
+            "db_20mm": {"db_run_numbers": [12350]},
         },
-        runs=[
-            {"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 111},
-            {"sequence_number": 2, "direct_beam": "db_20mm", "run_number": 112},
-        ],
+        runs={
+            1: {"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 111},
+            2: {"sequence_number": 2, "direct_beam": "db_20mm", "run_number": 112},
+        },
     )
     single = config.for_run(2)
-    assert [r.sequence_number for r in single.runs] == [2]
+    assert [r.sequence_number for r in single.runs.values()] == [2]
     assert set(single.direct_beams) == {"db_20mm"}
     # still passes the same validation as any other ReductionConfig
     assert isinstance(single, ReductionConfig)
@@ -82,23 +77,23 @@ def test_for_run_extracts_single_run_and_referenced_direct_beam():
 
 def test_for_run_raises_for_unknown_sequence_number():
     config = _minimal_config()
-    with pytest.raises(ValueError, match="no run with sequence_number"):
+    with pytest.raises(ValueError, match="No run with sequence_number"):
         config.for_run(999)
 
 
 def test_effective_merges_defaults_with_run_overrides():
     config = _minimal_config(
         defaults={"peak": {"min": 140, "max": 150}, "scale_factor": 1.0},
-        runs=[
-            {
+        runs={
+            1: {
                 "sequence_number": 1,
                 "direct_beam": "db_8mm",
                 "run_number": 111,
                 "peak": {"min": 100, "max": 110},
             }
-        ],
+        },
     )
-    effective = config.effective(config.runs[0])
+    effective = config.effective(config.runs[1])
     # run-level override wins over the global default
     assert effective.peak.min == 100
     assert effective.peak.max == 110
@@ -136,11 +131,11 @@ def test_direct_attribute_assignment_coerces_and_validates_nested_models():
     config = _minimal_config()
 
     # assigning a plain dict to a nested model field constructs and validates it, same as at load
-    config.runs[0].peak = {"min": 100, "max": 110}
-    assert config.runs[0].peak == PixelRange(min=100, max=110)
+    config.runs[1].peak = {"min": 100, "max": 110}
+    assert config.runs[1].peak == PixelRange(min=100, max=110)
 
     with pytest.raises(ValidationError, match="max .* < min"):
-        config.runs[0].peak = {"min": 200, "max": 100}
+        config.runs[1].peak = {"min": 200, "max": 100}
 
 
 def test_direct_attribute_assignment_does_not_recheck_other_models():
@@ -148,8 +143,8 @@ def test_direct_attribute_assignment_does_not_recheck_other_models():
     # validators, not a parent model's cross-field checks like referential integrity;
     # apply_overrides (or re-validating the whole tree) is required for that.
     config = _minimal_config()
-    config.runs[0].direct_beam = "does_not_exist"
-    assert config.runs[0].direct_beam == "does_not_exist"
+    config.runs[1].direct_beam = "does_not_exist"
+    assert config.runs[1].direct_beam == "does_not_exist"
 
     with pytest.raises(ValidationError, match="unknown direct_beam"):
         apply_overrides(config, {})

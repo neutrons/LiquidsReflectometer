@@ -15,6 +15,21 @@ class Entrypoint(ABC, Generic[T, S]):
 
     A fixed :meth:`execute` runs the steps in a guaranteed order; each concrete
     entrypoint overrides only the steps that differ.
+
+    Usage:
+
+        class MyEntrypoint(Entrypoint[MyInput, MyResult]):
+            def load_configuration(self) -> ReductionConfig:
+                ...
+
+            def load_data(self, config: ReductionConfig) -> MyInput:
+                ...
+
+            def call_operations(self, data: MyInput, config: ReductionConfig) -> MyResult:
+                ...
+
+            def save_output(self, result: MyResult) -> None:
+                ...
     """
 
     @abstractmethod

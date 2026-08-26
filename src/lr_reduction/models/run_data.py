@@ -14,3 +14,4 @@ class RunData:
     """
 
     run_number: ID = 123
+    sequence_number: ID = 1

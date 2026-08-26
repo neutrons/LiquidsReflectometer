@@ -9,15 +9,16 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from lr_reduction.api._shared import locate_configuration_relative_to
+from lr_reduction.api._shared import get_direct_beam_config, locate_configuration_relative_to
 from lr_reduction.api._single_run import SingleRunReduction
 from lr_reduction.api.interfaces import Entrypoint
-from lr_reduction.io import ConfigLoader, RunData, RunLoader
+from lr_reduction.io import ConfigLoader, RunLoader
 from lr_reduction.io.orso import read_partials, write_orso
 from lr_reduction.io.report import html_report
 from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 from lr_reduction.operations import CombineResultsOperation
+from lr_reduction.types import SingleReductionInput
 from lr_reduction.utils import get_logger
 
 logger = get_logger(__name__)
@@ -36,8 +37,13 @@ class AutoreduceSingleRun(SingleRunReduction):
         config_path = locate_configuration_relative_to(self._output_directory)
         return self._config_loader.load(str(config_path))
 
-    def load_data(self, _config: ReductionConfig) -> RunData:
-        return self._run_loader.load_from_path(self.nexus_file_path)
+    def load_data(self, config: ReductionConfig) -> SingleReductionInput:
+        # TODO: get sequence_number from sample logs and assign to self.sequence_number
+        run = self._run_loader.load_from_path(self.nexus_file_path)
+        self.sequence_number = run.sequence_number
+        db_config = get_direct_beam_config(run.sequence_number, config)
+        direct_beams = [self._run_loader.load(run_number) for run_number in db_config.db_run_numbers]
+        return SingleReductionInput(run_data=run, direct_beams=direct_beams, direct_beam_config=db_config)
 
     @property
     def output_directory(self) -> Path:
@@ -56,17 +62,15 @@ class FromDiskSequence(Entrypoint[list[ReductionResult], CombinedReductionResult
         config_path = locate_configuration_relative_to(self.output_directory)
         return self._config_loader.load(str(config_path))
 
-    def load_data(self, config: ReductionConfig):  # noqa: ARG002
-        # Placeholder: ReductionConfig does not yet carry a sequence_id (§3.3.1); a real
-        # identifier will come from the acquired run's metadata (§3.1.2.1) once available.
+    def load_data(self, config: ReductionConfig):  # noqa: ARG002 (Remove when used)
+        # TODO: ReductionConfig does not yet carry a sequence_id (§3.3.1); a real
+        #       identifier will come from the acquired run's metadata (§3.1.2.1) once available.
         sequence_id = 0
         return read_partials(str(self.output_directory), sequence_id)
 
     def call_operations(self, data: list[ReductionResult], config: ReductionConfig) -> CombinedReductionResult:
         op = CombineResultsOperation(data, config)
-        op.validate_input()
-        result = op.process()
-        op.cleanup()
+        result = op.execute()
         return result
 
     def save_output(self, result: CombinedReductionResult) -> None:

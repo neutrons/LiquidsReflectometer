@@ -76,9 +76,8 @@ def write_orso(
     )
 
     if title is None:
-        title = (
-            f"REF_L_{results.reduction_config.runs[0].run_number}_{results.reduction_config.runs[0].sequence_number}"
-        )
+        first_run = next(iter(results.reduction_config.runs.values()))
+        title = f"REF_L_{first_run.run_number}_{first_run.sequence_number}"
 
     experiment = Experiment(
         title=title,

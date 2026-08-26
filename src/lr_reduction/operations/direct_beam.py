@@ -5,7 +5,17 @@ from lr_reduction.types import CompositeDirectBeam
 
 
 class DirectBeamCompositionOperation(OperationInterface[list[RunData], DirectBeamConfig, CompositeDirectBeam]):
-    """Combine multiple direct beam runs into a single composite direct beam result."""
+    """Combine multiple direct beam runs into a single composite direct beam result.
+
+    Attributes
+    ----------
+
+    data : list[RunData]
+        The list of direct beam runs to be combined.
+
+    config : DirectBeamConfig
+        The configuration for the direct beam composition.
+    """
 
     def __init__(self, data: list[RunData], config: DirectBeamConfig):
         super().__init__(data, config)

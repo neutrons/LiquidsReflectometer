@@ -5,76 +5,95 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from lr_reduction.api._single_run import SingleRunReduction
+from lr_reduction.api._shared import get_direct_beam_config
+from lr_reduction.api._single_run import SingleRunReduction, reduce_one
 from lr_reduction.api.interfaces import Entrypoint
-from lr_reduction.io import ConfigLoader, RunData, RunLoader
+from lr_reduction.exceptions import LrValidationError
+from lr_reduction.io import ConfigLoader, RunLoader
 from lr_reduction.io.orso import write_orso
 from lr_reduction.io.report import html_report
 from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
-from lr_reduction.operations import CombineResultsOperation, DirectBeamCompositionOperation, SingleRunReductionOperation
-from lr_reduction.types import CompositeDirectBeam
+from lr_reduction.operations import CombineResultsOperation
+from lr_reduction.types import ID, SingleReductionInput
 
 
 class ManualSingleRun(SingleRunReduction):
     """Manual reduction of a single run, by run number."""
 
-    def __init__(self, run_number: int, configuration: str | Path, **overrides):
+    def __init__(self, run_number: ID, configuration: str | Path, sequence_number: ID | None = None, **overrides):
         super().__init__(**overrides)
-        self.run_number = run_number
         self.configuration = Path(configuration)
+        self.run_number = run_number
+        self.sequence_number = sequence_number
         self._run_loader = RunLoader()
 
     def load_configuration(self) -> ReductionConfig:
         return self._config_loader.load(str(self.configuration))
 
-    def load_data(self, _config: ReductionConfig) -> RunData:
-        return self._run_loader.load(self.run_number)
+    def load_data(self, config: ReductionConfig) -> SingleReductionInput:
+        if self.sequence_number is None:
+            # TODO: if sequence_number is None, use sequence_number from workspace sample logs
+            #       and assign to self.sequence_number for use in parent call_operations
+            self.sequence_number = 1  # Placeholder: sequence_number is not yet available
+        run = self._run_loader.load(self.run_number)
+        db_config = get_direct_beam_config(self.sequence_number, config)
+        direct_beams = [self._run_loader.load(run_number) for run_number in db_config.db_run_numbers]
+        return SingleReductionInput(run_data=run, direct_beams=direct_beams, direct_beam_config=db_config)
 
 
-class ManualRunSequence(Entrypoint[list[RunData], CombinedReductionResult]):
-    """Manual reduction of a full run sequence, assembled in-memory."""
+class ManualRunSequence(Entrypoint[list[SingleReductionInput], CombinedReductionResult]):
+    """Manual reduction of a full run sequence, assembled in-memory.
 
-    def __init__(self, sequence_id: int, configuration: str | Path, **overrides):
-        self.sequence_id = sequence_id
+    NOTE: `sequence_numbers` as an override is currently not implemented
+    """
+
+    def __init__(
+        self, run_numbers: list[ID], configuration: str | Path, sequence_numbers: list[ID] | None = None, **overrides
+    ):
+        self.run_numbers = run_numbers
         self.configuration = Path(configuration)
+        self.sequence_numbers = sequence_numbers
         self.overrides = overrides
         self._config_loader = ConfigLoader()
         self._run_loader = RunLoader()
 
+        # Validate_sequence_numbers
+        if self.sequence_numbers is not None:
+            if len(self.sequence_numbers) != len(self.run_numbers):
+                raise LrValidationError(
+                    f"Override sequences numbers {self.sequence_numbers}"
+                    + f" do not match the number of runs in the configuration ({len(self.run_numbers)})."
+                )
+
     def load_configuration(self) -> ReductionConfig:
         return self._config_loader.load(str(self.configuration))
 
-    def load_data(self, config: ReductionConfig) -> list[RunData]:
-        return [
-            self._run_loader.load(run_number)
-            for reflected_run in config.runs
-            for run_number in reflected_run.resolved_source_runs
-        ]
+    def load_data(self, config: ReductionConfig) -> list[SingleReductionInput]:
+        run_data = []
+        for run_number in self.run_numbers:
+            run = self._run_loader.load(run_number)
+            db_config = get_direct_beam_config(run.sequence_number, config)
+            run_data.append(
+                SingleReductionInput(
+                    run_data=run,
+                    direct_beams=[self._run_loader.load(db) for db in db_config.db_run_numbers],
+                    direct_beam_config=db_config,
+                )
+            )
+        return run_data
 
-    def call_operations(self, data: list[RunData], config: ReductionConfig) -> CombinedReductionResult:
-        _results: list[ReductionResult] = []
-        _comp_dbs: dict[str, CompositeDirectBeam] = {}
-        for idx, d in enumerate(data):
-            # Compose the direct beam for this run
-            db_name = config.runs[idx].direct_beam
-            db_op = DirectBeamCompositionOperation(data=[d], config=config.direct_beams[db_name])
-            comp_db = db_op.execute()
-            _comp_dbs[db_name] = comp_db
-
-            # Perform the single-run reduction for this run
-            single_run_config = config.for_run(config.runs[idx].sequence_number)
-            op = SingleRunReductionOperation(d, single_run_config, comp_db)
-            op.validate_input()
-            result = op.process()
-            op.cleanup()
-            _results.append(result)
-
-        # Combine the results
-        combine_op = CombineResultsOperation(_results, config)
-        combine_op.validate_input()
-        combined_result = combine_op.process()
-        combine_op.cleanup()
+    # TODO: figure out how to address override sequence numbers
+    def call_operations(self, data: list[SingleReductionInput], config: ReductionConfig) -> CombinedReductionResult:
+        """Perform the run-sequence reduction operations."""
+        # for each run, compose the direct beam and reduce the run
+        reduced_runs = []
+        for run in data:
+            reduced_run = reduce_one(run, config, run.run_data.sequence_number)
+            reduced_runs.append(reduced_run)
+        # combine the reduced runs into a single result
+        combine_op = CombineResultsOperation(reduced_runs, config)
+        combined_result = combine_op.execute()
         return combined_result
 
     def save_output(self, result: CombinedReductionResult) -> None:
@@ -82,14 +101,18 @@ class ManualRunSequence(Entrypoint[list[RunData], CombinedReductionResult]):
         write_orso(result, output_dir=self.overrides.get("output_dir", "."))
 
 
-def reduce_run(run_number: int, configuration: str | Path, **overrides) -> ReductionResult:
+def reduce_run(
+    run_number: int, configuration: str | Path, sequence_number: ID | None = None, **overrides
+) -> ReductionResult:
     """Manual single-run reduction (§6.4.7, §11.6.5)."""
-    return ManualSingleRun(run_number, configuration, **overrides).execute()
+    return ManualSingleRun(run_number, configuration, sequence_number, **overrides).execute()
 
 
-def reduce_run_sequence(sequence_id: int, configuration: str | Path, **overrides) -> CombinedReductionResult:
+def reduce_and_combine_runs(
+    run_numbers: list[ID], configuration: str | Path, sequence_numbers: list[ID] | None = None, **overrides
+) -> CombinedReductionResult:
     """Manual run-sequence reduction, in-memory assembly (§6.4.6, §11.6.4)."""
-    return ManualRunSequence(sequence_id, configuration, **overrides).execute()
+    return ManualRunSequence(run_numbers, configuration, sequence_numbers, **overrides).execute()
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -99,17 +122,18 @@ def main(argv: list[str] | None = None) -> None:
 
     run_parser = subparsers.add_parser("run", help="Reduce a single run (§6.4.7).")
     run_parser.add_argument("run_number", type=int)
-    run_parser.add_argument("configuration", type=Path)
+    run_parser.add_argument("--configuration", type=Path, required=True)
 
-    sequence_parser = subparsers.add_parser("sequence", help="Reduce a full run sequence (§6.4.6).")
-    sequence_parser.add_argument("sequence_id", type=int)
-    sequence_parser.add_argument("configuration", type=Path)
+    sequence_parser = subparsers.add_parser("sequence", help="Reduce a full run sequence.")
+    sequence_parser.add_argument("--run-numbers", type=int, nargs="+", required=True)
+    sequence_parser.add_argument("--configuration", type=Path, required=True)
+    sequence_parser.add_argument("--sequence-numbers", type=int, nargs="*", default=None)
 
     args = parser.parse_args(argv)
     if args.command == "run":
         reduce_run(args.run_number, args.configuration)
     else:
-        reduce_run_sequence(args.sequence_id, args.configuration)
+        reduce_and_combine_runs(args.run_numbers, args.configuration, sequence_numbers=args.sequence_numbers)
 
 
 if __name__ == "__main__":

@@ -35,4 +35,9 @@ def read_config(filepath: str) -> ReductionConfig:
         raise ConfigParseError(
             f"{filepath}: expected a YAML mapping, got {type(data).__name__}", filepath=filepath
         )
+    # On disk, `runs` is a list of mappings, each carrying its own `sequence_number` (§3.3.3);
+    # `ReductionConfig.runs` is keyed by that sequence_number, so re-key here before validation.
+    runs = data.get("runs")
+    if isinstance(runs, list):
+        data["runs"] = {run.get("sequence_number"): run for run in runs}
     return ReductionConfig(**data)
