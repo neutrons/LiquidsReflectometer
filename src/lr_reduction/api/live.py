@@ -7,7 +7,7 @@ import argparse
 
 from mantid.dataobjects import EventWorkspace
 
-from lr_reduction.api._shared import get_direct_beam_config, locate_standard_configuration
+from lr_reduction.api._shared import get_direct_beam_config, get_direct_beams, locate_standard_configuration
 from lr_reduction.api._single_run import SingleRunReduction
 from lr_reduction.api.autoreduce import FromDiskSequence
 from lr_reduction.io import RunLoader, diagnostic_plot
@@ -40,7 +40,7 @@ class LiveEntrypoint(SingleRunReduction):
         # TODO: get sequence_number from sample logs and assign to self.sequence_number
         self.sequence_number = 1  # Placeholder: sequence_number is not yet available
         db_config = get_direct_beam_config(self.sequence_number, config)
-        direct_beams = [self._run_loader.load(run_number) for run_number in db_config.direct_beam_run_numbers]
+        direct_beams = get_direct_beams(self._run_loader, db_config)
         run_data = RunData(
             run_number=self.run_number,
             sequence_number=self.sequence_number,

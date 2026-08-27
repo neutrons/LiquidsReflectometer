@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from lr_reduction.io import RunLoader
 from lr_reduction.models.config import DirectBeamConfig, ReductionConfig
+from lr_reduction.models.run_data import RunData
 from lr_reduction.types import ID
 from lr_reduction.utils import get_logger
 
@@ -26,6 +28,13 @@ def get_direct_beam_config(sequence_number: ID, config: ReductionConfig) -> Dire
     """
     db_name = config.runs[sequence_number].direct_beam
     return config.direct_beams[db_name]
+
+
+
+
+def get_direct_beams(run_loader: RunLoader, db_config: DirectBeamConfig) -> list[RunData]:
+    """Load the direct beam runs for a given run, according to the configuration."""
+    return [run_loader.load(run_number) for run_number in db_config.direct_beam_run_numbers]
 
 
 def locate_standard_configuration(run_number: ID) -> Path:
