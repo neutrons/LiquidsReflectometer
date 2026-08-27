@@ -33,11 +33,16 @@ def read_config(filepath: str) -> ReductionConfig:
             raise ConfigParseError(f"{filepath}: invalid YAML ({exc})", filepath=filepath) from exc
     if not isinstance(data, dict):
         raise ConfigParseError(
-            f"{filepath}: expected a YAML mapping, got {type(data).__name__}", filepath=filepath
+            f"{filepath}: expected a YAML mapping, got {type(data).__name__}",
+            filepath=filepath,
         )
     # On disk, `runs` is a list of mappings, each carrying its own `sequence_number` (§3.3.3);
     # `ReductionConfig.runs` is keyed by that sequence_number, so re-key here before validation.
     runs = data.get("runs")
     if isinstance(runs, list):
-        data["runs"] = {run.get("sequence_number"): run for run in runs}
+        try:
+            data["runs"] = {run["sequence_number"]: run for run in runs}
+        except KeyError as exc:
+            logger.error(f"Failed to re-key runs in {filepath}: {exc}")
+            raise ConfigParseError(f"{filepath}: invalid run data ({exc})", filepath=filepath) from exc
     return ReductionConfig(**data)

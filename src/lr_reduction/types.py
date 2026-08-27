@@ -27,6 +27,6 @@ class SingleReductionInput(NamedTuple):
     alongside so `call_operations` can reuse it directly instead of re-deriving it from `ReductionConfig`.
     """
 
-    run_data: RunData | EventWorkspace
+    run_data: RunData
     direct_beams: list[RunData]
     direct_beam_config: DirectBeamConfig

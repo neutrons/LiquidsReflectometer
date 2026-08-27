@@ -1,7 +1,6 @@
 from datetime import datetime
 
 from mantid import __version__ as mantid_version
-from mantid.dataobjects import EventWorkspace
 from orsopy.fileio import Software
 
 from lr_reduction import __version__ as lr_reduction_version
@@ -18,7 +17,7 @@ _LR_REDUCTION_SOFTWARE = Software(name="lr_reduction", version=lr_reduction_vers
 _MANTID_SOFTWARE = Software(name="mantid", version=mantid_version)
 
 
-class SingleRunReductionOperation(OperationInterface[RunData | EventWorkspace, ReductionConfig, ReductionResult]):
+class SingleRunReductionOperation(OperationInterface[RunData, ReductionConfig, ReductionResult]):
     """
     A single run reduction operation.
 
@@ -30,7 +29,7 @@ class SingleRunReductionOperation(OperationInterface[RunData | EventWorkspace, R
 
     def __init__(
         self,
-        data: RunData | EventWorkspace,
+        data: RunData,
         config: ReductionConfig,
         composite_direct_beam: CompositeDirectBeam,
         sequence_number: ID,
