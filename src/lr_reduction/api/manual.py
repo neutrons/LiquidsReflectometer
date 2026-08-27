@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from lr_reduction.api._shared import get_direct_beam_config
+from lr_reduction.api._shared import get_direct_beam_config, get_direct_beams
 from lr_reduction.api._single_run import SingleRunReduction, reduce_one
 from lr_reduction.api.interfaces import Entrypoint
 from lr_reduction.exceptions import LrValidationError
@@ -38,7 +38,7 @@ class ManualSingleRun(SingleRunReduction):
             self.sequence_number = 1  # Placeholder: sequence_number is not yet available
         run = self._run_loader.load(self.run_number)
         db_config = get_direct_beam_config(self.sequence_number, config)
-        direct_beams = [self._run_loader.load(run_number) for run_number in db_config.direct_beam_run_numbers]
+        direct_beams = get_direct_beams(self._run_loader, db_config)
         return SingleReductionInput(run_data=run, direct_beams=direct_beams, direct_beam_config=db_config)
 
 
@@ -102,7 +102,7 @@ class ManualRunSequence(Entrypoint[list[SingleReductionInput], CombinedReduction
 
 
 def reduce_run(
-    run_number: int, configuration: str | Path, sequence_number: ID | None = None, **overrides
+    run_number: ID, configuration: str | Path, sequence_number: ID | None = None, **overrides
 ) -> ReductionResult:
     """Manual single-run reduction (§6.4.7, §11.6.5)."""
     return ManualSingleRun(run_number, configuration, sequence_number, **overrides).execute()

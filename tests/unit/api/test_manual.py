@@ -4,9 +4,10 @@ from lr_reduction.api.manual import ManualRunSequence, ManualSingleRun, main, re
 from lr_reduction.io import RunData
 from lr_reduction.models.config import DirectBeamConfig, ReductionConfig, ReflectedRunConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
+from lr_reduction.types import ID
 
 
-def _config(run_number: int) -> ReductionConfig:
+def _config(run_number: ID) -> ReductionConfig:
     return ReductionConfig(
         direct_beams={"db": DirectBeamConfig(direct_beam_run_numbers=[11111])},
         runs={1: ReflectedRunConfig(sequence_number=1, direct_beam="db", run_number=run_number)},
