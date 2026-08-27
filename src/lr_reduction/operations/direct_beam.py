@@ -4,8 +4,17 @@ from lr_reduction.operations.interfaces import OperationInterface
 from lr_reduction.types import CompositeDirectBeam
 
 
-class DirectBeamComposition(OperationInterface[list[RunData], DirectBeamConfig, CompositeDirectBeam]):
-    """
+class DirectBeamCompositionOperation(OperationInterface[list[RunData], DirectBeamConfig, CompositeDirectBeam]):
+    """Combine multiple direct beam runs into a single composite direct beam result.
+
+    Attributes
+    ----------
+
+    data : list[RunData]
+        The list of direct beam runs to be combined.
+
+    config : DirectBeamConfig
+        The configuration for the direct beam composition.
     """
 
     def __init__(self, data: list[RunData], config: DirectBeamConfig):
@@ -13,14 +22,14 @@ class DirectBeamComposition(OperationInterface[list[RunData], DirectBeamConfig, 
 
     def validate_input(self) -> None:
         """
-        Validate the input data and configuration for the single run reduction.
+        Validate the input data and configuration for the direct beam composition.
         """
         # Implement validation logic here
         pass
 
     def process(self) -> CompositeDirectBeam:
         """
-        Perform the single run reduction operations and return the result.
+        Perform the direct beam composition operations and return the result.
         """
         # Implement processing logic here
         ...

@@ -45,7 +45,9 @@ def read_single_run(filepath: str) -> ReductionResult:
 
 def read_partials(partial_dir: str, sequence_id: int) -> list[ReductionResult]:
     """Discover and load partial ORSO files for a given sequence ID."""
-    ...
+    # TODO: For now, return an empty list; later, implement discovery and loading of partials from the directory.
+    print(partial_dir, sequence_id)
+    return []
 
 
 # TODO:
@@ -56,7 +58,7 @@ def read_partials(partial_dir: str, sequence_id: int) -> list[ReductionResult]:
 #   - Determine source for metadata:
 #       - experiment title
 #       - sample name, description, and category
-def write(
+def write_orso(
     results: ReductionResult | CombinedReductionResult,
     output_dir: str | Path = ".",
     title: str | None = None,
@@ -74,9 +76,8 @@ def write(
     )
 
     if title is None:
-        title = (
-            f"REF_L_{results.reduction_config.runs[0].run_number}_{results.reduction_config.runs[0].sequence_number}"
-        )
+        first_run = next(iter(results.reduction_config.runs.values()))
+        title = f"REF_L_{first_run.run_number}_{first_run.sequence_number}"
 
     experiment = Experiment(
         title=title,

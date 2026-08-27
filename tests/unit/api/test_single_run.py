@@ -6,8 +6,8 @@ from lr_reduction.models.config import DirectBeamConfig, ReductionConfig, Reflec
 
 def _config() -> ReductionConfig:
     return ReductionConfig(
-        direct_beams={"db": DirectBeamConfig(db_runs=[11111])},
-        runs=[ReflectedRunConfig(sequence_number=1, direct_beam="db", run_number=12345)],
+        direct_beams={"db": DirectBeamConfig(direct_beam_run_numbers=[11111])},
+        runs={1: ReflectedRunConfig(sequence_number=1, direct_beam="db", run_number=12345)},
     )
 
 
@@ -17,6 +17,9 @@ class _RecordingSingleRun(SingleRunReduction):
 
     def load_data(self, _config):
         return None
+
+    def call_operations(self, _data, _config):
+        return object()
 
 
 def test_output_directory_defaults_to_cwd():

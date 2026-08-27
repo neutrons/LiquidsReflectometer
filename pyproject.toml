@@ -4,7 +4,12 @@
 
 [project]
 name = "lr_reduction"
-authors = [{ name = "Mat", email = "m2d@ornl.gov" }]
+authors = [
+  { name = "Mat", email = "m2d@ornl.gov" },
+  { name = "Marie Backman", email = "backmanma@ornl.gov" },
+  { name = "Glass Elsarboukh", email = "glass.ships@protonmail.com" },
+  { name = "Kevin Tactac", email = "tactacka@ornl.gov" },
+]
 description = "Reduction backend for the Liquids Reflectometer."
 keywords = ["neutrons", "reflectometry", "reduction"]
 dynamic = ["version"]

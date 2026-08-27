@@ -7,12 +7,14 @@ import argparse
 
 from mantid.dataobjects import EventWorkspace
 
-from lr_reduction.api._shared import locate_standard_configuration
+from lr_reduction.api._shared import get_direct_beam_config, locate_standard_configuration
 from lr_reduction.api._single_run import SingleRunReduction
 from lr_reduction.api.autoreduce import FromDiskSequence
-from lr_reduction.io.plotting import diagnostic_plot
+from lr_reduction.io import RunLoader, diagnostic_plot
 from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
+from lr_reduction.models.run_data import RunData
+from lr_reduction.types import SingleReductionInput
 
 
 class LiveEntrypoint(SingleRunReduction):
@@ -25,16 +27,30 @@ class LiveEntrypoint(SingleRunReduction):
     def __init__(self, reflected_run: EventWorkspace, **overrides):
         super().__init__(**overrides)
         self.reflected_run = reflected_run
+        self._run_loader = RunLoader()
 
     def load_configuration(self) -> ReductionConfig:
         # Configuration is discovered from the run number carried by the workspace (§6.4.5.1),
         # mapping to the same configuration the autoreduction entrypoint would apply to that run.
-        run_number = self.reflected_run.getRunNumber()
-        config_path = locate_standard_configuration(run_number)
+        self.run_number = self.reflected_run.getRunNumber()
+        config_path = locate_standard_configuration(self.run_number)
         return self._config_loader.load(str(config_path))
 
-    def load_data(self, _config: ReductionConfig) -> EventWorkspace:
-        return self.reflected_run
+    def load_data(self, config: ReductionConfig) -> SingleReductionInput:
+        # TODO: get sequence_number from sample logs and assign to self.sequence_number
+        self.sequence_number = 1  # Placeholder: sequence_number is not yet available
+        db_config = get_direct_beam_config(self.sequence_number, config)
+        direct_beams = [self._run_loader.load(run_number) for run_number in db_config.direct_beam_run_numbers]
+        run_data = RunData(
+            run_number=self.run_number,
+            sequence_number=self.sequence_number,
+            workspace=self.reflected_run,
+        )
+        return SingleReductionInput(
+            run_data=run_data,
+            direct_beams=direct_beams,
+            direct_beam_config=db_config,
+        )
 
     def publish(self, _result: ReductionResult) -> None:
         diagnostic_plot()
