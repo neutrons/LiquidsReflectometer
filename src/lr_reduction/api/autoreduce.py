@@ -38,8 +38,9 @@ class AutoreduceSingleRun(SingleRunReduction):
         return self._config_loader.load(str(config_path))
 
     def load_data(self, config: ReductionConfig) -> SingleReductionInput:
-        # TODO: get sequence_number from sample logs and assign to self.sequence_number
         run = self._run_loader.load_from_path(self.nexus_file_path)
+        # Metadata-derived (§3.1.2). `RunData.sequence_number` becomes a
+        # `.logs["sequence_number"]` passthrough once the real RunData lands.
         self.sequence_number = run.sequence_number
         db_config = get_direct_beam_config(run.sequence_number, config)
         direct_beams = get_direct_beams(self._run_loader, db_config)

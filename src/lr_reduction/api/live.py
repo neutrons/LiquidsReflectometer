@@ -15,6 +15,7 @@ from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 from lr_reduction.models.run_data import RunData
 from lr_reduction.types import SingleReductionInput
+from lr_reduction.utils.sample_logs import SampleLogs
 
 
 class LiveEntrypoint(SingleRunReduction):
@@ -37,8 +38,10 @@ class LiveEntrypoint(SingleRunReduction):
         return self._config_loader.load(str(config_path))
 
     def load_data(self, config: ReductionConfig) -> SingleReductionInput:
-        # TODO: get sequence_number from sample logs and assign to self.sequence_number
-        self.sequence_number = 1  # Placeholder: sequence_number is not yet available
+        # The metadata-derived sequence_number (§3.1.2): the DAS records it as a log that
+        # is constant across the run, which is exactly what `[...]` is for. No fallback
+        # default — that would silently select the wrong configuration entry (§3.3.1).
+        self.sequence_number = SampleLogs(self.reflected_run)["sequence_number"]
         db_config = get_direct_beam_config(self.sequence_number, config)
         direct_beams = get_direct_beams(self._run_loader, db_config)
         run_data = RunData(
