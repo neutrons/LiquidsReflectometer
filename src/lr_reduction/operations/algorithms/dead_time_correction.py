@@ -70,23 +70,27 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
             tof_min = ws_event_data.getTofMin()
             tof_max = ws_event_data.getTofMax()
         logger.notice(f"TOF range: {tof_min} {tof_max}")
-        _ws_sc = Rebin(
-            InputWorkspace=ws_event_data, Params=(tof_min, tof_step, tof_max), PreserveEvents=False
-        )
 
-        # Get the total number of counts on the detector for each TOF bin per pulse
-        counts_ws = SumSpectra(_ws_sc, OutputWorkspace=output_workspace)
+        # Get the total number of counts on the detector for each TOF bin per pulse.
+        # The event lists are summed before they are binned rather than after: binning every pixel
+        # and then summing the histograms costs an order of magnitude more, and the counts are the
+        # same either way, since each bin holds a whole number of events.
+        _ws_sc = SumSpectra(ws_event_data)
+        counts_ws = Rebin(
+            InputWorkspace=_ws_sc,
+            Params=(tof_min, tof_step, tof_max),
+            PreserveEvents=False,
+            OutputWorkspace=output_workspace,
+        )
 
         # If we have error events, add them since those are also detector triggers
         if ws_error_events is not None:
-            _errors = Rebin(
-                InputWorkspace=ws_error_events, Params=(tof_min, tof_step, tof_max), PreserveEvents=False
-            )
+            _errors = Rebin(InputWorkspace=ws_error_events, Params=(tof_min, tof_step, tof_max), PreserveEvents=False)
             counts_ws += _errors
 
         # When operating at a given frequency, the proton charge of the blocked
         # pulsed is zero in the data file, so we don't have to adjust the number of pulses.
-        t_series = np.asarray(_ws_sc.getRun()["proton_charge"].value)
+        t_series = np.asarray(ws_event_data.getRun()["proton_charge"].value)
         n_pulses = np.count_nonzero(t_series)
 
         rate = counts_ws.readY(0) / n_pulses
