@@ -19,30 +19,18 @@ TOLERANCE = 0.07
 OUTPUT_NORM_DATA = False
 
 
-# How far above the template's own directory to look for a relative
-# scaling-factor path. Templates in this repository sit one level below the
-# directory their relative paths are anchored at (tests/data/template.xml
-# declaring data/sf_197912_Si_auto.cfg, anchored at tests/), so one level is
-# the case that matters; the small margin covers similarly-shaped layouts
-# without turning this into an unbounded filesystem search.
-_SCALING_FACTOR_ANCHOR_DEPTH = 3
-
-
 def _scaling_factor_candidates(scaling_factor_file: str, template_file: str) -> list:
     """Paths to try for a template's scaling-factor file, in precedence order."""
     # As-given first: an absolute path, or a relative one that resolves against
     # the current directory, is what the facility and the `cd tests/` gate
     # already rely on. Anchoring is a fallback, never an override.
     candidates = [scaling_factor_file]
-    if os.path.isabs(scaling_factor_file):
-        return candidates
-    directory = os.path.dirname(os.path.abspath(template_file))
-    for _ in range(_SCALING_FACTOR_ANCHOR_DEPTH):
-        candidates.append(os.path.join(directory, scaling_factor_file))
-        parent = os.path.dirname(directory)
-        if parent == directory:
-            break
-        directory = parent
+    if not os.path.isabs(scaling_factor_file):
+        # The template's own directory, and nothing above it. An upward search
+        # would silently bind a same-named file the template author never
+        # declared — the same wrong-number-without-a-word failure the raise
+        # below exists to close.
+        candidates.append(os.path.join(os.path.dirname(os.path.abspath(template_file)), scaling_factor_file))
     return candidates
 
 
@@ -52,14 +40,21 @@ def _resolve_scaling_factor_file(scaling_factor_file: str, template_file: str) -
     A relative path in a template used to be resolved against whatever
     directory the process happened to start in, so the same template worked
     under `cd tests/ && pytest` and failed from the repository root. Anchor it
-    to the template instead; if nothing resolves, return it unchanged so the
-    failure is reported against the path the template actually declares.
+    to the template instead. If nothing resolves, return the declared path
+    unchanged: the failure is then reported by scaling_factor() at the point of
+    use, which is the only place that knows whether the file is needed at all.
     """
     if not scaling_factor_file:
         return scaling_factor_file
-    for candidate in _scaling_factor_candidates(scaling_factor_file, template_file):
+    candidates = _scaling_factor_candidates(scaling_factor_file, template_file)
+    for candidate in candidates:
         if os.path.isfile(candidate):
+            if candidate != scaling_factor_file:
+                logger.notice("Scaling factor file %s resolved to %s" % (scaling_factor_file, candidate))
             return candidate
+    logger.warning(
+        "Could not resolve scaling factor file %s; tried: %s" % (scaling_factor_file, ", ".join(candidates))
+    )
     return scaling_factor_file
 
 
@@ -204,6 +199,13 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
         a_error = float(data_found["error_a"])
         b_error = float(data_found["error_b"])
     else:
+        # Pre-existing behaviour, unchanged: an unscaled result is returned when
+        # no entry matches. Logged because the caller cannot tell it apart from
+        # a real scaling factor of 1 — the reflectivity comes out plausible and
+        # wrong.
+        logger.warning(
+            "No matching scaling factor entry in %s; proceeding unscaled" % scaling_factor_file
+        )
         return 1, 0, 0, 0
     return a, b, a_error, b_error
 
@@ -472,6 +474,7 @@ def process_from_template_ws(
     if info:
         meta_data = event_refl.to_dict()
         meta_data["scaling_factors"] = dict(a=a, err_a=err_a, b=b, err_b=err_b)
+        meta_data["scaling_factor_file"] = template_data.scaling_factor_file
         meta_data["q_summing"] = q_summing
         meta_data["tof_weighted"] = tof_weighted
         meta_data["bck_in_q"] = bck_in_q

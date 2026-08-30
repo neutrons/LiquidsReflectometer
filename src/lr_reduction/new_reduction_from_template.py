@@ -14,6 +14,7 @@ from lr_reduction.new_reduction_template_reader import ReductionParameters
 #import template
 from lr_reduction.nr_reduction_calc import NR_Reduction  # TODO: Fix names of files!!
 from lr_reduction.nr_reduction_config import NRReductionConfig
+from lr_reduction.template import _resolve_scaling_factor_file
 
 
 def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True, eight_col=None, save_pdf_summary=False):  # noqa: ARG001 -- save_pdf_summary is public API (TODO in save_reduced_data); kept
@@ -471,6 +472,9 @@ def read_template(template_file: str, sequence_number: int) -> ReductionParamete
         data_set = data_sets[0]
     else:
         raise RuntimeError("Invalid reduction template")
+    # Same anchoring as template.read_template; this fork is scheduled for
+    # unification (TODO above) but must not resolve paths differently meanwhile.
+    data_set.scaling_factor_file = _resolve_scaling_factor_file(data_set.scaling_factor_file, template_file)
     return data_set
 
 def plot_reflectivity(data_array, RQ4=False, log_x = True):
