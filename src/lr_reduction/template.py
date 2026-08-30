@@ -19,6 +19,50 @@ TOLERANCE = 0.07
 OUTPUT_NORM_DATA = False
 
 
+# How far above the template's own directory to look for a relative
+# scaling-factor path. Templates in this repository sit one level below the
+# directory their relative paths are anchored at (tests/data/template.xml
+# declaring data/sf_197912_Si_auto.cfg, anchored at tests/), so one level is
+# the case that matters; the small margin covers similarly-shaped layouts
+# without turning this into an unbounded filesystem search.
+_SCALING_FACTOR_ANCHOR_DEPTH = 3
+
+
+def _scaling_factor_candidates(scaling_factor_file: str, template_file: str) -> list:
+    """Paths to try for a template's scaling-factor file, in precedence order."""
+    # As-given first: an absolute path, or a relative one that resolves against
+    # the current directory, is what the facility and the `cd tests/` gate
+    # already rely on. Anchoring is a fallback, never an override.
+    candidates = [scaling_factor_file]
+    if os.path.isabs(scaling_factor_file):
+        return candidates
+    directory = os.path.dirname(os.path.abspath(template_file))
+    for _ in range(_SCALING_FACTOR_ANCHOR_DEPTH):
+        candidates.append(os.path.join(directory, scaling_factor_file))
+        parent = os.path.dirname(directory)
+        if parent == directory:
+            break
+        directory = parent
+    return candidates
+
+
+def _resolve_scaling_factor_file(scaling_factor_file: str, template_file: str) -> str:
+    """Make a template's scaling-factor path independent of the working directory.
+
+    A relative path in a template used to be resolved against whatever
+    directory the process happened to start in, so the same template worked
+    under `cd tests/ && pytest` and failed from the repository root. Anchor it
+    to the template instead; if nothing resolves, return it unchanged so the
+    failure is reported against the path the template actually declares.
+    """
+    if not scaling_factor_file:
+        return scaling_factor_file
+    for candidate in _scaling_factor_candidates(scaling_factor_file, template_file):
+        if os.path.isfile(candidate):
+            return candidate
+    return scaling_factor_file
+
+
 def read_template(template_file: str, sequence_number: int) -> ReductionParameters:
     """
     Read template from file.
@@ -33,6 +77,7 @@ def read_template(template_file: str, sequence_number: int) -> ReductionParamete
         data_set = data_sets[0]
     else:
         raise RuntimeError("Invalid reduction template")
+    data_set.scaling_factor_file = _resolve_scaling_factor_file(data_set.scaling_factor_file, template_file)
     return data_set
 
 
@@ -72,8 +117,11 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
     @param workspace: Mantid workspace
     """
     if not os.path.isfile(scaling_factor_file):
-        print("Could not find scaling factor file: %s" % scaling_factor_file)
-        return workspace
+        # Raise rather than return the workspace: the only call site unpacks a
+        # 4-tuple, so this branch could never succeed — it turned a clear
+        # file-not-found into a TypeError four frames later. Relative paths are
+        # anchored when the template is read; see _resolve_scaling_factor_file.
+        raise FileNotFoundError("Could not find scaling factor file: %s" % scaling_factor_file)
 
     # Get the wavelength
     lr = workspace.getRun().getProperty("LambdaRequest").value[0]
