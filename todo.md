@@ -186,3 +186,32 @@ Secure Temporary Files rule (predictable, world-readable path).
    class B1 belonged to.
 3. The `test_template_paths.py` docstring, `re.findall` precondition, and
    routing the two helper tests through `read_template`.
+
+## Addendum (reviewer's completed matrix) — one coverage gap worth closing in v3
+
+The blocking finding above is unchanged. Two items the fuller report adds:
+
+- **Nothing pins the symptom the human actually reported.**
+  `test_scaling_factor_missing_file_raises` pins the *leaf function*. What was
+  observed in the field was the failure surfacing **through the pipeline** —
+  `TypeError: cannot unpack non-iterable EventWorkspace object` four frames
+  above, at `template.py:385`. A `pytest.raises(FileNotFoundError)` around
+  `process_from_template_ws` with an already-loaded fixture workspace would
+  close the loop at the level the bug was seen, and would fail if a future
+  refactor reintroduced an unpack-mismatch anywhere between the two. Cheap, and
+  it is the one test that maps 1:1 onto the report that started this slug.
+- `tests/test_reduction.py:90, 125, 179` — the three `cleanup_partial_files`
+  calls are dead (`process_from_template_ws` writes no partial files), and three
+  tests gained a `tmp_path` parameter solely to feed them. Deleting the calls and
+  the parameters is the cleaner end state. (Unrelated and genuinely good:
+  repointing the real `output_dir`s at `tmp_path` is a real isolation win —
+  those tests previously wrote partials and `REF_L_*_auto_template.xml` into
+  `tests/data/`, which is why working clones accumulate the 16 gitignored
+  byproducts that make them diverge from a fresh checkout.)
+
+Also recorded: the reviewer's probes overwrote the shared
+`/tmp/sf_197912_Si_test*.cfg` at 23:12–23:13. Both of my gates passed, so
+nothing in the result above is attributable to that — but it is an independent
+reproduction of the shared-`/tmp` race and strengthens the case for folding the
+**write** side of `test_scaling_factors_workflow.py` into the parked
+`test-tmp-isolation` slug.
