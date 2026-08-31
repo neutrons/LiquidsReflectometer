@@ -1,14 +1,17 @@
 """Template path resolution — the scaling-factor file must not depend on cwd.
 
-These guard a defect that the campaign gate structurally cannot see: the
-sanctioned command is `cd tests/ && pytest`, and the fixture's
-`<scaling_factor_file>data/sf_197912_Si_auto.cfg</scaling_factor_file>` resolves
-against that cwd. Any other invocation — `pixi run pytest` from the repo root,
-an IDE, `pytest tests/test_reduction.py -k …` — resolved it to nothing and then
-failed four frames later with `TypeError: cannot unpack non-iterable
-EventWorkspace object`. Both tests below chdir away from `tests/` deliberately,
-so they keep failing if the anchoring is reverted even though CI never runs
-from the repo root.
+A template's `<scaling_factor_file>` used to be resolved against whatever
+directory the process started in. The sanctioned gate command is
+`cd tests/ && pytest`, so it resolved there and nowhere else: any other
+invocation failed four frames later with `TypeError: cannot unpack
+non-iterable EventWorkspace object`. Resolution is now anchored to the
+template's own directory, and the fixtures declare their scaling-factor file as
+a sibling — which means the gate exercises the anchoring too, so deleting it
+reds the gate rather than only a repo-root run.
+
+The four tests below still chdir away deliberately: the anchoring is what makes
+the location irrelevant, and a guard that only runs where the answer is already
+right proves nothing.
 """
 
 import os
@@ -34,11 +37,16 @@ def test_scaling_factor_missing_file_raises(tmp_path):
     assert missing in str(excinfo.value)
 
 
-def _declared_scaling_factor_file(template_path):
-    """The raw <scaling_factor_file> string, straight out of the XML."""
-    match = re.search(r"<scaling_factor_file>([^<]*)</scaling_factor_file>", Path(template_path).read_text())
-    assert match, f"no scaling_factor_file element in {template_path}"
-    return match.group(1)
+def _declared_scaling_factor_files(template_path):
+    """Every raw <scaling_factor_file> string in the XML.
+
+    All of them, not the first: the template carries one per sequence and the
+    test below reads sequence 7, so checking only sequence 1's would assert
+    about a value the test never exercises.
+    """
+    declared = re.findall(r"<scaling_factor_file>([^<]*)</scaling_factor_file>", Path(template_path).read_text())
+    assert declared, f"no scaling_factor_file element in {template_path}"
+    return declared
 
 
 def test_template_scaling_factor_path_is_cwd_independent(monkeypatch, tmp_path, template_dir):
@@ -52,11 +60,11 @@ def test_template_scaling_factor_path_is_cwd_independent(monkeypatch, tmp_path, 
     so.
     """
     template_path = os.path.join(template_dir, "template.xml")
-    declared = _declared_scaling_factor_file(template_path)
-    assert declared, "template declares no scaling factor file"
-    assert not os.path.isabs(declared), (
-        f"precondition lost: {template_path} declares an absolute scaling factor path "
-        f"({declared}), so this test no longer exercises cwd-independence"
+    declared = _declared_scaling_factor_files(template_path)
+    absolute = [d for d in declared if os.path.isabs(d)]
+    assert not absolute, (
+        f"precondition lost: {template_path} declares absolute scaling factor path(s) "
+        f"({absolute}), so this test no longer exercises cwd-independence"
     )
 
     monkeypatch.chdir(tmp_path)
@@ -94,7 +102,8 @@ def test_as_given_path_wins_over_template_anchor(monkeypatch, tmp_path):
     )
 
     monkeypatch.chdir(workdir)
-    resolved = template._resolve_scaling_factor_file("sf.cfg", str(template_path))
+    # Through read_template, so what is pinned is the seam callers actually use.
+    resolved = template.read_template(str(template_path), 1).scaling_factor_file
 
     assert os.path.samefile(resolved, workdir / "sf.cfg"), (
         f"as-given (cwd) candidate must win; got {resolved}"
@@ -105,5 +114,9 @@ def test_unresolvable_path_is_returned_unchanged(tmp_path):
     """Nothing resolves: hand back what the template declared, so the error the
     caller raises names the author's path rather than an invented one."""
     template_path = tmp_path / "t.xml"
-    template_path.write_text("<Reduction/>")
-    assert template._resolve_scaling_factor_file("nowhere/sf.cfg", str(template_path)) == "nowhere/sf.cfg"
+    template_path.write_text(
+        "<Reduction><DataSeries><RefLData>"
+        "<scaling_factor_file>nowhere/sf.cfg</scaling_factor_file>"
+        "</RefLData></DataSeries></Reduction>"
+    )
+    assert template.read_template(str(template_path), 1).scaling_factor_file == "nowhere/sf.cfg"

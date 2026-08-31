@@ -474,7 +474,10 @@ def process_from_template_ws(
     if info:
         meta_data = event_refl.to_dict()
         meta_data["scaling_factors"] = dict(a=a, err_a=err_a, b=b, err_b=err_b)
-        meta_data["scaling_factor_file"] = template_data.scaling_factor_file
+        # Only when the scaling-factor branch actually ran: recording a path on
+        # the skip branch would name a file that was never read.
+        if normalize and template_data.scaling_factor_flag:
+            meta_data["scaling_factor_file"] = template_data.scaling_factor_file
         meta_data["q_summing"] = q_summing
         meta_data["tof_weighted"] = tof_weighted
         meta_data["bck_in_q"] = bck_in_q

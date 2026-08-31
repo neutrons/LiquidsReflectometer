@@ -1,6 +1,5 @@
 # standard imports
 import os
-from pathlib import Path
 from unittest.mock import patch
 
 # third-party imports
@@ -228,11 +227,9 @@ def test_reduce_workflow_with_stitching_automatic_average(template_dir, nexus_di
     # TODO: Add to this test once save/loading is complete in ewm13786
 
 
-def test_reduce_functional_bck(nexus_dir, template_dir, tmp_path, monkeypatch):
-    # monkeypatch.chdir is restored at teardown; a bare os.chdir here leaked the
-    # gate's working directory into every test collected after this one, which
-    # masked cwd-dependent failures for the rest of the session.
-    monkeypatch.chdir(Path(template_dir).parent)
+def test_reduce_functional_bck(nexus_dir, template_dir, tmp_path):
+    # No chdir: every path this test uses is absolute. The suite now contains no
+    # working-directory mutation at all, which conftest's _no_cwd_leak enforces.
     template_path = os.path.join(template_dir, "template_fbck.xml")
     output_dir = tmp_path
     reduced_path = os.path.join(output_dir, "REFL_198409_combined_data_auto.txt")
