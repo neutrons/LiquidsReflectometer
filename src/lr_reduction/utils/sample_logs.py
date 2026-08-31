@@ -75,7 +75,7 @@ class SampleLogs:
         imply ``self[name]`` will succeed."""
         return self._run().hasProperty(name)
 
-    def __getitem__(self, name: str) -> int | float | str:
+    def __getitem__(self, name: str) -> bool | int | float | str:
         """The log's single unambiguous value.
 
         Raises
@@ -102,7 +102,11 @@ class SampleLogs:
 
         Not time-weighted — each recorded entry counts equally regardless of how long it
         held. Use `time_average` for the time-weighted value, which is usually what a
-        motor or beam log means. Equivalent to ``single_value(name, np.mean)``.
+        motor or beam log means.
+
+        Implemented as ``single_value(name, np.mean)`` rather than through Mantid's
+        statistics, which report `nan` for a vector-valued log — one written from a plain
+        sequence, as `insert` does — instead of averaging its entries.
 
         Raises
         ------
@@ -114,7 +118,7 @@ class SampleLogs:
             The log records no values, so there is nothing to average.
         """
         self._require_numeric(name)
-        return self._run().getStatistics(name).mean
+        return self.single_value(name, np.mean)
 
     def time_average(self, name: str) -> float:
         """The **time-weighted** mean of a numeric log's values.
@@ -122,16 +126,26 @@ class SampleLogs:
         Weights each entry by how long it held, so a value recorded briefly contributes
         proportionally less. Contrast `mean`, which is the unweighted arithmetic mean.
 
+        Defined only for a scalar or a time series. A vector-valued log records its
+        entries without times, so there is no duration to weight them by; Mantid reports
+        `nan` for such a log rather than saying so, so this rejects it outright.
+
         Raises
         ------
         LogNotFoundError
             No log of this name exists.
         LogTypeError
-            The log does not hold numeric values.
+            The log does not hold numeric values, or is vector-valued and so carries no
+            times to weight by.
         AmbiguousLogError
             The log records no values, so there is nothing to average.
         """
-        self._require_numeric(name)
+        prop = self._require_numeric(name)
+        if self._is_vector(prop):
+            raise LogTypeError(
+                f"Sample log {name!r} is vector-valued and records no times, so it has no time-weighted "
+                f"mean; read it with mean({name!r}) or single_value({name!r}, operation=...) instead"
+            )
         return self._run().getStatistics(name).time_mean
 
     def single_value(self, name: str, operation: Callable[[Sequence], float] = np.mean) -> Any:
@@ -215,10 +229,24 @@ class SampleLogs:
     def insert(self, name: str, value: Any, unit: str | None = None) -> None:
         """Write a sample log onto the wrapped workspace, replacing any log of that name.
 
-        The write goes straight onto the workspace's `Run`, so it also works on
-        workspaces that are not in the analysis data service — as the intermediate
-        workspaces inside an algorithm typically are not. The trade-off is that it does
-        not appear in the workspace's algorithm history, as an `AddSampleLog` call would.
+        The write goes straight onto the workspace's `Run` rather than through
+        `AddSampleLog`. The trade-off is deliberate and costs provenance: an
+        `AddSampleLog` call would show up in the workspace's algorithm history and this
+        does not. It is made because `AddSampleLog` cannot express what this must write.
+
+        - No vector form. `LogText` is a string, so a sequence can only go in as the
+          *text* ``"[11111, 22222]"``; `Run.addProperty` records a real
+          `VectorIntPropertyWithValue` that `mean` and `single_value` can reduce.
+        - No boolean form, only ``LogText="1"``, which reads back as the integer 1 rather
+          than `True`.
+        - It fails outright on a workspace that is not in the analysis data service — as
+          the intermediate workspaces inside an algorithm are not — and fails *after*
+          adding the property, so the log is written and an exception raised.
+
+        Writing to an intermediate workspace is not wasted effort even though the
+        workspace itself is discarded: Mantid copies the `Run` from an algorithm's input
+        to its output, so a log written early travels down the chain onto the result that
+        does get saved.
 
         Numpy scalars and numpy array elements are converted to Python natives first:
         Mantid registers no converter for them and rejects them outright.
@@ -280,6 +308,16 @@ class SampleLogs:
         if values.size == 0:
             raise AmbiguousLogError(f"Sample log {name!r} records no values, so it cannot be reduced to a number")
         return prop
+
+    @staticmethod
+    def _is_vector(prop: Property) -> bool:
+        """Whether the property holds a bare vector of values — neither scalar nor series.
+
+        This pair of tests separates the three shapes a log can take: a scalar's value is
+        a Python native, a time series carries `times`, and a vector log — what `insert`
+        writes from any sequence — carries neither.
+        """
+        return not isinstance(prop.value, _SCALAR_TYPES) and not hasattr(prop, "times")
 
     def _normalize(self, name: str, value: Any) -> Any:
         """Reduce a raw log value to one Python scalar, or raise if it is ambiguous."""

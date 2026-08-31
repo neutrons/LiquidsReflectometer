@@ -70,6 +70,12 @@ def workspace():
     run.addProperty("empty", FloatTimeSeriesProperty("empty"), True)
     run.addProperty("all_nan", _float_series("all_nan", [("2020-01-01T00:00:00", float("nan"))]), True)
 
+    # Vector-valued logs: a plain sequence with no timestamps, which is what `insert`
+    # writes and what a composite run's per-run values are recorded as. Mantid gives
+    # these a `Vector*PropertyWithValue`, not a time series.
+    run.addProperty("vector", [1.0, 2.0, 6.0], "", True)
+    run.addProperty("vector_str", ["first", "second"], "", True)
+
     yield ws
     DeleteWorkspace(ws)
 
@@ -224,6 +230,35 @@ def test_time_average_rejects_an_empty_series(logs):
 def test_mean_rejects_a_missing_log(logs):
     with pytest.raises(LogNotFoundError):
         logs.mean("no_such_log")
+
+
+def test_mean_averages_a_vector_log(logs):
+    """Regression guard: Mantid's getStatistics reports nan for a vector-valued log
+    rather than averaging it, so `mean` reduces the values itself."""
+    assert logs.mean("vector") == pytest.approx(3.0)
+
+
+def test_mean_of_a_vector_log_returns_a_python_native(logs):
+    assert not isinstance(logs.mean("vector"), np.generic)
+
+
+def test_mean_rejects_a_vector_of_strings(logs):
+    with pytest.raises(LogTypeError):
+        logs.mean("vector_str")
+
+
+def test_time_average_rejects_a_vector_log(logs):
+    """A vector log records no times, so there is nothing to weight by. Mantid returns
+    nan for it, which would be a silently meaningless number."""
+    with pytest.raises(LogTypeError, match="no times"):
+        logs.time_average("vector")
+
+
+def test_time_average_still_weights_a_time_series(logs):
+    """Guards the vector rejection against over-reach: a series must still be weighted,
+    and so must a scalar, whose statistics Mantid reports correctly."""
+    assert logs.time_average("uneven") == pytest.approx(0.19607843, rel=1e-6)
+    assert logs.time_average("scalar_float") == pytest.approx(3.14)
 
 
 # --- single_value -----------------------------------------------------------------

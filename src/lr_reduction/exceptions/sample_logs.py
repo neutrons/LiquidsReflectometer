@@ -37,6 +37,7 @@ class LogUnitError(SampleLogsError, LrValidationError):
 class LogTypeError(SampleLogsError, UnsupportedFormatError):
     """A log's contents and the requested operation are incompatible.
 
-    Either a numeric operation was requested on a log that does not hold numbers, or a
-    value was written that Mantid cannot record as a log at all.
+    A numeric operation was requested on a log that does not hold numbers, a time-weighted
+    one on a vector-valued log that records no times, or a value was written that Mantid
+    cannot record as a log at all.
     """
