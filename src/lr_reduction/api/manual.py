@@ -32,11 +32,15 @@ class ManualSingleRun(SingleRunReduction):
         return self._config_loader.load(str(self.configuration))
 
     def load_data(self, config: ReductionConfig) -> SingleReductionInput:
-        if self.sequence_number is None:
-            # TODO: if sequence_number is None, use sequence_number from workspace sample logs
-            #       and assign to self.sequence_number for use in parent call_operations
-            self.sequence_number = 1  # Placeholder: sequence_number is not yet available
         run = self._run_loader.load(self.run_number)
+        if self.sequence_number is None:
+            # With no constructor override, fall back to what the run reports (§3.1.2.1),
+            # as AutoreduceSingleRun does.
+            # TODO: `RunLoader` is still a stub, so that fallback is `RunData`'s default
+            #       of 1, not a value read from this run. Read it from the
+            #       `sequence_number` sample log, as `LiveEntrypoint` already does, once
+            #       the real loader lands.
+            self.sequence_number = run.sequence_number
         db_config = get_direct_beam_config(self.sequence_number, config)
         direct_beams = get_direct_beams(self._run_loader, db_config)
         return SingleReductionInput(run_data=run, direct_beams=direct_beams, direct_beam_config=db_config)

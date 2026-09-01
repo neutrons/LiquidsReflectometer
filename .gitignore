@@ -152,3 +152,13 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# IDE
+.idea/
+
+# Editor backup files
+*~
+
+# Generated reduction output written to the repository root by the placeholder
+# ORSO writer (io/orso.py) when output_dir defaults to "."
+/PLACEHOLDER_FILENAME.ort

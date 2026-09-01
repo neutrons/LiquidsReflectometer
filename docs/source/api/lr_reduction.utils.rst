@@ -38,3 +38,19 @@ lr_reduction.utils.logging
    :members:
    :undoc-members:
    :show-inheritance:
+
+lr_reduction.utils.sample_logs
+++++++++++++++++++++++++++++++++
+
+.. automodule:: lr_reduction.utils.sample_logs
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+lr_reduction.utils.workspace
+++++++++++++++++++++++++++++++
+
+.. automodule:: lr_reduction.utils.workspace
+   :members:
+   :undoc-members:
+   :show-inheritance:
