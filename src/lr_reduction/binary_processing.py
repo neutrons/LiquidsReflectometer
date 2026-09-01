@@ -178,6 +178,12 @@ def get_log_values(fname):
         print("Older run doesn't include coordinates PV")
         pass
 
+    try:
+        log_values["incident_theta"] = f['entry/DASlogs/BL4B:CS:BeamToEarthCenterAngleOffset/value'][0]
+    except:
+        print("Older run doesn't include Beam-Earth centered angle, set to default 4.0deg")
+        log_values["incident_theta"] = 4.0
+
     # TODO: check if we need any of the other chopper parts.
     log_values["frequency"]=np.array(f['entry/DASlogs/BL4B:Det:TH:BL:Frequency/value'][0])
     log_values["lam_request"]=np.array(f['entry/DASlogs/BL4B:Det:TH:BL:Lambda/value'][0])

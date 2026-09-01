@@ -213,12 +213,12 @@ def generate_report_sections(
     logger.notice(f"  - generating report [{number_events}]")
 
     config = None
+    template_data = None
     if data_type == DataType.REFLECTED_BEAM:
         if config_in is not None:
             # Get the parameters from the settings instead
             config = config_in
             report = generate_report_section_reduction_parameters_new(config_in, workspace, sequence_number)
-            template_data = None
         # Read template if needed
         elif template_file is not None:
             if isinstance(template_file, str):
@@ -446,8 +446,8 @@ def generate_report_section_reduction_parameters_new(config, workspace: MantidWo
     meta += "<table style='width:100%'>"
     meta += "<tr><th>Wavelength</th><th>Q</th><th>dqbin</th><th>Thi</th><th>Ths</th><th>Offset</th><th>tthd</th></tr>"  # noqa E501
     meta += "<tr><td>%6.4g - %6.4g</td><td>%6.4g - %6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td></tr>\n" % (
-        config.LambdaMin[sequence_number-1],
-        config.LambdaMax[sequence_number-1],
+        config.LambdaMinUse,
+        config.LambdaMaxUse,
         config.qmin,
         config.qmax,
         config.dqbin,
