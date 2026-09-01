@@ -8,7 +8,7 @@ import lr_reduction.binary_processing as BP
 import lr_reduction.nr_tools as tools
 
 
-class Direct_Beam:
+class Direct_Beam:  # noqa: N801 -- public API name; rename deferred (imported by callers)
 
     def __init__(self, experiment_id=None, NEXUSpath=None, savepath=None):
         # if experiment_id is provided the IPTS-based convention will be used. Otherwise callers
@@ -168,8 +168,10 @@ class Direct_Beam:
 
             Cd_thickness = Cd_values[i]
 
-            if run == run_list[-1]: low_tag = True
-            else: low_tag = False
+            if run == run_list[-1]:
+                low_tag = True
+            else:
+                low_tag = False
             T, I, E, DTC = self._trim_and_chop(T, I, E, DTC, log_values["chop2_PD"], lowest = low_tag)
             T = T * 1e-3 # convert to ms
             #print(f'Run {run}: After trimming and chopping, {len(T)} points remain')
@@ -187,7 +189,7 @@ class Direct_Beam:
             try:
                 n = log_values["scale_multiplier"]
                 print(f'Using {n} as scale multiplier')
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- any lookup failure falls back to scale multiplier 1.0 by design
                 print(f'Using 1.0 as scale multiplier b/c {e} not in {repr(log_values)}')
                 n = 1.0
 
@@ -328,8 +330,10 @@ class Direct_Beam:
         DTC=DTC[p]
 
         # trim off parts above the DTC threshold
-        if lowest: DTC_threshold = self.DTCcut_config1
-        else: DTC_threshold = self.DTCcut
+        if lowest:
+            DTC_threshold = self.DTCcut_config1
+        else:
+            DTC_threshold = self.DTCcut
 
         above = np.where(DTC > DTC_threshold)[0]
         if above.size == 0:

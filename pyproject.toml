@@ -151,6 +151,7 @@ ruff = "*"
 codecov = "*"
 pytest = "*"
 pytest-cov = "*"
+pytest-timeout = ">=2.4.0,<3"
 
 [tool.pixi.feature.package.dependencies]  # necessary to build the conda package
 anaconda-client = ">=1.13.0,<2"
@@ -177,7 +178,8 @@ conda-builder = { cmd = "pixi build", description = "Command that creates the co
 conda-build = { depends-on = ["sync-version", "conda-builder", "reset-version"], description = "Build the conda package" }
 conda-clean = { cmd = "rm -f *.conda", description = "Clean the local .conda build artifacts" }
 # Testing
-test-reduction = { cmd = "cd tests/ && python -m pytest -vv --cov=../src --cov-report=xml --cov-report=term"}
+test-reduction = { cmd = "cd tests/ && python -m pytest -vv --cov=../src --cov-report=xml --cov-report=term", depends-on = ["test-launcher"]}
+test-launcher = { cmd = "python -m pytest -vv --timeout=120 --timeout-method=thread launcher/tests/", description = "Run launcher UI tests (headless Qt)" }
 # Misc
 clean-all = { description = "Clean all build artifacts", depends-on = ["docs-clean", "conda-clean"] }
 sync-version = { cmd = 'version=$(python -m versioningit); toml set tool.pixi.package.version "$version" --toml-path pyproject.toml', description = "Sync pyproject.toml version with Git version" }
@@ -215,6 +217,9 @@ markers = [
   "datarepo: mark a test as using LiquidsReflectometer-data repository",
   "scripts: mark a test as a script that should be run manually",
 ]
+# signal (the default) cannot interrupt a test blocked in Qt's C++ event loop;
+# this selects the method wherever a timeout is armed, and arms none by itself.
+timeout_method = "thread"
 addopts = "--import-mode=importlib"  # to allow a unit test and integration test with the same module name
 
 #########
@@ -242,6 +247,19 @@ ignore = [
   "N815", # mixed case variable in class scope
   "N999", # invalid module name
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# The launcher GUI's pervasive `except Exception:` handlers are its
+# deliberate error-boundary idiom (Qt slots/callbacks must not raise;
+# failures surface as dialogs/log lines instead of crashing the app) —
+# 303 pre-existing sites as of 2026-08-17. BLE001 stays enforced for
+# the library code under src/, where the few blind excepts carry
+# per-line noqa with the reason.
+"launcher/**" = ["BLE001"]
+# Fixture parameters in a test signature are the pytest idiom; ARG001 would
+# push authors to usefixtures marks instead, where a dropped mark yields a
+# hanging modal rather than a failure.
+"launcher/tests/**" = ["ARG001"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["lr_reduction"]

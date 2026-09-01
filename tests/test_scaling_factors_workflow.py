@@ -47,14 +47,14 @@ def check_results(data_file, reference):
             assert delta < 0.02
 
 
-def test_compute_sf(nexus_dir):
+def test_compute_sf(nexus_dir, template_dir, tmp_path):
     """
     Test the computation of scaling factors
     """
     with amend_config(data_dir=nexus_dir):
         ws = mtd_api.Load("REF_L_197912")
 
-    output_dir = "/tmp"
+    output_dir = str(tmp_path)
 
     # We are passing the first run of the set. For the autoreduction,
     # we would be missing runs from the complete set so we will want to
@@ -69,17 +69,17 @@ def test_compute_sf(nexus_dir):
     output = sf_workflow.process_scaling_factors(ws, output_dir, use_deadtime=False, wait=False, postfix="_test")
     assert output is True
 
-    check_results(output_cfg, "data/sf_197912_Si_auto.cfg")
+    check_results(output_cfg, os.path.join(template_dir, "sf_197912_Si_auto.cfg"))
 
 
-def test_compute_sf_with_deadtime(nexus_dir):
+def test_compute_sf_with_deadtime(nexus_dir, template_dir, tmp_path):
     """
     Test the computation of scaling factors
     """
     with amend_config(data_dir=nexus_dir):
         ws = mtd_api.Load("REF_L_197912")
 
-    output_dir = "/tmp"
+    output_dir = str(tmp_path)
 
     output_cfg = os.path.join(output_dir, "sf_197912_Si_test_dt.cfg")
     if os.path.isfile(output_cfg):
@@ -88,17 +88,17 @@ def test_compute_sf_with_deadtime(nexus_dir):
     output = sf_workflow.process_scaling_factors(ws, output_dir, use_deadtime=True, wait=False, postfix="_test_dt")
     assert output is True
 
-    check_results(output_cfg, "data/sf_197912_Si_dt_par_42_200.cfg")
+    check_results(output_cfg, os.path.join(template_dir, "sf_197912_Si_dt_par_42_200.cfg"))
 
 
-def test_compute_sf_with_deadtime_tof_300(nexus_dir):
+def test_compute_sf_with_deadtime_tof_300(nexus_dir, template_dir, tmp_path):
     """
     Test the computation of scaling factors
     """
     with amend_config(data_dir=nexus_dir):
         ws = mtd_api.Load("REF_L_197912")
 
-    output_dir = "/tmp"
+    output_dir = str(tmp_path)
 
     output_cfg = os.path.join(output_dir, "sf_197912_Si_test_dt.cfg")
     if os.path.isfile(output_cfg):
@@ -116,17 +116,17 @@ def test_compute_sf_with_deadtime_tof_300(nexus_dir):
     )
     assert output is True
 
-    check_results(output_cfg, "data/sf_197912_Si_dt_par_46_300.cfg")
+    check_results(output_cfg, os.path.join(template_dir, "sf_197912_Si_dt_par_46_300.cfg"))
 
 
-def test_compute_sf_with_deadtime_tof_200(nexus_dir):
+def test_compute_sf_with_deadtime_tof_200(nexus_dir, template_dir, tmp_path):
     """
     Test the computation of scaling factors
     """
     with amend_config(data_dir=nexus_dir):
         ws = mtd_api.Load("REF_L_197912")
 
-    output_dir = "/tmp"
+    output_dir = str(tmp_path)
 
     output_cfg = os.path.join(output_dir, "sf_197912_Si_test_dt.cfg")
     if os.path.isfile(output_cfg):
@@ -144,17 +144,17 @@ def test_compute_sf_with_deadtime_tof_200(nexus_dir):
     )
     assert output is True
 
-    check_results(output_cfg, "data/sf_197912_Si_dt_par_46_200.cfg")
+    check_results(output_cfg, os.path.join(template_dir, "sf_197912_Si_dt_par_46_200.cfg"))
 
 
-def test_compute_sf_with_deadtime_tof_200_sort(nexus_dir):
+def test_compute_sf_with_deadtime_tof_200_sort(nexus_dir, template_dir, tmp_path):
     """
     Test the computation of scaling factors
     """
     with amend_config(data_dir=nexus_dir):
         ws = mtd_api.Load("REF_L_197912")
 
-    output_dir = "/tmp"
+    output_dir = str(tmp_path)
 
     output_cfg = os.path.join(output_dir, "sf_197912_Si_test_dt.cfg")
     if os.path.isfile(output_cfg):
@@ -173,4 +173,4 @@ def test_compute_sf_with_deadtime_tof_200_sort(nexus_dir):
     )
     assert output is True
 
-    check_results(output_cfg, "data/sf_197912_Si_dt_par_46_200.cfg")
+    check_results(output_cfg, os.path.join(template_dir, "sf_197912_Si_dt_par_46_200.cfg"))
