@@ -49,7 +49,7 @@ def _declared_scaling_factor_files(template_path):
     return declared
 
 
-def test_template_scaling_factor_path_is_cwd_independent(monkeypatch, tmp_path, template_dir):
+def test_template_scaling_factor_path_is_cwd_independent(monkeypatch, template_dir, tmp_path):
     """Reading a template from an unrelated cwd must resolve to the intended file.
 
     Asserts identity, not mere existence: `isfile` alone would pass on any
