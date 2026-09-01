@@ -35,7 +35,7 @@ jobs:
           submodules: recursive
 
       - name: Set up Pixi
-        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
         with:
           manifest-path: pyproject.toml
 
@@ -88,7 +88,7 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Setup Pixi
-        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
 
       - name: Build conda package
         run: |
@@ -145,7 +145,7 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Setup Pixi
-        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
 
       - name: Download conda package artifact
         uses: actions/download-artifact@v8
