@@ -19,6 +19,45 @@ TOLERANCE = 0.07
 OUTPUT_NORM_DATA = False
 
 
+def _scaling_factor_candidates(scaling_factor_file: str, template_file: str) -> list:
+    """Paths to try for a template's scaling-factor file, in precedence order."""
+    # As-given first: an absolute path, or a relative one that resolves against
+    # the current directory, is what the facility and the `cd tests/` gate
+    # already rely on. Anchoring is a fallback, never an override.
+    candidates = [scaling_factor_file]
+    if not os.path.isabs(scaling_factor_file):
+        # The template's own directory, and nothing above it. An upward search
+        # would silently bind a same-named file the template author never
+        # declared — the same wrong-number-without-a-word failure the raise
+        # below exists to close.
+        candidates.append(os.path.join(os.path.dirname(os.path.abspath(template_file)), scaling_factor_file))
+    return candidates
+
+
+def _resolve_scaling_factor_file(scaling_factor_file: str, template_file: str) -> str:
+    """Make a template's scaling-factor path independent of the working directory.
+
+    A relative path in a template used to be resolved against whatever
+    directory the process happened to start in, so the same template worked
+    under `cd tests/ && pytest` and failed from the repository root. Anchor it
+    to the template instead. If nothing resolves, return the declared path
+    unchanged: the failure is then reported by scaling_factor() at the point of
+    use, which is the only place that knows whether the file is needed at all.
+    """
+    if not scaling_factor_file:
+        return scaling_factor_file
+    candidates = _scaling_factor_candidates(scaling_factor_file, template_file)
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            if candidate != scaling_factor_file:
+                logger.notice("Scaling factor file %s resolved to %s" % (scaling_factor_file, candidate))
+            return candidate
+    logger.warning(
+        "Could not resolve scaling factor file %s; tried: %s" % (scaling_factor_file, ", ".join(candidates))
+    )
+    return scaling_factor_file
+
+
 def read_template(template_file: str, sequence_number: int) -> ReductionParameters:
     """
     Read template from file.
@@ -33,6 +72,7 @@ def read_template(template_file: str, sequence_number: int) -> ReductionParamete
         data_set = data_sets[0]
     else:
         raise RuntimeError("Invalid reduction template")
+    data_set.scaling_factor_file = _resolve_scaling_factor_file(data_set.scaling_factor_file, template_file)
     return data_set
 
 
@@ -72,8 +112,11 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
     @param workspace: Mantid workspace
     """
     if not os.path.isfile(scaling_factor_file):
-        print("Could not find scaling factor file: %s" % scaling_factor_file)
-        return workspace
+        # Raise rather than return the workspace: the only call site unpacks a
+        # 4-tuple, so this branch could never succeed — it turned a clear
+        # file-not-found into a TypeError four frames later. Relative paths are
+        # anchored when the template is read; see _resolve_scaling_factor_file.
+        raise FileNotFoundError("Could not find scaling factor file: %s" % scaling_factor_file)
 
     # Get the wavelength
     lr = workspace.getRun().getProperty("LambdaRequest").value[0]
@@ -156,6 +199,13 @@ def scaling_factor(scaling_factor_file, workspace, match_slit_width=True):
         a_error = float(data_found["error_a"])
         b_error = float(data_found["error_b"])
     else:
+        # Pre-existing behaviour, unchanged: an unscaled result is returned when
+        # no entry matches. Logged because the caller cannot tell it apart from
+        # a real scaling factor of 1 — the reflectivity comes out plausible and
+        # wrong.
+        logger.warning(
+            "No matching scaling factor entry in %s; proceeding unscaled" % scaling_factor_file
+        )
         return 1, 0, 0, 0
     return a, b, a_error, b_error
 
@@ -424,6 +474,10 @@ def process_from_template_ws(
     if info:
         meta_data = event_refl.to_dict()
         meta_data["scaling_factors"] = dict(a=a, err_a=err_a, b=b, err_b=err_b)
+        # Only when the scaling-factor branch actually ran: recording a path on
+        # the skip branch would name a file that was never read.
+        if normalize and template_data.scaling_factor_flag:
+            meta_data["scaling_factor_file"] = template_data.scaling_factor_file
         meta_data["q_summing"] = q_summing
         meta_data["tof_weighted"] = tof_weighted
         meta_data["bck_in_q"] = bck_in_q

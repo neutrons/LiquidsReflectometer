@@ -1,6 +1,5 @@
 # standard imports
 import os
-from pathlib import Path
 from unittest.mock import patch
 
 # third-party imports
@@ -50,7 +49,7 @@ def test_attenuation(nexus_dir):
     event_reduction.process_attenuation(ws_sc, 0.005)
 
 
-def test_q_summing(template_dir, nexus_dir):
+def test_q_summing(template_dir, nexus_dir, tmp_path):
     """
     Test Q summing process
     """
@@ -86,7 +85,7 @@ def test_q_summing(template_dir, nexus_dir):
     assert np.fabs(np.mean(refl[3:] - refl0[2:])) < 1e-6
 
     # Cleanup
-    output_dir = "data/"
+    output_dir = str(tmp_path)
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
@@ -99,7 +98,9 @@ def test_q_summing(template_dir, nexus_dir):
         ("template.xml", False, False, True),
     ],
 )
-def test_q_summing_as_option(template_dir, nexus_dir, template_file, q_summing, expected_q_summing, tof_weighted):
+def test_q_summing_as_option(
+    template_dir, nexus_dir, tmp_path, template_file, q_summing, expected_q_summing, tof_weighted
+):
     """
     Test Q summing with and without supplying q_summing option
     """
@@ -119,11 +120,11 @@ def test_q_summing_as_option(template_dir, nexus_dir, template_file, q_summing, 
         call_kwargs = mock_specular.call_args[1]
         assert call_kwargs["q_summing"] == expected_q_summing
 
-    output_dir = "data/"
+    output_dir = str(tmp_path)
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
-def test_full_reduction(template_dir, nexus_dir):
+def test_full_reduction(template_dir, nexus_dir, tmp_path):
     """
     Test the full reduction chain
     """
@@ -156,7 +157,7 @@ def test_full_reduction(template_dir, nexus_dir):
     d_refl_all = np.take_along_axis(d_refl_all, idx, axis=None)
 
     assert np.fabs(resolution - 0.022751) < 1e-5
-    ref_data = np.loadtxt("data/reference_rq.txt").T
+    ref_data = np.loadtxt(os.path.join(template_dir, "reference_rq.txt")).T
 
     # Optional plotting for checking tests:
     # import matplotlib.pyplot as plt
@@ -173,7 +174,7 @@ def test_full_reduction(template_dir, nexus_dir):
     assert average_relative_difference < 0.05
 
     # Cleanup
-    output_dir = "data/"
+    output_dir = str(tmp_path)
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
@@ -227,7 +228,8 @@ def test_reduce_workflow_with_stitching_automatic_average(template_dir, nexus_di
 
 
 def test_reduce_functional_bck(nexus_dir, template_dir, tmp_path):
-    os.chdir(Path(template_dir).parent)
+    # No chdir: every path this test uses is absolute. The suite now contains no
+    # working-directory mutation at all, which conftest's _no_cwd_leak enforces.
     template_path = os.path.join(template_dir, "template_fbck.xml")
     output_dir = tmp_path
     reduced_path = os.path.join(output_dir, "REFL_198409_combined_data_auto.txt")
@@ -362,12 +364,12 @@ def test_quick_reduce(nexus_dir, datarepo_dir):
         assert np.fabs(np.sum(_data[i] - _refl[i])) < 1e-5
 
 
-def test_reduce_workflow_201282(template_dir, nexus_dir):
+def test_reduce_workflow_201282(template_dir, nexus_dir, tmp_path):
     """
     Test to reproduce autoreduction output
     """
     template_path = os.path.join(template_dir, "template_201282.xml")
-    output_dir = "data/"
+    output_dir = str(tmp_path)
     reduced_path = os.path.join(output_dir, "REFL_201282_combined_data_auto.txt")
     if os.path.isfile(reduced_path):
         os.remove(reduced_path)
@@ -398,12 +400,12 @@ def test_reduce_workflow_201282(template_dir, nexus_dir):
         assert average_fractional_difference < 0.07
 
 
-def test_background_subtraction(template_dir, nexus_dir):
+def test_background_subtraction(template_dir, nexus_dir, tmp_path):
     """
     Test with background subtraction off for the data and on for the normalization
     """
     template_path = os.path.join(template_dir, "template_short_nobck.xml")
-    output_dir = "data/"
+    output_dir = str(tmp_path)
     reduced_path = os.path.join(output_dir, "REFL_198382_combined_data_auto.txt")
     if os.path.isfile(reduced_path):
         os.remove(reduced_path)
