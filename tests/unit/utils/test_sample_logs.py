@@ -1,9 +1,22 @@
+import datetime
+
 import numpy as np
 import pytest
-from mantid.kernel import FloatTimeSeriesProperty, Int32TimeSeriesProperty, StringTimeSeriesProperty
+from mantid.kernel import (
+    BoolTimeSeriesProperty,
+    FloatTimeSeriesProperty,
+    Int32TimeSeriesProperty,
+    StringTimeSeriesProperty,
+)
 from mantid.simpleapi import AddSampleLog, CreateWorkspace, DeleteWorkspace, mtd
 
-from lr_reduction.exceptions import AmbiguousLogError, LogNotFoundError, LogTypeError, LogUnitError
+from lr_reduction.exceptions import (
+    AmbiguousLogError,
+    LogNotFoundError,
+    LogTypeError,
+    LogUnitError,
+    WorkspaceNotFoundError,
+)
 from lr_reduction.utils.sample_logs import SampleLogs
 
 
@@ -75,6 +88,34 @@ def workspace():
     # these a `Vector*PropertyWithValue`, not a time series.
     run.addProperty("vector", [1.0, 2.0, 6.0], "", True)
     run.addProperty("vector_str", ["first", "second"], "", True)
+
+    # A series with one NaN among good entries. Distinct from `all_nan`: this one has a
+    # real arithmetic mean if the NaN is skipped, so it separates "reject NaN" from
+    # "reject a log with nothing readable in it".
+    run.addProperty(
+        "some_nan",
+        _float_series(
+            "some_nan",
+            [
+                ("2020-01-01T00:00:00", 1.0),
+                ("2020-01-01T00:00:01", float("nan")),
+                ("2020-01-01T00:00:02", 3.0),
+            ],
+        ),
+        True,
+    )
+
+    # Boolean logs, which `insert` writes and `[...]` reads. `np.bool_` is not a subtype
+    # of `np.number`, so these are the case a dtype check silently excludes.
+    run.addProperty("flag_scalar", True, "", True)
+    flag_series = BoolTimeSeriesProperty("flag_series")
+    flag_series.addValue("2020-01-01T00:00:00", True)
+    flag_series.addValue("2020-01-01T00:00:01", False)
+    run.addProperty("flag_series", flag_series, True)
+
+    # An empty *string* series. `np.asarray([])` is float64 whatever the log holds, so
+    # this is the log a dtype-first check mistakes for an empty numeric one.
+    run.addProperty("empty_str", StringTimeSeriesProperty("empty_str"), True)
 
     yield ws
     DeleteWorkspace(ws)
@@ -261,6 +302,103 @@ def test_time_average_still_weights_a_time_series(logs):
     assert logs.time_average("scalar_float") == pytest.approx(3.14)
 
 
+# --- NaN handling in the fixed-reduction accessors ---------------------------------
+
+
+def test_mean_rejects_a_series_containing_nan(logs):
+    """`np.mean` propagates NaN, so this used to return nan — a silently meaningless
+    number reaching Q, the same failure class as the vector-log statistics."""
+    with pytest.raises(AmbiguousLogError, match="NaN"):
+        logs.mean("some_nan")
+
+
+def test_time_average_rejects_a_series_containing_nan(logs):
+    with pytest.raises(AmbiguousLogError, match="NaN"):
+        logs.time_average("some_nan")
+
+
+def test_nan_rejection_names_the_escape_hatch(logs):
+    with pytest.raises(AmbiguousLogError, match="nanmean"):
+        logs.mean("some_nan")
+
+
+def test_single_value_still_honors_a_nan_aware_operation(logs):
+    """The reduction is the caller's to state, so `single_value` does not reject NaN --
+    it is the escape hatch the other accessors point at."""
+    assert logs.single_value("some_nan", operation=np.nanmean) == pytest.approx(2.0)
+
+
+def test_single_value_propagates_nan_under_the_default_operation(logs):
+    """Documented rather than guarded: the default `np.mean` propagates NaN."""
+    assert np.isnan(logs.single_value("some_nan"))
+
+
+def test_find_log_with_units_rejects_nan_even_with_a_nan_aware_operation(logs):
+    """The cost of putting the check in the shared numeric layer, pinned so it is a
+    decision rather than a surprise: the unit assertion runs first, so a NaN-aware
+    operation does not get the chance to skip them."""
+    with pytest.raises(AmbiguousLogError, match="NaN"):
+        logs.find_log_with_units("some_nan", operation=np.nanmean)
+
+
+# --- boolean logs ------------------------------------------------------------------
+
+
+def test_mean_averages_a_boolean_series(logs):
+    """`np.bool_` is not a subtype of `np.number`, so a dtype check alone rejects a log
+    `insert` itself writes. The mean of a flag is the fraction of entries it held."""
+    assert logs.mean("flag_series") == pytest.approx(0.5)
+
+
+def test_time_average_gives_a_boolean_series_duty_cycle(logs):
+    assert logs.time_average("flag_series") == pytest.approx(0.5)
+
+
+def test_find_log_with_units_reads_a_boolean_log(logs):
+    assert logs.find_log_with_units("flag_scalar") is True
+
+
+def test_getitem_still_reads_boolean_logs(logs):
+    assert logs["flag_scalar"] is True
+
+
+def test_a_written_boolean_log_round_trips_through_every_accessor(logs):
+    """Regression guard for the inconsistency itself: the class must not reject a log it
+    just wrote.
+
+    Note the two shapes of answer, both intended: the accessors that read a value give the
+    flag back as `True`, while `mean` reduces it and so gives the number 1.0.
+    """
+    logs.insert("dead_time_applied", True)
+
+    assert logs["dead_time_applied"] is True
+    assert logs.single_value("dead_time_applied") is True
+    assert logs.find_log_with_units("dead_time_applied") is True
+    assert logs.mean("dead_time_applied") == pytest.approx(1.0)
+
+
+# --- the empty-string-series mislabelling -----------------------------------------
+
+
+def test_mean_reports_an_empty_string_series_as_a_type_error(logs):
+    """`np.asarray([])` is float64 whatever the log holds, so a dtype-first check passed
+    this log as numeric and blamed its emptiness. The type is the real problem, and a
+    caller that branches on the exception kind needs to be told which."""
+    with pytest.raises(LogTypeError, match="strings"):
+        logs.mean("empty_str")
+
+
+def test_mean_still_reports_an_empty_numeric_series_as_empty(logs):
+    """The other half of the distinction: an empty float series really is just empty."""
+    with pytest.raises(AmbiguousLogError, match="no values"):
+        logs.mean("empty")
+
+
+def test_time_average_reports_an_empty_string_series_as_a_type_error(logs):
+    with pytest.raises(LogTypeError, match="strings"):
+        logs.time_average("empty_str")
+
+
 # --- single_value -----------------------------------------------------------------
 
 
@@ -425,3 +563,76 @@ def test_insert_rejects_an_empty_sequence(logs):
     sequence log; this class translates Mantid's errors rather than leaking them."""
     with pytest.raises(LogTypeError, match="empty sequence"):
         logs.insert("nothing", [])
+
+
+@pytest.mark.parametrize(
+    "value",
+    [None, datetime.datetime(2020, 1, 1), object(), 3 + 4j],
+    ids=["none", "datetime", "object", "complex"],
+)
+def test_insert_rejects_an_unsupported_value_with_a_package_error(logs, value):
+    """Iteration used to decide this, so an unsupported value failed as a bare TypeError
+    ("'NoneType' object is not iterable") rather than the LogTypeError the docstring
+    promises. `None` from an unset optional is the one a caller will actually hit."""
+    with pytest.raises(LogTypeError):
+        logs.insert("unsupported", value)
+
+
+def test_insert_rejects_a_mapping_rather_than_writing_its_keys(logs):
+    """Worse than an error before this: iterating a mapping yields its keys, so
+    `insert("x", {"a": 1})` silently recorded ["a"] and discarded the values."""
+    with pytest.raises(LogTypeError, match="mapping"):
+        logs.insert("from_mapping", {"a": 1, "b": 2})
+
+    assert "from_mapping" not in logs
+
+
+def test_insert_rejects_a_zero_dimensional_array(logs):
+    """`np.array(5.0)` is not a sequence — iterating it raises "iteration over a 0-d
+    array" — but it is the shape a caller lands on after an accidental reduction."""
+    with pytest.raises(LogTypeError, match="dimensional"):
+        logs.insert("zero_dim", np.array(5.0))
+
+
+def test_insert_rejects_a_nested_sequence(logs):
+    """Mantid rejects this one itself, with a bare ValueError from its mapping layer."""
+    with pytest.raises(LogTypeError):
+        logs.insert("nested", [[1, 2], [3, 4]])
+
+
+def test_insert_still_accepts_a_scalar_after_the_shape_checks(logs):
+    """Guards the new validation against over-reach."""
+    logs.insert("still_scalar", 2.5, unit="mm")
+    logs.insert("still_sequence", [1.5, 2.5])
+
+    assert logs["still_scalar"] == 2.5
+    assert list(logs.property("still_sequence").value) == [1.5, 2.5]
+
+
+# --- workspace resolution ----------------------------------------------------------
+
+
+def test_contains_on_a_deleted_workspace_raises_a_package_error():
+    """`AnalysisDataService[name]` raises a bare KeyError, which a membership test has no
+    business raising and which sits outside the package's exception family. A name that
+    resolved earlier stops resolving once the workspace is deleted or replaced."""
+    name = mtd.unique_hidden_name()
+    CreateWorkspace(DataX=[0, 1], DataY=[0, 10], OutputWorkspace=name)
+    logs = SampleLogs(name)
+    assert "run_title" in logs
+
+    DeleteWorkspace(name)
+
+    with pytest.raises(WorkspaceNotFoundError):
+        "run_title" in logs  # noqa: B015 (the raise is the assertion)
+
+
+def test_reading_a_deleted_workspace_raises_a_package_error():
+    name = mtd.unique_hidden_name()
+    CreateWorkspace(DataX=[0, 1], DataY=[0, 10], OutputWorkspace=name)
+    logs = SampleLogs(name)
+
+    DeleteWorkspace(name)
+
+    with pytest.raises(WorkspaceNotFoundError):
+        logs["run_title"]

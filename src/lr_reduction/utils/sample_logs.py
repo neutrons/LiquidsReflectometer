@@ -1,11 +1,11 @@
 """Convenient, normalized access to a Mantid workspace's sample logs."""
 
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import Any
 
 import numpy as np
 from mantid.api import Run, Workspace
-from mantid.kernel import Property
+from mantid.kernel import Property, StringTimeSeriesProperty
 
 from lr_reduction.exceptions import (
     AmbiguousLogError,
@@ -104,21 +104,24 @@ class SampleLogs:
         held. Use `time_average` for the time-weighted value, which is usually what a
         motor or beam log means.
 
-        Implemented as ``single_value(name, np.mean)`` rather than through Mantid's
-        statistics, which report `nan` for a vector-valued log — one written from a plain
-        sequence, as `insert` does — instead of averaging its entries.
+        Equivalent to ``single_value(name, np.mean)``, but reduces the values this class
+        has already validated rather than reading the log a second time. Deliberately not
+        Mantid's statistics, which report `nan` for a vector-valued log — one written from
+        a plain sequence, as `insert` does — instead of averaging its entries.
 
         Raises
         ------
         LogNotFoundError
             No log of this name exists.
         LogTypeError
-            The log does not hold numeric values.
+            The log holds strings, so there is nothing to average.
         AmbiguousLogError
-            The log records no values, so there is nothing to average.
+            The log records no values, or contains NaN entries, so no meaningful mean
+            exists. Reduce it explicitly with ``single_value(name, np.nanmean)`` to skip
+            the NaN entries.
         """
-        self._require_numeric(name)
-        return self.single_value(name, np.mean)
+        _, values = self._numeric_values(name)
+        return self._to_python(np.mean(values))
 
     def time_average(self, name: str) -> float:
         """The **time-weighted** mean of a numeric log's values.
@@ -135,13 +138,15 @@ class SampleLogs:
         LogNotFoundError
             No log of this name exists.
         LogTypeError
-            The log does not hold numeric values, or is vector-valued and so carries no
-            times to weight by.
+            The log holds strings, or is vector-valued and so carries no times to weight
+            by.
         AmbiguousLogError
-            The log records no values, so there is nothing to average.
+            The log records no values, or contains NaN entries, so no meaningful mean
+            exists. Reduce it explicitly with ``single_value(name, np.nanmean)`` to skip
+            the NaN entries.
         """
-        prop = self._require_numeric(name)
-        if self._is_vector(prop):
+        prop, values = self._numeric_values(name)
+        if self._is_vector(prop, values):
             raise LogTypeError(
                 f"Sample log {name!r} is vector-valued and records no times, so it has no time-weighted "
                 f"mean; read it with mean({name!r}) or single_value({name!r}, operation=...) instead"
@@ -157,6 +162,13 @@ class SampleLogs:
 
         The reduction is **unweighted** — `operation` sees the raw values with no regard
         for how long each held. Use `time_average` for the time-weighted mean.
+
+        `operation` also owns the NaN policy, and is the only accessor here that does:
+        the default `np.mean` propagates NaN, so a series with a NaN entry reduces to NaN.
+        Pass `np.nanmean` (or another NaN-aware reduction) to skip those entries. The
+        fixed-reduction accessors — `mean`, `time_average`, `find_log_with_units` — reject
+        a NaN-bearing log instead, since they have no operation through which a caller
+        could state the intent.
 
         Parameters
         ----------
@@ -212,11 +224,14 @@ class SampleLogs:
         LogNotFoundError
             No log of this name exists.
         LogTypeError
-            The log does not hold numeric values.
+            The log holds strings.
         AmbiguousLogError
-            `operation` was omitted and the log has no single unambiguous value.
+            `operation` was omitted and the log has no single unambiguous value, or the
+            log contains NaN entries. Note that the NaN check applies even when
+            `operation` is NaN-aware, because the unit assertion runs first; read such a
+            log with ``single_value(name, np.nanmean)`` and check the unit separately.
         """
-        prop = self._require_numeric(name)
+        prop, _ = self._numeric_values(name)
         if unit is not None:
             accepted = (unit,) if isinstance(unit, str) else tuple(unit)
             if prop.units not in accepted:
@@ -256,25 +271,61 @@ class SampleLogs:
         name
             Name of the sample log to write.
         value
-            A scalar, or a sequence to record as a vector-valued log.
+            A scalar, or a list, tuple or array to record as a vector-valued log.
         unit
             Unit to record alongside the value.
 
         Raises
         ------
         LogTypeError
-            `value` is an empty sequence, which Mantid cannot record as a log.
+            `value` is not a shape Mantid can record: an empty sequence, a nested
+            sequence, or anything that is neither a scalar nor a flat sequence.
         """
         if isinstance(value, np.generic):
             value = value.item()
         elif not isinstance(value, _SCALAR_TYPES):
-            value = [self._to_python(entry) for entry in value]
-            if not value:
-                # Mantid raises a bare RuntimeError from deep inside its mapping layer
-                # ("Cannot have a sequence type of length zero"); translate it like the
-                # rest of this class translates Mantid's errors.
-                raise LogTypeError(f"Sample log {name!r} cannot be written from an empty sequence")
-        self._run().addProperty(name, value, unit or "", True)
+            value = self._insertable_sequence(name, value)
+        try:
+            self._run().addProperty(name, value, unit or "", True)
+        except (RuntimeError, TypeError, ValueError) as exc:
+            # Mantid rejects a shape its converters do not cover — a nested sequence, for
+            # one — with a bare RuntimeError or ValueError from deep inside its mapping
+            # layer. Translate it so a caller can catch `SampleLogsError` and mean it.
+            # The type, not the value: a long sequence would put a wall of numbers in the
+            # message, and Mantid's own text already says what it could not convert.
+            raise LogTypeError(f"Sample log {name!r} cannot be written from {type(value).__name__}: {exc}") from exc
+
+    def _insertable_sequence(self, name: str, value: Any) -> list:
+        """`value` as a list of Python natives, or a raise if it is not a flat sequence.
+
+        Validates the shape *before* iterating. Iteration is what previously decided this,
+        which meant an unsupported value failed as a bare `TypeError` ("'NoneType' object
+        is not iterable") rather than the documented `LogTypeError` — `None` from an unset
+        optional being the likely one. A mapping was worse than an error: iterating it
+        yields its keys, so the log was silently written from those.
+        """
+        if isinstance(value, Mapping):
+            raise LogTypeError(
+                f"Sample log {name!r} cannot be written from a mapping; iterating one would "
+                f"record its keys and silently discard the values"
+            )
+        if not isinstance(value, (Sequence, np.ndarray)):
+            raise LogTypeError(
+                f"Sample log {name!r} cannot be written from {type(value).__name__}; "
+                f"pass a scalar, or a list, tuple or array of them"
+            )
+        if isinstance(value, np.ndarray) and value.ndim != 1:
+            raise LogTypeError(
+                f"Sample log {name!r} cannot be written from a {value.ndim}-dimensional array; "
+                f"Mantid records a log as a scalar or a flat vector"
+            )
+        entries = [self._to_python(entry) for entry in value]
+        if not entries:
+            # Mantid raises a bare RuntimeError from deep inside its mapping layer
+            # ("Cannot have a sequence type of length zero"); translate it like the
+            # rest of this class translates Mantid's errors.
+            raise LogTypeError(f"Sample log {name!r} cannot be written from an empty sequence")
+        return entries
 
     def _workspace(self) -> Workspace:
         """The wrapped workspace, resolved fresh — see the class docstring."""
@@ -295,29 +346,62 @@ class SampleLogs:
             raise LogNotFoundError(f"No sample log named {name!r} on this workspace")
         return run.getProperty(name)
 
-    def _require_numeric(self, name: str) -> Property:
-        """The named `Property`, or a raise if it holds no numbers to reduce.
+    def _numeric_values(self, name: str) -> tuple[Property, np.ndarray]:
+        """The named `Property` and its values, or a raise if there is no number to reduce.
 
-        Mantid returns `nan` rather than raising for the statistics of a string log or of
-        an empty series, which would otherwise propagate a silently meaningless number.
+        Every fixed-reduction accessor goes through this, so all three reject the same
+        shapes. Mantid returns `nan` rather than raising for the statistics of a string
+        log, an empty series or a NaN-bearing one, each of which would otherwise propagate
+        a silently meaningless number into Q.
+
+        Returns the values alongside the property because `prop.value` builds a fresh
+        array on every access: a long run's `proton_charge` is large, and callers need both
+        the array and the checks derived from it. Reading it once here is the difference
+        between one copy and three per call.
         """
         prop = self._property(name)
         values = np.asarray(prop.value)
-        if not np.issubdtype(values.dtype, np.number):
-            raise LogTypeError(f"Sample log {name!r} does not hold numeric values, so it cannot be reduced")
+
+        # Type comes from the property, not from `values`: `np.asarray([])` is float64
+        # whatever the log holds, so an empty string series would pass a dtype check and
+        # be misreported as merely empty.
+        if self._is_string(prop):
+            raise LogTypeError(f"Sample log {name!r} holds strings, so it cannot be reduced to a number")
         if values.size == 0:
             raise AmbiguousLogError(f"Sample log {name!r} records no values, so it cannot be reduced to a number")
-        return prop
+        # `np.bool_` is not a subtype of `np.number`, so booleans need naming explicitly.
+        # They are reducible: the mean of a flag is the fraction of entries it held, and
+        # `time_average` gives its duty cycle. Rejecting them would refuse a log `insert`
+        # itself writes.
+        if not (np.issubdtype(values.dtype, np.number) or np.issubdtype(values.dtype, np.bool_)):
+            raise LogTypeError(f"Sample log {name!r} does not hold numeric values, so it cannot be reduced")
+        if np.issubdtype(values.dtype, np.floating) and bool(np.isnan(values).any()):
+            raise AmbiguousLogError(
+                f"Sample log {name!r} contains NaN entries, so it has no meaningful mean; "
+                f"reduce it explicitly with single_value({name!r}, operation=np.nanmean) "
+                f"to skip them"
+            )
+        return prop, values
 
     @staticmethod
-    def _is_vector(prop: Property) -> bool:
+    def _is_string(prop: Property) -> bool:
+        """Whether the property holds strings, determined without reading its values.
+
+        A series' `type` is a mangled C++ template name, so the series case goes by class
+        instead; the scalar and vector cases Mantid names plainly.
+        """
+        return prop.type in ("string", "str list") or isinstance(prop, StringTimeSeriesProperty)
+
+    @staticmethod
+    def _is_vector(prop: Property, values: np.ndarray) -> bool:
         """Whether the property holds a bare vector of values — neither scalar nor series.
 
-        This pair of tests separates the three shapes a log can take: a scalar's value is
-        a Python native, a time series carries `times`, and a vector log — what `insert`
-        writes from any sequence — carries neither.
+        This pair of tests separates the three shapes a log can take: a scalar reduces to
+        a zero-dimensional array, a time series carries `times`, and a vector log — what
+        `insert` writes from any sequence — carries neither. Takes the already-materialized
+        `values` so `prop.value` is not built a second time.
         """
-        return not isinstance(prop.value, _SCALAR_TYPES) and not hasattr(prop, "times")
+        return values.ndim > 0 and not hasattr(prop, "times")
 
     def _normalize(self, name: str, value: Any) -> Any:
         """Reduce a raw log value to one Python scalar, or raise if it is ambiguous."""

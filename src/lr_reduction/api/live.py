@@ -41,7 +41,10 @@ class LiveEntrypoint(SingleRunReduction):
         # The metadata-derived sequence_number (§3.1.2): the DAS records it as a log that
         # is constant across the run, which is exactly what `[...]` is for. No fallback
         # default — that would silently select the wrong configuration entry (§3.3.1).
-        self.sequence_number = SampleLogs(self.reflected_run)["sequence_number"]
+        # Coerced to `int` because `ID` is an int and the DAS may record the log as a
+        # double: a float would key `ReductionConfig.runs` by 1.0 and reach ORSO output as
+        # "REF_L_<run>_1.0".
+        self.sequence_number = int(SampleLogs(self.reflected_run)["sequence_number"])
         db_config = get_direct_beam_config(self.sequence_number, config)
         direct_beams = get_direct_beams(self._run_loader, db_config)
         run_data = RunData(

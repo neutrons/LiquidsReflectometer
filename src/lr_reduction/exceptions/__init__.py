@@ -24,6 +24,10 @@ from lr_reduction.exceptions.sample_logs import (
     LogUnitError,
     SampleLogsError,
 )
+from lr_reduction.exceptions.workspace import (
+    WorkspaceError,
+    WorkspaceNotFoundError,
+)
 
 __all__ = [
     "AmbiguousLogError",
@@ -44,4 +48,6 @@ __all__ = [
     "ResultError",
     "SampleLogsError",
     "UnsupportedFormatError",
+    "WorkspaceError",
+    "WorkspaceNotFoundError",
 ]
