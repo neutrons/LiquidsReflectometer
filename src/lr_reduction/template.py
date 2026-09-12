@@ -63,8 +63,8 @@ def read_template(template_file: str, sequence_number: int) -> ReductionParamete
     Read template from file.
     @param sequence_number: the ID of the data set within the sequence of runs
     """
-    fd = open(template_file, "r")
-    xml_str = fd.read()
+    with open(template_file, "r") as fd:
+        xml_str = fd.read()
     data_sets = reduction_template_reader.from_xml(xml_str)
     if len(data_sets) >= sequence_number:
         data_set = data_sets[sequence_number - 1]
