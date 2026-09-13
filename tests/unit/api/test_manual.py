@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from lr_reduction.api.manual import ManualRunSequence, ManualSingleRun, main, reduce_and_combine_runs, reduce_run
-from lr_reduction.io import RunData
+from lr_reduction.io import RunLoader
 from lr_reduction.models.config import DirectBeamConfig, ReductionConfig, ReflectedRunConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 from lr_reduction.types import ID
@@ -53,9 +53,11 @@ def test_manual_run_sequence_loads_every_configured_run(tmp_path, monkeypatch):
 
     monkeypatch.setattr("lr_reduction.api.manual.ConfigLoader.load", lambda _self, _path: config)
 
+    original_load = RunLoader.load
+
     def _capture_run_number(_self, run_number):
         loaded_run_numbers.append(run_number)
-        return RunData()
+        return original_load(_self, run_number)
 
     monkeypatch.setattr("lr_reduction.api.manual.RunLoader.load", _capture_run_number)
 

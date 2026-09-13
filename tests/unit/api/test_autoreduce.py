@@ -1,5 +1,5 @@
 from lr_reduction.api.autoreduce import AutoreduceSingleRun, FromDiskSequence, reduce_auto
-from lr_reduction.io import RunData
+from lr_reduction.io import RunLoader
 from lr_reduction.models.config import DirectBeamConfig, ReductionConfig, ReflectedRunConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 
@@ -39,9 +39,11 @@ def test_autoreduce_single_run_loads_data_from_the_given_path(tmp_path, monkeypa
     monkeypatch.setattr("lr_reduction.io.config_loader.ConfigLoader.load", lambda _self, _path: _config())
     captured_paths = []
 
+    original_load_from_path = RunLoader.load_from_path
+
     def _capture_path(_self, nexus_file_path):
         captured_paths.append(nexus_file_path)
-        return RunData()
+        return original_load_from_path(_self, nexus_file_path)
 
     monkeypatch.setattr("lr_reduction.io.run_loader.RunLoader.load_from_path", _capture_path)
     nexus_file = tmp_path / "reprocessed_data.nxs.h5"

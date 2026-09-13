@@ -39,9 +39,9 @@ class AutoreduceSingleRun(SingleRunReduction):
 
     def load_data(self, config: ReductionConfig) -> SingleReductionInput:
         run = self._run_loader.load_from_path(self.nexus_file_path)
-        # TODO: `RunLoader` is still a stub, so this is `RunData`'s default of 1 (§3.1.2),
-        #       not a value read from this run. Read it from the `sequence_number` sample
-        #       log, as `LiveEntrypoint` already does, once the real loader lands.
+        # TODO: this reads the `sequence_number` sample log (§3.1.2), but `RunLoader` is
+        #       still a stub, so the log it reads is the loader's placeholder rather than
+        #       this run's recorded value.
         self.sequence_number = run.sequence_number
         db_config = get_direct_beam_config(run.sequence_number, config)
         direct_beams = get_direct_beams(self._run_loader, db_config)
