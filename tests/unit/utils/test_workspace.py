@@ -2,7 +2,7 @@ import pytest
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, mtd
 
 from lr_reduction.exceptions import LrReductionError, NotFoundError, WorkspaceNotFoundError
-from lr_reduction.utils.workspace import workspace_handle
+from lr_reduction.utils.workspace import workspace_exists, workspace_handle
 
 
 @pytest.fixture
@@ -47,3 +47,26 @@ def test_a_deleted_workspace_is_reported_as_missing():
 
     with pytest.raises(WorkspaceNotFoundError):
         workspace_handle(name)
+
+
+def test_workspace_exists_for_a_registered_name(workspace):
+    assert workspace_exists(workspace.name())
+
+
+def test_workspace_exists_is_false_for_an_unknown_name():
+    assert not workspace_exists("no_such_workspace")
+
+
+def test_workspace_exists_is_false_for_an_empty_name():
+    """`.name()` of a workspace that was never registered; it must not read as present."""
+    assert not workspace_exists("")
+
+
+def test_workspace_exists_is_false_after_deletion():
+    name = mtd.unique_hidden_name()
+    CreateWorkspace(DataX=[0, 1], DataY=[0, 10], OutputWorkspace=name)
+    assert workspace_exists(name)
+
+    DeleteWorkspace(name)
+
+    assert not workspace_exists(name)

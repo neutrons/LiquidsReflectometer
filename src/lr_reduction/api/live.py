@@ -47,7 +47,9 @@ class LiveEntrypoint(SingleRunReduction):
         self.sequence_number = int(SampleLogs(self.reflected_run)["sequence_number"])
         db_config = get_direct_beam_config(self.sequence_number, config)
         direct_beams = get_direct_beams(self._run_loader, db_config)
-        run_data = RunData.from_workspace(self.reflected_run, run_numbers=(self.run_number,))
+        # `.name()` because RunData addresses its workspace by name (§11.1.6); the live-data
+        # service hands this entrypoint the workspace object itself.
+        run_data = RunData.from_workspace(self.reflected_run.name(), run_numbers=(self.run_number,))
         return SingleReductionInput(
             run_data=run_data,
             direct_beams=direct_beams,

@@ -1,6 +1,6 @@
 import pytest
 from mantid.kernel import Int32TimeSeriesProperty
-from mantid.simpleapi import CreateSampleWorkspace
+from mantid.simpleapi import CreateSampleWorkspace, mtd
 
 from lr_reduction.api.live import LiveEntrypoint, reduce_live
 from lr_reduction.exceptions import LogNotFoundError
@@ -11,8 +11,12 @@ from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 def _live_workspace(sequence_number: int | None = 1):
     """A live reflected-run workspace, with `sequence_number` recorded as the DAS records
     it: a time series that is constant across the run (`legacy/workflow.py` reads it as
-    `.value[0]`). Pass None to omit the log entirely."""
-    ws = CreateSampleWorkspace(WorkspaceType="Event")
+    `.value[0]`). Pass None to omit the log entirely.
+
+    Named explicitly: `RunData` carries the workspace by name, and simpleapi would
+    otherwise register every one of these under this function's local variable name, so
+    each call would replace the last."""
+    ws = CreateSampleWorkspace(WorkspaceType="Event", OutputWorkspace=mtd.unique_hidden_name())
     ws.getRun().addProperty("run_number", "54321", True)
     if sequence_number is not None:
         recorded = Int32TimeSeriesProperty("sequence_number")

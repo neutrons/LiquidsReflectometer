@@ -6,7 +6,7 @@ from mantid.simpleapi import CreateSampleWorkspace, mtd
 
 from lr_reduction.io.interfaces import RunLoaderInterface
 from lr_reduction.models.run_data import RunData
-from lr_reduction.types import ID, MantidWorkspace
+from lr_reduction.types import ID, MantidWorkspaceName
 from lr_reduction.utils.logging import get_logger
 from lr_reduction.utils.sample_logs import SampleLogs
 
@@ -16,20 +16,21 @@ logger = get_logger(__name__)
 _PLACEHOLDER_SEQUENCE_NUMBER = 1
 
 
-def _placeholder_workspace() -> MantidWorkspace:
-    """An empty event workspace carrying a fabricated sequence_number log.
+def _placeholder_workspace() -> MantidWorkspaceName:
+    """Name of an empty event workspace carrying a fabricated sequence_number log.
 
     TODO: replaced by the real NeXus-backed workspace with RunLoader's own implementation.
     """
-    workspace = CreateSampleWorkspace(
+    name = mtd.unique_hidden_name()
+    CreateSampleWorkspace(
         WorkspaceType="Event",
         NumBanks=1,
         BankPixelWidth=1,
         NumEvents=1,
-        OutputWorkspace=mtd.unique_hidden_name(),
+        OutputWorkspace=name,
     )
-    SampleLogs(workspace).insert("sequence_number", _PLACEHOLDER_SEQUENCE_NUMBER)
-    return workspace
+    SampleLogs(name).insert("sequence_number", _PLACEHOLDER_SEQUENCE_NUMBER)
+    return name
 
 
 class RunLoader(RunLoaderInterface):

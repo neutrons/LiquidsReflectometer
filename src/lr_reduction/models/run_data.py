@@ -6,10 +6,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from lr_reduction.exceptions import IncompleteRunDataError
+from lr_reduction.exceptions import IncompleteRunDataError, WorkspaceNotFoundError
 from lr_reduction.models.config import RunFilter
-from lr_reduction.types import ID, MantidWorkspace
+from lr_reduction.types import ID, MantidWorkspaceName
 from lr_reduction.utils.sample_logs import SampleLogs
+from lr_reduction.utils.workspace import workspace_exists
 
 
 @dataclass
@@ -26,8 +27,12 @@ class RunData:
     Attributes
     ----------
     workspace
-        The primary event workspace. Per-pixel-resolved and never histogrammed here; this
-        is the medium the corrections and operations exchange.
+        Name of the primary event workspace in the analysis data service. Per-pixel-
+        resolved and never histogrammed here; this is the medium the corrections and
+        operations exchange. A name rather than a workspace object because §11.1.6 requires
+        workspaces to be passed by name, and because a name is re-resolved on every read:
+        an algorithm that writes its output back under the same name replaces the entry,
+        and a held object would go on reading the workspace it replaced.
     run_numbers
         The constituent run number(s). Tracked explicitly rather than read back off the
         workspace's own `run_number` log, because Mantid's `MergeRuns` keeps a single
@@ -36,7 +41,7 @@ class RunData:
         not be mutated in place; note `ReductionResult.run_numbers` is a `list`, so there
         is a deliberate conversion at that seam.
     error_events_workspace
-        The paired rejected-event workspace (Mantid `LoadErrorEventsNexus`), an input to
+        Name of the paired rejected-event workspace (Mantid `LoadErrorEventsNexus`), an input to
         the dead-time correction. Optional: not every file has one, and not every load
         needs one. When several source runs are summed, the loader merges their
         rejected-event companions in step, so this stays the rejected-event population of
@@ -50,33 +55,60 @@ class RunData:
         without re-deriving it from configuration.
     """
 
-    workspace: MantidWorkspace
+    workspace: MantidWorkspaceName
     run_numbers: tuple[ID, ...]
-    error_events_workspace: MantidWorkspace | None = None
+    error_events_workspace: MantidWorkspaceName | None = None
     source_paths: tuple[Path, ...] = ()
     applied_filter: RunFilter | None = None
 
     def __post_init__(self):
-        if self.workspace is None:
-            raise IncompleteRunDataError("RunData requires a workspace")
+        # An empty name is rejected along with None: that is what `.name()` returns for a
+        # workspace which was never registered, and it is the one way a nameless workspace
+        # could reach here from a caller holding an object.
+        if not self.workspace:
+            raise IncompleteRunDataError("RunData requires a workspace name")
         if not self.run_numbers:
             raise IncompleteRunDataError("RunData requires at least one run number")
+        # Fail at the seam that introduced a name the analysis data service cannot resolve,
+        # rather than much later at the first log read. `WorkspaceNotFoundError` rather than
+        # this module's own family: it is the same failure `workspace_handle` reports, and
+        # it is about the workspace, not about RunData's own fields.
+        self._require_registered(self.workspace)
+        if self.error_events_workspace is not None:
+            self._require_registered(self.error_events_workspace)
+
+    @staticmethod
+    def _require_registered(name: MantidWorkspaceName) -> None:
+        """Raise unless the analysis data service holds a workspace of this name."""
+        if not workspace_exists(name):
+            raise WorkspaceNotFoundError(f"No workspace named {name!r} in the analysis data service")
 
     @classmethod
     def from_workspace(
         cls,
-        workspace: MantidWorkspace,
+        workspace: MantidWorkspaceName,
         *,
         run_numbers: Sequence[ID],
         source_paths: Sequence[Path] = (),
-        error_events_workspace: MantidWorkspace | None = None,
+        error_events_workspace: MantidWorkspaceName | None = None,
         applied_filter: RunFilter | None = None,
     ) -> RunData:
-        """Build a RunData around an already-loaded workspace.
+        """Build a RunData around the name of an already-loaded workspace.
 
         The validated, ergonomic entry point, and the one the loader always constructs
         through: it accepts any sequence for the two tuple fields and normalizes them, so a
         caller holding a list need not convert.
+
+        Takes a name, not a workspace object (§11.1.6). A caller holding an object passes
+        `workspace.name()`; an object that was never registered has no name to pass, and is
+        rejected by the empty-name check rather than silently wrapped.
+
+        Raises
+        ------
+        IncompleteRunDataError
+            `workspace` is empty, or `run_numbers` is.
+        WorkspaceNotFoundError
+            The analysis data service holds no workspace of the given name.
         """
         return cls(
             workspace=workspace,
@@ -90,8 +122,8 @@ class RunData:
     def logs(self) -> SampleLogs:
         """This run's sample logs — the single source of truth for its metadata.
 
-        Built fresh on each access rather than cached: `SampleLogs` re-resolves its
-        workspace on every read by design, and constructing one is a single assignment.
+        Built fresh on each access rather than cached: `SampleLogs` re-resolves the name on
+        every read by design, and constructing one is a single assignment.
         """
         return SampleLogs(self.workspace)
 
