@@ -11,6 +11,8 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import curve_fit
 
+import lr_reduction.reduction_domains as domains
+
 
 def safe_divide(numerator, denominator):
     """Wrapper for safe division with zeros where denominator is zero.
@@ -226,7 +228,10 @@ def fit_peak(ypix, iY, peaktype="gauss", bkgtype="none"):
         par, cov = curve_fit(model, ypix, iY, p0=p0, bounds=bounds)
 
     else:
-        raise ValueError("peaktype must be 'gauss' or 'supergauss'")
+        raise ValueError(
+            "peaktype must be one of %s"
+            % ", ".join(repr(c) for c in domains.PEAK_TYPE_CHOICES)
+        )
 
     # --- Evaluate fit and extract background ---
     f = model(yv, *par)
@@ -395,8 +400,11 @@ def calc_beam_on_detector(Ypix, CenPix, Si, S1, dS1Si, dSiSam, dSamDet, mmpix, D
         kernel /= kernel.sum()
         I = np.convolve(I, kernel, mode="same")
 
-    elif DetResFn not in ["none", None]:
-         raise ValueError("DetResFn must be 'rectangular', 'gaussian', or 'none'")
+    elif DetResFn not in list(domains.DET_RES_TOLERATED) + [None]:
+        raise ValueError(
+            "DetResFn must be one of %s, or 'none'"
+            % ", ".join(repr(c) for c in domains.DET_RES_CHOICES)
+        )
 
     # normalize
     if I.max() <= 0:
