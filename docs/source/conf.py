@@ -5,6 +5,7 @@ https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 import os
 import sys
+from importlib.util import find_spec
 
 import versioningit
 from packaging.version import Version
@@ -54,7 +55,14 @@ myst_enable_extensions = [
 # Allow heading anchors
 myst_heading_anchors = 3
 
-autodoc_mock_imports = [
+def _should_mock(module_name: str) -> bool:
+    try:
+        return find_spec(module_name) is None
+    except ModuleNotFoundError:
+        return True
+
+
+_optional_imports = [
     "mantid",
     "mantid.api",
     "mantid.kernel",
@@ -74,6 +82,8 @@ autodoc_mock_imports = [
     "mantid.plots.utility",
     "requests",
 ]
+
+autodoc_mock_imports = [module_name for module_name in _optional_imports if _should_mock(module_name)]
 
 master_doc = "index"
 
