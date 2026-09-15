@@ -100,8 +100,8 @@ validated — every model in the schema sets `validate_assignment=True`, so an o
 wrong-type value is rejected immediately, the same as at load time:
 
 ```python
-config.assembly.q_norm = 0.02          # validated against AssemblyConfig's own constraints
-config.runs[0].peak = {"min": 100, "max": 110}   # a plain dict is coerced into a PixelRange
+config.assembly.q_norm = 0.02  # validated against AssemblyConfig's own constraints
+config.runs[0].peak = {"min": 100, "max": 110}  # a plain dict is coerced into a PixelRange
 ```
 
 The caveat: this only re-validates the model whose attribute you set, not a *different* model

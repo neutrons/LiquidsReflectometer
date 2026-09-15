@@ -17,7 +17,6 @@ logging.addLevelName(logging.ERROR, "ERR")
 logging.addLevelName(logging.CRITICAL, "CRIT")
 
 
-
 def set_log_config(level: str | int = logging.INFO):
     """Sets basic logging config and format for the root logger and all existing loggers,
     ensuring that all log messages are printed to stdout with the same format.
@@ -40,7 +39,6 @@ def set_log_config(level: str | int = logging.INFO):
         logger.setLevel(level)
 
     return
-
 
 
 def get_logger(name: str, level: str | int = logging.INFO) -> logging.Logger:
