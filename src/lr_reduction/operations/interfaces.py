@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
-
-T = TypeVar("T")  # Input data type
-S = TypeVar("S")  # Configuration type
-U = TypeVar("U")  # Output type
 
 
-class OperationInterface(ABC, Generic[T, S, U]):
-    """Abstract base class for operations that can be executed with a configuration and data."""
+class OperationInterface[T, S, U](ABC):
+    """Abstract base class for operations that can be executed with a configuration and data.
+
+    Type parameters:
+        T: The type of the input data.
+        S: The type of the configuration.
+        U: The type of the result produced by the operation.
+    """
 
     def __init__(self, data: T, config: S) -> None:
         self.data = data
