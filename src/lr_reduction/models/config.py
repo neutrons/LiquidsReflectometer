@@ -391,9 +391,7 @@ class ReductionConfig(BaseModel):
                     f"direct_beam '{run.direct_beam}'; defined: {sorted(names)}"
                 )
             if run.sequence_number != seq_num:
-                raise ValueError(
-                    f"`runs` key {seq_num} does not match its run's sequence_number={run.sequence_number}"
-                )
+                raise ValueError(f"`runs` key {seq_num} does not match its run's sequence_number={run.sequence_number}")
         return self
 
     # TODO (Glass): consider removing

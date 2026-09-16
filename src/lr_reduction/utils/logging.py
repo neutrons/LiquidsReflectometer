@@ -1,8 +1,9 @@
 import logging
 import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Literal, Union
+from typing import Literal
 
 FORMAT = "%(asctime)s | %(levelname)-4s | %(name)-8s | %(message)s"
 DATEFMT = "%Y-%m-%d %H:%M:%S"
@@ -16,7 +17,7 @@ logging.addLevelName(logging.ERROR, "ERR")
 logging.addLevelName(logging.CRITICAL, "CRIT")
 
 
-def set_log_config(level: Union[str, int] = logging.INFO):
+def set_log_config(level: str | int = logging.INFO):
     """Sets basic logging config and format for the root logger and all existing loggers,
     ensuring that all log messages are printed to stdout with the same format.
 
@@ -40,7 +41,7 @@ def set_log_config(level: Union[str, int] = logging.INFO):
     return
 
 
-def get_logger(name: str, level: Union[str, int] = logging.INFO) -> logging.Logger:
+def get_logger(name: str, level: str | int = logging.INFO) -> logging.Logger:
     """Get the logger of a given name and level, adding a stream handler to stdout if none exists
 
     Parameters

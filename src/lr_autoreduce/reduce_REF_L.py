@@ -128,9 +128,16 @@ def autoreduce(
 
     if data_type == DataType.REFLECTED_BEAM:
         # Run the reduction
-        _, report = workflow.reduce(ws, template_file, output_dir,
-                        average_overlap=avg_overlap, theta_offset=theta_offset,
-                        q_summing=const_q, bck_in_q=False, return_report=True)
+        _, report = workflow.reduce(
+            ws,
+            template_file,
+            output_dir,
+            average_overlap=avg_overlap,
+            theta_offset=theta_offset,
+            q_summing=const_q,
+            bck_in_q=False,
+            return_report=True,
+        )
     elif data_type == DataType.DIRECT_BEAM:
         # Generate simple report
         report_sections = generate_report_sections(ws, template_file)
@@ -142,11 +149,11 @@ def autoreduce(
         raise ValueError(f"Unhandled data type: {data_type}")
 
     # Save to disk and (optionally) upload the HTML report
-    match = re.search(r'REF_L_(\d+)', events_file)
+    match = re.search(r"REF_L_(\d+)", events_file)
     if not match:
         raise ValueError(f"Could not extract run number from events file: {events_file}")
     run_number = match.group(1)
-    save_report(report, os.path.join(output_dir, f'REF_L_{run_number}.html'))
+    save_report(report, os.path.join(output_dir, f"REF_L_{run_number}.html"))
     if publish:
         upload_report(report, run_number=run_number)
 

@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
 
 from lr_reduction.models.config import ReductionConfig
 
-T = TypeVar("T")  # Generic input data type
-S = TypeVar("S")  # Generic return type (results)
 
-
-class Entrypoint(ABC, Generic[T, S]):
+class Entrypoint[T, S](ABC):
     """
     Template Method skeleton shared by every reduction invocation surface.
 
     A fixed :meth:`execute` runs the steps in a guaranteed order; each concrete
     entrypoint overrides only the steps that differ.
+
+    Type parameters:
+        T: The type of the input data this entrypoint operates on.
+        S: The type of the result this entrypoint produces.
 
     Usage:
 

@@ -131,7 +131,7 @@ class TestRunCollection:
             file_path = Path(tmpdir) / "output.txt"
             rc.save_ascii(str(file_path))
 
-            with open(file_path, "r") as f:
+            with open(file_path) as f:
                 content = f.read()
                 assert "# Experiment test_exp Run 1" in content
                 assert "# Run title: Test Run" in content

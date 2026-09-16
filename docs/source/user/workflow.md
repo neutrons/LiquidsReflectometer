@@ -66,13 +66,13 @@ from lr_reduction import workflow
 from mantid.simpleapi import LoadEventNexus
 
 # Load the data from disk
-ws = LoadEventNexus(Filename='/SNS/REF_L/IPTS-XXXX/nexus/REFL_YYYY.h5')
+ws = LoadEventNexus(Filename="/SNS/REF_L/IPTS-XXXX/nexus/REFL_YYYY.h5")
 
 # The template file you want to use
-template_file = '/SNS/REF_L/IPTS-XXXX/autoreduce/template.xml'
+template_file = "/SNS/REF_L/IPTS-XXXX/autoreduce/template.xml"
 
 # The folder where you want your output
-output_dir = '/tmp'
+output_dir = "/tmp"
 
 workflow.reduce(ws, template_file, output_dir)
 ```

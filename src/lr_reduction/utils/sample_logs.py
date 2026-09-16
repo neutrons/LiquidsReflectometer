@@ -31,7 +31,7 @@ class SampleLogs:
         incidence_angle = logs.single_value("ths", operation=np.mean)
 
     Reading with ``[...]``
-    ---------------------
+    ----------------------
     ``logs[name]`` returns a plain Python value, but only when the log has an
     unambiguous one: a scalar, or a time series whose entries are all equal. A series
     that genuinely varies raises `AmbiguousLogError` rather than silently picking an
