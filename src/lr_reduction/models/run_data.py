@@ -119,7 +119,7 @@ class RunData:
     @property
     def sequence_id(self) -> ID:
         """sequence_id as recorded in this run's NeXus logs (§3.1.2)."""
-        return ID(self.logs["sequence_id"])
+        return int(self.logs["sequence_id"])
 
     @property
     def sequence_number(self) -> ID:
@@ -132,6 +132,7 @@ class RunData:
         the config; this property is for diagnostics, logging, and the default
         (no-override) case.
         """
-        # `ID` is an int and the DAS may record the log as a double; a float would key
-        # `ReductionConfig.runs` by 1.0 and reach ORSO output as "REF_L_<run>_1.0".
-        return ID(self.logs["sequence_number"])
+        # The DAS may record the log as a double; a float would key `ReductionConfig.runs`
+        # by 1.0 and reach ORSO output as "REF_L_<run>_1.0". Spelled `int` and not `ID`:
+        # `ID` is a PEP 695 type alias, which is a typing construct and not callable.
+        return int(self.logs["sequence_number"])

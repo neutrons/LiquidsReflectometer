@@ -13,7 +13,7 @@ type MantidWorkspace = str | Workspace
 
 
 """Alias for the name of a workspace registered in the analysis data service (§11.1.6)."""
-MantidWorkspaceName: TypeAlias = str
+type MantidWorkspaceName = str
 
 
 """The assembled direct beam to be used in single run reduction."""
