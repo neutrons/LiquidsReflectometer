@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NamedTuple, TypeAlias, Union
+from typing import TYPE_CHECKING, NamedTuple
 
 from mantid.api import Workspace
 from mantid.dataobjects import EventWorkspace
@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from lr_reduction.models.config import DirectBeamConfig
     from lr_reduction.models.run_data import RunData
 
-MantidWorkspace = Union[str, Workspace]
+type MantidWorkspace = str | Workspace
 
 
 """Alias for the name of a workspace registered in the analysis data service (§11.1.6)."""
@@ -17,11 +17,11 @@ MantidWorkspaceName: TypeAlias = str
 
 
 """The assembled direct beam to be used in single run reduction."""
-CompositeDirectBeam: TypeAlias = EventWorkspace
+type CompositeDirectBeam = EventWorkspace
 
 
 """Alias for ID numbers (run numbers, sequence id's, etc.)"""
-ID: TypeAlias = int
+type ID = int
 
 
 class SingleReductionInput(NamedTuple):

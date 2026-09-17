@@ -14,7 +14,7 @@ from lmfit.models import GaussianModel
 SLD = dict(Si=2.07e-6, Quartz=4.18e-6)
 
 # FIX: I don't think we're using `set_ylim` correctly (Glass)
-class Refracted(object):
+class Refracted:
     def __init__(self, ws, material="Si", tof_bin=200, offset=0.01, pixel_size=0.00072):
         """
         Initial process of the raw data to organize it.
@@ -142,7 +142,7 @@ class Refracted(object):
             pixel_size = self.pixel_size
 
         _theta_specular = self.theta_sample + offset
-        return 180.0 / np.pi * np.arcsin((pixel_size * (pixels - self.center_db) / self.det_distance)) - _theta_specular
+        return 180.0 / np.pi * np.arcsin(pixel_size * (pixels - self.center_db) / self.det_distance) - _theta_specular
 
     def compute_refracted_angle(self, wl, offset):
         """Compute refracted angle as a function of wavelength"""
@@ -356,7 +356,7 @@ class Refracted(object):
 
         db = np.sum(self.p_vs_t[125:195, :], axis=0)
         _theta = (
-            180.0 / np.pi * np.arcsin((self.pixel_size * (self.y_pixel - self.center_db) / self.det_distance))
+            180.0 / np.pi * np.arcsin(self.pixel_size * (self.y_pixel - self.center_db) / self.det_distance)
             - _theta_specular
         )
 

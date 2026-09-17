@@ -15,14 +15,14 @@ def check_results(data_file, reference):
     Check scaling factor file output against reference
     """
     # Read data and skip header
-    with open(data_file, "r") as fd:
+    with open(data_file) as fd:
         _cfg_data = fd.readlines()
         cfg_data = []
         for line in _cfg_data:
             if not line.startswith("#"):
                 cfg_data.append(line)
 
-    with open(reference, "r") as fd:
+    with open(reference) as fd:
         _cfg_ref = fd.readlines()
         cfg_ref = []
         for line in _cfg_ref:
