@@ -28,6 +28,7 @@ import numpy as np
 from qtpy import QtCore
 from qtpy.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -70,8 +71,10 @@ from launcher.apps.file_batch import parse_run_list
 N_Y = 304
 N_X = 256
 
-# Maximum number of events read when estimating a peak position
-MAX_EVENTS = 4000000
+# Maximum number of events read from a run. The profiles only serve to choose
+# pixel ranges, so a sub-sample is plenty, and it keeps the ROI dialog quick on
+# long runs.
+MAX_EVENTS = 2000000
 
 # Chopper band used to select the useful TOF range (see the ROI selector)
 CHOPPER_BANDWIDTH = 3.5
@@ -326,6 +329,11 @@ def default_bkg_roi(y_min, y_max, gap=3, width=5):
     ]
 
 
+def _move_span(patch, low, high):
+    """Move a shaded region, whose vertical extent is in axes coordinates."""
+    patch.set_xy([[low, 0], [low, 1], [high, 1], [high, 0], [low, 0]])
+
+
 class ROISelectionDialog(QDialog):
     """
     Pick the peak, the background, the x pixel range and the TOF range by
@@ -351,15 +359,17 @@ class ROISelectionDialog(QDialog):
         self.tof_edges = np.arange(self.tof.min(), self.tof.max() + self.TOF_BIN, self.TOF_BIN)
         self.y_profile = np.zeros(N_Y)
         self._updating = False
-        self._spans = []
+        self._tof_label = ""
 
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        self.figure = Figure(figsize=(8, 7), layout="tight")
+        # A layout engine would run on every redraw, which is too slow while dragging
+        self.figure = Figure(figsize=(8, 7))
         self.y_axis, self.tof_axis, self.x_axis = self.figure.subplots(
             3, 1, gridspec_kw={"height_ratios": [2, 1, 1]}
         )
+        self.figure.subplots_adjust(left=0.1, right=0.98, top=0.94, bottom=0.08, hspace=0.45)
         self.canvas = FigureCanvas(self.figure)
         layout.addWidget(NavigationToolbar(self.canvas, self))
         layout.addWidget(self.canvas, stretch=1)
@@ -369,22 +379,36 @@ class ROISelectionDialog(QDialog):
         title = row.title or ""
         self.y_axis.set_title(f"{title} (sequence {row.seq})" if row.seq else title)
         self.y_axis.set_xlabel("y pixel (reflectivity direction)")
-        self.tof_axis.set_xlabel("time of flight [us]")
         self.x_axis.set_xlabel("x pixel (low resolution direction)")
         for axis in (self.y_axis, self.tof_axis, self.x_axis):
             axis.set_ylabel("counts")
         (self.y_line,) = self.y_axis.plot([], [], drawstyle="steps-mid", color="tab:blue")
         (self.tof_line,) = self.tof_axis.plot([], [], drawstyle="steps-mid", color="tab:blue")
         (self.x_line,) = self.x_axis.plot([], [], drawstyle="steps-mid", color="tab:blue")
+
+        # The shaded regions are made once and moved, so that the legends can
+        # be made once as well: rebuilding them on every change is slow
+        self.peak_span = self.y_axis.axvspan(0, 1, color="tab:green", alpha=0.25, label="peak")
+        self.bkg_spans = [
+            self.y_axis.axvspan(0, 1, color="tab:red", alpha=0.2, label="background"),
+            self.y_axis.axvspan(0, 1, color="tab:red", alpha=0.2),
+        ]
+        self.tof_span = self.tof_axis.axvspan(0, 1, color="tab:green", alpha=0.25, label="TOF range")
+        self.x_span = self.x_axis.axvspan(0, 1, color="tab:green", alpha=0.25, label="x range")
+        for axis in (self.y_axis, self.tof_axis, self.x_axis):
+            axis.legend(loc="upper right", fontsize="small")
+
         self._set_log_scale(True)
         self._update_profiles()
         self._reset_limits()
 
         # Dragging on a plot sets the range it shows; on the upper plot, the
         # range selected by the radio buttons
+        # useblit keeps the drag from redrawing the whole figure at every mouse
+        # move, which freezes the dialog on runs with many events
         self.selectors = [
             SpanSelector(
-                axis, callback, "horizontal", useblit=False,
+                axis, callback, "horizontal", useblit=True,
                 props={"facecolor": "tab:blue", "alpha": 0.2}, drag_from_anywhere=True,
             )
             for axis, callback in (
@@ -531,10 +555,13 @@ class ROISelectionDialog(QDialog):
         inside_tof = (self.tof >= tof_range[0]) & (self.tof <= tof_range[1])
         if y_max > y_min:
             inside_peak = (self.y_pixel >= y_min) & (self.y_pixel <= y_max)
-            self.tof_line.set_label("counts in the peak")
+            label = "time of flight [us], counts inside the peak"
         else:  # no peak chosen yet, so show every pixel rather than nothing
             inside_peak = np.ones(self.y_pixel.shape, dtype=bool)
-            self.tof_line.set_label("counts, every pixel")
+            label = "time of flight [us], counts over the whole detector"
+        if label != self._tof_label:
+            self.tof_axis.set_xlabel(label)
+            self._tof_label = label
 
         self.y_profile = counts_in_range(self.y_pixel, inside_x & inside_tof, N_Y)
         x_profile = counts_in_range(self.x_pixel, inside_peak & inside_tof, N_X)
@@ -546,19 +573,15 @@ class ROISelectionDialog(QDialog):
         self.x_line.set_data(np.arange(N_X), x_profile)
         self.tof_line.set_data((self.tof_edges[:-1] + self.tof_edges[1:]) / 2.0, tof_counts)
 
-        for span in self._spans:
-            span.remove()
-        self._spans = [
-            self.y_axis.axvspan(y_min, y_max, color="tab:green", alpha=0.25, label="peak"),
-            self.y_axis.axvspan(bkg[0], bkg[1], color="tab:red", alpha=0.2, label="background"),
-            self.y_axis.axvspan(bkg[2], bkg[3], color="tab:red", alpha=0.2),
-            self.tof_axis.axvspan(tof_range[0], tof_range[1], color="tab:green", alpha=0.25, label="TOF range"),
-            self.x_axis.axvspan(x_range[0], x_range[1], color="tab:green", alpha=0.25, label="x range"),
-        ]
+        _move_span(self.peak_span, y_min, y_max)
+        _move_span(self.bkg_spans[0], bkg[0], bkg[1])
+        _move_span(self.bkg_spans[1], bkg[2], bkg[3])
+        _move_span(self.tof_span, tof_range[0], tof_range[1])
+        _move_span(self.x_span, x_range[0], x_range[1])
+
         for axis in (self.y_axis, self.tof_axis, self.x_axis):
             axis.relim()
             axis.autoscale_view(scalex=False)
-            axis.legend(loc="upper right", fontsize="small")
         self.canvas.draw_idle()
 
     def _set_log_scale(self, log_scale):
@@ -1207,11 +1230,17 @@ class JSONSettingsBuilderTab(QWidget):
             return
 
         x_range = self._global_value("data_x_range")
+        self.status_label.setText(f"Reading the events of run {row.run}...")
+        QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        QApplication.processEvents()
         try:
             dialog = ROISelectionDialog(row, x_range, parent=self)
         except (OSError, KeyError, ValueError) as error:
             QMessageBox.critical(self, "Read error", f"Could not read {row.nexus_path}:\n{error}")
             return
+        finally:
+            QApplication.restoreOverrideCursor()
+            self.status_label.setText("")
         if dialog.exec_() != QDialog.Accepted:
             return
 
@@ -1446,8 +1475,6 @@ class JSONSettingsBuilderTab(QWidget):
 
 def main():
     import sys
-
-    from qtpy.QtWidgets import QApplication
 
     app = QApplication(sys.argv)
     window = JSONSettingsBuilderTab()
