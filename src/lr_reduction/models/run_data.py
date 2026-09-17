@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -32,14 +31,17 @@ class RunData:
         operations exchange. A name rather than a workspace object because §11.1.6 requires
         workspaces to be passed by name, and because a name is re-resolved on every read:
         an algorithm that writes its output back under the same name replaces the entry,
-        and a held object would go on reading the workspace it replaced.
+        and a held object would go on reading the workspace it replaced. A caller holding a
+        workspace object passes `workspace.name()`; one that was never registered has no
+        name to pass, and is rejected rather than silently wrapped.
     run_numbers
         The constituent run number(s). Tracked explicitly rather than read back off the
         workspace's own `run_number` log, because Mantid's `MergeRuns` keeps a single
         value, so after the loader sums several source runs that log no longer identifies
         every run in the sum. A tuple because it is part of this object's identity and must
-        not be mutated in place; note `ReductionResult.run_numbers` is a `list`, so there
-        is a deliberate conversion at that seam.
+        not be mutated in place; any sequence may be passed and is stored as one, so a
+        caller's list cannot go on aliasing it. Note `ReductionResult.run_numbers` is a
+        `list`, so there is a deliberate conversion at that seam.
     error_events_workspace
         Name of the paired rejected-event workspace (Mantid `LoadErrorEventsNexus`), an input to
         the dead-time correction. Optional: not every file has one, and not every load
@@ -48,11 +50,19 @@ class RunData:
         the whole merged run.
     source_paths
         The NeXus file path(s) actually read. A provenance and debugging aid, independent
-        of whether the run was addressed by number or by path.
+        of whether the run was addressed by number or by path. Stored as a tuple, on the
+        same terms as `run_numbers`.
     applied_filter
         The time or log-value filter the loader applied before producing this RunData, if
         any. Lets downstream and diagnostic code see what happened to this workspace
         without re-deriving it from configuration.
+
+    Raises
+    ------
+    IncompleteRunDataError
+        `workspace` is empty, or `run_numbers` is.
+    WorkspaceNotFoundError
+        The analysis data service holds no workspace of a given name.
     """
 
     workspace: MantidWorkspaceName
@@ -69,6 +79,11 @@ class RunData:
             raise IncompleteRunDataError("RunData requires a workspace name")
         if not self.run_numbers:
             raise IncompleteRunDataError("RunData requires at least one run number")
+        # Normalized after the guards above, not before: `tuple(None)` raises a bare
+        # TypeError, and `None` from an unset optional is the likely bad input -- the same
+        # trap `SampleLogs._insertable_sequence` documents having fallen into.
+        self.run_numbers = tuple(self.run_numbers)
+        self.source_paths = tuple(self.source_paths)
         # Fail at the seam that introduced a name the analysis data service cannot resolve,
         # rather than much later at the first log read. `WorkspaceNotFoundError` rather than
         # this module's own family: it is the same failure `workspace_handle` reports, and
@@ -82,41 +97,6 @@ class RunData:
         """Raise unless the analysis data service holds a workspace of this name."""
         if not workspace_exists(name):
             raise WorkspaceNotFoundError(f"No workspace named {name!r} in the analysis data service")
-
-    @classmethod
-    def from_workspace(
-        cls,
-        workspace: MantidWorkspaceName,
-        *,
-        run_numbers: Sequence[ID],
-        source_paths: Sequence[Path] = (),
-        error_events_workspace: MantidWorkspaceName | None = None,
-        applied_filter: RunFilter | None = None,
-    ) -> RunData:
-        """Build a RunData around the name of an already-loaded workspace.
-
-        The validated, ergonomic entry point, and the one the loader always constructs
-        through: it accepts any sequence for the two tuple fields and normalizes them, so a
-        caller holding a list need not convert.
-
-        Takes a name, not a workspace object (§11.1.6). A caller holding an object passes
-        `workspace.name()`; an object that was never registered has no name to pass, and is
-        rejected by the empty-name check rather than silently wrapped.
-
-        Raises
-        ------
-        IncompleteRunDataError
-            `workspace` is empty, or `run_numbers` is.
-        WorkspaceNotFoundError
-            The analysis data service holds no workspace of the given name.
-        """
-        return cls(
-            workspace=workspace,
-            run_numbers=tuple(run_numbers),
-            error_events_workspace=error_events_workspace,
-            source_paths=tuple(source_paths),
-            applied_filter=applied_filter,
-        )
 
     @property
     def logs(self) -> SampleLogs:

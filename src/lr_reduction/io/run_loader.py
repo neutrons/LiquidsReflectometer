@@ -40,15 +40,15 @@ class RunLoader(RunLoaderInterface):
         """Load raw event data for *run_number* and return it as RunData."""
         logger.info(f"Loading run data for run number {run_number}")
         # Placeholder implementation; replace with actual data loading logic
-        return RunData.from_workspace(_placeholder_workspace(), run_numbers=(run_number,))
+        return RunData(workspace=_placeholder_workspace(), run_numbers=(run_number,))
 
     def load_from_path(self, nexus_file_path: str | Path) -> RunData:
         """Load raw event data directly from a NeXus file path and return it as RunData."""
         logger.info(f"Loading run data from path {nexus_file_path}")
         # Placeholder implementation; replace with actual data loading logic. The run
         # number is not known until the file is read, so it stands in as 0.
-        return RunData.from_workspace(
-            _placeholder_workspace(),
+        return RunData(
+            workspace=_placeholder_workspace(),
             run_numbers=(0,),
             source_paths=(Path(nexus_file_path),),
         )
