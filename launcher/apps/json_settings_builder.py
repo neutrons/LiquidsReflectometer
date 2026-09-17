@@ -146,6 +146,7 @@ class RunRow:
     use_bs: int = 1
     theta_shift: float = 0.0
     scale_factor: float = 1.0
+    tof_range: object = None  # TOF range the ROIs were chosen on, None for the chopper band
     profile: object = None  # cached counts vs y pixel, for plotting
 
 
@@ -205,30 +206,39 @@ def _chopper_tof_range(h5_file):
     return tof_min, tof_max
 
 
-def load_event_pixels(file_path):
+def load_events(file_path):
     """
-    Pixel coordinates of the events of a run that fall inside the chopper
-    wavelength band. Events are sub-sampled for very large files.
+    The events of a run, sub-sampled for very large files.
 
     Returns
     -------
-    tuple of numpy.ndarray
-        The x (low resolution) and y (reflectivity) pixel of each event.
+    tuple
+        The x (low resolution) pixel, the y (reflectivity) pixel and the time
+        of flight of each event, and the TOF range of the chopper wavelength
+        band, which falls back to the range covered by the events.
     """
     with h5py.File(file_path, "r") as h5_file:
         events = h5_file["entry/bank1_events/event_id"]
         stride = max(1, int(np.ceil(events.shape[0] / MAX_EVENTS)))
         event_id = events[::stride]
-        tof_range = _chopper_tof_range(h5_file)
-        time_offset = None
-        if tof_range is not None:
-            time_offset = h5_file["entry/bank1_events/event_time_offset"][::stride]
+        time_offset = h5_file["entry/bank1_events/event_time_offset"][::stride]
+        chopper_range = _chopper_tof_range(h5_file)
 
     keep = (event_id >= 0) & (event_id < N_X * N_Y)
-    if tof_range is not None:
-        keep &= (time_offset >= tof_range[0]) & (time_offset <= tof_range[1])
     event_id = event_id[keep]
-    return event_id // N_Y, event_id % N_Y
+    time_offset = time_offset[keep].astype(float)
+
+    if time_offset.size == 0:
+        raise ValueError("The file holds no event in the detector")
+    full_range = (float(time_offset.min()), float(time_offset.max()))
+    if chopper_range is None:
+        chopper_range = full_range
+    else:  # the band can reach outside the frame
+        chopper_range = (max(chopper_range[0], full_range[0]), min(chopper_range[1], full_range[1]))
+        if chopper_range[1] <= chopper_range[0]:
+            chopper_range = full_range
+
+    return event_id // N_Y, event_id % N_Y, time_offset, chopper_range
 
 
 def counts_in_range(pixels, selection, n_pixels):
@@ -236,10 +246,16 @@ def counts_in_range(pixels, selection, n_pixels):
     return np.bincount(pixels[selection], minlength=n_pixels)[:n_pixels].astype(float)
 
 
-def counts_vs_y(file_path, x_range=(50, 200)):
-    """Counts per vertical pixel, summed over the useful x pixels."""
-    x_pixel, y_pixel = load_event_pixels(file_path)
+def counts_vs_y(file_path, x_range=(50, 200), tof_range=None):
+    """
+    Counts per vertical pixel, summed over the useful x pixels and over a TOF
+    range, which defaults to the chopper wavelength band.
+    """
+    x_pixel, y_pixel, tof, chopper_range = load_events(file_path)
+    if tof_range is None:
+        tof_range = chopper_range
     inside = (x_pixel >= min(x_range)) & (x_pixel <= max(x_range))
+    inside &= (tof >= min(tof_range)) & (tof <= max(tof_range))
     return counts_in_range(y_pixel, inside, N_Y)
 
 
@@ -312,24 +328,27 @@ def default_bkg_roi(y_min, y_max, gap=3, width=5):
 
 class ROISelectionDialog(QDialog):
     """
-    Pick the peak, the background and the x pixel range by dragging on the
-    counts profiles of a run.
+    Pick the peak, the background, the x pixel range and the TOF range by
+    dragging on the counts profiles of a run.
 
     The peak and the background belong to the angle setting being edited. The
     x pixel range is the ``data_x_range`` option, which is shared by every
-    angle setting, so it is applied to the whole settings file. Both profiles
-    are tied together: the vertical profile only counts the events inside the
-    x range, and the x profile only those inside the peak.
+    angle setting. The TOF range only selects the events the profiles are
+    made of: at the highest angles nearly every count outside the reflected
+    signal is background, which flattens the profile, and narrowing the TOF
+    range around the signal brings the peak out.
     """
 
     PEAK, BACKGROUND_LEFT, BACKGROUND_RIGHT = "peak", "left", "right"
+    TOF_BIN = 100.0  # microseconds
 
     def __init__(self, row, x_range, parent=None):
         QDialog.__init__(self, parent)
-        self.setWindowTitle(f"Run {row.run}: peak, background and x range" if row.run else "Select the ROIs")
-        self.resize(900, 750)
+        self.setWindowTitle(f"Run {row.run}: peak, background and ranges" if row.run else "Select the ranges")
+        self.resize(950, 850)
 
-        self.x_pixel, self.y_pixel = load_event_pixels(row.nexus_path)
+        self.x_pixel, self.y_pixel, self.tof, self.chopper_range = load_events(row.nexus_path)
+        self.tof_edges = np.arange(self.tof.min(), self.tof.max() + self.TOF_BIN, self.TOF_BIN)
         self.y_profile = np.zeros(N_Y)
         self._updating = False
         self._spans = []
@@ -337,8 +356,10 @@ class ROISelectionDialog(QDialog):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        self.figure = Figure(figsize=(8, 6), layout="tight")
-        self.y_axis, self.x_axis = self.figure.subplots(2, 1, gridspec_kw={"height_ratios": [2, 1]})
+        self.figure = Figure(figsize=(8, 7), layout="tight")
+        self.y_axis, self.tof_axis, self.x_axis = self.figure.subplots(
+            3, 1, gridspec_kw={"height_ratios": [2, 1, 1]}
+        )
         self.canvas = FigureCanvas(self.figure)
         layout.addWidget(NavigationToolbar(self.canvas, self))
         layout.addWidget(self.canvas, stretch=1)
@@ -348,25 +369,30 @@ class ROISelectionDialog(QDialog):
         title = row.title or ""
         self.y_axis.set_title(f"{title} (sequence {row.seq})" if row.seq else title)
         self.y_axis.set_xlabel("y pixel (reflectivity direction)")
-        self.y_axis.set_ylabel("counts")
+        self.tof_axis.set_xlabel("time of flight [us]")
         self.x_axis.set_xlabel("x pixel (low resolution direction)")
-        self.x_axis.set_ylabel("counts")
+        for axis in (self.y_axis, self.tof_axis, self.x_axis):
+            axis.set_ylabel("counts")
         (self.y_line,) = self.y_axis.plot([], [], drawstyle="steps-mid", color="tab:blue")
+        (self.tof_line,) = self.tof_axis.plot([], [], drawstyle="steps-mid", color="tab:blue")
         (self.x_line,) = self.x_axis.plot([], [], drawstyle="steps-mid", color="tab:blue")
         self._set_log_scale(True)
         self._update_profiles()
         self._reset_limits()
 
-        # Dragging on a plot sets the range selected by the radio buttons, and
-        # on the lower plot the x range
-        self.y_selector = SpanSelector(
-            self.y_axis, self._y_range_selected, "horizontal", useblit=False,
-            props={"facecolor": "tab:blue", "alpha": 0.2}, drag_from_anywhere=True,
-        )
-        self.x_selector = SpanSelector(
-            self.x_axis, self._x_range_selected, "horizontal", useblit=False,
-            props={"facecolor": "tab:blue", "alpha": 0.2}, drag_from_anywhere=True,
-        )
+        # Dragging on a plot sets the range it shows; on the upper plot, the
+        # range selected by the radio buttons
+        self.selectors = [
+            SpanSelector(
+                axis, callback, "horizontal", useblit=False,
+                props={"facecolor": "tab:blue", "alpha": 0.2}, drag_from_anywhere=True,
+            )
+            for axis, callback in (
+                (self.y_axis, self._y_range_selected),
+                (self.tof_axis, self._tof_range_selected),
+                (self.x_axis, self._x_range_selected),
+            )
+        ]
 
     def _build_controls(self, row, x_range):
         """Radio buttons to choose what a drag sets, and the values themselves."""
@@ -389,40 +415,52 @@ class ROISelectionDialog(QDialog):
         grid.addLayout(modes, 0, 1, 1, 4)
 
         grid.addWidget(QLabel("Peak (RB_Ymin, RB_Ymax):"), 1, 0)
-        self.peak_spins = [self._make_spin(row.y_min, N_Y), self._make_spin(row.y_max, N_Y)]
+        self.peak_spins = [self._make_spin(row.y_min, N_Y - 1), self._make_spin(row.y_max, N_Y - 1)]
         for column, spin in enumerate(self.peak_spins):
             grid.addWidget(spin, 1, 1 + column)
 
         grid.addWidget(QLabel("Background (BkgROI):"), 2, 0)
-        self.bkg_spins = [self._make_spin(value, N_Y) for value in row.bkg]
+        self.bkg_spins = [self._make_spin(value, N_Y - 1) for value in row.bkg]
         for column, spin in enumerate(self.bkg_spins):
             grid.addWidget(spin, 2, 1 + column)
 
         grid.addWidget(QLabel("x range, all settings:"), 3, 0)
-        self.x_spins = [self._make_spin(x_range[0], N_X), self._make_spin(x_range[1], N_X)]
+        self.x_spins = [self._make_spin(x_range[0], N_X - 1), self._make_spin(x_range[1], N_X - 1)]
         for column, spin in enumerate(self.x_spins):
             grid.addWidget(spin, 3, 1 + column)
 
+        tof_range = row.tof_range or self.chopper_range
+        grid.addWidget(QLabel("TOF range [us], profiles only:"), 4, 0)
+        self.tof_spins = [self._make_spin(value, int(self.tof.max()) + 1) for value in tof_range]
+        for column, spin in enumerate(self.tof_spins):
+            spin.setSingleStep(100)
+            spin.setToolTip("Only the events of this TOF range are counted in the profiles above")
+            grid.addWidget(spin, 4, 1 + column)
+        band_btn = QPushButton("Whole band")
+        band_btn.setToolTip("Go back to the TOF range of the chopper wavelength band")
+        band_btn.clicked.connect(self._reset_tof_range)
+        grid.addWidget(band_btn, 4, 3)
+
         estimate_btn = QPushButton("Estimate the peak")
-        estimate_btn.setToolTip("Set the peak and background from the profile, as when the file is loaded")
+        estimate_btn.setToolTip("Set the peak and background from the profile shown, over the TOF range above")
         estimate_btn.clicked.connect(self._estimate)
-        grid.addWidget(estimate_btn, 4, 0)
+        grid.addWidget(estimate_btn, 5, 0)
 
         self.log_check = QCheckBox("Log scale")
         self.log_check.setChecked(True)
         self.log_check.toggled.connect(self._set_log_scale)
-        grid.addWidget(self.log_check, 4, 1)
+        grid.addWidget(self.log_check, 5, 1)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-        grid.addWidget(buttons, 4, 3, 1, 2)
+        grid.addWidget(buttons, 5, 3, 1, 2)
 
         return box
 
-    def _make_spin(self, value, n_pixels):
+    def _make_spin(self, value, maximum):
         spin = QSpinBox()
-        spin.setRange(0, n_pixels - 1)
+        spin.setRange(0, maximum)
         spin.setValue(int(value))
         spin.valueChanged.connect(self._values_changed)
         return spin
@@ -443,15 +481,18 @@ class ROISelectionDialog(QDialog):
             spins = self.bkg_spins[:2]
         else:
             spins = self.bkg_spins[2:]
-        self._apply_range(spins, low, high, N_Y)
+        self._apply_range(spins, low, high)
 
     def _x_range_selected(self, low, high):
-        self._apply_range(self.x_spins, low, high, N_X)
+        self._apply_range(self.x_spins, low, high)
 
-    def _apply_range(self, spins, low, high, n_pixels):
+    def _tof_range_selected(self, low, high):
+        self._apply_range(self.tof_spins, low, high)
+
+    def _apply_range(self, spins, low, high):
         low, high = sorted((int(round(low)), int(round(high))))
-        low = max(0, min(n_pixels - 1, low))
-        high = max(low + 1, min(n_pixels - 1, high))
+        low = max(spins[0].minimum(), min(spins[0].maximum(), low))
+        high = max(low + 1, min(spins[1].maximum(), high))
         self._updating = True
         try:
             spins[0].setValue(low)
@@ -463,6 +504,9 @@ class ROISelectionDialog(QDialog):
     def _values_changed(self):
         if not self._updating:
             self._update_profiles()
+
+    def _reset_tof_range(self):
+        self._apply_range(self.tof_spins, *self.chopper_range)
 
     def _estimate(self):
         y_min, y_max, _contrast = estimate_peak_range(self.y_profile)
@@ -480,16 +524,27 @@ class ROISelectionDialog(QDialog):
     # ------------------------------------------------------------ plotting
 
     def _update_profiles(self):
-        """Recompute both profiles for the current ranges and redraw them."""
-        y_min, y_max, bkg, x_range = self.values()
+        """Recompute the three profiles for the current ranges and redraw them."""
+        y_min, y_max, bkg, x_range, tof_range = self.values()
 
         inside_x = (self.x_pixel >= x_range[0]) & (self.x_pixel <= x_range[1])
-        self.y_profile = counts_in_range(self.y_pixel, inside_x, N_Y)
-        inside_peak = (self.y_pixel >= y_min) & (self.y_pixel <= y_max)
-        x_profile = counts_in_range(self.x_pixel, inside_peak, N_X)
+        inside_tof = (self.tof >= tof_range[0]) & (self.tof <= tof_range[1])
+        if y_max > y_min:
+            inside_peak = (self.y_pixel >= y_min) & (self.y_pixel <= y_max)
+            self.tof_line.set_label("counts in the peak")
+        else:  # no peak chosen yet, so show every pixel rather than nothing
+            inside_peak = np.ones(self.y_pixel.shape, dtype=bool)
+            self.tof_line.set_label("counts, every pixel")
+
+        self.y_profile = counts_in_range(self.y_pixel, inside_x & inside_tof, N_Y)
+        x_profile = counts_in_range(self.x_pixel, inside_peak & inside_tof, N_X)
+        # The TOF profile keeps the whole range, so that the signal can be
+        # found again after a narrow range has been selected
+        tof_counts, _edges = np.histogram(self.tof[inside_x & inside_peak], bins=self.tof_edges)
 
         self.y_line.set_data(np.arange(N_Y), self.y_profile)
         self.x_line.set_data(np.arange(N_X), x_profile)
+        self.tof_line.set_data((self.tof_edges[:-1] + self.tof_edges[1:]) / 2.0, tof_counts)
 
         for span in self._spans:
             span.remove()
@@ -497,36 +552,39 @@ class ROISelectionDialog(QDialog):
             self.y_axis.axvspan(y_min, y_max, color="tab:green", alpha=0.25, label="peak"),
             self.y_axis.axvspan(bkg[0], bkg[1], color="tab:red", alpha=0.2, label="background"),
             self.y_axis.axvspan(bkg[2], bkg[3], color="tab:red", alpha=0.2),
+            self.tof_axis.axvspan(tof_range[0], tof_range[1], color="tab:green", alpha=0.25, label="TOF range"),
             self.x_axis.axvspan(x_range[0], x_range[1], color="tab:green", alpha=0.25, label="x range"),
         ]
-        for axis in (self.y_axis, self.x_axis):
+        for axis in (self.y_axis, self.tof_axis, self.x_axis):
             axis.relim()
             axis.autoscale_view(scalex=False)
             axis.legend(loc="upper right", fontsize="small")
         self.canvas.draw_idle()
 
     def _set_log_scale(self, log_scale):
-        for axis in (self.y_axis, self.x_axis):
+        for axis in (self.y_axis, self.tof_axis, self.x_axis):
             axis.set_yscale("log" if log_scale else "linear")
         self.canvas.draw_idle()
 
     def _reset_limits(self):
         """Show the region around the ROIs, or around the peak if there is none yet."""
-        y_min, y_max, bkg, _x_range = self.values()
+        y_min, y_max, bkg, _x_range, _tof_range = self.values()
         edges = [value for value in list(bkg) + [y_min, y_max] if value]
         if not edges:
             edges = [int(np.argmax(self.y_profile))]
         self.y_axis.set_xlim(max(0, min(edges) - 30), min(N_Y - 1, max(edges) + 30))
+        self.tof_axis.set_xlim(self.tof_edges[0], self.tof_edges[-1])
         self.x_axis.set_xlim(0, N_X - 1)
         self.canvas.draw_idle()
 
     def values(self):
-        """The peak range, the background ROI and the x pixel range."""
+        """The peak range, the background ROI, the x pixel range and the TOF range."""
         return (
             self.peak_spins[0].value(),
             self.peak_spins[1].value(),
             [spin.value() for spin in self.bkg_spins],
             [spin.value() for spin in self.x_spins],
+            [spin.value() for spin in self.tof_spins],
         )
 
 
@@ -541,6 +599,7 @@ class JSONSettingsBuilderTab(QWidget):
         self.db_files = []  # direct beam files offered for DBname
         self.db_headers = {}
         self.db_directory = ""
+        self.experiment = ""  # the experiment the directories were set from
         self.extra_keys = {}  # settings keys we read but do not edit here
         self._updating = False
 
@@ -1109,7 +1168,7 @@ class JSONSettingsBuilderTab(QWidget):
             return False
         x_range = self._global_value("data_x_range")
         try:
-            row.profile = counts_vs_y(row.nexus_path, x_range=x_range)
+            row.profile = counts_vs_y(row.nexus_path, x_range=x_range, tof_range=row.tof_range)
         except (OSError, KeyError, ValueError) as error:
             self.status_label.setText(f"Could not read events from {os.path.basename(row.nexus_path)}: {error}")
             return False
@@ -1118,7 +1177,8 @@ class JSONSettingsBuilderTab(QWidget):
         row.bkg = default_bkg_roi(y_min, y_max)
         if contrast < 3:
             self.status_label.setText(
-                f"Run {row.run}: weak peak (contrast {contrast:.1f}), check the profile and adjust the ROI"
+                f"Run {row.run}: weak peak (contrast {contrast:.1f}); open 'Select ROI...' and narrow "
+                "the TOF range around the signal to bring it out"
             )
         return True
 
@@ -1155,7 +1215,10 @@ class JSONSettingsBuilderTab(QWidget):
         if dialog.exec_() != QDialog.Accepted:
             return
 
-        row.y_min, row.y_max, row.bkg, new_x_range = dialog.values()
+        row.y_min, row.y_max, row.bkg, new_x_range, tof_range = dialog.values()
+        # Keep the TOF range, so that estimating the ROIs again uses the range
+        # the peak was chosen on
+        row.tof_range = tof_range if list(tof_range) != list(dialog.chopper_range) else None
         if new_x_range != x_range:
             self._set_global_value("data_x_range", new_x_range)
             for other in self.rows:
@@ -1245,11 +1308,11 @@ class JSONSettingsBuilderTab(QWidget):
         if not isinstance(settings, dict):
             QMessageBox.critical(self, "Load error", "The settings file must hold a dictionary")
             return
-        self.settings_file_edit.setText(file_path)
         match = re.search(r"IPTS-\d+", file_path)
         if match and not self.experiment_edit.text().strip():
             self.experiment_edit.setText(match.group(0))
-            self._experiment_changed()
+            self._experiment_changed()  # sets the directories, and a default settings path
+        self.settings_file_edit.setText(file_path)  # which the file just loaded overrides
         self.from_settings(settings)
         attached = sum(self.attach_run(row, row.run) for row in self.rows if row.run and not row.nexus_path)
         self._refresh_table()
@@ -1342,18 +1405,23 @@ class JSONSettingsBuilderTab(QWidget):
         return ""
 
     def _experiment_changed(self):
-        """Fill the directories from the experiment identifier."""
+        """
+        Point the directories at the experiment.
+
+        The paths follow the experiment whenever it changes, since that is the
+        point of the field. Nothing is touched when the experiment is only
+        confirmed again, so a directory edited by hand survives.
+        """
         experiment = self.experiment_edit.text().strip()
-        if not experiment:
+        if not experiment or experiment == self.experiment:
             return
+        self.experiment = experiment
         base = Path("/SNS/REF_L") / experiment
-        if not self.nexus_dir_edit.text().strip():
-            self.nexus_dir_edit.setText(str(base / "nexus"))
-        if not self.db_dir_edit.text().strip():
-            self.db_dir_edit.setText(str(base / "shared" / "transmission"))
-        if not self.settings_file_edit.text().strip():
-            self.settings_file_edit.setText(str(base / "shared" / "autoreduce" / "reduce_settings.json"))
+        self.nexus_dir_edit.setText(str(base / "nexus"))
+        self.db_dir_edit.setText(str(base / "shared" / "transmission"))
+        self.settings_file_edit.setText(str(base / "shared" / "autoreduce" / "reduce_settings.json"))
         self.scan_db_files()
+        self.status_label.setText(f"Directories set to {base}")
 
     def _browse_directory(self, line_edit, on_change=None):
         directory = QFileDialog.getExistingDirectory(self, "Select a directory", line_edit.text().strip())
@@ -1364,6 +1432,7 @@ class JSONSettingsBuilderTab(QWidget):
 
     def _read_user_settings(self):
         self.experiment_edit.setText(self.settings.value("json_builder_experiment_id", ""))
+        self.experiment = self.experiment_edit.text().strip()
         self.nexus_dir_edit.setText(self.settings.value("json_builder_nexus_dir", ""))
         self.db_dir_edit.setText(self.settings.value("json_builder_db_dir", ""))
         self.settings_file_edit.setText(self.settings.value("json_builder_settings_file", ""))
