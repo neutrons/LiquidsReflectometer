@@ -36,10 +36,9 @@ class ManualSingleRun(SingleRunReduction):
         if self.sequence_number is None:
             # With no constructor override, fall back to what the run reports (§3.1.2.1),
             # as AutoreduceSingleRun does.
-            # TODO: `RunLoader` is still a stub, so that fallback is `RunData`'s default
-            #       of 1, not a value read from this run. Read it from the
-            #       `sequence_number` sample log, as `LiveEntrypoint` already does, once
-            #       the real loader lands.
+            # TODO: this reads the `sequence_number` sample log, but `RunLoader` is still a
+            #       stub, so the log it reads is the loader's placeholder rather than this
+            #       run's recorded value.
             self.sequence_number = run.sequence_number
         db_config = get_direct_beam_config(self.sequence_number, config)
         direct_beams = get_direct_beams(self._run_loader, db_config)

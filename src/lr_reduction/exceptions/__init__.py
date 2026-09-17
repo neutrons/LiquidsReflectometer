@@ -17,6 +17,10 @@ from lr_reduction.exceptions.results import (
     MalformedDataError,
     ResultError,
 )
+from lr_reduction.exceptions.run_data import (
+    IncompleteRunDataError,
+    RunDataError,
+)
 from lr_reduction.exceptions.sample_logs import (
     AmbiguousLogError,
     LogNotFoundError,
@@ -37,6 +41,7 @@ __all__ = [
     "ConfigParseError",
     "ConfigValidationError",
     "IncompleteDataError",
+    "IncompleteRunDataError",
     "LogNotFoundError",
     "LogTypeError",
     "LogUnitError",
@@ -46,6 +51,7 @@ __all__ = [
     "NotFoundError",
     "ParseError",
     "ResultError",
+    "RunDataError",
     "SampleLogsError",
     "UnsupportedFormatError",
     "WorkspaceError",

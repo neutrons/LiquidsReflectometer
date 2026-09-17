@@ -7,7 +7,7 @@ third-party `mantid` package.
 from mantid.api import AnalysisDataService, Workspace
 
 from lr_reduction.exceptions import WorkspaceNotFoundError
-from lr_reduction.types import MantidWorkspace
+from lr_reduction.types import MantidWorkspace, MantidWorkspaceName
 
 
 def workspace_handle(workspace: MantidWorkspace) -> Workspace:
@@ -38,3 +38,13 @@ def workspace_handle(workspace: MantidWorkspace) -> Workspace:
             # so translate it rather than letting a KeyError escape a bool-returning call.
             raise WorkspaceNotFoundError(f"No workspace named {workspace!r} in the analysis data service") from exc
     return workspace
+
+
+def workspace_exists(name: MantidWorkspaceName) -> bool:
+    """Whether the analysis data service holds a workspace of this name.
+
+    The membership half of `workspace_handle`, for a caller that wants to check a name
+    rather than resolve it. Kept here so this module stays the one place that touches the
+    analysis data service directly.
+    """
+    return AnalysisDataService.doesExist(name)
