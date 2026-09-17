@@ -330,8 +330,16 @@ def default_bkg_roi(y_min, y_max, gap=3, width=5):
 
 
 def _move_span(patch, low, high):
-    """Move a shaded region, whose vertical extent is in axes coordinates."""
-    patch.set_xy([[low, 0], [low, 1], [high, 1], [high, 0], [low, 0]])
+    """
+    Move a shaded region, whose vertical extent is in axes coordinates.
+
+    ``axvspan`` returns a rectangle from matplotlib 3.9 on and a polygon
+    before, and the two do not take the same coordinates.
+    """
+    if hasattr(patch, "set_bounds"):  # a rectangle
+        patch.set_bounds(low, 0, high - low, 1)
+    else:  # a polygon
+        patch.set_xy([[low, 0], [low, 1], [high, 1], [high, 0], [low, 0]])
 
 
 class ROISelectionDialog(QDialog):
@@ -350,12 +358,12 @@ class ROISelectionDialog(QDialog):
     PEAK, BACKGROUND_LEFT, BACKGROUND_RIGHT = "peak", "left", "right"
     TOF_BIN = 100.0  # microseconds
 
-    def __init__(self, row, x_range, parent=None):
+    def __init__(self, row, x_range, events=None, parent=None):
         QDialog.__init__(self, parent)
         self.setWindowTitle(f"Run {row.run}: peak, background and ranges" if row.run else "Select the ranges")
         self.resize(950, 850)
 
-        self.x_pixel, self.y_pixel, self.tof, self.chopper_range = load_events(row.nexus_path)
+        self.x_pixel, self.y_pixel, self.tof, self.chopper_range = events or load_events(row.nexus_path)
         self.tof_edges = np.arange(self.tof.min(), self.tof.max() + self.TOF_BIN, self.TOF_BIN)
         self.y_profile = np.zeros(N_Y)
         self._updating = False
@@ -1230,17 +1238,21 @@ class JSONSettingsBuilderTab(QWidget):
             return
 
         x_range = self._global_value("data_x_range")
+        # The file is read here rather than in the dialog, so that a failure to
+        # read is the only thing reported as one
         self.status_label.setText(f"Reading the events of run {row.run}...")
         QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         QApplication.processEvents()
         try:
-            dialog = ROISelectionDialog(row, x_range, parent=self)
+            events = load_events(row.nexus_path)
         except (OSError, KeyError, ValueError) as error:
             QMessageBox.critical(self, "Read error", f"Could not read {row.nexus_path}:\n{error}")
             return
         finally:
             QApplication.restoreOverrideCursor()
             self.status_label.setText("")
+
+        dialog = ROISelectionDialog(row, x_range, events=events, parent=self)
         if dialog.exec_() != QDialog.Accepted:
             return
 
