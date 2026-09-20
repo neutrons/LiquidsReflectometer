@@ -6,6 +6,7 @@ from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 from launcher.app_identity import ensure_identity, migrate_legacy_settings
 from launcher.apps.direct_beam import DirectBeamTab
 from launcher.apps.file_batch import FileBatchTab
+from launcher.apps.json_settings_builder import JSONSettingsBuilderTab
 from launcher.apps.overplot import Overplot
 from launcher.apps.settings_editor import SettingsEditorTab
 from launcher.apps.sld_calculator import SLD
@@ -45,13 +46,17 @@ class ReductionInterface(QTabWidget):
         #self.addTab(self.roi_tab, "ROI selector")
         #self.setTabText(tab_id, "ROI selector")
 
-        # Reduction settings editor. Supersedes the JSONSettingsBuilderTab this
-        # module imported in a comment for a module that never existed
-        # (`git log --all -S json_settings_builder` finds only the comment).
+        # Simple settings editor
         tab_id += 1
         self.settings_editor_tab = SettingsEditorTab()
         self.addTab(self.settings_editor_tab, "Settings editor")
         self.setTabText(tab_id, "Settings editor")
+
+        # Reduction settings builder (JSON)
+        tab_id += 1
+        self.settings_builder_tab = JSONSettingsBuilderTab()
+        self.addTab(self.settings_builder_tab, "Settings builder")
+        self.setTabText(tab_id, "Settings builder")
 
         # SLD calculator
         tab_id += 1
