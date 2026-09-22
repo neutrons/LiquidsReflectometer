@@ -227,13 +227,13 @@ def generate_report_sections(
                 template_data = template_file
             report = generate_report_section_reduction_parameters(workspace, template_data, meta_data)
         else:
-            logger.error("Reflected beam type requires a template or setting file to be provided")
+            report = generate_report_section_error(workspace, "Reflected beam type requires a template or setting file to be provided")
 
     elif data_type == DataType.DIRECT_BEAM:
         report = generate_report_section_direct_beam_parameters(workspace)
         template_data = None # Always can ignore the template for the DB output.
     else:
-        logger.error("Invalid data type for report: %s", data_type.name)
+        report = generate_report_section_error(workspace, f"Invalid data type for report: {data_type.name}")
         return ReportSections("", [], "")
 
     run_meta_data = generate_report_section_run_meta_data(workspace)
@@ -249,6 +249,29 @@ def generate_report_sections(
 
     return ReportSections(run_meta_data, plots, report)
 
+def generate_report_section_error(_workspace: MantidWorkspace, error: str) -> str:
+    """Generate HTML report section containing an error string
+
+    Parameters
+    ----------
+    workspace: MantidWorkspace
+        Reflected beam workspace (required, but unused)
+    error
+        Error string from a step
+
+    Returns
+    -------
+    str
+        Messages in the form of an HTML table
+    """
+    logger.error(error)
+
+    meta = "<table style='width:80%'>"
+    meta += "<tr><td>Error:</td><td><b>%s</b></td></tr>" % (
+        error,
+    )
+    meta += "</table>\n"
+    return meta
 
 def generate_report_section_run_meta_data(workspace: MantidWorkspace) -> str:
     """Generate an HTML table containing run information
