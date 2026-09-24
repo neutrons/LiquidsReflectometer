@@ -66,6 +66,7 @@ except ImportError:  # the interface works without the ROI plots
     Figure = None
 
 from launcher.apps.file_batch import parse_run_list
+from lr_reduction import nr_tools as tools
 
 # Detector geometry: event_id = x_pixel * N_Y + y_pixel
 N_Y = 304
@@ -77,7 +78,7 @@ N_X = 256
 MAX_EVENTS = 2000000
 
 # Chopper band used to select the useful TOF range (see the ROI selector)
-CHOPPER_BANDWIDTH = 3.5
+#CHOPPER_BANDWIDTH = 3.5
 MODERATOR_DETECTOR_DISTANCE = 15.75  # meters
 
 METHODS = ["meantheta", "constantq", "constanttof"]
@@ -101,7 +102,7 @@ PER_RUN_KEYS = [
 #   float_opt  same as float plus an initial value, with a checkbox to leave
 #              the key out of the file and take the value from the run logs
 GLOBAL_FIELDS = [
-    ("data_x_range", "Data x range [pixels]", "int_pair", [50, 200], (0, N_X - 1)),
+    ("data_x_range", "Data x range [pixels]", "int_pair", [50, 220], (0, N_X - 1)),
     ("Normalize", "Normalize to critical edge", "bool", False, None),
     ("AutoScale", "Auto-scale between angles", "bool", False, None),
     (
@@ -109,7 +110,9 @@ GLOBAL_FIELDS = [
         "Theta from fitted peak",
         "choice",
         False,
-        [("off", False), ("detector_angle", "detector_angle"), ("sample_angle", "sample_angle")],
+        [("off", False), ("on", True)]
+        # can go back to full version in future once properly implemented
+        #[("off", False), ("detector_angle", "detector_angle"), ("sample_angle", "sample_angle")],
     ),
     ("useGravity", "Gravity correction", "bool", True, None),
     ("save8col", "Save 8-column output", "bool", False, None),
@@ -122,9 +125,9 @@ GLOBAL_FIELDS = [
     ("IncidentTheta", "Incident theta [deg]", "float_opt", None, (-10.0, 10.0, 3, 0.01, 4.0)),
     ("dead_time", "Dead time [us]", "float", 4.2, (0.0, 100.0, 3, 0.1)),
     ("dead_time_tof_step", "Dead time TOF step [us]", "int", 50, (1, 10000)),
-    ("DetResFn", "Detector resolution", "choice", "rectangular",
+    ("DetResFn", "Detector resolution", "choice", "gaussian",
      [("rectangular", "rectangular"), ("gaussian", "gaussian"), ("none", "none")]),
-    ("DetSigma", "Detector sigma [pixel]", "float", 0.8, (0.0, 20.0, 3, 0.1)),
+    ("DetSigma", "Detector sigma [pixel]", "float", 1.0, (0.0, 20.0, 3, 0.1)),
     ("peak_pad", "Peak fit padding [pixels]", "int", 1, (0, 50)),
     ("peak_type", "Peak shape", "choice", "supergauss", [("supergauss", "supergauss"), ("gauss", "gauss")]),
 ]
@@ -192,16 +195,18 @@ def read_nexus_metadata(file_path):
         meta["seq_num"] = 0
     return meta
 
-
+# change to use the same logic as the reduction, i.e. to use nr_tools.get_lam_range
 def _chopper_tof_range(h5_file):
     """TOF range [us] covered by the chopper wavelength band, or None."""
     chopper_lambda = _first_value(h5_file, "entry/DASlogs/BL4B:Det:TH:BL:Lambda/value")
     chopper_speed = _first_value(h5_file, "entry/DASlogs/BL4B:Det:TH:BL:Frequency/value")
     if chopper_lambda is None or chopper_speed is None or float(chopper_speed) == 0:
         return None
-    half_band = CHOPPER_BANDWIDTH / 2.0 * 60.0 / float(chopper_speed)
-    wl_min = float(chopper_lambda) - half_band
-    wl_max = float(chopper_lambda) + half_band
+
+    wl_min, wl_max = tools.get_lam_range(chopper_lambda, chopper_speed, scaled_width=3.4)
+    #half_band = CHOPPER_BANDWIDTH / 2.0 * 60.0 / float(chopper_speed)
+    #wl_min = float(chopper_lambda) - half_band
+    #wl_max = float(chopper_lambda) + half_band
     tof_min = 252.78 * wl_min * MODERATOR_DETECTOR_DISTANCE
     tof_max = 252.78 * wl_max * MODERATOR_DETECTOR_DISTANCE
     if tof_max <= tof_min:
@@ -633,6 +638,7 @@ class JSONSettingsBuilderTab(QWidget):
         self.experiment = ""  # the experiment the directories were set from
         self.extra_keys = {}  # settings keys we read but do not edit here
         self._updating = False
+        self.original_settings = None  # store original state for reset
 
         self.settings = QtCore.QSettings()
 
@@ -699,6 +705,10 @@ class JSONSettingsBuilderTab(QWidget):
         save_as_btn = QPushButton("Save as...")
         save_as_btn.clicked.connect(self.save_settings_as)
         buttons.addWidget(save_as_btn)
+        reset_btn = QPushButton("Reset")
+        reset_btn.setToolTip("Clear all edited inputs back to the original state")
+        reset_btn.clicked.connect(self._reset_settings)
+        buttons.addWidget(reset_btn)
         grid.addLayout(buttons, 3, 2)
 
         return box
@@ -861,8 +871,9 @@ class JSONSettingsBuilderTab(QWidget):
         if kind == "bool":
             widget.setChecked(bool(value))
         elif kind == "choice":
-            if key == "useCalcTheta" and value is True:  # legacy value for the detector angle
-                value = "detector_angle"
+            # can put this back in once fully implemented.
+            #if key == "useCalcTheta" and value is True:  # legacy value for the detector angle
+            #    value = "detector_angle"
             index = widget.findData(value)
             if index < 0 and isinstance(value, str):
                 index = widget.findText(value.lower())
@@ -1297,6 +1308,9 @@ class JSONSettingsBuilderTab(QWidget):
 
     def from_settings(self, settings):
         """Fill the interface from a settings dictionary."""
+        # Store the original settings for the reset button
+        self.original_settings = json.loads(json.dumps(settings))
+        
         arrays = {key: settings[key] for key in PER_RUN_KEYS if isinstance(settings.get(key), list)}
         n_rows = max((len(value) for value in arrays.values()), default=0)
         run_numbers = settings.get("RBnum") or []
@@ -1396,6 +1410,37 @@ class JSONSettingsBuilderTab(QWidget):
             return
         self._write_user_settings()
         self.status_label.setText(f"Saved {file_path}")
+
+    def _reset_settings(self):
+        """Clear all inputs and restore to empty/default state."""
+        answer = QMessageBox.question(
+            self,
+            "Clear all?",
+            "Clear all loaded/edited inputs and all angle settings?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+        
+        # Clear all rows from the table
+        self.rows = []
+        self.original_settings = None
+        
+        # Reset global options to their defaults
+        for key, _label, _kind, default, _extra in GLOBAL_FIELDS:
+            self._set_global_value(key, default)
+        
+        # Reset extra keys
+        self.extra_keys = {}
+        
+        # Reset checkboxes
+        self.auto_roi_check.setChecked(True)
+        self.save_runs_check.setChecked(False)
+        
+        # Refresh the table to show nothing
+        self._refresh_table()
+        self.status_label.setText("Cleared all inputs and angle settings")
 
     def validate(self):
         """Return the errors that prevent saving and the warnings worth a look."""
