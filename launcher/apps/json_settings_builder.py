@@ -1310,7 +1310,7 @@ class JSONSettingsBuilderTab(QWidget):
         """Fill the interface from a settings dictionary."""
         # Store the original settings for the reset button
         self.original_settings = json.loads(json.dumps(settings))
-        
+
         arrays = {key: settings[key] for key in PER_RUN_KEYS if isinstance(settings.get(key), list)}
         n_rows = max((len(value) for value in arrays.values()), default=0)
         run_numbers = settings.get("RBnum") or []
@@ -1422,22 +1422,22 @@ class JSONSettingsBuilderTab(QWidget):
         )
         if answer != QMessageBox.Yes:
             return
-        
+
         # Clear all rows from the table
         self.rows = []
         self.original_settings = None
-        
+
         # Reset global options to their defaults
         for key, _label, _kind, default, _extra in GLOBAL_FIELDS:
             self._set_global_value(key, default)
-        
+
         # Reset extra keys
         self.extra_keys = {}
-        
+
         # Reset checkboxes
         self.auto_roi_check.setChecked(True)
         self.save_runs_check.setChecked(False)
-        
+
         # Refresh the table to show nothing
         self._refresh_table()
         self.status_label.setText("Cleared all inputs and angle settings")
