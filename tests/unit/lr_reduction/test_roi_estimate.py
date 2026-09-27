@@ -375,9 +375,28 @@ def test_a_zero_proton_charge_is_refused_rather_than_bracketing_pixel_zero(tmp_p
     as a real state.
     """
     path = _write_nexus(tmp_path / "zero_pc.nxs.h5", proton_charge=0.0)
-    with pytest.raises(ValueError, match="proton charge|no counts"):
-        counts = re_mod.counts_vs_y(path, lowres=(100, 160))
-        re_mod.estimate_peak_range(counts)
+    with pytest.raises(ValueError, match="proton charge"):
+        re_mod.counts_vs_y(path, lowres=(100, 160))
+
+
+def test_a_non_finite_profile_is_refused_even_if_it_reaches_the_estimator():
+    """The SECOND half of A2, pinned independently of the first.
+
+    There are two guards on this path — `counts_vs_y` refuses a zero charge at
+    source, and `estimate_peak_range` refuses a non-finite profile downstream.
+    A single test that composed them left BOTH mutations green, because each
+    guard covered for the other: drop either one and the survivor still raised.
+    Measured as battery rows 12 and 13, both surviving.
+
+    So this one hands the estimator the profile directly. A zero-charge divide
+    yields NaN on empty rows and inf on occupied ones; unguarded, `any(counts >
+    0)` passes on the infs, argmax finds the first NaN at index 0, both walks
+    stop, and the function returns (0, 0).
+    """
+    profile = np.full(N_Y, np.nan)
+    profile[150] = np.inf
+    with pytest.raises(ValueError, match="NaN|inf|non-finite"):
+        re_mod.estimate_peak_range(profile)
 
 
 @pytest.mark.parametrize(
