@@ -258,18 +258,20 @@ def estimate_peak_range(counts, min_contrast=1.5, smooth=3, with_contrast=False)
     ``with_contrast``.
     """
     counts = np.asarray(counts, dtype=float)
-    if counts.size == 0 or not np.any(np.isfinite(counts) & (counts > 0)):
-        raise CannotEstimateError("no counts on the detector — no peak can be estimated")
     if not np.all(np.isfinite(counts)):
-        # NaN/inf reach here from a zero proton-charge normalisation. Left
-        # alone, `any(counts > 0)` passes on the infs, argmax finds the first
-        # NaN at index 0, both walks stop, and the function returns (0, 0) —
-        # the exact failure the guard above claims to prevent.
+        # Checked BEFORE the no-counts guard: a zero proton-charge divide makes
+        # empty rows NaN and occupied rows inf, and `isfinite & > 0` is then
+        # False everywhere — so the no-counts guard would fire and report the
+        # wrong cause. Unguarded entirely, `any(counts > 0)` passes on the infs,
+        # argmax finds the first NaN at index 0, both walks stop, and the
+        # function returns (0, 0).
         raise CannotEstimateError(
             "the row profile contains NaN or inf — normalisation produced a "
             "non-finite profile (a zero proton charge does this), so no peak "
             "can be estimated"
         )
+    if counts.size == 0 or not np.any(np.isfinite(counts) & (counts > 0)):
+        raise CannotEstimateError("no counts on the detector — no peak can be estimated")
 
     if smooth and smooth > 1:
         kernel = np.ones(int(smooth)) / float(smooth)
