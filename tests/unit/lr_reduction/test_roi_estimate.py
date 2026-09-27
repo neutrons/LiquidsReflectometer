@@ -8,6 +8,7 @@ one thing — notably the PRESENCE of a log, which amendment 21 requires.
 """
 
 import os
+from pathlib import Path
 
 import h5py
 import numpy as np
@@ -460,8 +461,16 @@ def test_the_mutation_battery_refuses_a_dirty_baseline():
     """
     import importlib.util
 
+    # Anchored to THIS FILE, not the process CWD. `pixi run test-reduction` is
+    # `cd tests/ && python -m pytest`, so a relative path resolves to
+    # <repo>/tests/plans/... and raises FileNotFoundError — the gate goes red
+    # while running pytest from the repo root stays green. That asymmetry is
+    # `scaling-factor-path-anchor-learning.md` #1 ("a gate command that changes
+    # directory hides every cwd-dependent defect behind it"), and I hit it by
+    # verifying with pytest instead of with the gate command itself.
+    repo_root = Path(__file__).resolve().parents[3]
     spec = importlib.util.spec_from_file_location(
-        "roi_batt", "plans/scripts/roi_estimate_mutations.py"
+        "roi_batt", str(repo_root / "plans" / "scripts" / "roi_estimate_mutations.py")
     )
     batt = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(batt)
