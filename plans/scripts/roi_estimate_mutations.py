@@ -21,50 +21,42 @@ MOD = os.path.join(REPO, "src/lr_reduction/roi_estimate.py")
 T = "tests/unit/lr_reduction/test_roi_estimate.py"
 
 MUTATIONS = [
-    (1, "motors read [0] (the angle BEFORE the move) instead of [-1]",
-     'meta[name] = float(f[dpath][-1])', 'meta[name] = float(f[dpath][0])'),
-    (2, "a missing chopper log defaults instead of refusing",
-     '''                raise KeyError(
-                    f"{path} has no chopper log at {dpath!r} — the wavelength "
-                    f"band cannot be derived for this run, and must not be guessed"
-                )''',
-     '                return [2.4, 5.8]'),
-    (3, "inline the band maths (a fifth copy) instead of calling the library",
+    (1, 'motors read [0] (the angle BEFORE the move) instead of [-1]',
+     'meta[name] = float(f[dpath][-1])',
+     'meta[name] = float(f[dpath][0])'),
+    (3, 'inline the band maths (a fifth copy) instead of calling the library',
      '        return nr_tools.get_lam_range(chopper_lam, chopper_speed)',
      '        return [chopper_lam - 1.75 * 60.0 / chopper_speed - 0.15,\n                chopper_lam + 1.75 * 60.0 / chopper_speed - 0.15]'),
-    (4, "fork the id unpacking instead of calling get_y_tof",
-     '''    _, y_tof, _ = binary_processing.get_y_tof(
-        tof_array, event_id, e_offset, list(lowres), pcharge, n_y=n_y, n_x=n_x
-    )''',
-     '''    y_tof = np.zeros((n_y, len(tof_array)))
-    np.add.at(y_tof, (event_id % n_y, np.zeros(len(event_id), dtype=int)), 1)'''),
-    (5, "hard-code the detector shape instead of the instrument DB",
-     '''    settings = nr_tools.read_settings(start_time)
-    return int(settings["num_x_pixels"]), int(settings["num_y_pixels"])''',
+    (5, 'hard-code the detector shape instead of the instrument DB',
+     '    settings = nr_tools.read_settings(start_time)\n    return int(settings["num_x_pixels"]), int(settings["num_y_pixels"])',
      '    return 256, 304'),
-    (6, "drop the no-counts guard",
-     '''    if counts.size == 0 or not np.any(counts > 0):
-        raise ValueError("no counts on the detector — no peak can be estimated")''',
-     '    pass'),
-    (7, "drop the contrast guard",
-     '''    if contrast < min_contrast:
-        raise ValueError(
-            f"contrast {contrast:.2f} is below {min_contrast} — the detector is "
-            f"featureless here, so the largest bin is noise, not a peak"
-        )''',
-     '    pass'),
-    (8, "drop the low-side FIT CHECK (the real protection; the clamps were dead)",
-     '    if high_edge - width + 1 >= 0:',
-     '    if True:'),
-    (9, "drop the no-room refusal",
-     '''    raise ValueError(
-        f"no room for a {width}-pixel background with a {gap}-pixel gap beside "
-        f"peak {peak_range} on a {n_y}-pixel detector"
-    )''',
+    (6, 'drop the no-counts guard',
+     '    if counts.size == 0 or not np.any(np.isfinite(counts) & (counts > 0)):',
+     '    if False:'),
+    (9, 'drop the no-room refusal',
+     '    raise ValueError(\n        f"no room for a {width}-pixel background with a {gap}-pixel gap beside "\n        f"peak {peak_range} on a {n_y}-pixel detector"\n    )',
      '    return 0, width - 1'),
-    (10, "normalise by the DASlogs time series instead of the run total",
+    (10, 'normalise by the DASlogs series instead of the run total',
      '        pcharge = np.asarray(f["entry/proton_charge"][:])',
      '        pcharge = np.asarray(f["entry/DASlogs/proton_charge/value"][:])'),
+    (11, 'A1: let a zero/NaN baseline score as infinite contrast again',
+     '    if not np.isfinite(baseline) or baseline <= 0:',
+     '    if False:'),
+    (12, 'A2: drop the non-finite profile refusal',
+     '    if not np.all(np.isfinite(counts)):',
+     '    if False:'),
+    (13, 'A2: drop the zero proton-charge refusal at source',
+     '    if not np.isfinite(total_charge) or total_charge <= 0:',
+     '    if False:'),
+    (14, 'D1: drop the on-detector validation of peak_range',
+     '    if not 0 <= peak_low <= peak_high <= n_y - 1:',
+     '    if False:'),
+    (15, 'C3: drop the inverted-band refusal',
+     '    if hi <= lo:',
+     '    if False:'),
+    (16, 'C1: lambda_to_tof forgets the mm->m conversion',
+     '    flight_m = float(settings["source_detector_distance"]) / 1000.0',
+     '    flight_m = float(settings["source_detector_distance"])'),
 ]
 
 
