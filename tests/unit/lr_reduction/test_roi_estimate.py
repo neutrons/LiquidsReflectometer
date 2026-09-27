@@ -7,6 +7,8 @@ in order to know what the fixture actually asserts. It also lets each test vary
 one thing — notably the PRESENCE of a log, which amendment 21 requires.
 """
 
+import os
+
 import h5py
 import numpy as np
 import pytest
@@ -21,7 +23,7 @@ def _write_nexus(
     path,
     *,
     peak_y=150,
-    peak_width=6.0,
+    peak_width=1.0,
     n_events=60000,
     title="synthetic round-trip run",
     run_number=213628,
@@ -33,6 +35,7 @@ def _write_nexus(
     chopper_lam=4.25,
     chopper_speed=60.0,
     with_chopper=True,
+    proton_charge=1.0e12,
     start_time="2025-03-04T11:22:33-05:00",
 ):
     """Write a minimal REF_L-shaped NeXus file.
@@ -43,10 +46,19 @@ def _write_nexus(
     convention production uses, not about a convention invented here.
     """
     rng = np.random.default_rng(1234)
-    y = np.clip(rng.normal(peak_y, peak_width, n_events), 0, N_Y - 1).astype(np.int64)
-    x = rng.integers(100, 160, n_events)
+    # A flat background under the peak. Without it the profile's median is 0,
+    # which is A1's defective regime: the contrast score returned inf and the
+    # assertions below were satisfied BY the bug. Real detectors are not
+    # backgroundless, and `peak_width=1.0` matches the real bracket width
+    # (median 3 px across 63 REF_L files; the old 6.0 gave 13 and left the
+    # low-side half-max walk deletable with every test still green).
+    n_bkg = max(1, n_events // 5)
+    y_peak = np.clip(rng.normal(peak_y, peak_width, n_events), 0, N_Y - 1)
+    y_bkg = rng.integers(0, N_Y, n_bkg)
+    y = np.concatenate([y_peak, y_bkg]).astype(np.int64)
+    x = rng.integers(100, 160, len(y))
     event_id = x * N_Y + y
-    tof = rng.uniform(10000.0, 40000.0, n_events)
+    tof = rng.uniform(10000.0, 40000.0, len(y))
 
     with h5py.File(path, "w") as f:
         entry = f.create_group("entry")
@@ -55,7 +67,7 @@ def _write_nexus(
         entry.create_dataset("run_number", data=[str(run_number).encode()])
         # The TOTAL accumulated charge, which is what `load_and_extract` passes
         # to `get_y_tof` as `pcharge` — not the DASlogs time series beside it.
-        entry.create_dataset("proton_charge", data=np.array([1.0e12]))
+        entry.create_dataset("proton_charge", data=np.array([proton_charge]))
 
         events = entry.create_group("bank1_events")
         events.create_dataset("event_id", data=event_id)
@@ -115,7 +127,7 @@ def test_read_nexus_metadata_takes_the_LAST_motor_sample_not_the_first(tmp_path)
 # -- chopper window (amendment 21: vary PRESENCE, not only value) ------------
 
 
-def test_chopper_tof_window_uses_the_library_not_a_private_copy(nexus):
+def test_chopper_lambda_range_uses_the_library_not_a_private_copy(nexus):
     """#197 grew a third copy of this maths at 3.5 A; the library default is 3.4.
 
     Asserting equality with `nr_tools.get_lam_range` rather than with a literal
@@ -124,12 +136,12 @@ def test_chopper_tof_window_uses_the_library_not_a_private_copy(nexus):
     """
     from lr_reduction.nr_tools import get_lam_range
 
-    window = re_mod.chopper_tof_window(nexus)
+    window = re_mod.chopper_lambda_range(nexus)
 
     assert window == pytest.approx(get_lam_range(4.25, 60.0))
 
 
-def test_chopper_tof_window_refuses_when_the_chopper_log_is_ABSENT(tmp_path):
+def test_chopper_lambda_range_refuses_when_the_chopper_log_is_ABSENT(tmp_path):
     """Amendment 21: absent is a state, not a value.
 
     The window must be derived or refused — never replayed from a previous
@@ -138,21 +150,21 @@ def test_chopper_tof_window_refuses_when_the_chopper_log_is_ABSENT(tmp_path):
     """
     path = _write_nexus(tmp_path / "nochop.nxs.h5", with_chopper=False)
     with pytest.raises(KeyError, match="chopper"):
-        re_mod.chopper_tof_window(path)
+        re_mod.chopper_lambda_range(path)
 
 
-def test_chopper_tof_window_does_not_cache_across_files(tmp_path):
+def test_chopper_lambda_range_does_not_cache_across_files(tmp_path):
     """The stale-window failure, stated as a test rather than trusted."""
     a = _write_nexus(tmp_path / "a.nxs.h5", chopper_lam=4.25, chopper_speed=60.0)
     b = _write_nexus(tmp_path / "b.nxs.h5", chopper_lam=9.0, chopper_speed=30.0)
 
-    first = re_mod.chopper_tof_window(a)
-    second = re_mod.chopper_tof_window(b)
+    first = re_mod.chopper_lambda_range(a)
+    second = re_mod.chopper_lambda_range(b)
 
     assert first != second
     absent = _write_nexus(tmp_path / "c.nxs.h5", with_chopper=False)
     with pytest.raises(KeyError):
-        re_mod.chopper_tof_window(absent)
+        re_mod.chopper_lambda_range(absent)
 
 
 # -- counts vs y ------------------------------------------------------------
@@ -204,7 +216,9 @@ def test_estimate_peak_range_brackets_the_injected_peak(nexus):
     low, high = re_mod.estimate_peak_range(counts)
 
     assert low < 150 < high
-    assert high - low < 40, "the half-max walk should not swallow the detector"
+    # <= 5, not < 40: real REF_L brackets are median 3 px. At the old width the
+    # low-side half-max walk was deletable with all tests green.
+    assert high - low <= 5, "the bracket is far wider than a real specular peak"
 
 
 def test_estimate_peak_range_refuses_an_empty_detector():
@@ -233,6 +247,7 @@ def test_estimate_peak_range_reports_its_contrast_when_asked(nexus):
     counts = re_mod.counts_vs_y(nexus, lowres=(100, 160))
     low, high, contrast = re_mod.estimate_peak_range(counts, with_contrast=True)
     assert low < 150 < high
+    assert np.isfinite(contrast), "an infinite contrast means the baseline was zero"
     assert contrast > 1.0
 
 
@@ -329,3 +344,134 @@ def test_the_geometry_comes_from_the_instrument_database_not_a_literal(monkeypat
 
     monkeypatch.setattr(re_mod.nr_tools, "read_settings", moved)
     assert re_mod.detector_shape("2025-03-04T11:22:33-05:00") == (512, 608)
+
+
+# -- v2: the five demonstrated-harm fixes -----------------------------------
+
+
+def test_a_sparse_profile_is_refused_not_scored_as_infinite_contrast():
+    """A1: `baseline == 0` made the contrast guard a no-op.
+
+    `inf < min_contrast` is False for EVERY threshold, so a zero baseline passed
+    unconditionally — and a zero baseline is what a sparse, low-flux run has.
+    Reachable on 5 of 63 real REF_L files (70-77% empty rows); those are exactly
+    the runs the guard exists for. A profile of zeros with one 3-count row
+    returned a confident ROI with infinite contrast.
+    """
+    sparse = np.zeros(N_Y)
+    sparse[200] = 3.0
+    with pytest.raises(ValueError, match="baseline|contrast"):
+        re_mod.estimate_peak_range(sparse)
+
+
+def test_a_zero_proton_charge_is_refused_rather_than_bracketing_pixel_zero(tmp_path):
+    """A2: `y_tof /= 0` walks every guard and returns (0, 0).
+
+    Empty rows become NaN and occupied rows inf, so `any(counts > 0)` is True on
+    the infs; argmax finds the first NaN at index 0; peak is NaN so both walks
+    stop; baseline is NaN and `nan > 0` is False, so contrast is inf and that
+    guard passes too. The result is (0, 0) — verbatim the failure the no-counts
+    guard says it prevents. `get_deadtime_correction` already treats zero charge
+    as a real state.
+    """
+    path = _write_nexus(tmp_path / "zero_pc.nxs.h5", proton_charge=0.0)
+    with pytest.raises(ValueError, match="proton charge|no counts"):
+        counts = re_mod.counts_vs_y(path, lowres=(100, 160))
+        re_mod.estimate_peak_range(counts)
+
+
+@pytest.mark.parametrize(
+    "peak", [(400, 410), (-50, -40), (300, 320), (-5, 5)], ids=["past-end", "negative", "straddles-end", "straddles-zero"]
+)
+def test_default_bkg_roi_refuses_a_peak_that_is_not_on_the_detector(peak):
+    """D1: each branch checks only ONE end, so the other end went unchecked.
+
+    Measured before the fix: `(400, 410)` on a 304-row detector returned
+    `(385, 394)` and `(-50, -40)` returned `(-34, -25)` — both the failure the
+    docstring says it prevents. I had removed the clamps as "dead code"; they
+    were dead only under an unstated precondition (that `peak_range` is on the
+    detector) which the function never checked and my sweep never violated.
+
+    Refusing rather than clamping, deliberately: clamping `(400, 410)` yields a
+    band from the wrong end of the detector, silently. `RB_Ymin`/`RB_Ymax` reach
+    the resolver from layer (c) as unvalidated file input, so this is reachable.
+    """
+    with pytest.raises(ValueError, match="detector"):
+        re_mod.default_bkg_roi(peak, n_y=N_Y, gap=5, width=10)
+
+
+def test_the_lambda_range_and_the_tof_band_compose(nexus):
+    """C1: the two functions disagreed on units and the composition was silent.
+
+    `chopper_tof_window` was named for TOF and returned Angstrom, while
+    `counts_vs_y(tof_band=...)` is microseconds. The natural composition
+    filtered events to 2.4-5.8 us, produced an all-zero profile, and made
+    `estimate_peak_range` blame the run for a unit error.
+    """
+    lam = re_mod.chopper_lambda_range(nexus)
+    meta = re_mod.read_nexus_metadata(nexus)
+    band = re_mod.lambda_to_tof(lam, meta["start_time"])
+
+    assert band[1] > band[0]
+    assert band[0] > 1000.0, "a TOF band in microseconds, not Angstrom"
+
+    counts = re_mod.counts_vs_y(nexus, lowres=(100, 160), tof_band=band)
+    assert counts.sum() > 0, "the composed band selected no events"
+
+
+def test_counts_vs_y_refuses_an_inverted_band(nexus):
+    """C3: nothing pinned the `hi <= lo` refusal.
+
+    Remove it and `np.linspace(hi, lo, n)` descends, `d_tof` goes negative,
+    `np.digitize` clips into valid indices, and the function returns a plausible
+    profile computed from inverted bins with no error at all.
+    """
+    with pytest.raises(ValueError, match="band"):
+        re_mod.counts_vs_y(nexus, lowres=(100, 160), tof_band=(40000.0, 10000.0))
+
+
+def test_the_mutation_battery_refuses_a_dirty_baseline():
+    """G: the committed battery adopted whatever was on disk as "clean".
+
+    It took `sha(MOD)` of the working tree with zero git references, so a
+    leftover from a killed run became the baseline and the battery printed
+    `restored: OK` with the mutation still in the file. This is the campaign's
+    reference battery and it had the exact failure
+    `todo-mutation-harness-restore-safety` was written about.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "roi_batt", "plans/scripts/roi_estimate_mutations.py"
+    )
+    batt = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(batt)
+
+    import subprocess
+
+    assert hasattr(batt, "verify_baseline_matches_head"), "no git-backed baseline check"
+    assert hasattr(batt, "signal"), "no signal module — a SIGTERM'd run cannot restore"
+
+    original = open(batt.MOD, encoding="utf-8").read()
+    rel = os.path.relpath(batt.MOD, batt.REPO)
+    head_blob = subprocess.run(
+        ["git", "show", f"HEAD:{rel}"], cwd=batt.REPO, capture_output=True, check=True
+    ).stdout.decode()
+
+    try:
+        # Matches HEAD -> accepted. Written explicitly rather than relying on the
+        # working tree being clean, so the test is deterministic while the slug
+        # is mid-edit.
+        with open(batt.MOD, "w", encoding="utf-8") as fh:
+            fh.write(head_blob)
+        batt.verify_baseline_matches_head()
+
+        # Differs from HEAD -> refused. This is the case that matters: a
+        # leftover from a killed run must not become the baseline.
+        with open(batt.MOD, "w", encoding="utf-8") as fh:
+            fh.write(head_blob + "\n# leftover from a killed run\n")
+        with pytest.raises(SystemExit, match="dirty|HEAD|baseline"):
+            batt.verify_baseline_matches_head()
+    finally:
+        with open(batt.MOD, "w", encoding="utf-8") as fh:
+            fh.write(original)

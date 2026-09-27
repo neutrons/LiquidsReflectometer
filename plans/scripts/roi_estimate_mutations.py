@@ -11,6 +11,7 @@ harness ceiling.
 
 import hashlib
 import os
+import signal
 import subprocess
 import sys
 import tempfile
@@ -72,13 +73,60 @@ def sha(path):
         return hashlib.sha256(fh.read()).hexdigest()
 
 
+def verify_baseline_matches_head():
+    """Refuse to start unless the target matches its committed blob.
+
+    The first version took `sha(MOD)` of whatever was on disk and called that
+    "clean". With zero git references, a leftover from a killed run BECAME the
+    baseline: the battery then restored to the mutated text and printed
+    `restored: OK` with the mutation still in the file. That is precisely the
+    failure `todo-mutation-harness-restore-safety` was written about, and since
+    this is the campaign's first committed battery it is the reference
+    implementation — so the bug propagates by being copied.
+
+    Detection complete: compare against `git show HEAD:<path>`, not against the
+    working tree. A battery that cannot tell dirty from clean cannot honestly
+    report anything.
+    """
+    rel = os.path.relpath(MOD, REPO)
+    try:
+        blob = subprocess.run(
+            ["git", "show", f"HEAD:{rel}"], cwd=REPO,
+            capture_output=True, check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, OSError) as exc:
+        raise SystemExit(f"ABORT: cannot read the HEAD blob for {rel}: {exc}") from exc
+    if hashlib.sha256(blob).hexdigest() != sha(MOD):
+        raise SystemExit(
+            f"ABORT: {rel} differs from HEAD — the working tree is dirty, so it "
+            f"cannot serve as the mutation baseline. Commit or restore it first. "
+            f"(A leftover from a killed run looks exactly like this.)"
+        )
+
+
 def main():
+    # Baseline first: never adopt the working tree sight-unseen.
+    verify_baseline_matches_head()
+
     orig = open(MOD, encoding="utf-8").read()
     clean = sha(MOD)
     fd, bak = tempfile.mkstemp(prefix="roi-", suffix=".bak")
     os.close(fd)
     os.chmod(bak, 0o600)
     open(bak, "w", encoding="utf-8").write(orig)
+
+    # A `finally` does not run when the process is SIGTERM'd, which is exactly
+    # how the 600 s harness ceiling kills a long battery — demonstrated: killed
+    # at the limit, the target was left mutated. Restore from the handler too.
+    def _restore_and_die(signum, _frame):
+        with open(MOD, "w", encoding="utf-8") as fh:
+            fh.write(orig)
+        print(f"\nsignal {signum}: restored {MOD} before exiting", file=sys.stderr)
+        raise SystemExit(128 + signum)
+
+    for _sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(_sig, _restore_and_die)
+
     rows = []
     try:
         for row, desc, old, new in MUTATIONS:

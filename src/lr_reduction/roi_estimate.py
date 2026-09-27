@@ -19,6 +19,19 @@ import numpy as np
 
 from lr_reduction import nr_tools
 
+
+class CannotEstimateError(ValueError):
+    """No estimate is available for this run — a genuine refusal, not a caller error.
+
+    Layer (e)'s `dataset_probe` needs to tell "I looked and there is nothing to
+    guess" apart from "you called me wrong". Both were plain `ValueError`, so a
+    probe wrapper written as `except ValueError: return None` would swallow
+    programming errors as "no guess" and fall through to layer (f) wearing a
+    badge that reads "default" — the silent-wrong-value class. Introduced now so
+    layer (e) inherits it; introducing it later changes what the probe catches.
+    """
+
+
 #: DASlogs paths, matching `binary_processing.get_log_values` exactly. Motors
 #: are read at [-1] (where the axis ended up) and the autoreduce counters at [0]
 #: (they are set once per run).
@@ -63,8 +76,14 @@ def read_nexus_metadata(path):
     return meta
 
 
-def chopper_tof_window(path, scaled_width=None):
-    """The wavelength band this run actually measured, from its chopper logs.
+def chopper_lambda_range(path, scaled_width=None):
+    """The wavelength band this run actually measured, in **Angstrom**.
+
+    Named for what it returns. It was `chopper_tof_window`, which promised TOF
+    and returned wavelength, so composing it with `counts_vs_y(tof_band=...)` —
+    documented in microseconds — filtered events to 2.4-5.8 us, produced an
+    all-zero profile, and made `estimate_peak_range` blame the run for a unit
+    error. Use :func:`lambda_to_tof` to cross the units deliberately.
 
     Delegates to :func:`lr_reduction.nr_tools.get_lam_range`. **Do not inline
     this maths.** It already exists at four values in this tree — 3.4 in
@@ -96,6 +115,27 @@ def chopper_tof_window(path, scaled_width=None):
     if scaled_width is None:
         return nr_tools.get_lam_range(chopper_lam, chopper_speed)
     return nr_tools.get_lam_range(chopper_lam, chopper_speed, scaled_width=scaled_width)
+
+
+def lambda_to_tof(lam_range, start_time):
+    """Convert an Angstrom band to a TOF band in microseconds for this run.
+
+    de Broglie, with the moderator-to-detector flight path from the
+    time-indexed instrument database rather than a literal — the distance has
+    three entries in `settings.json` and has genuinely changed.
+
+    tof[us] = (m_n / h) * L[m] * lam[A] * 1e-4
+    """
+    settings = nr_tools.read_settings(start_time)
+    # read_settings reports this in MILLIMETRES (15750.0 for the 15.75 m
+    # path) — the reducer works in mm. Writing the conversion without checking
+    # gave a band of 9.5e6 us, ~1000x the run's whole TOF span; the composition
+    # test is what caught it, which is the case for having written one.
+    flight_m = float(settings["source_detector_distance"]) / 1000.0
+    # m_n/h in us/(m*A): 252.7701 (CODATA), the standard neutron TOF constant.
+    k = 252.7701
+    lo, hi = float(lam_range[0]), float(lam_range[1])
+    return k * flight_m * lo, k * flight_m * hi
 
 
 def detector_shape(start_time):
@@ -163,6 +203,13 @@ def counts_vs_y(path, lowres=(0, 255), max_events=None, n_tof_bins=200, tof_band
         event_id = event_id[::step]
         e_offset = e_offset[::step]
 
+    total_charge = float(np.sum(pcharge))
+    if not np.isfinite(total_charge) or total_charge <= 0:
+        raise CannotEstimateError(
+            f"proton charge is {total_charge!r} — dividing by it yields a NaN/inf "
+            f"profile that walks every downstream guard and brackets pixel 0"
+        )
+
     n_x, n_y = detector_shape(start_time)
 
     if len(e_offset) == 0:
@@ -171,7 +218,10 @@ def counts_vs_y(path, lowres=(0, 255), max_events=None, n_tof_bins=200, tof_band
     lo = float(np.min(e_offset)) if tof_band is None else float(tof_band[0])
     hi = float(np.max(e_offset)) if tof_band is None else float(tof_band[1])
     if hi <= lo:
-        raise ValueError(f"empty TOF band {(lo, hi)!r}")
+        # Not cosmetic: without this `np.linspace(hi, lo, n)` descends, `d_tof`
+        # goes negative, `np.digitize` clips into valid indices, and the
+        # function returns a plausible profile from inverted bins with no error.
+        raise ValueError(f"empty or inverted TOF band {(lo, hi)!r}")
     tof_array = np.linspace(lo, hi, n_tof_bins)
 
     _, y_tof, _ = binary_processing.get_y_tof(
@@ -208,8 +258,18 @@ def estimate_peak_range(counts, min_contrast=1.5, smooth=3, with_contrast=False)
     ``with_contrast``.
     """
     counts = np.asarray(counts, dtype=float)
-    if counts.size == 0 or not np.any(counts > 0):
-        raise ValueError("no counts on the detector — no peak can be estimated")
+    if counts.size == 0 or not np.any(np.isfinite(counts) & (counts > 0)):
+        raise CannotEstimateError("no counts on the detector — no peak can be estimated")
+    if not np.all(np.isfinite(counts)):
+        # NaN/inf reach here from a zero proton-charge normalisation. Left
+        # alone, `any(counts > 0)` passes on the infs, argmax finds the first
+        # NaN at index 0, both walks stop, and the function returns (0, 0) —
+        # the exact failure the guard above claims to prevent.
+        raise CannotEstimateError(
+            "the row profile contains NaN or inf — normalisation produced a "
+            "non-finite profile (a zero proton charge does this), so no peak "
+            "can be estimated"
+        )
 
     if smooth and smooth > 1:
         kernel = np.ones(int(smooth)) / float(smooth)
@@ -234,10 +294,22 @@ def estimate_peak_range(counts, min_contrast=1.5, smooth=3, with_contrast=False)
     # "outside" is empty, and an empty outside was reading as infinite
     # contrast: the one input the contrast score exists to reject scored best.
     baseline = float(np.median(smoothed))
-    contrast = peak / baseline if baseline > 0 else float("inf")
+
+    # Refuse, do NOT score as infinite. `inf < min_contrast` is False for every
+    # threshold, so the previous `else float("inf")` made this guard a no-op on
+    # exactly the runs it exists for: a sparse, low-flux profile has median 0.
+    # Reachable on 5 of 63 real REF_L files (70-77% empty rows) — a profile of
+    # zeros with one 3-count row scored (199, 201, inf).
+    if not np.isfinite(baseline) or baseline <= 0:
+        raise CannotEstimateError(
+            f"the row profile has a non-positive baseline ({baseline!r}) — it is "
+            f"too sparse to separate a peak from nothing, so no contrast can be "
+            f"computed and no ROI is offered"
+        )
+    contrast = peak / baseline
 
     if contrast < min_contrast:
-        raise ValueError(
+        raise CannotEstimateError(
             f"contrast {contrast:.2f} is below {min_contrast} — the detector is "
             f"featureless here, so the largest bin is noise, not a peak"
         )
@@ -264,6 +336,22 @@ def default_bkg_roi(peak_range, n_y, gap=5, width=10):
     and provides none.
     """
     peak_low, peak_high = int(peak_range[0]), int(peak_range[1])
+
+    # Each branch below checks only ONE end, so the other end went unchecked and
+    # the function returned bands off the detector: (400, 410) on a 304-row
+    # detector gave (385, 394), and (-50, -40) gave (-34, -25). I had removed
+    # clamps here as "dead code"; they were dead only under an unstated
+    # precondition — that `peak_range` is on the detector — which nothing
+    # checked. Validating and refusing rather than clamping, because clamping
+    # (400, 410) returns a band from the wrong END of the detector, silently,
+    # which is the failure this docstring names. RB_Ymin/RB_Ymax reach the
+    # resolver from layer (c) as unvalidated file input.
+    if not 0 <= peak_low <= peak_high <= n_y - 1:
+        raise ValueError(
+            f"peak {peak_range} is not on a {n_y}-pixel detector (rows 0-{n_y - 1}); "
+            f"refusing rather than clamping, which would return a band from the "
+            f"wrong end"
+        )
 
     high_edge = peak_low - gap - 1
     if high_edge - width + 1 >= 0:
