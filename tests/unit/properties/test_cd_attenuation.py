@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 from mantid.api import IEventWorkspace
-from mantid.simpleapi import ConvertUnits, CreateSampleWorkspace, DeleteWorkspace, Rebin, mtd
+from mantid.simpleapi import ConvertUnits, CreateSampleWorkspace, CreateWorkspace, DeleteWorkspace, Rebin, mtd
 
 from lr_reduction.exceptions import LrValidationError, SampleLogsError
 from lr_reduction.properties import cd_attenuation
@@ -239,17 +239,64 @@ def test_transmission_is_reused_from_the_analysis_data_service():
     np.testing.assert_array_equal(get_transmission_workspace(MODERATE_THICKNESS).readY(0), -1.0)
 
 
+def test_transmission_is_named_by_its_thickness_in_microns():
+    assert get_transmission_workspace(MODERATE_THICKNESS).name() == "transmission_307um"
+
+
 def test_nearby_thicknesses_do_not_share_a_transmission():
     first = get_transmission_workspace(0.00574)
     second = get_transmission_workspace(0.00575)
 
-    assert first.name() != second.name()
+    assert (first.name(), second.name()) == ("transmission_57.4um", "transmission_57.5um")
     assert not np.allclose(first.readY(0), second.readY(0), rtol=1e-6)
+
+
+def test_thicknesses_sharing_a_rounded_name_each_get_their_own_transmission():
+    """Thicknesses equal to six significant figures share a name; the second must not reuse the first."""
+    _, mu = _load_cd_attenuation_data()
+    nearby = MODERATE_THICKNESS + 1e-9
+    get_transmission_workspace(MODERATE_THICKNESS)
+
+    transmission = get_transmission_workspace(nearby)
+
+    assert transmission.name() == "transmission_307um"
+    np.testing.assert_allclose(transmission.readY(0), np.exp(-mu * nearby), rtol=1e-12)
+    assert transmission.getRun()["cd_thickness"].value == nearby
+
+
+def test_correction_output_written_over_the_cached_name_is_not_reused(make_events):
+    """An output that overwrites the cached transmission's name forces a rebuild, not a bogus divide."""
+    apply_correction(make_events(), MODERATE_THICKNESS, "transmission_307um")
+    assert isinstance(mtd["transmission_307um"], IEventWorkspace)
+
+    corrected = apply_correction(make_events(), MODERATE_THICKNESS, "transmission_307um_corrected")
+    try:
+        event_list = corrected.getSpectrum(0)
+        np.testing.assert_allclose(
+            event_list.getWeights(), expected_scale(event_list.getTofs(), MODERATE_THICKNESS), rtol=RTOL
+        )
+    finally:
+        DeleteWorkspace(corrected)
+
+
+def test_unrelated_workspace_under_the_cached_name_is_replaced():
+    CreateWorkspace(DataX=[1.0, 2.0], DataY=[5.0], UnitX="Wavelength", OutputWorkspace="transmission_307um")
+
+    transmission = get_transmission_workspace(MODERATE_THICKNESS)
+
+    _, mu = _load_cd_attenuation_data()
+    np.testing.assert_allclose(transmission.readY(0), np.exp(-mu * MODERATE_THICKNESS), rtol=1e-12)
 
 
 @pytest.mark.parametrize("cd_thickness", [-0.001, np.nan, np.inf])
 def test_nonsensical_thickness_raises(cd_thickness):
     with pytest.raises(LrValidationError, match="non-negative"):
+        get_transmission_workspace(cd_thickness)
+
+
+@pytest.mark.parametrize("cd_thickness", [None, "abc", np.array([0.01, 0.02])])
+def test_non_numeric_thickness_raises(cd_thickness):
+    with pytest.raises(LrValidationError, match="must be a number"):
         get_transmission_workspace(cd_thickness)
 
 

@@ -14,6 +14,7 @@ from mantid.simpleapi import ConvertToHistogram, CreateWorkspace, Divide
 
 from lr_reduction.exceptions import LrValidationError, SampleLogsError
 from lr_reduction.types import MantidWorkspace, MantidWorkspaceName
+from lr_reduction.utils.sample_logs import SampleLogs
 from lr_reduction.utils.workspace import workspace_exists, workspace_handle
 
 cd_attenuation_file = Path(__file__).parent / "Cd-attenuation.csv"
@@ -24,6 +25,8 @@ CD_FOILS = (57.5, 126.5, 126.5 + 123.0, 2 * (126.5 + 123.0))
 # Mantid stores weighted-event weights and squared errors as float32. Dividing by T = exp(-μ·d)
 # scales a squared error by exp(2·μ·d), which overflows to inf beyond this exponent.
 _MAX_ATTENUATION_EXPONENT = 0.5 * np.log(np.finfo(np.float32).max)
+
+_THICKNESS_LOG = "cd_thickness"
 
 
 @lru_cache(maxsize=1)
@@ -105,17 +108,38 @@ def get_transmission_workspace(cd_thickness: float) -> MatrixWorkspace:
     Raises
     ------
     LrValidationError
-        `cd_thickness` is negative or not finite.
+        `cd_thickness` is not a number, is negative, or is not finite.
     """
-    if not np.isfinite(cd_thickness) or cd_thickness < 0:
-        raise LrValidationError(f"Cd thickness must be a non-negative number of centimeters, got {cd_thickness}")
-    # Keyed to 1e-8 cm: a coarser key would hand one thickness the cached transmission of a nearby one.
-    name = f"transmission_{cd_thickness:.8f}"
-    if workspace_exists(name):
+    try:
+        thickness = float(cd_thickness)
+    except (TypeError, ValueError) as exc:
+        raise LrValidationError(f"Cd thickness must be a number of centimeters, got {cd_thickness!r}") from exc
+    if not np.isfinite(thickness) or thickness < 0:
+        raise LrValidationError(f"Cd thickness must be a non-negative number of centimeters, got {thickness}")
+    # The name is for readability only; reuse is decided by the exact thickness logged on the workspace.
+    name = f"transmission_{thickness * 1e4:g}um"
+    if _is_transmission_for(name, thickness):
         return workspace_handle(name)
     wavelength, mu = _load_cd_attenuation_data()
-    CreateWorkspace(OutputWorkspace=name, DataX=wavelength, DataY=np.exp(-mu * cd_thickness), UnitX="Wavelength")
-    return ConvertToHistogram(InputWorkspace=name, OutputWorkspace=name)
+    CreateWorkspace(OutputWorkspace=name, DataX=wavelength, DataY=np.exp(-mu * thickness), UnitX="Wavelength")
+    transmission = ConvertToHistogram(InputWorkspace=name, OutputWorkspace=name)
+    SampleLogs(transmission).insert(_THICKNESS_LOG, thickness, unit="cm")
+    return transmission
+
+
+def _is_transmission_for(name: MantidWorkspaceName, thickness: float) -> bool:
+    """Whether the workspace of this name is the transmission this module built for `thickness`.
+
+    The name is shared, process-global state: a workspace written over it — an `apply_correction`
+    output, say — or a rounded name shared by two thicknesses must be rebuilt, not reused.
+    """
+    if not workspace_exists(name):
+        return False
+    ws = workspace_handle(name)
+    if not isinstance(ws, MatrixWorkspace) or not ws.isHistogramData():
+        return False
+    logs = SampleLogs(ws)
+    return _THICKNESS_LOG in logs and logs[_THICKNESS_LOG] == thickness
 
 
 def apply_correction(
