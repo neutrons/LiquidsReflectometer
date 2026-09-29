@@ -69,7 +69,8 @@ class Direct_Beam:
             return f'IPTS-{m.group(1)}'
         return s
 
-    def create_db(self, run_list, save_name, plot=True, mu_file = None, flip_atten=False, return_traces=False, experiment_id=None):
+    def create_db(self, run_list, save_name, plot=True, mu_file = None, flip_atten=False, return_traces=False, experiment_id=None, cd_list=None,
+                  start_times = None, end_times = None):
         """
         Create a direct beam spectrum from the given run list including an attenuation correction for Cd foils (if used).
         Saves the file to the specified location, with header information of the DB pixel position.
@@ -122,9 +123,17 @@ class Direct_Beam:
         for i, run in enumerate(run_list):
             # get header info from Nexus: atten and chop2 phase
             fname = os.path.join(nexus_base, f'REF_L_{run}.nxs.h5')
+            print(fname)
 
-            tof_array, y_tof_corr, error_array_corr, log_values, DTC_corr = BP.convert_to_binary(fname, self.low_res, collapse_x = True, tofbin=self.tofbin, tofmax=self.tofmax,
-                                                                                                 tofmin=self.tofmin, deadtime=self.deadtime, tof_step=self.tof_step)
+            binary_return = BP.convert_to_binary(fname, self.low_res, collapse_x = True, tofbin=self.tofbin, tofmax=self.tofmax,
+                                                                                                 tofmin=self.tofmin, deadtime=self.deadtime, tof_step=self.tof_step,
+                                                                                                 start_times=start_times, end_times=end_times)
+            if binary_return is None:
+                # TODO: fix this handling properly
+                print('Ending DB processing. No counts in run:', run)
+                return
+            else:
+                tof_array, y_tof_corr, error_array_corr, log_values, DTC_corr = binary_return
             T = tof_array * 1000
             DTC = DTC_corr
             y_tof_corr = np.flipud(y_tof_corr) # flip the y-axis to match the orientation of the detector
@@ -152,6 +161,10 @@ class Direct_Beam:
             # read in Cd linear attenuation coefficient data
             L_ENDF, mu_ENDF = np.loadtxt(mu_file, unpack=True, skiprows=1)
 
+            print(log_values['Atten'])
+            if cd_list:
+                log_values['Atten']=cd_list
+                print('Replacing attentuator list with provided input: ', cd_list)
             # Need to split some parts out into separate functions if the logic is correct.
             Cd_thickness = self._extract_cd_values(log_values, flip_atten)
             print(f'Run {run}: Cd thickness = {Cd_thickness:.5f} cm')

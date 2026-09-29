@@ -8,7 +8,7 @@ from scipy.special import lambertw
 
 # TODO: link up the parts that are self. from copying across.
 
-def convert_to_binary(fname, lowres, collapse_x = True, tofbin=50, tofmax=100000, tofmin=0, deadtime=4.2, tof_step=100, n_y=304, n_x=256):
+def convert_to_binary(fname, lowres, collapse_x = True, tofbin=50, tofmax=100000, tofmin=0, deadtime=4.2, tof_step=100, n_y=304, n_x=256, start_times=None, end_times=None):
     '''
     Main function for converting to load the file, apply the dead-time correction and obtain y vs tof data (non-event).
 
@@ -17,28 +17,40 @@ def convert_to_binary(fname, lowres, collapse_x = True, tofbin=50, tofmax=100000
     :param collapse_x: planned option to keep the x-pixel direction but not implemented. True sums over x-pixels in the lowres range.
     :param tofbin: default bin size for tof histogramming
     :param tofmax: default max tof for histogramming (mainly important for non-standard chopper configurations)
+    :param start_times: default None. Allows list of start times for event filtering on time. Must match length of stop_times.
+    :param stop_times: default None. Allows list of stop times for event filtering on time. Must match length of start_times.
     :return: tof_array, y_tof_corr, error_array_corr
     '''
     # Include option to collapse along the x-pixel direction between the min/max bounds
     # Assume wksp has had the DTC applied.
 
     # Example using the h5py to extract info as can be easier to manipulate that mantid wksp
-    e_offset, event_id, error_event_offset, pcharge, cPc, log_values = load_and_extract(fname)
-    tof_array, DTC, error_counts = get_deadtime_correction(error_event_offset, e_offset, cPc, tofbin, tofmax, tofmin, deadtime=deadtime, tof_step=tof_step)
-    tof_array, y_tof, error_array = get_y_tof(tof_array, event_id, e_offset, lowres, pcharge, n_y, n_x)
+    e_offset, event_id, error_event_offset, pcharge, cPc, log_values = load_and_extract(fname, start_times=start_times, end_times=end_times)
+    
+    pGood=len(cPc[cPc != 0])
+    print('pGood', pGood)
+    print('number events', len(e_offset))
+    # TODO: work out where to put this
+    if pGood < 1:
+        print('There are no good counts in this run.')
+        return
+
+    else:
+        tof_array, DTC, error_counts = get_deadtime_correction(error_event_offset, e_offset, cPc, tofbin, tofmax, tofmin, deadtime=deadtime, tof_step=tof_step)
+        tof_array, y_tof, error_array = get_y_tof(tof_array, event_id, e_offset, lowres, pcharge, n_y, n_x)
 
 
-    #y_tof_collapse = np.sum(y_tof, axis=0)
-    # Apply the dead-time correction
-    y_tof_corr = y_tof * DTC
-    error_array_corr = error_array * DTC
-    y_tof_corr = np.nan_to_num(y_tof_corr, nan=0)
-    error_array_corr = np.nan_to_num(error_array_corr, nan=0)
+        #y_tof_collapse = np.sum(y_tof, axis=0)
+        # Apply the dead-time correction
+        y_tof_corr = y_tof * DTC
+        error_array_corr = error_array * DTC
+        y_tof_corr = np.nan_to_num(y_tof_corr, nan=0)
+        error_array_corr = np.nan_to_num(error_array_corr, nan=0)
 
-    tof_array = tof_array / 1000
-    return tof_array, y_tof_corr, error_array_corr, log_values, DTC
+        tof_array = tof_array / 1000
+        return tof_array, y_tof_corr, error_array_corr, log_values, DTC
 
-def load_and_extract(fname):
+def load_and_extract(fname, start_times = None, end_times = None):
     '''
     Load the nexus file and extract the relevant arrays using h5py.
 
@@ -48,16 +60,92 @@ def load_and_extract(fname):
     # Example using the h5py to extract info as can be easier to manipulate that mantid wksp
     f = h5py.File(fname, 'r')
 
-    e_offset = np.array(f['entry/bank1_events/event_time_offset'][:])
-    event_id = np.array(f['entry/bank1_events/event_id'][:])
-    error_event_offset = np.array(f['entry/bank_error_events/event_time_offset'][:])
-    pcharge=np.array(f['entry/proton_charge'][:])
+    e_offset = np.array(f['entry/bank1_events/event_time_offset'][:]) # TOF
+    event_id = np.array(f['entry/bank1_events/event_id'][:]) # position on detector
+    event_time = np.array(f['entry/bank1_events/event_time_zero'][:]) # pulses ms
+    event_index = np.array(f['entry/bank1_events/event_index'][:]) # which number is max in that pulse
+
+    error_event_offset = np.array(f['entry/bank_error_events/event_time_offset'][:]) # error TOF
+    error_event_time = np.array(f['entry/bank_error_events/event_time_zero'][:]) # error pulses ms
+    error_event_index = np.array(f['entry/bank_error_events/event_index'][:]) # error index
+
+    #pcharge=np.array(f['entry/proton_charge'][:])
     # This is single value. TODO: streamline so don't need this and the previous log.
     cPC=np.array(f['entry/DASlogs/proton_charge/value'][:])
+    pcharge=[np.sum(cPC)] # test this change
 
     log_values = get_log_values(fname)
+    
+    if start_times is not None or end_times is not None:
+        if start_times is None or end_times is None:
+            raise ValueError("start_times and end_times must either both be provided or both be None.")
 
-    return e_offset, event_id, error_event_offset, pcharge, cPC, log_values
+        if not isinstance(start_times, list):
+            start_times = [start_times]
+        if not isinstance(end_times, list):
+            end_times = [end_times]
+
+        if len(start_times) != len(end_times):
+            raise ValueError("Start and end times for time slices must be the same length.")
+
+        masked_e_offset, masked_event_id, masked_e_offset_error, masked_cPC = event_time_filter(start_times, end_times, event_time, event_id,
+                                                                                                 e_offset,event_index, error_event_time, 
+                                                                                                 error_event_offset, error_event_index, cPC)
+        masked_pcharge = [np.sum(masked_cPC)]
+        return masked_e_offset, masked_event_id, masked_e_offset_error, masked_pcharge, masked_cPC, log_values
+
+    else:
+        return e_offset, event_id, error_event_offset, pcharge, cPC, log_values
+
+def event_time_filter(start_times, end_times, event_time, event_id, e_offset, event_index,
+                       error_event_time, error_event_offset, error_event_index, cPC):
+    masked_event_id = []
+    masked_e_offset = []
+    masked_e_offset_error = []
+    masked_cPC = []
+
+    # Find the event time zero pulse, then event index that follows this, apply these masks to the TOF and position
+
+    # Loop over all starts/ends
+    for start, end in zip(start_times, end_times):
+        # Check that start is before end.
+        if start >= end:
+            raise ValueError(
+                f"Start time ({start}) must be less than end time ({end})."
+            )
+        
+        # Normal events
+        start_idx = np.searchsorted(event_time, start, side="right")
+        stop_idx = np.searchsorted(event_time, end, side="right")
+
+        # find in the event index
+        if start != 0:
+            start_event = event_index[start_idx] - 1
+        else:
+            start_event = event_index[start_idx]
+        stop_event = event_index[stop_idx] - 1
+
+        # TODO: need to check on +/- values    
+        # write some proper tests to check aren't losing single events on edges or duplicating them    
+        
+        masked_event_id.append(event_id[start_event:stop_event])
+        masked_e_offset.append(e_offset[start_event:stop_event])
+        masked_cPC.append(cPC[start_idx:stop_idx])
+
+        # Error events
+        error_start_idx = np.searchsorted(error_event_time, start, side="right")
+        error_stop_idx = np.searchsorted(error_event_time, end, side="right")
+        error_start_event = error_event_index[error_start_idx]
+        error_stop_event = error_event_index[error_stop_idx]
+        masked_e_offset_error.append(error_event_offset[error_start_event:error_stop_event])
+
+    # Concatenate them back into one.
+    masked_event_id = np.concatenate(masked_event_id)
+    masked_e_offset = np.concatenate(masked_e_offset)
+    masked_e_offset_error = np.concatenate(masked_e_offset_error)
+    masked_cPC = np.concatenate(masked_cPC)
+
+    return masked_e_offset, masked_event_id, masked_e_offset_error, masked_cPC
 
 
 def get_deadtime_correction(error_event_offset, e_offset, pcharge, tofbin=50, tofmax=50000, tofmin=0, use_bad_counts=True, deadtime=4.2, tof_step=100):

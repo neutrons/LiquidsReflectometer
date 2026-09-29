@@ -107,7 +107,8 @@ class NR_Reduction:
         if not self.config.tof_max:
             self.config.tof_max = [100000] * n_settings # TODO: Work out where to set this up properly!
 
-    def reduce(self, save=True, save_all=True, plot=None, eight_col=None, save_pdf_summary=False):
+    def reduce(self, save=True, save_all=True, plot=None, eight_col=None, save_pdf_summary=False,
+               start_times = None, end_times = None):
         """
         Perform the reduction of all angle settings and combine into an output.
 
@@ -149,7 +150,7 @@ class NR_Reduction:
                 non_specified.append(i)
                 continue
 
-            result, config_out, log_vals = self._reduce_single_run(i, rb_num)
+            result, config_out, log_vals = self._reduce_single_run(i, rb_num, start_times=start_times, end_times=end_times)
             print("Completed reduction for run", rb_num)
             # TODO: add better autoscaling options.
             if self.config.AutoScale and last_valid_idx is not None:
@@ -175,6 +176,9 @@ class NR_Reduction:
             used_theta_vals["ths"].append(np.round(log_vals["ths"], 3))
             used_theta_vals["ThCen"].append(np.round(log_vals["ThCen"], 3))
             used_theta_vals['title'].append(self.log_values['title'])
+
+            self.config.start_times = start_times
+            self.config.end_times = end_times
 
             Q.append(result['q'])
             R.append(result['r'])
@@ -295,7 +299,7 @@ class NR_Reduction:
             tof_array, y_tof_corr, error_array_corr, log_values = self._make_binary_files(rb_num, self.config.tof_min[i], self.config.tof_max[i])
             return tof_array, y_tof_corr, error_array_corr, log_values
 
-    def _make_binary_files(self, rb_num, tof_min=0, tof_max=50000):
+    def _make_binary_files(self, rb_num, tof_min=0, tof_max=50000, start_times=None, end_times=None):
         """
         Make binary files.
 
@@ -340,7 +344,9 @@ class NR_Reduction:
                 deadtime=self.config.dead_time,
                 tof_step=self.config.dead_time_tof_step,
                 n_y=304,    # TODO: Work out how to add here when settings not created yet.
-                n_x=256
+                n_x=256,
+                start_times=start_times,
+                end_times=end_times
             )
 
             print(f"Binary data computed successfully for run {rb_num}")
@@ -349,7 +355,7 @@ class NR_Reduction:
         except Exception as e:
             raise RuntimeError(f"Failed to compute binary data for run {rb_num}: {str(e)}")
 
-    def _load_and_extract_lambda(self, i, rb_num):
+    def _load_and_extract_lambda(self, i, rb_num, start_times=None, end_times=None):
         """
         Load binary TOF data and convert to lambda space including the emission time correction.
         Return arrays for run and direct beam with matching bins.
@@ -369,7 +375,7 @@ class NR_Reduction:
              ThCen)
         """
         # Get binary data recompute to ensure correct x-ranges etc.
-        tRB, nRB, nRBE, log_values = self._make_binary_files(rb_num, self.config.tof_min[i], self.config.tof_max[i])
+        tRB, nRB, nRBE, log_values = self._make_binary_files(rb_num, self.config.tof_min[i], self.config.tof_max[i], start_times=start_times, end_times=end_times)
         self.log_values = log_values
         # Read in the instrument settings file from the json. # TODO: A little more logic should be added to mimic prior setup.
         settings = tools.read_settings(log_values["start_time"])
@@ -938,7 +944,7 @@ class NR_Reduction:
 
         return theta, mode
 
-    def _reduce_single_run(self, i, rb_num, save=True):
+    def _reduce_single_run(self, i, rb_num, save=True, start_times=None, end_times=None):
         """
         Reduce a single run setting using the pre-defined config.
 
@@ -956,7 +962,7 @@ class NR_Reduction:
         """
         # Load and extract data to lambda space
         # Note: q and lDB are available as self.q, not needed in unpacking
-        _, iDB, eDB, _, _, _, ypix, RB, RBE, LAMBDA, LambdaBinSize, _, mode = self._load_and_extract_lambda(i, rb_num)
+        _, iDB, eDB, _, _, _, ypix, RB, RBE, LAMBDA, LambdaBinSize, _, mode = self._load_and_extract_lambda(i, rb_num, start_times=start_times, end_times=end_times)
         ## NOTE: Is the q value needed from the output above?! Track through the self.q...?
 
         # Crop to y-pixel ROI
