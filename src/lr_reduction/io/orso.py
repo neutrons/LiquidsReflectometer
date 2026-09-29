@@ -50,6 +50,26 @@ def read_partials(partial_dir: str, sequence_id: int) -> list[ReductionResult]:
     return []
 
 
+def _run_label(results: ReductionResult | CombinedReductionResult) -> str:
+    """A human-readable name for the run(s) that produced *results*, for log messages.
+
+    A run summed from several source runs is named by them joined with ``+``. A combined
+    result is named by its partials' runs, or by the configured runs when it carries no
+    partials.
+    """
+
+    def summed(run_numbers) -> str:
+        return "+".join(str(run_number) for run_number in run_numbers)
+
+    if isinstance(results, ReductionResult):
+        return f"run {summed(results.run_numbers) or '<unknown>'}"
+    if results.partials:
+        runs = [summed(partial.run_numbers) for partial in results.partials]
+    else:
+        runs = [summed(run.resolved_source_runs) for run in results.reduction_config.runs.values()]
+    return f"combined runs {', '.join(runs) or '<unknown>'}"
+
+
 # TODO:
 #   - Double check comment/metadata and fields/values/units with CISes
 #   - Parse Results, ReductionConfig, and Nexus logs for info to populate ORSO fields
@@ -65,7 +85,7 @@ def write_orso(
 ) -> Path:
     """Write reduction results to an ORSO format file and return the path of the written file."""
 
-    logger.info(f"Writing ORSO reduced data for {type(results).__name__} to {output_dir}")
+    logger.info(f"Writing ORSO reduced data for {_run_label(results)} to {output_dir}")
 
     header = fileio.orso.Orso.empty()
 
