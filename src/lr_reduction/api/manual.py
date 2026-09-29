@@ -14,6 +14,7 @@ from lr_reduction.io.orso import write_orso
 from lr_reduction.io.report import html_report
 from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
+from lr_reduction.models.run_data import RunData
 from lr_reduction.operations import CombineResultsOperation
 from lr_reduction.types import ID, SingleReductionInput
 
@@ -73,14 +74,19 @@ class ManualRunSequence(Entrypoint[list[SingleReductionInput], CombinedReduction
         return self._config_loader.load(str(self.configuration))
 
     def load_data(self, config: ReductionConfig) -> list[SingleReductionInput]:
+        # Runs referencing the same composite direct beam share one load of its runs.
+        direct_beams_by_name: dict[str, list[RunData]] = {}
         run_data = []
         for run_number in self.run_numbers:
             run = self._run_loader.load(run_number)
-            db_config = get_direct_beam_config(run.sequence_number, config)
+            db_name = config.runs[run.sequence_number].direct_beam
+            db_config = config.direct_beams[db_name]
+            if db_name not in direct_beams_by_name:
+                direct_beams_by_name[db_name] = get_direct_beams(self._run_loader, db_config)
             run_data.append(
                 SingleReductionInput(
                     run_data=run,
-                    direct_beams=[self._run_loader.load(db) for db in db_config.run_numbers],
+                    direct_beams=direct_beams_by_name[db_name],
                     direct_beam_config=db_config,
                 )
             )

@@ -5,6 +5,7 @@ from lr_reduction.io import RunLoader
 from lr_reduction.models.config import DirectBeamConfig, ReductionConfig, ReflectedRunConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 from lr_reduction.types import ID
+from lr_reduction.utils.sample_logs import SampleLogs
 
 
 def _config(run_number: ID) -> ReductionConfig:
@@ -64,6 +65,42 @@ def test_manual_run_sequence_loads_every_configured_run(tmp_path, monkeypatch):
     ManualRunSequence([54321], tmp_path / "seq_999.yaml", output_dir=str(tmp_path)).execute()
 
     assert loaded_run_numbers == [54321, 11111]  # The reflected run and the direct beam run are both loaded
+
+
+def test_manual_run_sequence_loads_a_shared_direct_beam_once(tmp_path, monkeypatch):
+    """Reflected runs referencing the same composite direct beam share one load of its runs."""
+    config = ReductionConfig(
+        direct_beams={
+            "db_a": DirectBeamConfig(run_numbers=[11111, 11112]),
+            "db_b": DirectBeamConfig(run_numbers=[22222]),
+        },
+        runs={
+            1: ReflectedRunConfig(sequence_number=1, direct_beam="db_a", run_number=101),
+            2: ReflectedRunConfig(sequence_number=2, direct_beam="db_b", run_number=102),
+            3: ReflectedRunConfig(sequence_number=3, direct_beam="db_a", run_number=103),
+        },
+    )
+    sequence_numbers = {run.run_number: run.sequence_number for run in config.runs.values()}
+    loaded_run_numbers = []
+
+    monkeypatch.setattr("lr_reduction.api.manual.ConfigLoader.load", lambda _self, _path: config)
+
+    original_load = RunLoader.load
+
+    def _load_with_recorded_sequence_number(_self, run_number):
+        # The stub loader records sequence_number 1 on every run; record the configured one instead.
+        loaded_run_numbers.append(run_number)
+        run = original_load(_self, run_number)
+        if run_number in sequence_numbers:
+            SampleLogs(run.workspace).insert("sequence_number", sequence_numbers[run_number])
+        return run
+
+    monkeypatch.setattr("lr_reduction.api.manual.RunLoader.load", _load_with_recorded_sequence_number)
+
+    data = ManualRunSequence([101, 102, 103], tmp_path / "seq.yaml").load_data(config)
+
+    assert loaded_run_numbers == [101, 11111, 11112, 102, 22222, 103]
+    assert data[0].direct_beams is data[2].direct_beams
 
 
 def test_main_run_subcommand_parses_and_dispatches(monkeypatch):
