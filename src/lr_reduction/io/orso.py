@@ -85,8 +85,6 @@ def write_orso(
 ) -> Path:
     """Write reduction results to an ORSO format file and return the path of the written file."""
 
-    logger.info(f"Writing ORSO reduced data for {_run_label(results)} to {output_dir}")
-
     header = fileio.orso.Orso.empty()
 
     user = Person(
@@ -187,6 +185,7 @@ def write_orso(
 
     fn = "PLACEHOLDER_FILENAME.ort"
     output = Path(output_dir) / fn
+    logger.info(f"Writing ORSO reduced data for {_run_label(results)} to {output}")
     save_orso(datasets=[dataset], fname=str(output))
 
     return output
