@@ -4,6 +4,7 @@ re-reducing as more events arrive."""
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from mantid.dataobjects import EventWorkspace
 
@@ -34,8 +35,8 @@ class LiveEntrypoint(SingleRunReduction):
         # Configuration is discovered from the run number carried by the workspace (§6.4.5.1),
         # mapping to the same configuration the autoreduction entrypoint would apply to that run.
         self.run_number = self.reflected_run.getRunNumber()
-        config_path = locate_standard_configuration(self.run_number)
-        return self._config_loader.load(str(config_path))
+        self.configuration_path = locate_standard_configuration(self.run_number)
+        return self._config_loader.load(str(self.configuration_path))
 
     def load_data(self, config: ReductionConfig) -> SingleReductionInput:
         # The metadata-derived sequence_number (§3.1.2): the DAS records it as a log that
@@ -60,6 +61,17 @@ class LiveEntrypoint(SingleRunReduction):
         diagnostic_plot()
 
 
+class LiveSequence(FromDiskSequence):
+    """On-disk sequence assembly under the configuration the live leaf resolved (§6.4.5.1)."""
+
+    def __init__(self, output_directory: str | Path, configuration_path: str | Path, **overrides):
+        super().__init__(output_directory, **overrides)
+        self.configuration_path = Path(configuration_path)
+
+    def load_configuration(self) -> ReductionConfig:
+        return self._config_loader.load(str(self.configuration_path))
+
+
 def reduce_live(reflected_run: EventWorkspace, **overrides) -> CombinedReductionResult:
     """Live reduction (§6.4.5, §11.6.3).
 
@@ -68,7 +80,7 @@ def reduce_live(reflected_run: EventWorkspace, **overrides) -> CombinedReduction
     """
     entrypoint = LiveEntrypoint(reflected_run, **overrides)
     entrypoint.execute()
-    return FromDiskSequence(entrypoint.output_directory, **overrides).execute()
+    return LiveSequence(entrypoint.output_directory, entrypoint.configuration_path, **overrides).execute()
 
 
 def main(argv: list[str] | None = None) -> None:
