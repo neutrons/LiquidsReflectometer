@@ -67,7 +67,7 @@ def _combined(config: ReductionConfig, partials: list[ReductionResult]) -> Combi
 
 def _sequence_config() -> ReductionConfig:
     return ReductionConfig(
-        direct_beams={"db": DirectBeamConfig(direct_beam_run_numbers=[11111])},
+        direct_beams={"db": DirectBeamConfig(run_numbers=[11111])},
         runs={
             1: ReflectedRunConfig(sequence_number=1, direct_beam="db", run_number=12360),
             2: ReflectedRunConfig(sequence_number=2, direct_beam="db", source_runs=[12361, 12362]),

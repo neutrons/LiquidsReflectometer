@@ -34,7 +34,7 @@ def reflected_run():
 @pytest.fixture(autouse=True)
 def _config_loader(monkeypatch):
     config = ReductionConfig(
-        direct_beams={"db": DirectBeamConfig(direct_beam_run_numbers=[11111])},
+        direct_beams={"db": DirectBeamConfig(run_numbers=[11111])},
         runs={1: ReflectedRunConfig(sequence_number=1, direct_beam="db", run_number=54321)},
     )
     monkeypatch.setattr("lr_reduction.io.config_loader.ConfigLoader.load", lambda _self, _path: config)
@@ -54,7 +54,7 @@ def test_reduce_live_assembles_under_the_configuration_the_live_leaf_resolved(re
     monkeypatch.chdir(tmp_path)
     loaded_paths = []
     config = ReductionConfig(
-        direct_beams={"db": DirectBeamConfig(direct_beam_run_numbers=[11111])},
+        direct_beams={"db": DirectBeamConfig(run_numbers=[11111])},
         runs={1: ReflectedRunConfig(sequence_number=1, direct_beam="db", run_number=54321)},
     )
 

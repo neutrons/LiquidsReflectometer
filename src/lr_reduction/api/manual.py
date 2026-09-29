@@ -80,7 +80,7 @@ class ManualRunSequence(Entrypoint[list[SingleReductionInput], CombinedReduction
             run_data.append(
                 SingleReductionInput(
                     run_data=run,
-                    direct_beams=[self._run_loader.load(db) for db in db_config.direct_beam_run_numbers],
+                    direct_beams=[self._run_loader.load(db) for db in db_config.run_numbers],
                     direct_beam_config=db_config,
                 )
             )

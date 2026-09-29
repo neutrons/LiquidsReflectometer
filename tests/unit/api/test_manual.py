@@ -9,7 +9,7 @@ from lr_reduction.types import ID
 
 def _config(run_number: ID) -> ReductionConfig:
     return ReductionConfig(
-        direct_beams={"db": DirectBeamConfig(direct_beam_run_numbers=[11111])},
+        direct_beams={"db": DirectBeamConfig(run_numbers=[11111])},
         runs={1: ReflectedRunConfig(sequence_number=1, direct_beam="db", run_number=run_number)},
     )
 
