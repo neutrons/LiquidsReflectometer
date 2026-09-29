@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 
 from lr_reduction.api._shared import get_direct_beam_config, get_direct_beams
-from lr_reduction.api._single_run import SingleRunReduction, reduce_one
+from lr_reduction.api._single_run import SingleRunReduction, compose_direct_beam, reduce_with_direct_beam
 from lr_reduction.api.interfaces import Entrypoint
 from lr_reduction.exceptions import LrValidationError
 from lr_reduction.io import ConfigLoader, RunLoader
@@ -16,7 +16,7 @@ from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 from lr_reduction.models.run_data import RunData
 from lr_reduction.operations import CombineResultsOperation
-from lr_reduction.types import ID, SingleReductionInput
+from lr_reduction.types import ID, CompositeDirectBeam, SingleReductionInput
 
 
 class ManualSingleRun(SingleRunReduction):
@@ -95,10 +95,15 @@ class ManualRunSequence(Entrypoint[list[SingleReductionInput], CombinedReduction
     # TODO: figure out how to address override sequence numbers
     def call_operations(self, data: list[SingleReductionInput], config: ReductionConfig) -> CombinedReductionResult:
         """Perform the run-sequence reduction operations."""
-        # for each run, compose the direct beam and reduce the run
+        # Each composite direct beam is composed once and reused by every run referencing it.
+        composed_by_name: dict[str, CompositeDirectBeam] = {}
         reduced_runs = []
         for run in data:
-            reduced_run = reduce_one(run, config, run.run_data.sequence_number)
+            sequence_number = run.run_data.sequence_number
+            db_name = config.runs[sequence_number].direct_beam
+            if db_name not in composed_by_name:
+                composed_by_name[db_name] = compose_direct_beam(run)
+            reduced_run = reduce_with_direct_beam(run.run_data, config, composed_by_name[db_name], sequence_number)
             reduced_runs.append(reduced_run)
         # combine the reduced runs into a single result
         combine_op = CombineResultsOperation(reduced_runs, config)
