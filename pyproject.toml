@@ -161,6 +161,8 @@ ruff = "*"
 codecov = "*"
 pytest = "*"
 pytest-cov = "*"
+jupyterlab = ">=4.6.4,<5"
+ipykernel = ">=7.3.0,<8"
 
 [tool.pixi.feature.docs.dependencies]
 sphinx = "*"
