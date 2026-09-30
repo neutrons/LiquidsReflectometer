@@ -121,20 +121,21 @@ class Direct_Beam:
             raise ValueError('NEXUSpath/savepath not set: provide experiment_id or supply NEXUSpath/savepath when constructing Direct_Beam or call create_db with experiment_id')
 
         # Pre-sort the runs into order by Cd amount in case run in a different order
-        # if cd_list provided then let this overwrite the log values
-        print(log_values['Atten'])
-        if cd_list:
-            log_values['Atten']=cd_list
-            print('Replacing attentuator list with provided input: ', cd_list)
-        else:
-            for run in run_list:
-                fname = os.path.join(nexus_base, f'REF_L_{run}.nxs.h5')
-                log_values = BP.get_log_values(fname)             # Just need the Atten log value at this point. But can use existing function
+        
+        for ii, run in enumerate(run_list):
+            fname = os.path.join(nexus_base, f'REF_L_{run}.nxs.h5')
+            log_values = BP.get_log_values(fname)             # Just need the Atten log value at this point. But can use existing function
+            # if cd_list provided then let this overwrite the log values
+            # short-term fix, hopefully not needed long term, otherwise should put before the file load.
+            if cd_list:
+                log_values['Atten']=cd_list[ii]
+                print('Replacing attentuator list with provided input: ', cd_list)
 
-        # Need to split some parts out into separate functions if the logic is correct.
-        Cd_thickness = self._extract_cd_values(log_values, flip_atten)
-        print(f'Run {run}: Cd thickness = {Cd_thickness:.5f} cm')
-        Cd_values.append(Cd_thickness)
+            print(log_values['Atten'])
+            # Need to split some parts out into separate functions if the logic is correct.
+            Cd_thickness = self._extract_cd_values(log_values, flip_atten)
+            print(f'Run {run}: Cd thickness = {Cd_thickness:.5f} cm')
+            Cd_values.append(Cd_thickness)
 
         # Sort the Cd_values by value - increasing Cd
         sorted_idx = np.argsort(np.array(Cd_values))
