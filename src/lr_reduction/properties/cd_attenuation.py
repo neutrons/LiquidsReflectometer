@@ -176,7 +176,7 @@ def apply_correction(
     """
     ws = workspace_handle(workspace)
     unit = ws.getAxis(0).getUnit().unitID()
-    if unit != "Wavelength":
+    if unit.lower() != "wavelength":
         raise LrValidationError(f"Cd attenuation correction needs a workspace in Wavelength, got {unit!r}")
     transmission = get_transmission_workspace(cd_thickness)
     if isinstance(ws, IEventWorkspace) and ws.getNumberEvents() > 0:
@@ -190,6 +190,8 @@ def _check_event_wavelengths(ws: IEventWorkspace, cd_thickness: float, bin_edges
     Both would otherwise fail silently: Mantid leaves an event outside the transmission's bins
     unscaled, and a weight or squared error past the float32 range becomes inf.
     """
+    # Despite the name, these return the events' X values in the workspace's current unit;
+    # ConvertUnits rewrites each event's "tof" field in place, so here they are wavelengths.
     wavelength_min, wavelength_max = ws.getTofMin(), ws.getTofMax()
     if wavelength_min < bin_edges[0] or wavelength_max >= bin_edges[-1]:
         raise LrValidationError(
