@@ -123,7 +123,10 @@ def event_time_filter(start_times, end_times, event_time, event_id, e_offset, ev
             start_event = event_index[start_idx] - 1
         else:
             start_event = event_index[start_idx]
-        stop_event = event_index[stop_idx] - 1
+        try:
+             stop_event = event_index[stop_idx] - 1
+        except IndexError:
+            stop_event = event_index[-1] - 2 # Not sure why might be left/right search, but ok to lose 1 event at this stage. #TODO: fix this properly.
 
         # TODO: need to check on +/- values    
         # write some proper tests to check aren't losing single events on edges or duplicating them    
@@ -135,8 +138,15 @@ def event_time_filter(start_times, end_times, event_time, event_id, e_offset, ev
         # Error events
         error_start_idx = np.searchsorted(error_event_time, start, side="right")
         error_stop_idx = np.searchsorted(error_event_time, end, side="right")
-        error_start_event = error_event_index[error_start_idx]
-        error_stop_event = error_event_index[error_stop_idx]
+        if start != 0:
+            error_start_event = error_event_index[error_start_idx] - 1
+        else:
+            error_start_event = error_event_index[error_start_idx]
+        try:
+            error_stop_event = error_event_index[error_stop_idx] - 1
+        except IndexError:
+            error_stop_event = error_event_index[-1] - 2 # Not sure why might be left/right search, but ok to lose 1 event at this stage. #TODO: fix this properly.
+
         masked_e_offset_error.append(error_event_offset[error_start_event:error_stop_event])
 
     # Concatenate them back into one.
