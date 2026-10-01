@@ -9,6 +9,7 @@ from launcher.apps.direct_beam import DirectBeamTab
 from launcher.apps.file_batch import FileBatchTab
 from launcher.apps.overplot import Overplot
 from launcher.apps.sld_calculator import SLD
+from launcher.apps.time_resolved import TimeResolvedTab
 
 #REFERENCE_DIRECTIVE = "Click to choose a 60Hz reference R(Q) file"
 #TEMPLATE_DIRECTIVE = "Click to choose a 30Hz template"
@@ -40,6 +41,12 @@ class ReductionInterface(QTabWidget):
         self.file_batch_tab = FileBatchTab()
         self.addTab(self.file_batch_tab, "Batch file")
         self.setTabText(tab_id, "Batch file")
+
+        # Time-resolved reduction tab
+        tab_id += 1
+        self.time_resolved_tab = TimeResolvedTab()
+        self.addTab(self.time_resolved_tab, "Time resolved")
+        self.setTabText(tab_id, "Time resolved")
 
         ## ROI selector
         #tab_id += 1
