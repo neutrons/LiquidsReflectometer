@@ -77,6 +77,7 @@ def load_and_extract(fname, start_times = None, end_times = None):
     log_values = get_log_values(fname)
     
     if start_times is not None or end_times is not None:
+        print('Processing with time filter.')
         if start_times is None or end_times is None:
             raise ValueError("start_times and end_times must either both be provided or both be None.")
 
