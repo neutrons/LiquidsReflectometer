@@ -81,25 +81,27 @@ class SettingsDocument:
 
     @staticmethod
     def _canonicalize_booleans(config):
-        """Hold every declared boolean as a ``bool``, whatever spelling the file used.
+        """Hold the entries of every integer-encoded list as ``bool``, whatever spelling the file used.
 
-        The reducer writes ``useBS`` as ``1``/``0`` and reads it by truthiness
-        (see :func:`~lr_reduction.field_spec.as_boolean`), so a loaded integer is
-        a boolean in all but spelling. Converting it on load gives the panel one
-        spelling to show and gives the view a real ``bool`` to bind. Anything
-        that is not a boolean spelling is left exactly as loaded, for
-        ``validate()`` to report. A ``useBS`` that is not a list at all is left
-        alone too.
+        The reducer writes ``useBS`` as ``1``/``0`` and reads it by truthiness or
+        ``== 1`` (see :func:`~lr_reduction.field_spec.as_boolean`), so a loaded
+        integer there is a boolean in all but spelling. Converting it on load
+        gives the panel one spelling to show and gives the view a real ``bool``
+        to bind. Anything that is not a boolean spelling is left exactly as
+        loaded, for ``validate()`` to report. A ``useBS`` that is not a list at
+        all is left alone too.
+
+        Scalar booleans are not touched. The reducer reads ``useGravity`` with
+        ``is True`` (``nr_reduction_calc.py:1079``), so turning a hand-written
+        ``1`` into ``True`` here switched gravity correction on (review
+        8b62952). Which fields are canonicalized is ``Field.int_encoded``.
         """
         for field in fs.FIELD_SPEC:
-            if field.element_type != "bool":
+            if not field.int_encoded:
                 continue
             value = getattr(config, field.name)
-            if field.is_list:
-                if isinstance(value, list):
-                    setattr(config, field.name, [_held_as_bool(entry) for entry in value])
-            else:
-                setattr(config, field.name, _held_as_bool(value))
+            if isinstance(value, list):
+                setattr(config, field.name, [_held_as_bool(entry) for entry in value])
 
     @staticmethod
     def _migrate_legacy(config):
