@@ -42,6 +42,12 @@ from lr_reduction.save_reduced_data import make_json_safe
 MAX_REPORTED_PROBLEMS = 200
 
 
+def _held_as_bool(value):
+    """``value`` as a ``bool`` if it is a boolean spelling, otherwise unchanged."""
+    boolean = fs.as_boolean(value)
+    return value if boolean is None else boolean
+
+
 class SettingsDocument:
     """One editable reduction configuration."""
 
@@ -67,7 +73,33 @@ class SettingsDocument:
         except AttributeError as exc:
             raise ValueError(f"Not a valid reduction setting: {exc}") from exc
         cls._migrate_legacy(config)
+        # Before cls(config): the seed is taken there, and it must hold the
+        # same spelling as the document, or "Changed from the seed" shows
+        # [1, 1, 0] -> [True, False, False] for a one-cell edit.
+        cls._canonicalize_booleans(config)
         return cls(config)
+
+    @staticmethod
+    def _canonicalize_booleans(config):
+        """Hold every declared boolean as a ``bool``, whatever spelling the file used.
+
+        The reducer writes ``useBS`` as ``1``/``0`` and reads it by truthiness
+        (see :func:`~lr_reduction.field_spec.as_boolean`), so a loaded integer is
+        a boolean in all but spelling. Converting it on load gives the panel one
+        spelling to show and gives the view a real ``bool`` to bind. Anything
+        that is not a boolean spelling is left exactly as loaded, for
+        ``validate()`` to report. A ``useBS`` that is not a list at all is left
+        alone too.
+        """
+        for field in fs.FIELD_SPEC:
+            if field.element_type != "bool":
+                continue
+            value = getattr(config, field.name)
+            if field.is_list:
+                if isinstance(value, list):
+                    setattr(config, field.name, [_held_as_bool(entry) for entry in value])
+            else:
+                setattr(config, field.name, _held_as_bool(value))
 
     @staticmethod
     def _migrate_legacy(config):
@@ -257,6 +289,16 @@ class SettingsDocument:
                     for i, entry in enumerate(value)
                     if entry is not None
                 )
+            elif field.runtime_owned:
+                # The runtime record (LambdaMinUse/LambdaMaxUse) is not an
+                # input. The reduction assigns it on every run
+                # (nr_reduction_calc.py:385-391, in _load_and_extract_lambda,
+                # before that method reads it at :452), and the editor shows it
+                # read-only. A problem line here could not be acted on. The
+                # declared list[float] disagrees with the writer's one scalar
+                # per call; header-scale-factors-per-position decides the
+                # record's shape, and until then this check stays out of it.
+                continue
             else:
                 messages.append(field.check(value))
 
@@ -294,13 +336,32 @@ class SettingsDocument:
 
         Those fields (``RBnum`` and the ``Lambda*Use`` record) are filled in by
         the reduction from the runs it is given; carrying an authored value for
-        them would silently override the run.
+        them would silently override the run. Integer-encoded lists are written
+        as ``save()`` writes them (``_encode_for_file``).
         """
         return {
             key: value
-            for key, value in make_json_safe(self.to_dict()).items()
+            for key, value in self._encode_for_file(make_json_safe(self.to_dict())).items()
             if key not in fs.RUNTIME_OWNED_NAMES
         }
+
+    @staticmethod
+    def _encode_for_file(values):
+        """Write the integer-encoded lists as the reduction writes them: ``1``/``0``.
+
+        The model holds booleans, and a settings file holds what the reducer's
+        own writer produces (``nr_reduction_calc.py:103``). Which fields this
+        applies to is declared on the field (``Field.int_encoded``), not decided
+        here by name. Only ``bool`` entries change. An unset entry stays
+        ``None`` (``null``), and anything else is written as held, so the file
+        keeps what ``validate()`` reported. ``values`` is the fresh mapping
+        ``make_json_safe`` built, never the document's own state.
+        """
+        for name in fs.INT_ENCODED_NAMES:
+            entries = values.get(name)
+            if isinstance(entries, list):
+                values[name] = [int(entry) if isinstance(entry, bool) else entry for entry in entries]
+        return values
 
     def save(self, path):
         """Write the full document as a JSON settings file, atomically.
@@ -328,7 +389,7 @@ class SettingsDocument:
                 f"{path} is a symbolic link to {os.path.realpath(path)}; "
                 f"refusing to write through it — save to the target directly if that is the intent"
             )
-        payload = json.dumps(make_json_safe(self.to_dict()), indent=2)
+        payload = json.dumps(self._encode_for_file(make_json_safe(self.to_dict())), indent=2)
         # mkstemp opens O_CREAT|O_EXCL on a fresh name, so there is no link to
         # follow and no pre-existing file to clobber.
         handle_fd, temporary = tempfile.mkstemp(

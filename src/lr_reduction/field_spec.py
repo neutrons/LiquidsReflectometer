@@ -71,8 +71,8 @@ from lr_reduction.reduction_domains import (
 __all__ = [
     "CALC_THETA_CHOICES", "DET_RES_CHOICES", "METHOD_CHOICES", "PEAK_TYPE_CHOICES",
     "Field", "FIELD_SPEC", "BY_NAME", "PER_ANGLE_NAMES", "OPTIONAL_LIST_NAMES",
-    "RUNTIME_OWNED_NAMES", "DEFAULT_IF_EMPTY_NAMES", "GROUPS", "TYPES",
-    "get", "fields_in",
+    "RUNTIME_OWNED_NAMES", "INT_ENCODED_NAMES", "DEFAULT_IF_EMPTY_NAMES", "GROUPS", "TYPES",
+    "as_boolean", "get", "fields_in",
 ]
 
 
@@ -112,6 +112,10 @@ class Field:
     runtime_owned
         Filled in by the reduction run, not authored by the scientist. Dropped
         by ``SettingsDocument.normalize()``.
+    int_encoded
+        A ``list[bool]`` whose entries a settings file holds as ``1``/``0``,
+        because that is what the reduction itself writes. The model holds
+        booleans; ``SettingsDocument`` encodes at the file boundary.
     """
 
     name: str
@@ -127,6 +131,7 @@ class Field:
     broadcast_ok: bool = False
     optional_list: bool = False
     runtime_owned: bool = False
+    int_encoded: bool = False
     default_if_empty: bool = False
     no_separators: bool = False
     falsy_means_off: bool = False
@@ -302,6 +307,27 @@ _TRUE = {"true", "1", "yes", "on", "t", "y"}
 _FALSE = {"false", "0", "no", "off", "f", "n"}
 
 
+def as_boolean(value):
+    """Return ``value`` as a ``bool`` if a settings file may spell a boolean that way, else ``None``.
+
+    ``True``/``False``, and the integers ``1``/``0`` the reduction itself writes
+    for ``useBS`` (``nr_reduction_calc.py:103``,
+    ``new_reduction_from_template.py:182``) and reads by truthiness (``:509``,
+    ``:979``). Nothing else qualifies, including ``2``, ``1.0`` and ``"0"`` —
+    ``"0"`` is truthy to the reducer, so treating it as off would invert what
+    the reduction does with it.
+
+    The one place that decides this. Validation, load-time canonicalization and
+    the editor's cell text all ask here, so they cannot disagree about what
+    counts as a boolean.
+    """
+    if isinstance(value, bool):
+        return value
+    if type(value) is int and value in (0, 1):
+        return bool(value)
+    return None
+
+
 def _coerce_typed(text, type_name):
     """Coerce one piece of text to ``type_name``. Empty means unset (``None``).
 
@@ -341,7 +367,7 @@ def _coerce_typed(text, type_name):
 def _type_problem(value, type_name):
     """Describe how ``value`` contradicts ``type_name``, or return ``""``."""
     if type_name == "bool":
-        return "" if isinstance(value, bool) else f"expected true/false, got {value!r}"
+        return "" if as_boolean(value) is not None else f"expected true/false (or 1/0), got {value!r}"
     if type_name == "int":
         # bool is an int subclass; a checkbox value in an int field is a bug.
         if isinstance(value, bool) or not isinstance(value, int):
@@ -422,7 +448,8 @@ FIELD_SPEC = (
     Field("BkgROI", "Background ROI", BACKGROUND, "list[list[int]]", [],
           "Background region per angle, as pixel bounds.", per_angle=True),
     Field("useBS", "Subtract background", BACKGROUND, "list[bool]", [],
-          "Whether to subtract background at each angle.", per_angle=True, default_if_empty=True),
+          "Whether to subtract background at each angle.", per_angle=True, default_if_empty=True,
+          int_encoded=True),
     Field("tof_min", "TOF min", WAVELENGTH, "list[float]", [],
           "Lower time-of-flight bound per angle.",
           minimum=0.0, per_angle=True, default_if_empty=True),
@@ -581,6 +608,9 @@ OPTIONAL_LIST_NAMES = tuple(f.name for f in FIELD_SPEC if f.optional_list)
 
 #: Fields the reduction run fills in, dropped when normalizing for save.
 RUNTIME_OWNED_NAMES = tuple(f.name for f in FIELD_SPEC if f.runtime_owned)
+
+#: Boolean lists a settings file holds as 1/0 (``Field.int_encoded``).
+INT_ENCODED_NAMES = tuple(f.name for f in FIELD_SPEC if f.int_encoded)
 
 #: Per-angle fields the reducer fills in itself when left empty
 #: (nr_reduction_calc, "Set defaults for optional arrays"). An empty one is a

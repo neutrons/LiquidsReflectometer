@@ -557,3 +557,23 @@ def test_an_injected_integer_switch_renders_true_or_false():
     config.useBS = [1, 1, 0]
     tab = SettingsEditorTab(document=SettingsDocument(config))
     assert _column_text(tab, "useBS") == ["true", "true", "false"]
+
+
+def test_a_numeric_column_holding_ones_and_zeros_keeps_its_numbers(tmp_path, monkeypatch):
+    """Only the boolean column reads true/false.
+
+    The reducer fills an empty `ThetaShift` with `[0] * n` and an empty
+    `ScaleFactor` with `[1] * n` (`nr_reduction_calc.py:101,105`) on the config
+    it then saves, so a file saved after a run can carry integer 0s and 1s in
+    numeric columns too (the 1s survive unless prior-combination replaces them,
+    `new_reduction_from_file.py:96`). Added when mutation M22 (the cell-text
+    helper applied to every column) survived the battery: no test held a numeric
+    1/0, and a scale factor would have read "true".
+    """
+    path = tmp_path / "after_a_run.json"
+    path.write_text(json.dumps({"useBS": [1, 1, 0], "ScaleFactor": [1, 1, 1], "ThetaShift": [0, 0, 0]}))
+    tab = SettingsEditorTab()
+    _load(tab, path, monkeypatch)
+    assert _column_text(tab, "useBS") == ["true", "true", "false"]
+    assert _column_text(tab, "ScaleFactor") == ["1", "1", "1"]
+    assert _column_text(tab, "ThetaShift") == ["0", "0", "0"]
