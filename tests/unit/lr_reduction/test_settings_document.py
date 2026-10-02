@@ -17,8 +17,9 @@ import textwrap
 import pytest
 
 from lr_reduction import field_spec as fs
-from lr_reduction.new_reduction_from_file import json_to_config
+from lr_reduction.new_reduction_from_file import json_to_config, save_config_json
 from lr_reduction.nr_reduction_config import NRReductionConfig
+from lr_reduction.save_reduced_data import make_json_safe
 from lr_reduction.settings_document import SettingsDocument
 
 # --------------------------------------------------------------------------
@@ -1023,3 +1024,199 @@ def test_a_per_angle_enumerated_cell_is_normalised_on_entry():
     doc.add_angle(method_per_run=fs.get("method_per_run").coerce_element("CONSTANTQ"))
     assert doc.get("method_per_run") == ["constantQ"]
     assert doc.validate() == []
+
+
+# --------------------------------------------------------------------------
+# editor-load-fidelity — a reducer-written file loads quietly, saves as it was
+# written, and its runtime record is quiet
+# --------------------------------------------------------------------------
+#
+# True == 1 and isinstance(True, int), so every assertion below about encoding
+# or canonicalization compares type(), a repr, or the saved TEXT.
+# `doc.get("useBS") == [True, True, False]` passes on [1, 1, 0] and guards
+# nothing.
+
+
+def _reducer_shaped_config(record=True):
+    """A config shaped by the reduction's own writers, not by this editor.
+
+    `useBS` holds integers because that is what the reducer writes:
+    `nr_reduction_calc.py:103` fills an empty one with `[1] * n` and
+    `new_reduction_from_template.py:182` writes 0 for "off". The runtime record
+    is one scalar per call (`nr_reduction_calc.py:385-391`), not the
+    `list[float]` FIELD_SPEC declares for it.
+    """
+    config = NRReductionConfig()
+    config.experiment_id = "IPTS-00000"
+    config.RBnum = [201282, 201283, 201284]
+    config.DBname = ["db_a.dat", "db_b.dat", "db_c.dat"]
+    config.method_per_run = ["meanTheta"]
+    config.RB_Ymin = [140, 141, 142]
+    config.RB_Ymax = [150, 151, 152]
+    config.BkgROI = [[120, 130], [121, 131], [122, 132]]
+    config.useBS = [1] * 3
+    config.useBS[2] = 0
+    config.useCalcTheta = "detector_angle"
+    if record:
+        config.LambdaMinUse = 2.95
+        config.LambdaMaxUse = 6.1
+    return config
+
+
+def _reducer_written_json(directory):
+    """The fixture as a settings file, written by the reduction's own saver."""
+    path = pathlib.Path(directory) / "run_settings.json"
+    save_config_json(path, _reducer_shaped_config())
+    return path
+
+
+def _reducer_written_dat(directory):
+    """The same config as a reduced .dat carries it, on its `# Config:` line."""
+    path = pathlib.Path(directory) / "run.dat"
+    config_json = json.dumps(make_json_safe(_reducer_shaped_config().__dict__))
+    path.write_text(f"# Config: {config_json}\n# columns = Q, R, dR, dQ\n0.01 1.0 0.1 0.001\n")
+    return path
+
+
+_REDUCER_WRITTEN = [
+    pytest.param(_reducer_written_json, id="json"),
+    pytest.param(_reducer_written_dat, id="dat-header"),
+]
+
+
+def _saved_block(name, value):
+    """The exact text `save()` writes for one top-level key (indent=2)."""
+    return json.dumps({name: value}, indent=2)[len("{\n  ") : -len("\n}")]
+
+
+@pytest.mark.parametrize("write", _REDUCER_WRITTEN)
+def test_a_reducer_written_file_validates_clean(tmp_path, write):
+    """Three useBS integers and the scalar record each used to be a problem line."""
+    assert SettingsDocument.from_file(write(tmp_path)).validate() == []
+
+
+@pytest.mark.parametrize(
+    "load",
+    [
+        pytest.param(lambda d: SettingsDocument.from_file(_reducer_written_json(d)), id="json"),
+        pytest.param(lambda d: SettingsDocument.from_file(_reducer_written_dat(d)), id="dat-header"),
+        pytest.param(lambda _d: SettingsDocument.from_dict({"useBS": [1, True, 0]}), id="mixed"),
+    ],
+)
+def test_a_loaded_useBS_is_held_as_booleans(tmp_path, load):
+    held = load(tmp_path).get("useBS")
+    assert [type(v) for v in held] == [bool, bool, bool]
+    assert repr(held) == "[True, True, False]"
+
+
+def test_an_injected_config_with_integer_useBS_validates_clean():
+    """No load and so no canonicalization: acceptance has to hold on its own."""
+    doc = SettingsDocument(_reducer_shaped_config(record=False))
+    assert [type(v) for v in doc.get("useBS")] == [int, int, int]
+    assert doc.validate() == []
+
+
+@pytest.mark.parametrize(
+    "build, expected",
+    [
+        pytest.param(lambda: SettingsDocument.from_dict({"useBS": [1, 1, 0]}), [1, 1, 0], id="ints"),
+        pytest.param(
+            lambda: SettingsDocument.from_dict({"useBS": [True, True, False]}), [1, 1, 0], id="bools"
+        ),
+        pytest.param(lambda: SettingsDocument.from_dict({"useBS": [1, True, 0]}), [1, 1, 0], id="mixed"),
+        pytest.param(lambda: SettingsDocument(_reducer_shaped_config()), [1, 1, 0], id="injected-ints"),
+        pytest.param(lambda: SettingsDocument.from_dict({"useBS": [False, None]}), [0, None], id="unset-entry"),
+    ],
+)
+def test_useBS_is_saved_as_ones_and_zeros(tmp_path, build, expected):
+    """The reduction's own spelling, whatever the document was built from."""
+    text = build().save(tmp_path / "out.json").read_text()
+    saved = json.loads(text)["useBS"]
+    assert [type(v) for v in saved] == [type(v) for v in expected]
+    assert _saved_block("useBS", expected) in text
+
+
+def test_normalize_writes_useBS_as_ones_and_zeros():
+    normalized = SettingsDocument.from_dict({"useBS": [True, True, False]}).normalize()["useBS"]
+    assert [type(v) for v in normalized] == [int, int, int]
+    assert normalized == [1, 1, 0]
+
+
+@pytest.mark.parametrize("loaded", [True, 1], ids=["bool", "int"])
+def test_a_scalar_boolean_is_saved_as_true_or_false(tmp_path, loaded):
+    """Only the declared list is integer-encoded; a loaded scalar 1 saves as true."""
+    doc = SettingsDocument.from_dict({"Normalize": loaded})
+    assert doc.validate() == []
+    assert '"Normalize": true' in doc.save(tmp_path / "out.json").read_text()
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        pytest.param(2, id="two"),
+        pytest.param("0", id="string-zero"),
+        pytest.param(1.0, id="float-one"),
+        pytest.param([1], id="nested"),
+    ],
+)
+def test_a_non_boolean_useBS_entry_is_reported_and_kept(tmp_path, entry):
+    """Never coerced on load: "0" is truthy to the reducer (`if useBS[i]:`), so
+    accepting it silently would subtract a background its author switched off."""
+    doc = SettingsDocument.from_dict({"useBS": [True, entry]})
+    problems = [m for m in doc.validate() if "(useBS)" in m]
+    assert len(problems) == 1
+    assert "at angle 1" in problems[0]
+    assert "true/false (or 1/0)" in problems[0]
+    assert repr(doc.get("useBS")[1]) == repr(entry)
+    saved = json.loads(doc.save(tmp_path / "out.json").read_text())["useBS"]
+    assert repr(saved[1]) == repr(entry)
+
+
+def test_a_non_list_useBS_is_reported_once_and_saved_as_held(tmp_path):
+    doc = SettingsDocument.from_dict({"useBS": 1})
+    assert len([m for m in doc.validate() if "(useBS)" in m]) == 1
+    assert repr(doc.get("useBS")) == "1"
+    assert repr(json.loads(doc.save(tmp_path / "out.json").read_text())["useBS"]) == "1"
+
+
+@pytest.mark.parametrize("name", ["LambdaMinUse", "LambdaMaxUse"])
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param(2.95, id="scalar"),
+        pytest.param(None, id="unset"),
+        pytest.param([2.95, 3.1], id="list"),
+        pytest.param("n/a", id="text"),
+    ],
+)
+def test_the_runtime_record_is_never_a_problem(name, value):
+    """Not an input: `nr_reduction_calc.py:385-391` overwrites it before its first
+    use, and a problem line on a field nobody can edit has no remedy."""
+    assert SettingsDocument.from_dict({name: value}).validate() == []
+
+
+def test_the_round_trip_is_idempotent_and_keeps_useBS_as_written(tmp_path):
+    source = _reducer_written_json(tmp_path)
+    first = SettingsDocument.from_file(source).save(tmp_path / "first.json")
+    second = SettingsDocument.from_file(first).save(tmp_path / "second.json")
+    assert first.read_bytes() == second.read_bytes()
+    # json.dumps tells 1 from true, so this compares the written spelling.
+    assert json.dumps(json.loads(first.read_text())["useBS"]) == json.dumps(
+        json.loads(source.read_text())["useBS"]
+    )
+
+
+def test_the_seed_is_canonical_too(tmp_path):
+    """Compared by repr: [1, 1, 0] == [True, True, False], so equality cannot
+    tell a seed taken before canonicalization from one taken after."""
+    doc = SettingsDocument.from_file(_reducer_written_json(tmp_path))
+    assert doc.changed_vs_seed() == {}
+    doc.set_angle_field(0, "useBS", False)
+    before, after = doc.changed_vs_seed()["useBS"]
+    assert repr(before) == "[True, True, False]"
+    assert repr(after) == "[False, True, False]"
+
+
+def test_the_integer_encoded_names_are_exactly_useBS():
+    """Pin the declaration separately from the behaviour it drives."""
+    assert set(fs.INT_ENCODED_NAMES) == {"useBS"}

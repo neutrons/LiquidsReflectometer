@@ -22,6 +22,8 @@ from qtpy.QtTest import QTest
 from launcher.app_identity import APP_NAME, ORG_NAME
 from launcher.apps.settings_editor import SettingsEditorTab
 from lr_reduction import field_spec as fs
+from lr_reduction.new_reduction_from_file import save_config_json
+from lr_reduction.nr_reduction_config import NRReductionConfig
 from lr_reduction.settings_document import SettingsDocument
 
 pytestmark = pytest.mark.usefixtures("isolated_qapp", "no_qmessagebox")
@@ -432,3 +434,126 @@ def test_an_enumerated_editor_offers_the_declared_spellings():
     combo = tab.editors["DetResFn"]
     offered = [combo.itemText(i) for i in range(combo.count())]
     assert offered == list(fs.DET_RES_CHOICES)
+
+
+# --------------------------------------------------------------------------
+# editor-load-fidelity — what the scientist sees for a reducer-written file
+# --------------------------------------------------------------------------
+
+
+def _reducer_written_settings(directory):
+    """A settings file shaped and written by the reduction itself.
+
+    Twin of `_reducer_shaped_config` in
+    tests/unit/lr_reduction/test_settings_document.py — copied, not imported:
+    `test-launcher` runs from the repository root and `test-reduction` from
+    tests/, so a cross-suite import would be the fragile part. `useBS` is ints
+    (`nr_reduction_calc.py:103`, `new_reduction_from_template.py:182`); the
+    runtime record is one scalar per call (`nr_reduction_calc.py:385-391`).
+    """
+    config = NRReductionConfig()
+    config.experiment_id = "IPTS-00000"
+    config.RBnum = [201282, 201283, 201284]
+    config.DBname = ["db_a.dat", "db_b.dat", "db_c.dat"]
+    config.method_per_run = ["meanTheta"]
+    config.RB_Ymin = [140, 141, 142]
+    config.RB_Ymax = [150, 151, 152]
+    config.BkgROI = [[120, 130], [121, 131], [122, 132]]
+    config.useBS = [1] * 3
+    config.useBS[2] = 0
+    config.useCalcTheta = "detector_angle"
+    config.LambdaMinUse = 2.95
+    config.LambdaMaxUse = 6.1
+    path = directory / "run_settings.json"
+    save_config_json(path, config)
+    return path
+
+
+def _load(tab, path, monkeypatch):
+    """Load through the button's own slot, with the dialog answering `path`."""
+    monkeypatch.setattr(
+        QtWidgets.QFileDialog, "getOpenFileName", staticmethod(lambda *_a, **_k: (str(path), ""))
+    )
+    tab.load_settings()
+
+
+def _column_text(tab, name):
+    column = fs.PER_ANGLE_NAMES.index(name)
+    return [tab.angle_table.item(row, column).text() for row in range(tab.angle_table.rowCount())]
+
+
+def test_a_loaded_background_switch_reads_true_or_false(tmp_path, monkeypatch):
+    tab = SettingsEditorTab()
+    _load(tab, _reducer_written_settings(tmp_path), monkeypatch)
+    assert _column_text(tab, "useBS") == ["true", "true", "false"]
+
+
+def test_a_reducer_written_file_reports_no_problems(tmp_path, monkeypatch):
+    tab = SettingsEditorTab()
+    _load(tab, _reducer_written_settings(tmp_path), monkeypatch)
+    assert tab.report.toPlainText() == "No problems found."
+
+
+@pytest.mark.parametrize("name", ["LambdaMinUse", "LambdaMaxUse"])
+def test_typing_into_the_runtime_record_changes_nothing(tmp_path, monkeypatch, name):
+    """Keystrokes, not setText: a read-only QLineEdit refuses the gesture, and
+    Return still emits editingFinished, so a live connection would show here."""
+    tab = SettingsEditorTab()
+    _load(tab, _reducer_written_settings(tmp_path), monkeypatch)
+    editor = tab.editors[name]
+    shown, held = editor.text(), tab.document.get(name)
+    assert editor.isReadOnly()
+    QTest.keyClicks(editor, "9.9")
+    QTest.keyClick(editor, QtCore.Qt.Key_Return)
+    assert editor.text() == shown
+    assert repr(tab.document.get(name)) == repr(held)
+
+
+@pytest.mark.parametrize("name", ["LambdaMinUse", "LambdaMaxUse"])
+def test_a_programmatic_edit_signal_on_the_runtime_record_changes_nothing(tmp_path, monkeypatch, name):
+    """The pathological leg: a signal no user gesture produced must not reach the
+    document either, so the record editors are not connected at all."""
+    tab = SettingsEditorTab()
+    _load(tab, _reducer_written_settings(tmp_path), monkeypatch)
+    held = tab.document.get(name)
+    tab.editors[name].editingFinished.emit()
+    assert repr(tab.document.get(name)) == repr(held)
+
+
+def test_the_runtime_record_shows_what_each_loaded_file_recorded(tmp_path, monkeypatch):
+    tab = SettingsEditorTab()
+    _load(tab, _reducer_written_settings(tmp_path), monkeypatch)
+    assert tab.editors["LambdaMinUse"].text() == "2.95"
+
+    listed = tmp_path / "listed.json"
+    listed.write_text(json.dumps({"LambdaMinUse": [2.95, 3.1]}))
+    _load(tab, listed, monkeypatch)
+    assert tab.editors["LambdaMinUse"].text() == "2.95, 3.1"
+
+    absent = tmp_path / "absent.json"
+    absent.write_text(json.dumps({"Sname": "no_record"}))
+    _load(tab, absent, monkeypatch)
+    assert tab.editors["LambdaMinUse"].text() == ""
+
+
+def test_toggling_a_loaded_switch_saves_ones_and_zeros(tmp_path, monkeypatch):
+    tab = SettingsEditorTab()
+    _load(tab, _reducer_written_settings(tmp_path), monkeypatch)
+    tab.angle_table.item(1, fs.PER_ANGLE_NAMES.index("useBS")).setText("false")
+    assert "useBS: [True, True, False] -> [True, False, False]" in tab.report.toPlainText()
+
+    target = tmp_path / "saved.json"
+    monkeypatch.setattr(
+        QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), ""))
+    )
+    tab.save_settings()
+    saved = json.loads(target.read_text())["useBS"]
+    assert [type(v) for v in saved] == [int, int, int]
+    assert saved == [1, 0, 0]
+
+
+def test_an_injected_integer_switch_renders_true_or_false():
+    config = NRReductionConfig()
+    config.useBS = [1, 1, 0]
+    tab = SettingsEditorTab(document=SettingsDocument(config))
+    assert _column_text(tab, "useBS") == ["true", "true", "false"]
