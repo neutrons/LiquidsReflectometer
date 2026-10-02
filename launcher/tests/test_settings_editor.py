@@ -577,3 +577,20 @@ def test_a_numeric_column_holding_ones_and_zeros_keeps_its_numbers(tmp_path, mon
     assert _column_text(tab, "useBS") == ["true", "true", "false"]
     assert _column_text(tab, "ScaleFactor") == ["1", "1", "1"]
     assert _column_text(tab, "ThetaShift") == ["0", "0", "0"]
+
+
+def test_a_hand_written_integer_useGravity_is_reported_and_saved_as_written(tmp_path, monkeypatch):
+    """v2 (review 8b62952): the reducer reads useGravity with `is True`, so a file holding 1 reduces
+    with gravity correction OFF. Load -> Save must neither hide nor change that."""
+    path = tmp_path / "hand_written.json"
+    path.write_text(json.dumps({"useGravity": 1}))
+    tab = SettingsEditorTab()
+    _load(tab, path, monkeypatch)
+    assert "(useGravity)" in tab.report.toPlainText()
+
+    target = tmp_path / "saved.json"
+    monkeypatch.setattr(
+        QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), ""))
+    )
+    tab.save_settings()
+    assert '"useGravity": 1' in target.read_text()

@@ -1142,10 +1142,13 @@ def test_normalize_writes_useBS_as_ones_and_zeros():
     assert normalized == [1, 1, 0]
 
 
-@pytest.mark.parametrize("loaded", [True, 1], ids=["bool", "int"])
-def test_a_scalar_boolean_is_saved_as_true_or_false(tmp_path, loaded):
-    """Only the declared list is integer-encoded; a loaded scalar 1 saves as true."""
-    doc = SettingsDocument.from_dict({"Normalize": loaded})
+def test_a_scalar_true_is_saved_as_true(tmp_path):
+    """Only the declared list is integer-encoded; a scalar boolean is written as held.
+
+    (v2: the `1` leg that asserted a loaded scalar 1 saves as true is withdrawn — the reducer reads
+    useGravity with `is True`, so that rewrite changed the reduction. The scalar matrix below replaces it.)
+    """
+    doc = SettingsDocument.from_dict({"Normalize": True})
     assert doc.validate() == []
     assert '"Normalize": true' in doc.save(tmp_path / "out.json").read_text()
 
@@ -1220,3 +1223,86 @@ def test_the_seed_is_canonical_too(tmp_path):
 def test_the_integer_encoded_names_are_exactly_useBS():
     """Pin the declaration separately from the behaviour it drives."""
     assert set(fs.INT_ENCODED_NAMES) == {"useBS"}
+
+
+# --------------------------------------------------------------------------
+# editor-load-fidelity v2 — load -> save never changes what the reduction does with a
+# declared boolean (B8). The reducer reads useGravity with `is True`
+# (nr_reduction_calc.py:1079), so a scalar is left exactly as loaded: 1 stays 1.
+# --------------------------------------------------------------------------
+
+#: Derived, not typed: the matrix below must grow when a boolean is added.
+SCALAR_BOOLEANS = tuple(f.name for f in fs.FIELD_SPEC if f.type == "bool")
+BOOLEAN_SPELLINGS = [
+    pytest.param(1, id="one"),
+    pytest.param(0, id="zero"),
+    pytest.param(True, id="true"),
+    pytest.param(False, id="false"),
+]
+
+
+def test_the_scalar_booleans_are_the_seven_whose_readers_were_checked():
+    """A pin on the derivation the matrix iterates. Before updating it for an eighth boolean, read
+    how the reduction reads that one: truthiness, identity (`is True`), or formatting into a header."""
+    assert set(SCALAR_BOOLEANS) == {
+        "Normalize", "AutoScale", "plotON", "plotQ4", "save8col", "useGravity", "use_emission_time",
+    }
+
+
+@pytest.mark.parametrize("value", BOOLEAN_SPELLINGS)
+@pytest.mark.parametrize("name", SCALAR_BOOLEANS)
+def test_load_then_save_keeps_a_scalar_boolean_exactly_as_written(tmp_path, name, value):
+    source = tmp_path / "source.json"
+    source.write_text(json.dumps({name: value}))
+    saved = json.loads(SettingsDocument.from_file(source).save(tmp_path / "saved.json").read_text())[name]
+    assert type(saved) is type(value)
+    assert saved == value
+
+
+@pytest.mark.parametrize("value", BOOLEAN_SPELLINGS)
+@pytest.mark.parametrize("name", SCALAR_BOOLEANS)
+def test_an_integer_scalar_boolean_is_reported_without_offering_1_or_0(name, value):
+    lines = [m for m in SettingsDocument.from_dict({name: value}).validate() if f"({name})" in m]
+    if type(value) is bool:
+        assert lines == []
+    else:
+        assert len(lines) == 1
+        assert "true/false" in lines[0]
+        assert "1/0" not in lines[0]
+
+
+@pytest.mark.parametrize("value", BOOLEAN_SPELLINGS)
+def test_the_reduction_reads_a_saved_useGravity_as_it_read_the_source(tmp_path, value):
+    """The rejection's reproduction (review 8b62952): `nr_reduction_calc.py:1079` tests
+    `useGravity is True`, and json_to_config does no conversion, so 1 means gravity OFF."""
+    source = tmp_path / "source.json"
+    source.write_text(json.dumps({"useGravity": value}))
+    saved = SettingsDocument.from_file(source).save(tmp_path / "saved.json")
+
+    def gravity_on(path):
+        return json_to_config(json.loads(path.read_text())).useGravity is True
+
+    assert gravity_on(saved) == gravity_on(source)
+
+
+@pytest.mark.parametrize("value", [pytest.param(1, id="one"), pytest.param(0, id="zero")])
+@pytest.mark.parametrize("name", SCALAR_BOOLEANS)
+def test_an_injected_integer_scalar_boolean_is_reported_and_kept(tmp_path, name, value):
+    config = NRReductionConfig()
+    setattr(config, name, value)
+    doc = SettingsDocument(config)
+    assert len([m for m in doc.validate() if f"({name})" in m]) == 1
+    assert repr(doc.get(name)) == repr(value)
+    assert repr(json.loads(doc.save(tmp_path / "out.json").read_text())[name]) == repr(value)
+
+
+@pytest.mark.parametrize("value", BOOLEAN_SPELLINGS)
+def test_a_saved_useBS_entry_is_read_as_the_source_entry(tmp_path, value):
+    """Its readers: truthiness (nr_reduction_calc.py:509, :979) and `== 1`
+    (new_reduction_from_template.py:224) — both must see what they saw in the source."""
+    source = tmp_path / "source.json"
+    source.write_text(json.dumps({"useBS": [value]}))
+    saved = json.loads(SettingsDocument.from_file(source).save(tmp_path / "saved.json").read_text())["useBS"][0]
+    assert type(saved) is int
+    assert bool(saved) == bool(value)
+    assert (saved == 1) == (value == 1)
