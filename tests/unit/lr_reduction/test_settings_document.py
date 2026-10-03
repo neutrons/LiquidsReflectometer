@@ -2056,3 +2056,87 @@ def test_an_explicit_none_given_to_add_leaves_a_compact_list_compact():
     assert doc.get("LambdaMin") is None
     assert doc.get("ThetaShift") == []
     assert not any("(LambdaMin)" in line or "(ThetaShift)" in line for line in doc.validate())
+
+
+# --------------------------------------------------------------------------
+# editor-combos — what a direct-beam cell offers (C4, C5: the *.txt/*.dat names in the folder the
+# reducer joins DBname to), and what a compact list implies at an angle it does not hold (C7)
+# --------------------------------------------------------------------------
+
+
+def test_only_the_direct_beam_column_offers_candidates_and_from_the_folder_the_reducer_reads():
+    """nr_reduction_calc.py:402 calls tools.load_db_file(config.DBpath, config.DBname[i]): a DBname entry
+    is a file name in DBpath, so that is the folder its candidates come from."""
+    assert {f.name: f.candidates_folder for f in fs.FIELD_SPEC if f.candidates_folder} == {"DBname": "DBpath"}
+
+
+def _direct_beam_folder(tmp_path, names):
+    folder = tmp_path / "transmission"
+    folder.mkdir()
+    for name in names:
+        (folder / name).write_text("")
+    return folder
+
+
+def test_the_direct_beam_candidates_are_the_folders_txt_and_dat_files_sorted(tmp_path):
+    """Names are stored verbatim (spaces, non-ASCII); another suffix and a sub-folder are not offered."""
+    folder = _direct_beam_folder(tmp_path, ["db_b.dat", "db_a.txt", "notes.md", "db 1 é.dat"])
+    (folder / "sub.dat").mkdir()
+    doc = SettingsDocument.from_dict({"_DBpath_override": str(folder)})
+    assert doc.candidates("DBname") == (["db 1 é.dat", "db_a.txt", "db_b.dat"], 3)
+
+
+@pytest.mark.parametrize("state", ["missing", "a-file", "unreadable", "scandir-raises", "unresolvable-path"])
+def test_the_direct_beam_candidates_are_empty_whenever_the_folder_cannot_be_listed(tmp_path, monkeypatch, state):
+    """Every failure is an empty list, so a cell never raises into a Qt slot. The folder is on a facility
+    mount (F6), where any of these is ordinary; "unresolvable-path" is experiment_id None, for which the
+    config's DBpath property itself raises TypeError (Path / None)."""
+    folder = _direct_beam_folder(tmp_path, ["db_a.dat"])
+    values = {"_DBpath_override": str(folder)}
+    if state == "missing":
+        values["_DBpath_override"] = str(tmp_path / "absent")
+    elif state == "a-file":
+        values["_DBpath_override"] = str(folder / "db_a.dat")
+    elif state == "unreadable":
+        if os.geteuid() == 0:
+            pytest.skip("root lists a mode-000 folder")
+        folder.chmod(0)
+    elif state == "scandir-raises":
+        def scandir(_path):
+            raise OSError("stale file handle")
+
+        monkeypatch.setattr(os, "scandir", scandir)
+    else:
+        values = {"experiment_id": None}
+    try:
+        assert SettingsDocument.from_dict(values).candidates("DBname") == ([], 0)
+    finally:
+        folder.chmod(0o755)
+
+
+def test_the_direct_beam_candidates_are_capped_and_say_how_many_there_were(tmp_path):
+    folder = _direct_beam_folder(tmp_path, [f"db_{k:02d}.dat" for k in range(7)])
+    doc = SettingsDocument.from_dict({"_DBpath_override": str(folder)})
+    assert doc.candidates("DBname", limit=5) == ([f"db_{k:02d}.dat" for k in range(5)], 7)
+
+
+def test_a_compact_list_implies_the_reductions_value_at_each_angle_it_does_not_hold():
+    """C7's model half: where a compact list gives nothing, the reduction uses the broadcast entry
+    (nr_reduction_calc.py:77-79) or its own default (:99-110), held in the document's spelling (True for
+    useBS's 1)."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": ["constantQ"], "useBS": []})
+    assert [doc.implied_entry(k, "method_per_run") for k in range(3)] == [None, "constantQ", "constantQ"]
+    assert repr([doc.implied_entry(k, "useBS") for k in range(3)]) == "[True, True, True]"
+
+
+def test_nothing_is_implied_where_the_reduction_has_no_value_of_its_own():
+    """A surplus row (never read); a held entry; an entry left unset in a list the reducer reads as held
+    (it reads None there, which is a problem line, not a default); a derived λ; an angle-defining list."""
+    surplus = _surplus_document()  # useBS x4, method_per_run []
+    assert surplus.implied_entry(2, "method_per_run") == "meanTheta"
+    assert surplus.implied_entry(3, "method_per_run") is None
+    ragged = SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": ["constantQ", None, "constantTOF"]})
+    assert ragged.implied_entry(0, "method_per_run") is None
+    assert ragged.implied_entry(1, "method_per_run") is None
+    assert surplus.implied_entry(0, "LambdaMin") is None
+    assert surplus.implied_entry(0, "DBname") is None
