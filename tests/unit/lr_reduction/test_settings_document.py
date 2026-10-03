@@ -133,17 +133,25 @@ def test_unknown_key_in_a_seed_is_reported_by_name(tmp_path):
 
 
 def test_add_angle_grows_every_per_angle_field():
-    """All 13 move together, or the arrays silently desynchronise.
+    """Every list an angle is read from moves together, or the arrays silently desynchronise.
 
-    Growing only the obvious eight is the defect this slug exists to prevent:
-    `RBnum` and `ScaleFactor` are easy to forget, and a short array shifts every
-    subsequent angle's settings by one.
+    Growing only the obvious eight was the original T2 defect: `RBnum` is easy to
+    forget, and a short array shifts every subsequent angle's settings by one.
+
+    Since editor-angle-count (G6), a list the reducer fills, broadcasts or derives is
+    left compact when no value is given: empty, one broadcast entry, or None. The
+    reducer expands it to every angle itself (nr_reduction_calc.py:42-43, :77-79,
+    :99-110), and the unset entries this test used to require were what made an
+    editor-authored file unreducible (F5). Every angle-defining list still grows.
     """
     doc = SettingsDocument()
     doc.add_angle()
     doc.add_angle()
-    lengths = {name: len(doc.get(name)) for name in fs.PER_ANGLE_NAMES if doc.get(name) is not None}
-    assert set(lengths.values()) == {2}
+    for name in fs.PER_ANGLE_NAMES:
+        if name in fs.ANGLE_DEFINING_NAMES:
+            assert len(doc.get(name)) == 2, name
+        else:
+            assert doc.get(name) in ([], None), name
     assert doc.n_angles == 2
 
 
@@ -1489,4 +1497,13 @@ def test_a_per_angle_value_that_is_not_a_list_is_kept_out_of_the_counts():
     doc = SettingsDocument.from_dict({**_THREE_ANGLES, "tof_min": 5})
     assert doc.reduction_angles == 3
     assert any("(tof_min)" in m for m in doc.validate())
-    assert doc.notes() == []
+    assert not any("(tof_min)" in line for line in doc.notes())
+
+
+def test_an_all_unset_default_list_shorter_than_the_angles_is_not_reported_short(tmp_path):
+    """Added when mutation F7 survived the battery. An all-unset default list is written []
+    (G7), so the reducer fills it whatever its length, and reporting it short would cry
+    wolf on a file that reduces. No test held one shorter than the angle count."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "ThetaShift": [None]})
+    assert not any("(ThetaShift)" in m for m in doc.validate())
+    assert json.loads(doc.save(tmp_path / "out.json").read_text())["ThetaShift"] == []

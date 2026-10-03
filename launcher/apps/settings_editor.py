@@ -281,6 +281,22 @@ class SettingsEditorTab(QtWidgets.QWidget):
         return str(value)
 
     @staticmethod
+    def _row_header(row, surplus):
+        """A row beyond the reduction's angle count says so, and says why.
+
+        The row stays visible and editable: hiding it would hide a held value
+        and let Add reuse its slot. Remove angle on it drops the surplus entries.
+        """
+        if not surplus:
+            return QtWidgets.QTableWidgetItem(str(row + 1))
+        item = QtWidgets.QTableWidgetItem(f"{row + 1} (surplus)")
+        item.setToolTip(
+            "Beyond the angles the reduction uses: it never reads these entries. "
+            "Remove angle on this row drops them."
+        )
+        return item
+
+    @staticmethod
     def _cell_text(field, value):
         """Render one Angles-table cell.
 
@@ -390,8 +406,10 @@ class SettingsEditorTab(QtWidgets.QWidget):
         try:
             shown = min(self.document.n_angles, MAX_TABLE_ROWS)
             self._rows_hidden = self.document.n_angles - shown
+            count = self.document.reduction_angles
             self.angle_table.setRowCount(shown)
             for row in range(shown):
+                self.angle_table.setVerticalHeaderItem(row, self._row_header(row, surplus=row >= count))
                 values = self.document.angle_row(row)
                 for column, name in enumerate(fs.PER_ANGLE_NAMES):
                     value = values[name]
@@ -423,6 +441,15 @@ class SettingsEditorTab(QtWidgets.QWidget):
             lines.extend(f"  - {message}" for message in problems)
         else:
             lines.append("No problems found.")
+
+        # Notes are true of a file that reduces (surplus entries; a default the
+        # reducer will fill), so they sit in their own section, apart from the
+        # problems.
+        notes = self.document.notes()
+        if notes:
+            lines.append("")
+            lines.append("Notes:")
+            lines.extend(f"  - {note}" for note in notes)
 
         changed = self.document.changed_vs_seed()
         if changed:

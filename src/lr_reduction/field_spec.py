@@ -71,7 +71,8 @@ from lr_reduction.reduction_domains import (
 __all__ = [
     "CALC_THETA_CHOICES", "DET_RES_CHOICES", "METHOD_CHOICES", "PEAK_TYPE_CHOICES",
     "Field", "FIELD_SPEC", "BY_NAME", "PER_ANGLE_NAMES", "OPTIONAL_LIST_NAMES",
-    "RUNTIME_OWNED_NAMES", "INT_ENCODED_NAMES", "DEFAULT_IF_EMPTY_NAMES", "GROUPS", "TYPES",
+    "RUNTIME_OWNED_NAMES", "INT_ENCODED_NAMES", "DEFAULT_IF_EMPTY_NAMES", "ANGLE_DEFINING_NAMES",
+    "GROUPS", "TYPES",
     "as_boolean", "get", "fields_in",
 ]
 
@@ -631,6 +632,16 @@ INT_ENCODED_NAMES = tuple(f.name for f in FIELD_SPEC if f.int_encoded)
 #: deliberate "use the default", not a length mismatch to report — reporting it
 #: trains the scientist to ignore the panel, which is how a real problem hides.
 DEFAULT_IF_EMPTY_NAMES = tuple(f.name for f in FIELD_SPEC if f.default_if_empty)
+
+#: Per-angle fields the reducer indexes with no fallback: neither filled in when
+#: empty, nor broadcast, nor optional. Derived from those three declarations,
+#: not listed by hand. The reducer counts its angles by ``RBnum`` and requires
+#: the others not to be shorter (``nr_reduction_calc.py:61-75``), so the longest
+#: of these is the number of angles a reduction will use.
+ANGLE_DEFINING_NAMES = tuple(
+    f.name for f in FIELD_SPEC
+    if f.per_angle and not (f.default_if_empty or f.broadcast_ok or f.optional_list)
+)
 
 #: Groups in the order the editor should present them.
 GROUPS = tuple(dict.fromkeys(f.group for f in FIELD_SPEC))
