@@ -1986,3 +1986,73 @@ def test_clearing_a_cell_that_holds_no_entry_changes_nothing():
     doc.set_angle_field(1, "method_per_run", None)
     assert doc.get("method_per_run") == ["constantQ"]
     assert doc.validate() == []
+
+
+# Added when rows of the v3 battery survived (ledger scripts/mutations-editor-angle-count.py).
+
+
+def test_clearing_the_one_angle_a_broadcast_entry_shows_on_keeps_it_for_the_others():
+    """F6, N2: the entry shows on row 0 only, but the reducer repeats it at every angle (:77-79).
+    Clearing row 0 unsets angle 0 and no other: the list is expanded to the reduction's count (not
+    the table's rows) first, and the line names angle 0 — the reducer refuses an unset entry (:82)."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": [1] * 4, "method_per_run": ["constantQ"]})
+    doc.set_angle_field(0, "method_per_run", None)
+    assert doc.get("method_per_run") == [None, "constantQ", "constantQ"]
+    lines = [line for line in doc.validate() if "(method_per_run)" in line]
+    assert len(lines) == 1 and "angles [0]" in lines[0]
+
+
+def test_a_refusal_does_not_come_back_after_the_field_is_set_and_cleared():
+    """W11: an accepted edit forgets the field's refusal. Otherwise, once the field is derived again,
+    the old line about a row the user typed into long ago would return."""
+    doc = _aug2026_document()
+    doc.set_angle_field(5, "LambdaMin", 3.0)
+    doc.set_angle_field(0, "LambdaMin", 2.5)
+    doc.set_angle_field(0, "LambdaMin", None)
+    assert doc.get("LambdaMin") is None
+    assert not any("surplus row" in line for line in doc.validate())
+
+
+def test_a_broadcast_list_unset_at_every_angle_holds_no_unset_entry_once_written_out(tmp_path):
+    """W13, W14: a method list unset at every angle (written [], so meanTheta everywhere) that holds an
+    unset and a set surplus entry. An edit or an Add writes it out, and the unset surplus entry gets
+    the reducer's default too: the reducer lower-cases every entry (nr_reduction_calc.py:82)."""
+    shape = {**_THREE_ANGLES, "useBS": [1] * 6, "method_per_run": [None, None, None, None, "constantTOF"]}
+    edited = SettingsDocument.from_dict(shape)
+    edited.set_angle_field(0, "method_per_run", "constantQ")
+    assert edited.get("method_per_run") == ["constantQ"] + ["meanTheta"] * 3 + ["constantTOF"]
+    added = SettingsDocument.from_dict(shape)
+    added.add_angle(DBname="d.dat", method_per_run="constantQ")
+    assert added.get("method_per_run") == ["meanTheta"] * 3 + ["constantQ", "meanTheta", "constantTOF"]
+    for doc in (edited, added):
+        assert not any("(method_per_run)" in line for line in doc.validate())
+    assert _reducer_reading(edited.save(tmp_path / "out.json"))["method_per_run"] == [
+        "'constantq'", "'meantheta'", "'meantheta'"]
+
+
+def test_a_ragged_broadcast_list_padded_past_its_end_leaves_the_missing_angle_unset_and_named():
+    """W16: padding fills a broadcast list's SURPLUS rows with the reducer's default, never an angle.
+    Angle 2 had no method (the list was short, which the panel already reported); filling it would
+    choose one for the scientist, silently."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": [1] * 6, "method_per_run": ["constantQ"] * 2})
+    doc.set_angle_field(5, "method_per_run", "constantTOF")
+    assert doc.get("method_per_run") == ["constantQ", "constantQ", None, "meanTheta", "meanTheta", "constantTOF"]
+    assert any("(method_per_run)" in line and "angles [2]" in line for line in doc.validate())
+
+
+def test_a_broadcast_list_unset_at_every_angle_is_no_problem_for_its_unset_surplus_entry(tmp_path):
+    """W18: unset at every angle, it is written [] and the reducer uses meanTheta; no entry of it
+    reaches the reducer, so its unset surplus entry is no problem."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": [1] * 4, "method_per_run": [None] * 4})
+    assert not any("(method_per_run)" in line for line in doc.validate())
+    assert json.loads(doc.save(tmp_path / "out.json").read_text())["method_per_run"] == []
+
+
+def test_an_explicit_none_given_to_add_leaves_a_compact_list_compact():
+    """W23: None is "no value". Writing a derived λ out as [None, None, None, None] gave a list that
+    reports a length and carries no values (web_report.py:547 indexes it), and a line."""
+    doc = _surplus_document()
+    doc.add_angle(DBname="d.dat", LambdaMin=None, ThetaShift=None)
+    assert doc.get("LambdaMin") is None
+    assert doc.get("ThetaShift") == []
+    assert not any("(LambdaMin)" in line or "(ThetaShift)" in line for line in doc.validate())

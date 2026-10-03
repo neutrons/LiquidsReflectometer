@@ -728,3 +728,21 @@ def test_a_lambda_typed_into_a_surplus_row_is_refused_and_the_cell_shows_it(tmp_
     assert _column_text(tab, "LambdaMin") == ["", "", "", ""]
     problems = tab.report.toPlainText().split("Notes:", 1)[0]
     assert "(LambdaMin)" in problems and "surplus row 4" in problems
+
+
+def test_emptying_the_lambda_that_alone_reached_the_last_row_leaves_the_table_drawable(tmp_path, monkeypatch):
+    """W21 (added when it survived): clearing λ's last value turns it back into None, and if it was the
+    only list reaching the last row, the table now shows a row past the document's. Re-drawing the
+    column reads that row as empty rather than raising inside the edit."""
+    path = tmp_path / "lambda_longest.json"
+    path.write_text(json.dumps({
+        "RBnum": [201282, 201283, 201284], "DBname": ["db_a.dat", "db_b.dat", "db_c.dat"],
+        "RB_Ymin": [140, 141, 142], "RB_Ymax": [150, 151, 152], "BkgROI": [[120, 130], [121, 131], [122, 132]],
+        "LambdaMin": [2.5, None, None, None],
+    }))
+    tab = SettingsEditorTab()
+    _load(tab, path, monkeypatch)
+    tab.angle_table.item(0, fs.PER_ANGLE_NAMES.index("LambdaMin")).setText("")
+    assert tab.document.get("LambdaMin") is None
+    assert "Could not complete" not in tab.report.toPlainText()
+    assert _column_text(tab, "LambdaMin") == ["", "", "", ""]
