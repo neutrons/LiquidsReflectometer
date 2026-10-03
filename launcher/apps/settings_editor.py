@@ -99,8 +99,6 @@ class _ChoiceDelegate(QtWidgets.QStyledItemDelegate):
 
     def _implied(self, index):
         """The text of the value the reduction uses in this cell when it holds none, or ``""``."""
-        if index.data(QtCore.Qt.DisplayRole):
-            return ""
         value = self._tab.document.implied_entry(index.row(), self._field.name)
         return "" if value is None else self._tab._cell_text(self._field, value)
 

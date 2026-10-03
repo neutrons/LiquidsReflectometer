@@ -2081,10 +2081,10 @@ def _direct_beam_folder(tmp_path, names):
 
 def test_the_direct_beam_candidates_are_the_folders_txt_and_dat_files_sorted(tmp_path):
     """Names are stored verbatim (spaces, non-ASCII); another suffix and a sub-folder are not offered."""
-    folder = _direct_beam_folder(tmp_path, ["db_b.dat", "db_a.txt", "notes.md", "db 1 é.dat"])
+    folder = _direct_beam_folder(tmp_path, ["db_b.dat", "db_a.txt", "notes.md", "db 1 é.dat", "DB_Z.DAT"])
     (folder / "sub.dat").mkdir()
     doc = SettingsDocument.from_dict({"_DBpath_override": str(folder)})
-    assert doc.candidates("DBname") == (["db 1 é.dat", "db_a.txt", "db_b.dat"], 3)
+    assert doc.candidates("DBname") == (["DB_Z.DAT", "db 1 é.dat", "db_a.txt", "db_b.dat"], 4)
 
 
 @pytest.mark.parametrize(
@@ -2168,3 +2168,10 @@ def test_an_entry_that_cannot_be_examined_is_left_out_and_the_rest_are_listed(tm
     monkeypatch.setattr(os, "scandir", lambda _path: Listing())
     doc = SettingsDocument.from_dict({"_DBpath_override": str(tmp_path)})
     assert doc.candidates("DBname") == (["db_a.txt", "db_b.dat"], 2)
+
+
+def test_a_list_unset_at_every_angle_implies_the_reductions_default():
+    """Added when frame row F34 survived: written [] (G7), so the reducer uses its default there; the
+    tests above held only [] and one broadcast entry, never unset entries."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": [None, None, None]})
+    assert [doc.implied_entry(k, "method_per_run") for k in range(3)] == ["meanTheta"] * 3

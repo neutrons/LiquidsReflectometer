@@ -1041,7 +1041,9 @@ def test_a_compact_column_shows_the_value_the_reduction_uses_marked_as_implied(t
         ("constantQ", False), ("constantQ", True), ("constantQ", True)]
     assert [_shown(tab, row, "useBS") for row in range(3)] == [("true", True)] * 3
     assert tab.document.changed_vs_seed() == {}
-    _choose(_open_cell_editor(tab, 1, "method_per_run"), "meanTheta")
+    editor = _open_cell_editor(tab, 1, "method_per_run")
+    assert editor.currentText() == "constantQ"  # the editor opens on what the cell shows
+    _choose(editor, "meanTheta")
     assert tab.document.get("method_per_run") == ["constantQ", "meanTheta", "constantQ"]
     assert [_shown(tab, row, "method_per_run") for row in range(3)] == [
         ("constantQ", False), ("meanTheta", False), ("constantQ", False)]
@@ -1138,3 +1140,97 @@ def test_a_capped_direct_beam_list_says_so(tmp_path, monkeypatch):
     editor = _open_cell_editor(tab, 0, "DBname")
     assert editor.count() == MAX_CANDIDATES
     assert f"first {MAX_CANDIDATES} of {MAX_CANDIDATES + 1}" in editor.toolTip()
+
+
+
+# Added when frame rows of the battery survived GREEN (ledger scripts/mutations-editor-combos.py).
+
+
+def test_an_implied_value_is_drawn_in_the_placeholder_colour():
+    """F12: italics and the placeholder colour together mark a value the cell does not hold."""
+    tab = SettingsEditorTab(SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": ["constantQ"]}))
+    column = fs.PER_ANGLE_NAMES.index("method_per_run")
+    delegate = tab.angle_table.itemDelegateForColumn(column)
+
+    def colours(row):
+        option = QtWidgets.QStyleOptionViewItem()
+        delegate.initStyleOption(option, tab.angle_table.model().index(row, column))
+        return option.palette.color(QtGui.QPalette.Text), option.palette.color(QtGui.QPalette.PlaceholderText)
+
+    text, placeholder = colours(1)
+    assert text == placeholder
+    text, placeholder = colours(0)
+    assert text != placeholder
+
+
+def test_an_implied_cell_says_where_its_value_comes_from():
+    """F13: the tooltip a hover shows, through the view's own tooltip path (a help event to the viewport)."""
+    tab = SettingsEditorTab(SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": ["constantQ"]}))
+    tab.resize(1100, 700)
+    tab.show()
+    QTest.qWaitForWindowExposed(tab)
+    index = tab.angle_table.model().index(1, fs.PER_ANGLE_NAMES.index("method_per_run"))
+    tab.angle_table.scrollTo(index)
+    centre = tab.angle_table.visualRect(index).center()
+    viewport = tab.angle_table.viewport()
+    QtWidgets.QApplication.sendEvent(
+        viewport, QtGui.QHelpEvent(QtCore.QEvent.ToolTip, centre, viewport.mapToGlobal(centre)))
+    assert "the reduction uses constantQ" in QtWidgets.QToolTip.text()
+    QtWidgets.QToolTip.hideText()
+    tab.close()
+
+
+def test_a_drop_down_does_not_take_focus_from_the_wheel():
+    """F4: QComboBox defaults to WheelFocus, so a list scrolled past one would leave the focus, and the
+    keyboard's arrow keys, on it. Qt only gives focus for a real (spontaneous) wheel event, which a test
+    cannot send, so this asserts the policy that decides it."""
+    tab = SettingsEditorTab(SettingsDocument.from_dict(_THREE_ANGLES))
+    for name in _SCALAR_CHOICES:
+        assert tab.editors[name].focusPolicy() == QtCore.Qt.StrongFocus, name
+    for name in ("method_per_run", "useBS", "DBname"):
+        editor = _open_cell_editor(tab, 0, name)
+        assert editor.focusPolicy() == QtCore.Qt.StrongFocus, name
+        QTest.keyClick(editor, QtCore.Qt.Key_Escape)
+        QtWidgets.QApplication.processEvents()
+
+
+def test_a_direct_beam_list_at_the_cap_does_not_say_it_was_cut(tmp_path, monkeypatch):
+    """F16: exactly MAX_CANDIDATES names is the whole folder."""
+    from lr_reduction.settings_document import MAX_CANDIDATES
+
+    path, _ = _direct_beam_settings(tmp_path, [f"db_{k:05d}.dat" for k in range(MAX_CANDIDATES)])
+    tab = SettingsEditorTab()
+    _load(tab, path, monkeypatch)
+    editor = _open_cell_editor(tab, 0, "DBname")
+    assert editor.count() == MAX_CANDIDATES
+    assert editor.toolTip() == ""
+
+
+def test_a_change_in_another_column_repaints_the_implied_cells(tmp_path, monkeypatch):
+    """F23: a DBname typed into a surplus row makes it an angle, so its Q-method cell now implies meanTheta,
+    but nothing in that column changed. While other rows stay surplus, the row header keeps its width, so
+    nothing else repaints that cell: refresh_marks must."""
+    tab = SettingsEditorTab()
+    _load(tab, _settings_file(tmp_path, {**_THREE_ANGLES, "useBS": [1] * 6}), monkeypatch)
+    tab.resize(1100, 700)
+    tab.show()
+    QTest.qWaitForWindowExposed(tab)
+    method = tab.angle_table.model().index(3, fs.PER_ANGLE_NAMES.index("method_per_run"))
+    tab.angle_table.scrollTo(method)
+    QtWidgets.QApplication.processEvents()
+    assert _shown(tab, 3, "method_per_run") == ("", False)
+    painted = []
+
+    class Recorder(QtCore.QObject):
+        def eventFilter(self, _watched, event):
+            if event.type() == QtCore.QEvent.Paint:
+                painted.append(QtGui.QRegion(event.region()))
+            return False
+
+    recorder = Recorder()
+    tab.angle_table.viewport().installEventFilter(recorder)
+    tab.angle_table.item(3, fs.PER_ANGLE_NAMES.index("DBname")).setText("d.dat")
+    QtWidgets.QApplication.processEvents()
+    assert _shown(tab, 3, "method_per_run") == ("meanTheta", True)
+    assert any(region.contains(tab.angle_table.visualRect(method)) for region in painted)
+    tab.close()
