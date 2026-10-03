@@ -356,6 +356,7 @@ class SettingsEditorTab(QtWidgets.QWidget):
         item = self.angle_table.item(row, column)
         value = fs.get(name).coerce_element(item.text() if item is not None else "")
         self.document.set_angle_field(row, name, value)
+        self.refresh_marks()
         self.refresh_report()
 
     @guarded
@@ -406,10 +407,8 @@ class SettingsEditorTab(QtWidgets.QWidget):
         try:
             shown = min(self.document.n_angles, MAX_TABLE_ROWS)
             self._rows_hidden = self.document.n_angles - shown
-            count = self.document.reduction_angles
             self.angle_table.setRowCount(shown)
             for row in range(shown):
-                self.angle_table.setVerticalHeaderItem(row, self._row_header(row, surplus=row >= count))
                 values = self.document.angle_row(row)
                 for column, name in enumerate(fs.PER_ANGLE_NAMES):
                     value = values[name]
@@ -420,8 +419,20 @@ class SettingsEditorTab(QtWidgets.QWidget):
                     self.angle_table.setItem(
                         row, column, QtWidgets.QTableWidgetItem(self._cell_text(fs.get(name), value))
                     )
+            self.refresh_marks()
         finally:
             self._populating = False
+
+    def refresh_marks(self):
+        """Mark the rows beyond the reduction's angle count, from the document as it is now.
+
+        Run after every change that can move the count: Load, Add, Remove, and
+        a cell edit (an angle-defining value typed into a surplus row makes it an
+        angle). The only place a mark is decided.
+        """
+        count = self.document.reduction_angles
+        for row in range(self.angle_table.rowCount()):
+            self.angle_table.setVerticalHeaderItem(row, self._row_header(row, surplus=row >= count))
 
     def refresh_scalars(self):
         for name, editor in self.editors.items():

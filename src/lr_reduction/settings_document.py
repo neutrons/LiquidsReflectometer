@@ -12,15 +12,18 @@ is testable without a display.
 
 Two design points worth stating, because both differ from the obvious reading:
 
-*Angles grow together.* ``add_angle`` mutates **every** per-angle field in one
-operation. Growing only the obvious ones leaves the others short, and a short
-array shifts every subsequent angle's settings by one — silently, since nothing
-in the config class enforces equal lengths.
+*One index per added angle.* ``add_angle`` puts the new angle at the
+reduction's next index (``reduction_angles``) in every list an angle is read
+from, so a short array cannot shift every subsequent angle's settings by one —
+which would happen silently, since nothing in the config class enforces equal
+lengths. Lists the reducer fills, broadcasts or derives stay compact when no
+value is given (empty, one broadcast entry, ``None``): the reducer expands them
+itself. An edit (``set_angle_field``) changes exactly the entry edited.
 
 *Validation is not the same as the equal-length invariant.* The reducer
 deliberately broadcasts a single ``method_per_run`` entry across all angles
-(``nr_reduction_calc.py:76-78``) and defaults an empty one to ``meanTheta``
-(``:41-42``). A validator that demanded strict equal lengths everywhere would
+(``nr_reduction_calc.py:77-79``) and defaults an empty one to ``meanTheta``
+(``:42-43``). A validator that demanded strict equal lengths everywhere would
 reject configurations the reducer accepts, so the broadcastable cases are
 exempted here rather than "fixed".
 """
@@ -196,12 +199,15 @@ class SettingsDocument:
         return self._defining_length() or self.n_angles
 
     def add_angle(self, **values):
-        """Add one angle at index ``n_angles``, the same index in every list it touches.
+        """Add one angle at index ``reduction_angles`` — the reduction's next one — in every list it touches.
 
         Appending to each list at its own end misaligned a file whose lists
         differ in length: the new values landed in different rows, and the
-        author's ``useBS`` sat beside an old surplus entry. Now, by the list's
-        state before the gesture:
+        author's ``useBS`` sat beside an old surplus entry. Appending after the
+        surplus rows instead (v1) turned them into angles with no required
+        values. The new angle goes directly after the last real angle, and any
+        surplus entries move down one row and stay surplus. By the list's state
+        before the gesture:
 
         * a compact list the reduction accepts as it is is left alone when no
           value is supplied. Compact means an empty ``default_if_empty`` list
@@ -214,20 +220,20 @@ class SettingsDocument:
         * a compact list given a value is expanded: a broadcast list by
           repeating its single entry for the existing angles, the others with
           unset entries;
-        * any other list is padded with unset entries to ``n_angles`` and then
-          appended to. With surplus rows present, the new angle is therefore the
-          row after them, never a surplus slot;
+        * any other list gets the new entry at index ``reduction_angles``: a
+          shorter list is first padded with unset entries to that index, and a
+          longer one's surplus entries follow the new entry;
         * a per-angle value that is not a list is left as it is, for
           ``validate()`` to report.
         """
-        n = self.n_angles
+        m = self.reduction_angles
         for name in fs.PER_ANGLE_NAMES:
             field = fs.get(name)
             current = self.get(name)
             supplied = name in values
             if current is None:
                 if supplied:
-                    self.set(name, [None] * n + [values[name]])
+                    self.set(name, [None] * m + [values[name]])
                 continue
             if not isinstance(current, (list, tuple)):
                 continue
@@ -235,10 +241,11 @@ class SettingsDocument:
             compact = (field.default_if_empty and not current) or (field.broadcast_ok and len(current) <= 1)
             if compact:
                 if supplied:
-                    head = current * n if (field.broadcast_ok and len(current) == 1) else [None] * n
+                    head = current * m if (field.broadcast_ok and len(current) == 1) else [None] * m
                     self.set(name, head + [values[name]])
                 continue
-            self.set(name, current + [None] * (n - len(current)) + [values.get(name)])
+            angles = current[:m] + [None] * (m - len(current[:m]))
+            self.set(name, angles + [values.get(name)] + current[m:])
 
     def remove_angle(self, index):
         """Remove one angle from every per-angle field."""
@@ -261,29 +268,27 @@ class SettingsDocument:
         if not field.per_angle:
             raise KeyError(f"{name} is not a per-angle field")
         current = self.get(name)
-        # A single broadcast entry stands for every angle (nr_reduction_calc.py:77-79).
-        # Setting one angle expands it first, so the others keep that value instead
-        # of becoming unset entries the reducer would choke on.
-        if field.broadcast_ok and isinstance(current, (list, tuple)) and len(current) == 1:
-            current = list(current) * max(self.n_angles, 1)
-        # Pad a None field AND a SHORT one. Only the None case was handled
-        # before, so any per-angle column shorter than n_angles raised
-        # IndexError here — and an unhandled exception in a Qt slot calls
-        # qFatal(), killing the whole launcher. Short columns arise from
-        # ordinary files: the reducer sanctions a length-1 method_per_run, and
-        # normalize() itself drops the runtime-owned RBnum, so the editor's own
-        # save/reload round trip produces one.
-        # isinstance, not len(): a per-angle field holding a bare string has a
-        # length, so a len() guard let list("abc") explode it into
-        # ['a','b','c'] instead of treating it as the wrong type it is.
-        if not isinstance(current, (list, tuple)) or len(current) < self.n_angles:
-            padded = [None] * self.n_angles
-            if isinstance(current, (list, tuple)):
-                padded[: len(current)] = list(current)
-            current = padded
         if not 0 <= index < self.n_angles:
             raise IndexError(f"No angle at index {index} (have {self.n_angles})")
-        updated = list(current)
+        # A single broadcast entry stands for the reduction's angles
+        # (nr_reduction_calc.py:77-79). Setting one of them expands it to the
+        # reduction's count first, so the others keep that value instead of
+        # becoming unset entries the reducer would choke on. It expands to that
+        # count, not to the table's rows, because rows past it are surplus.
+        if field.broadcast_ok and isinstance(current, (list, tuple)) and len(current) == 1:
+            current = list(current) * max(self.reduction_angles, 1)
+        # An edit changes exactly the entry edited. A list is padded only far
+        # enough to reach the edited index, never to the table's row count: v1
+        # padded to n_angles, and on a file with surplus rows one cell edit grew
+        # every edited list into them, which raised the reduction's count (3 -> 7
+        # on a real file) and reported problems that did not exist (review 1568397).
+        # Padding a SHORT list rather than indexing past it matters too: an
+        # IndexError in a Qt slot reaches qFatal() and kills the launcher, and short
+        # lists are ordinary (a length-1 method_per_run; normalize() drops RBnum).
+        # isinstance, not len(): a bare string has a length, and list("abc") would
+        # explode it into ['a', 'b', 'c'] instead of replacing a wrong type.
+        updated = list(current) if isinstance(current, (list, tuple)) else []
+        updated += [None] * (index + 1 - len(updated))
         updated[index] = value
         field = fs.get(name)
         # An optional list that is emptied of every value goes back to None —
@@ -332,7 +337,12 @@ class SettingsDocument:
                 if not isinstance(value, (list, tuple)):
                     messages.append(field.check(value))
                     continue
-                missing = [i for i, entry in enumerate(value) if entry is None]
+                # "Unset at some angles" looks at the angles the reduction uses,
+                # entries below the count. Past it is surplus that the reducer never
+                # reads, and naming a surplus row as unset was a false problem
+                # (review 1568397, B-1).
+                angles = list(value[:count])
+                missing = [i for i, entry in enumerate(angles) if entry is None]
                 if field.optional_list and missing:
                     messages.append(
                         f"{field.label} ({field.name}) is set for some angles but not "
@@ -344,13 +354,13 @@ class SettingsDocument:
                 # SOME angles cannot be written as a default and reaches the
                 # reducer as None (:413 adds it; :82 calls .lower() on it).
                 fills_itself = field.default_if_empty or field.broadcast_ok
-                if fills_itself and missing and len(missing) < len(value):
+                if fills_itself and missing and len(missing) < len(angles):
                     messages.append(
                         f"{field.label} ({field.name}) is set for some angles but not "
                         f"angles {missing}: either give every angle a value or clear "
                         f"the field to use the reduction's default"
                     )
-                length = 0 if fills_itself and len(missing) == len(value) else len(value)
+                length = 0 if fills_itself and len(missing) == len(angles) else len(value)
                 if length < count and not self._length_is_allowed(field, length):
                     messages.append(
                         f"{field.label} ({field.name}) has {len(value)} entries "
@@ -391,8 +401,8 @@ class SettingsDocument:
           indexes ``[i]`` with ``i < len(RBnum)`` (``nr_reduction_calc.py:61``)
           and never reads the extra entries. One line per field, never per
           entry; Remove angle on a surplus row drops them.
-        * A boolean default list unset at every angle (``useBS`` — pinned by a
-          test on the derivation): it is written ``[]``, which the reducer
+        * A boolean default list unset at every angle the reduction uses
+          (``useBS`` — pinned by a test on the derivation): it is written ``[]``, which the reducer
           fills with 1, on, for every angle (``:102-103``). Shown only when
           angle-defining entries exist, because otherwise there is no reduction
           to describe.
@@ -412,7 +422,7 @@ class SettingsDocument:
                     f"reduction uses; it ignores them, and removing the surplus angle drops them"
                 )
             if (field.default_if_empty and field.element_type == "bool" and defining
-                    and all(entry is None for entry in value)):
+                    and all(entry is None for entry in value[:count])):
                 lines.append(
                     f"{field.label} ({field.name}) is unset, so the reduction uses its default: "
                     f"on (1) at every angle (nr_reduction_calc.py:102-103)"
@@ -451,16 +461,17 @@ class SettingsDocument:
         """
         return {
             key: value
-            for key, value in self._encode_for_file(make_json_safe(self.to_dict())).items()
+            for key, value in self._encode_for_file(make_json_safe(self.to_dict()), self.reduction_angles).items()
             if key not in fs.RUNTIME_OWNED_NAMES
         }
 
     @staticmethod
-    def _encode_for_file(values):
+    def _encode_for_file(values, count):
         """Write lists the way the reduction reads them.
 
         * A list the reducer fills or broadcasts (``default_if_empty``,
-          ``broadcast_ok``) that is unset at every angle is written ``[]``. That
+          ``broadcast_ok``) that is unset at every angle below ``count`` (the
+          reduction's; entries past it are surplus it never reads) is written ``[]``. That
           is the only spelling of "use your default" the reducer has: it tests
           ``if not self.config.<name>`` (``nr_reduction_calc.py:99-110``), and
           ``[None, None]`` is a list, so the default is skipped and the ``None``
@@ -479,7 +490,7 @@ class SettingsDocument:
             if not (field.default_if_empty or field.broadcast_ok):
                 continue
             entries = values.get(field.name)
-            if isinstance(entries, list) and entries and all(entry is None for entry in entries):
+            if isinstance(entries, list) and entries and all(entry is None for entry in entries[:count]):
                 values[field.name] = []
         for name in fs.INT_ENCODED_NAMES:
             entries = values.get(name)
@@ -513,7 +524,7 @@ class SettingsDocument:
                 f"{path} is a symbolic link to {os.path.realpath(path)}; "
                 f"refusing to write through it — save to the target directly if that is the intent"
             )
-        payload = json.dumps(self._encode_for_file(make_json_safe(self.to_dict())), indent=2)
+        payload = json.dumps(self._encode_for_file(make_json_safe(self.to_dict()), self.reduction_angles), indent=2)
         # mkstemp opens O_CREAT|O_EXCL on a fresh name, so there is no link to
         # follow and no pre-existing file to clobber.
         handle_fd, temporary = tempfile.mkstemp(

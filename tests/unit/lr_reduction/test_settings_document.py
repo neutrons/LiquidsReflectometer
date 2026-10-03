@@ -1565,7 +1565,7 @@ def _angles_named(lines):
 @pytest.mark.parametrize("shape", list(_SHAPES))
 def test_an_edit_changes_exactly_the_entry_edited(tmp_path, shape, name, value, where):
     doc = _SHAPES[shape]()
-    m, notes_before = doc.reduction_angles, doc.notes()
+    m, notes_before, problems_before = doc.reduction_angles, doc.notes(), doc.validate()
     index = {"first": 0, "last-angle": m - 1, "surplus-row": m}[where]
     before = doc.get(name)
     expected = list(before) if isinstance(before, list) else []
@@ -1579,7 +1579,18 @@ def test_an_edit_changes_exactly_the_entry_edited(tmp_path, shape, name, value, 
     assert repr(doc.get(name)) == repr(expected)
     defines = name in fs.ANGLE_DEFINING_NAMES and index >= m
     assert doc.reduction_angles == (index + 1 if defines else m)
-    assert all(i < doc.reduction_angles for i in _angles_named(doc.validate()))
+    problems = doc.validate()
+    assert all(i < doc.reduction_angles for i in _angles_named(problems))
+    if not defines:
+        # nothing else changes: an edit to one list never alters what is said about another
+        def others(lines):
+            return [line for line in lines if f"({name})" not in line]
+
+        assert others(problems) == others(problems_before)
+    field = fs.get(name)
+    if index >= m and (field.default_if_empty or field.broadcast_ok):
+        # a value in a surplus row of a list the reducer fills is never read: no problem about it
+        assert not any(f"({name})" in line for line in problems)
     if index < m:
         assert doc.notes() == notes_before
     first = doc.save(tmp_path / "first.json")
@@ -1620,3 +1631,24 @@ def test_a_value_for_an_empty_default_list_lands_on_the_new_angle():
     doc = SettingsDocument.from_dict({**_THREE_ANGLES, "ThetaShift": []})
     doc.add_angle(DBname="d.dat", ThetaShift=0.1)
     assert doc.get("ThetaShift") == [None, None, None, 0.1]
+
+
+def test_a_value_typed_into_a_surplus_row_of_an_unset_default_list_is_not_written(tmp_path):
+    """Added when frame row V2 (save() deciding "all unset" over the table's rows) and plan row N3
+    (the some-unset rule over the whole list) survived the first battery. The angles are all unset,
+    so the reducer's default applies, and the surplus value is one it never reads."""
+    doc = _surplus_document()
+    doc.set_angle_field(3, "ThetaShift", 0.01)
+    assert doc.validate() == []
+    assert any("(ThetaShift)" in line and "1 extra" in line for line in doc.notes())
+    assert json.loads(doc.save(tmp_path / "out.json").read_text())["ThetaShift"] == []
+    assert doc.normalize()["ThetaShift"] == []
+
+
+def test_an_unset_background_switch_with_a_surplus_value_is_still_noted_as_the_default(tmp_path):
+    """Added when frame row V3 (the A2 note deciding "unset" over the whole list) survived. Unset
+    at every angle is what the reducer sees: the file is written [] and it fills 1 (on)."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": ["meanTheta"] * 4})
+    doc.set_angle_field(3, "useBS", False)
+    assert any("(useBS)" in line and re.search(r"\bon\b", line) for line in doc.notes())
+    assert json.loads(doc.save(tmp_path / "out.json").read_text())["useBS"] == []
