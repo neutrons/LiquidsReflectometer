@@ -71,7 +71,8 @@ from lr_reduction.reduction_domains import (
 __all__ = [
     "CALC_THETA_CHOICES", "DET_RES_CHOICES", "METHOD_CHOICES", "PEAK_TYPE_CHOICES",
     "Field", "FIELD_SPEC", "BY_NAME", "PER_ANGLE_NAMES", "OPTIONAL_LIST_NAMES",
-    "RUNTIME_OWNED_NAMES", "INT_ENCODED_NAMES", "DEFAULT_IF_EMPTY_NAMES", "GROUPS", "TYPES",
+    "RUNTIME_OWNED_NAMES", "INT_ENCODED_NAMES", "DEFAULT_IF_EMPTY_NAMES", "ANGLE_DEFINING_NAMES",
+    "GROUPS", "TYPES",
     "as_boolean", "get", "fields_in",
 ]
 
@@ -120,6 +121,15 @@ class Field:
         validation and canonicalized on load here, and nowhere else. A scalar
         boolean is left as written, because the reducer reads ``useGravity``
         with ``is True`` (``nr_reduction_calc.py:1079``).
+    reducer_default
+        For a list the reducer fills or broadcasts itself (``default_if_empty``,
+        ``broadcast_ok``): the value it uses at an angle the list does not give,
+        exactly as the reducer writes it — ``0`` for ``ThetaShift``, ``1`` for
+        ``useBS`` (``nr_reduction_calc.py:99-110``), ``meanTheta`` for
+        ``method_per_run`` (``:42-43``, which lower-cases it). An edit of one
+        angle of such a list writes this at the others, so they reduce as before
+        (``SettingsDocument.set_angle_field``). ``None`` for every other field.
+        Pinned against the reducer by a test.
     """
 
     name: str
@@ -141,6 +151,7 @@ class Field:
     falsy_means_off: bool = False
     case_sensitive: bool = False
     value_notes: Tuple[Tuple[str, str], ...] = ()
+    reducer_default: Any = None
 
     # -- type vocabulary ------------------------------------------------
 
@@ -446,7 +457,7 @@ FIELD_SPEC = (
           "Lambda-to-Q conversion used for each angle. One entry per angle; a "
           "single entry is broadcast to all angles, and an empty list defaults "
           "to meanTheta.",
-          allowed=METHOD_CHOICES, per_angle=True, broadcast_ok=True),
+          allowed=METHOD_CHOICES, per_angle=True, broadcast_ok=True, reducer_default="meanTheta"),
     Field("DBname", "Direct-beam file", RUNS, "list[str]", [],
           "Pre-processed direct-beam file backing each angle.", per_angle=True),
     Field("RBnum", "Run numbers", RUNS, "list[int]", [],
@@ -463,13 +474,13 @@ FIELD_SPEC = (
           "Background region per angle, as pixel bounds.", per_angle=True),
     Field("useBS", "Subtract background", BACKGROUND, "list[bool]", [],
           "Whether to subtract background at each angle.", per_angle=True, default_if_empty=True,
-          int_encoded=True),
+          int_encoded=True, reducer_default=1),
     Field("tof_min", "TOF min", WAVELENGTH, "list[float]", [],
           "Lower time-of-flight bound per angle.",
-          minimum=0.0, per_angle=True, default_if_empty=True),
+          minimum=0.0, per_angle=True, default_if_empty=True, reducer_default=0),
     Field("tof_max", "TOF max", WAVELENGTH, "list[float]", [],
           "Upper time-of-flight bound per angle.",
-          minimum=0.0, per_angle=True, default_if_empty=True),
+          minimum=0.0, per_angle=True, default_if_empty=True, reducer_default=100000),
     Field("LambdaMin", "Lambda min", WAVELENGTH, "list[float]", None,
           "Lower wavelength bound per angle. Leave unset to derive it from the "
           "chopper ranges; if set, every angle needs a value.",
@@ -479,10 +490,11 @@ FIELD_SPEC = (
           "chopper ranges; if set, every angle needs a value.",
           per_angle=True, optional_list=True),
     Field("ThetaShift", "Theta shift (deg)", THETA, "list[float]", [],
-          "Correction added to the measured theta at each angle.", per_angle=True, default_if_empty=True),
+          "Correction added to the measured theta at each angle.", per_angle=True, default_if_empty=True,
+          reducer_default=0),
     Field("ScaleFactor", "Scale factor", THETA, "list[float]", [],
           "Multiplier applied to each angle's reflectivity before stitching.",
-          per_angle=True, default_if_empty=True),
+          per_angle=True, default_if_empty=True, reducer_default=1),
 
     # ---- scalars ---------------------------------------------------------
     Field("Sname", "Output name", NAMING, "str", "reduction_output",
@@ -631,6 +643,16 @@ INT_ENCODED_NAMES = tuple(f.name for f in FIELD_SPEC if f.int_encoded)
 #: deliberate "use the default", not a length mismatch to report — reporting it
 #: trains the scientist to ignore the panel, which is how a real problem hides.
 DEFAULT_IF_EMPTY_NAMES = tuple(f.name for f in FIELD_SPEC if f.default_if_empty)
+
+#: Per-angle fields the reducer indexes with no fallback: neither filled in when
+#: empty, nor broadcast, nor optional. Derived from those three declarations,
+#: not listed by hand. The reducer counts its angles by ``RBnum`` and requires
+#: the others not to be shorter (``nr_reduction_calc.py:61-75``), so the longest
+#: of these is the number of angles a reduction will use.
+ANGLE_DEFINING_NAMES = tuple(
+    f.name for f in FIELD_SPEC
+    if f.per_angle and not (f.default_if_empty or f.broadcast_ok or f.optional_list)
+)
 
 #: Groups in the order the editor should present them.
 GROUPS = tuple(dict.fromkeys(f.group for f in FIELD_SPEC))

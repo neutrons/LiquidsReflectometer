@@ -594,3 +594,155 @@ def test_a_hand_written_integer_useGravity_is_reported_and_saved_as_written(tmp_
     )
     tab.save_settings()
     assert '"useGravity": 1' in target.read_text()
+
+
+# --------------------------------------------------------------------------
+# editor-angle-count — the reduction's angle count; surplus rows; Add keeps one index
+# --------------------------------------------------------------------------
+
+
+def _surplus_settings(directory):
+    """Three angles by RBnum, useBS four long — IPTS-36119's reduce_settings.json shape."""
+    path = directory / "reduce_settings.json"
+    path.write_text(json.dumps({
+        "RBnum": [201282, 201283, 201284],
+        "DBname": ["db_a.dat", "db_b.dat", "db_c.dat"],
+        "RB_Ymin": [140, 141, 142],
+        "RB_Ymax": [150, 151, 152],
+        "BkgROI": [[120, 130], [121, 131], [122, 132]],
+        "useBS": [1, 1, 1, 1],
+    }))
+    return path
+
+
+def _row_label(tab, row):
+    item = tab.angle_table.verticalHeaderItem(row)
+    return item.text() if item is not None else ""
+
+
+def test_a_surplus_file_reads_no_problems_and_shows_its_note(tmp_path, monkeypatch):
+    tab = SettingsEditorTab()
+    _load(tab, _surplus_settings(tmp_path), monkeypatch)
+    text = tab.report.toPlainText()
+    assert text.startswith("No problems found.")
+    notes = text.split("Notes:", 1)[1]
+    assert "(useBS)" in notes and "1 extra" in notes
+
+
+def test_the_surplus_row_is_marked_and_the_others_are_not(tmp_path, monkeypatch):
+    """The queryable property: the row's vertical header says "surplus"."""
+    tab = SettingsEditorTab()
+    _load(tab, _surplus_settings(tmp_path), monkeypatch)
+    assert tab.angle_table.rowCount() == 4
+    assert [("surplus" in _row_label(tab, row)) for row in range(4)] == [False, False, False, True]
+
+
+def test_add_angle_inserts_the_reductions_next_angle_before_the_surplus_rows(tmp_path, monkeypatch):
+    """v2 (G6 revised, review 1568397 Q-1): the new angle is row m, directly after the last
+    real angle; the surplus row moves down and stays surplus. v1 appended after it, so a
+    saved RBnum read [..., null, <new run>]."""
+    tab = SettingsEditorTab()
+    _load(tab, _surplus_settings(tmp_path), monkeypatch)
+    QTest.mouseClick(tab.add_angle_button, QtCore.Qt.LeftButton)
+    for name, text in (("DBname", "new.dat"), ("RBnum", "999999")):
+        tab.angle_table.item(3, fs.PER_ANGLE_NAMES.index(name)).setText(text)
+    doc = tab.document
+    assert doc.get("DBname")[3] == "new.dat"
+    assert doc.reduction_angles == 4
+    assert repr(doc.get("useBS")) == "[True, True, True, None, True]"
+    assert [("surplus" in _row_label(tab, row)) for row in range(5)] == [False, False, False, False, True]
+    target = tmp_path / "saved.json"
+    monkeypatch.setattr(
+        QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), ""))
+    )
+    tab.save_settings()
+    assert json.loads(target.read_text())["RBnum"] == [201282, 201283, 201284, 999999]
+
+
+def test_removing_the_surplus_row_clears_its_note(tmp_path, monkeypatch):
+    tab = SettingsEditorTab()
+    _load(tab, _surplus_settings(tmp_path), monkeypatch)
+    tab.angle_table.setCurrentCell(3, 0)
+    QTest.mouseClick(tab.remove_angle_button, QtCore.Qt.LeftButton)
+    assert "(useBS)" not in tab.report.toPlainText()
+    assert tab.document.get("useBS") == [True, True, True]
+
+
+def test_a_new_document_writes_the_reducers_defaults_as_empty_lists(tmp_path, monkeypatch):
+    """F5: the editor's own file must reduce; an unset default list is written [] (G7)."""
+    tab = SettingsEditorTab()
+    for _ in range(2):
+        QTest.mouseClick(tab.add_angle_button, QtCore.Qt.LeftButton)
+    for row in range(2):
+        for name, text in (("DBname", f"db_{row}.dat"), ("RB_Ymin", "140"), ("RB_Ymax", "150"), ("BkgROI", "120, 130")):
+            tab.angle_table.item(row, fs.PER_ANGLE_NAMES.index(name)).setText(text)
+    target = tmp_path / "authored.json"
+    monkeypatch.setattr(
+        QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), ""))
+    )
+    tab.save_settings()
+    saved = json.loads(target.read_text())
+    assert saved["ThetaShift"] == []
+    assert saved["method_per_run"] == []
+
+
+@pytest.mark.parametrize("row, still_surplus", [(0, True), (3, False)], ids=["edit-an-angle", "edit-the-surplus-row"])
+def test_the_surplus_marks_follow_an_edit(tmp_path, monkeypatch, row, still_surplus):
+    """v2 (G8): marks are re-derived after an edit, as after Load, Add and Remove. Editing an
+    angle leaves the surplus row surplus and the panel clean; a DBname typed into the surplus
+    row makes it a real angle."""
+    tab = SettingsEditorTab()
+    _load(tab, _surplus_settings(tmp_path), monkeypatch)
+    tab.angle_table.item(row, fs.PER_ANGLE_NAMES.index("DBname")).setText("edited.dat")
+    assert ("surplus" in _row_label(tab, 3)) is still_surplus
+    if still_surplus:
+        text = tab.report.toPlainText()
+        assert text.startswith("No problems found.")
+        assert "(useBS)" in text.split("Notes:", 1)[1]
+
+
+# --------------------------------------------------------------------------
+# editor-angle-count v3 — G9 at the gesture: an edit of a compact list shows what it wrote; a λ
+# typed into a surplus row of a derived list is refused, visibly
+# --------------------------------------------------------------------------
+
+
+def test_an_edit_of_an_empty_default_list_shows_the_values_it_wrote(tmp_path, monkeypatch):
+    """G9 writes entries the user did not type (the reducer's own value at the other angles), so the
+    column is re-drawn from the document: what is shown is what is held."""
+    tab = SettingsEditorTab()
+    _load(tab, _surplus_settings(tmp_path), monkeypatch)
+    tab.angle_table.item(1, fs.PER_ANGLE_NAMES.index("ThetaShift")).setText("0.01")
+    assert repr(tab.document.get("ThetaShift")) == "[0, 0.01, 0]"
+    assert _column_text(tab, "ThetaShift") == ["0", "0.01", "0", ""]
+    assert tab.report.toPlainText().startswith("No problems found.")
+
+
+def test_a_lambda_typed_into_a_surplus_row_is_refused_and_the_cell_shows_it(tmp_path, monkeypatch):
+    """S3 at the gesture: the document keeps λ derived, the cell goes back to unset, and the panel
+    says why."""
+    tab = SettingsEditorTab()
+    _load(tab, _surplus_settings(tmp_path), monkeypatch)
+    tab.angle_table.item(3, fs.PER_ANGLE_NAMES.index("LambdaMin")).setText("3.0")
+    assert tab.document.get("LambdaMin") is None
+    assert _column_text(tab, "LambdaMin") == ["", "", "", ""]
+    problems = tab.report.toPlainText().split("Notes:", 1)[0]
+    assert "(LambdaMin)" in problems and "surplus row 4" in problems
+
+
+def test_emptying_the_lambda_that_alone_reached_the_last_row_leaves_the_table_drawable(tmp_path, monkeypatch):
+    """W21 (added when it survived): clearing λ's last value turns it back into None, and if it was the
+    only list reaching the last row, the table now shows a row past the document's. Re-drawing the
+    column reads that row as empty rather than raising inside the edit."""
+    path = tmp_path / "lambda_longest.json"
+    path.write_text(json.dumps({
+        "RBnum": [201282, 201283, 201284], "DBname": ["db_a.dat", "db_b.dat", "db_c.dat"],
+        "RB_Ymin": [140, 141, 142], "RB_Ymax": [150, 151, 152], "BkgROI": [[120, 130], [121, 131], [122, 132]],
+        "LambdaMin": [2.5, None, None, None],
+    }))
+    tab = SettingsEditorTab()
+    _load(tab, path, monkeypatch)
+    tab.angle_table.item(0, fs.PER_ANGLE_NAMES.index("LambdaMin")).setText("")
+    assert tab.document.get("LambdaMin") is None
+    assert "Could not complete" not in tab.report.toPlainText()
+    assert _column_text(tab, "LambdaMin") == ["", "", "", ""]

@@ -10,6 +10,7 @@ import ast
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import textwrap
@@ -132,17 +133,25 @@ def test_unknown_key_in_a_seed_is_reported_by_name(tmp_path):
 
 
 def test_add_angle_grows_every_per_angle_field():
-    """All 13 move together, or the arrays silently desynchronise.
+    """Every list an angle is read from moves together, or the arrays silently desynchronise.
 
-    Growing only the obvious eight is the defect this slug exists to prevent:
-    `RBnum` and `ScaleFactor` are easy to forget, and a short array shifts every
-    subsequent angle's settings by one.
+    Growing only the obvious eight was the original T2 defect: `RBnum` is easy to
+    forget, and a short array shifts every subsequent angle's settings by one.
+
+    Since editor-angle-count (G6), a list the reducer fills, broadcasts or derives is
+    left compact when no value is given: empty, one broadcast entry, or None. The
+    reducer expands it to every angle itself (nr_reduction_calc.py:42-43, :77-79,
+    :99-110), and the unset entries this test used to require were what made an
+    editor-authored file unreducible (F5). Every angle-defining list still grows.
     """
     doc = SettingsDocument()
     doc.add_angle()
     doc.add_angle()
-    lengths = {name: len(doc.get(name)) for name in fs.PER_ANGLE_NAMES if doc.get(name) is not None}
-    assert set(lengths.values()) == {2}
+    for name in fs.PER_ANGLE_NAMES:
+        if name in fs.ANGLE_DEFINING_NAMES:
+            assert len(doc.get(name)) == 2, name
+        else:
+            assert doc.get(name) in ([], None), name
     assert doc.n_angles == 2
 
 
@@ -1306,3 +1315,744 @@ def test_a_saved_useBS_entry_is_read_as_the_source_entry(tmp_path, value):
     assert type(saved) is int
     assert bool(saved) == bool(value)
     assert (saved == 1) == (value == 1)
+
+
+# --------------------------------------------------------------------------
+# editor-angle-count — the editor counts, adds and saves angles the way the
+# reduction reads them (nr_reduction_calc.py:61-110)
+# --------------------------------------------------------------------------
+
+_THREE_ANGLES = {
+    "RBnum": [201282, 201283, 201284],
+    "DBname": ["db_a.dat", "db_b.dat", "db_c.dat"],
+    "RB_Ymin": [140, 141, 142],
+    "RB_Ymax": [150, 151, 152],
+    "BkgROI": [[120, 130], [121, 131], [122, 132]],
+}
+
+
+def _surplus_document(extra=1):
+    """Three angles by RBnum, with `useBS` longer — the real files' shape
+    (IPTS-36119 reduce_settings.json holds useBS [1, 1, 1, 1] for three runs)."""
+    return SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": [1] * (3 + extra)})
+
+
+def test_a_surplus_entry_is_not_a_problem():
+    assert _surplus_document().validate() == []
+
+
+@pytest.mark.parametrize("extra", [1, 5], ids=["one-extra", "five-extra"])
+def test_a_surplus_entry_is_one_note_naming_the_field_and_the_count(extra):
+    doc = _surplus_document(extra)
+    notes = [line for line in doc.notes() if "(useBS)" in line]
+    assert len(notes) == 1  # one line per field, never per entry
+    assert f"{extra} extra" in notes[0]
+    assert not any("(useBS)" in line for line in doc.validate())
+
+
+def test_the_reduction_counts_its_angles_and_the_table_shows_every_row():
+    doc = _surplus_document()
+    assert doc.reduction_angles == 3
+    assert doc.n_angles == 4
+    # every angle-defining list empty: the count falls back to the longest list, so a
+    # document holding only optional columns still shows them, without a note
+    fallback = SettingsDocument.from_dict({"LambdaMin": [2.5, 2.6], "ThetaShift": [0.1, 0.2]})
+    assert fallback.reduction_angles == 2 == fallback.n_angles
+    assert fallback.notes() == []
+
+
+def test_a_short_angle_defining_list_is_still_reported():
+    """A pin against over-relaxing: the reducer raises on a short DBname (nr_reduction_calc.py:67-68)."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "DBname": ["db_a.dat", "db_b.dat"]})
+    assert "Direct-beam file (DBname) has 2 entries for 3 angles" in doc.validate()
+
+
+def test_the_angle_defining_names_are_derived_and_every_per_angle_field_has_one_kind():
+    assert set(fs.ANGLE_DEFINING_NAMES) == {"DBname", "RBnum", "RB_Ymin", "RB_Ymax", "BkgROI"}
+    for name in fs.PER_ANGLE_NAMES:
+        field = fs.get(name)
+        kinds = [name in fs.ANGLE_DEFINING_NAMES, field.default_if_empty, field.broadcast_ok, field.optional_list]
+        assert sum(kinds) == 1, name
+
+
+def test_an_added_angle_has_one_index_in_every_list():
+    """v2 (G6 revised): the new angle is the reduction's next one, index m, directly after
+    the last real angle; the surplus entry shifts down one row and stays surplus. (v1 put
+    it after the surplus rows, which turned them into angles with no required values.)"""
+    doc = _surplus_document()
+    doc.add_angle(DBname="d.dat", useBS=False)
+    assert doc.reduction_angles == 4
+    for name in ("DBname", "RBnum", "RB_Ymin", "RB_Ymax", "BkgROI"):
+        assert len(doc.get(name)) == 4, name
+    assert doc.get("DBname")[3] == "d.dat"
+    assert repr(doc.get("useBS")) == "[True, True, True, False, True]"
+    assert doc.n_angles == 5
+    # the compact lists the reducer fills or derives are untouched
+    assert doc.get("method_per_run") == []
+    assert doc.get("ThetaShift") == []
+    assert doc.get("LambdaMin") is None
+
+
+def test_an_added_angle_leaves_a_broadcast_method_broadcast():
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": ["meanTheta"]})
+    doc.add_angle()
+    assert doc.get("method_per_run") == ["meanTheta"]
+    doc.add_angle(method_per_run="constantQ")
+    assert doc.get("method_per_run") == ["meanTheta"] * 4 + ["constantQ"]
+
+
+def test_setting_one_angle_of_a_broadcast_method_keeps_it_for_the_others():
+    """The §5 row "set method_per_run for the new angle only": the earlier angles keep
+    the broadcast value the reducer would have used (nr_reduction_calc.py:77-79)."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": ["meanTheta"]})
+    doc.set_angle_field(0, "method_per_run", "constantQ")
+    assert doc.get("method_per_run") == ["constantQ", "meanTheta", "meanTheta"]
+
+
+def test_an_added_angle_leaves_an_empty_default_list_empty():
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "ThetaShift": []})
+    doc.add_angle()
+    assert doc.get("ThetaShift") == []
+
+
+def test_the_reducer_accepts_what_the_editor_writes():
+    """F5: a file authored in the editor validated clean and could not be reduced.
+
+    Runs the reducer's own path: NR_Reduction.__init__ (which defaults an empty
+    method_per_run, nr_reduction_calc.py:42-43) and _validate_config (:55-110). The
+    module's _bare_reduction skips __init__, so it would not show that default.
+    """
+    from lr_reduction.nr_reduction_calc import NR_Reduction
+
+    doc = SettingsDocument()
+    for k in range(2):
+        doc.add_angle(DBname=f"db_{k}.dat", RB_Ymin=140, RB_Ymax=150, BkgROI=[120, 130])
+    config = json_to_config(doc.normalize())
+    config.RBnum = [201282, 201283]  # as reduce_from_file sets it from the runs (new_reduction_from_file.py:65)
+    NR_Reduction(config)
+    assert config.ThetaShift == [0, 0]
+    assert config.method_per_run == ["meantheta", "meantheta"]
+
+
+def _all_unset_document():
+    return SettingsDocument.from_dict({
+        **_THREE_ANGLES,
+        "DBname": [None, None, None],
+        "ThetaShift": [None, None, None],
+        "method_per_run": [None, None, None],
+        "useBS": [None, None, None],
+    })
+
+
+@pytest.mark.parametrize("output", ["save", "normalize"])
+def test_an_all_unset_default_or_broadcast_list_is_written_empty(tmp_path, output):
+    doc = _all_unset_document()
+    if output == "save":
+        written = json.loads(doc.save(tmp_path / "out.json").read_text())
+    else:
+        written = doc.normalize()
+    for name in ("ThetaShift", "method_per_run", "useBS"):
+        assert written[name] == [], name
+    # an angle-defining list is never collapsed: unset there is not a default
+    assert written["DBname"] == [None, None, None]
+
+
+#: One set value per list the reducer fills or broadcasts — the dimension G7's rule must cover
+#: (v2, review 1568397 B-3: a ThetaShift-only test let the broadcast leg go unguarded).
+_FILLS_ITSELF = [
+    pytest.param(f.name, value, id=f.name)
+    for f, value in (
+        (fs.get("ThetaShift"), 0.1), (fs.get("useBS"), True), (fs.get("ScaleFactor"), 1.05),
+        (fs.get("tof_min"), 10.0), (fs.get("tof_max"), 50000.0), (fs.get("method_per_run"), "constantQ"),
+    )
+]
+
+
+def test_the_fills_itself_matrix_covers_every_default_and_broadcast_list():
+    """A pin: when a field gains default_if_empty or broadcast_ok, add it to _FILLS_ITSELF."""
+    covered = {p.values[0] for p in _FILLS_ITSELF}
+    assert covered == {f.name for f in fs.FIELD_SPEC if f.default_if_empty or f.broadcast_ok}
+
+
+@pytest.mark.parametrize("name, value", _FILLS_ITSELF)
+def test_a_partly_set_default_list_is_a_problem_naming_the_unset_angles_and_is_saved_as_held(tmp_path, name, value):
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, name: [value, None, None]})
+    lines = [m for m in doc.validate() if f"({name})" in m]
+    assert len(lines) == 1
+    assert "[1, 2]" in lines[0]
+    saved = json.loads(doc.save(tmp_path / "out.json").read_text())[name]
+    assert saved[1:] == [None, None]
+
+
+def test_an_all_null_default_list_loads_as_unset_and_saves_empty(tmp_path):
+    source = tmp_path / "older_editor_save.json"
+    source.write_text(json.dumps({**_THREE_ANGLES, "ThetaShift": [None, None, None]}))
+    doc = SettingsDocument.from_file(source)
+    assert doc.get("ThetaShift") == [None, None, None]
+    assert doc.validate() == []
+    assert '"ThetaShift": []' in doc.save(tmp_path / "out.json").read_text()
+
+
+def test_removing_the_surplus_angle_clears_the_note_and_trims_only_useBS():
+    doc = _surplus_document()
+    doc.remove_angle(3)
+    assert doc.notes() == []
+    assert doc.get("useBS") == [True, True, True]
+    assert doc.get("DBname") == _THREE_ANGLES["DBname"]
+
+
+def test_an_unset_background_switch_is_noted_as_the_reductions_default():
+    """Plan A2: an all-unset useBS is written [], which the reducer fills with 1 (on) for
+    every angle (nr_reduction_calc.py:102-103), so the panel says so."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": []})
+    notes = [line for line in doc.notes() if "(useBS)" in line]
+    assert len(notes) == 1
+    assert re.search(r"\bon\b", notes[0]), notes[0]
+
+
+def test_the_boolean_default_lists_are_exactly_useBS():
+    """A pin on the derivation the A2 note uses: its "on" is the reducer's fill for useBS
+    (nr_reduction_calc.py:103). Before adding another, read that field's default fill."""
+    assert {f.name for f in fs.FIELD_SPEC if f.default_if_empty and f.element_type == "bool"} == {"useBS"}
+
+
+def test_a_per_angle_value_that_is_not_a_list_is_kept_out_of_the_counts():
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "tof_min": 5})
+    assert doc.reduction_angles == 3
+    assert any("(tof_min)" in m for m in doc.validate())
+    assert not any("(tof_min)" in line for line in doc.notes())
+
+
+def test_an_all_unset_default_list_shorter_than_the_angles_is_not_reported_short(tmp_path):
+    """Added when mutation F7 survived the battery. An all-unset default list is written []
+    (G7), so the reducer fills it whatever its length, and reporting it short would cry
+    wolf on a file that reduces. No test held one shorter than the angle count."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "ThetaShift": [None]})
+    assert not any("(ThetaShift)" in m for m in doc.validate())
+    assert json.loads(doc.save(tmp_path / "out.json").read_text())["ThetaShift"] == []
+
+
+# --------------------------------------------------------------------------
+# editor-angle-count v2 — G8: an edit changes exactly the entry edited (review 1568397, B-1:
+# one cell edit on Aug2026/REFL_231105 padded DBname to the table's 7 rows, the count went
+# 3 -> 7, the notes vanished and four false problems appeared)
+# --------------------------------------------------------------------------
+
+
+def _aug2026_document():
+    """Aug2026/REFL_231105_settings.json's shape: three angles, useBS 6 long, method_per_run 7."""
+    return SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": [1] * 6, "method_per_run": ["meanTheta"] * 7})
+
+
+def _filled_document():
+    """Every list the reducer reads holds an entry per angle, useBS one longer: the reducer-written
+    reduce_settings.json shape (ThetaShift, ScaleFactor, method_per_run for the three angles), λ set too."""
+    return SettingsDocument.from_dict({
+        **_THREE_ANGLES, "useBS": [1] * 4, "ThetaShift": [0, 0, 0], "ScaleFactor": [1, 1, 1],
+        "method_per_run": ["meanTheta"] * 3, "LambdaMin": [2.5, 2.6, 2.7],
+    })
+
+
+_SHAPES = {"surplus": _surplus_document, "aug2026": _aug2026_document, "filled": _filled_document}
+_EDITS = {  # one list of each kind, with a value of its type
+    "DBname": "x.dat", "ThetaShift": 0.01, "useBS": False, "method_per_run": "constantQ", "LambdaMin": 2.5,
+}
+#: The (shape, list) cells where the list holds entries the reducer reads as they are. v3 moved the
+#: cells of a compact list (empty, unset, one broadcast entry, None) to G9's matrix below, which
+#: asserts what the reducer reads after the edit; the "filled" shape gives every kind a cell here.
+_NON_COMPACT = [
+    pytest.param(shape, name, id=f"{shape}-{name}")
+    for shape, names in (
+        ("surplus", ("DBname", "useBS")),
+        ("aug2026", ("DBname", "useBS", "method_per_run")),
+        ("filled", ("DBname", "ThetaShift", "useBS", "method_per_run", "LambdaMin")),
+    )
+    for name in names
+]
+
+
+def _angles_named(lines):
+    """Every angle index a problem line names."""
+    return [int(i) for line in lines for group in re.findall(r"angles \[([0-9, ]*)\]", line)
+            for i in group.split(",") if i.strip()]
+
+
+@pytest.mark.parametrize("where", ["first", "last-angle", "surplus-row"])
+@pytest.mark.parametrize("shape, name", _NON_COMPACT)
+def test_an_edit_changes_exactly_the_entry_edited(tmp_path, shape, name, where):
+    doc = _SHAPES[shape]()
+    value = _EDITS[name]
+    m, notes_before, problems_before = doc.reduction_angles, doc.notes(), doc.validate()
+    index = {"first": 0, "last-angle": m - 1, "surplus-row": m}[where]
+    before = doc.get(name)
+    # a cell G8 decides: the list holds entries at the angles and reaches the edited row, or one short of it
+    assert len(before) >= m and any(entry is not None for entry in before[:m])
+    expected = list(before) + [None] * (index + 1 - len(before))
+    expected[index] = value
+
+    doc.set_angle_field(index, name, value)
+
+    assert repr(doc.get(name)) == repr(expected)
+    defines = name in fs.ANGLE_DEFINING_NAMES and index >= m
+    assert doc.reduction_angles == (index + 1 if defines else m)
+    problems = doc.validate()
+    assert all(i < doc.reduction_angles for i in _angles_named(problems))
+    if not defines:
+        # nothing else changes: an edit to one list never alters what is said about another
+        def others(lines):
+            return [line for line in lines if f"({name})" not in line]
+
+        assert others(problems) == others(problems_before)
+    field = fs.get(name)
+    if index >= m and (field.default_if_empty or field.broadcast_ok):
+        # a value in a surplus row of a list the reducer fills is never read: no problem about it
+        assert not any(f"({name})" in line for line in problems)
+    if index < m:
+        assert doc.notes() == notes_before
+    first = doc.save(tmp_path / "first.json")
+    # the written list, not only a round trip (which agrees with any consistent wrong encoding)
+    written = json.loads(first.read_text())[name]
+    assert repr(written) == repr([int(entry) if isinstance(entry, bool) else entry for entry in expected])
+    second = SettingsDocument.from_file(first).save(tmp_path / "second.json")
+    assert first.read_bytes() == second.read_bytes()
+
+
+def test_an_edit_below_the_count_reports_nothing_about_a_surplus_row():
+    """B-1's second reproduction: the reducer-written reduce_settings.json shape (ThetaShift,
+    ScaleFactor and method_per_run filled for the three angles, useBS one longer)."""
+    doc = SettingsDocument.from_dict({
+        **_THREE_ANGLES, "useBS": [1] * 4, "ThetaShift": [0, 0, 0], "ScaleFactor": [1, 1, 1],
+        "method_per_run": ["meanTheta"] * 3,
+    })
+    doc.set_angle_field(0, "ThetaShift", 0.01)
+    assert doc.validate() == []
+    assert doc.get("ThetaShift") == [0.01, 0, 0]
+
+
+def test_a_broadcast_entry_expands_to_the_reductions_angles_not_the_tables_rows():
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": [1] * 4, "method_per_run": ["meanTheta"]})
+    doc.set_angle_field(0, "method_per_run", "constantQ")
+    assert doc.get("method_per_run") == ["constantQ", "meanTheta", "meanTheta"]
+
+
+def test_an_angle_defining_edit_in_a_surplus_row_makes_it_an_angle_and_nothing_else_grows():
+    doc = _surplus_document()
+    doc.set_angle_field(3, "DBname", "d.dat")
+    assert doc.reduction_angles == 4
+    assert doc.get("DBname") == ["db_a.dat", "db_b.dat", "db_c.dat", "d.dat"]
+    assert doc.get("RB_Ymin") == [140, 141, 142]
+    assert len(doc.get("useBS")) == 4
+
+
+def test_a_value_for_an_empty_default_list_lands_on_the_new_angle():
+    """B-3: G6's "compact, given a value -> expanded" for an EMPTY list when n > 0. Asserts the
+    position: a bare [0.1] would put the new angle's value on angle 0. v3 (G9): the existing angles
+    hold the reducer's own value (0, nr_reduction_calc.py:101), not unset entries."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "ThetaShift": []})
+    doc.add_angle(DBname="d.dat", ThetaShift=0.1)
+    assert repr(doc.get("ThetaShift")) == "[0, 0, 0, 0.1]"
+
+
+def test_an_unset_default_list_with_a_surplus_value_is_written_empty(tmp_path):
+    """Added when frame row V2 (save() deciding "all unset" over the table's rows) and plan row N3
+    (the some-unset rule over the whole list) survived the first battery. v3: an edit of an empty
+    list fills the angles (G9), so the state is reached by clearing them again. The angles are all
+    unset, so the reducer's default applies, and the surplus value is one it never reads."""
+    doc = _surplus_document()
+    doc.set_angle_field(3, "ThetaShift", 0.01)
+    for angle in range(3):
+        doc.set_angle_field(angle, "ThetaShift", None)
+    assert repr(doc.get("ThetaShift")) == "[None, None, None, 0.01]"
+    assert doc.validate() == []
+    assert any("(ThetaShift)" in line and "1 extra" in line for line in doc.notes())
+    assert json.loads(doc.save(tmp_path / "out.json").read_text())["ThetaShift"] == []
+    assert doc.normalize()["ThetaShift"] == []
+
+
+def test_an_unset_background_switch_with_a_surplus_value_is_still_noted_as_the_default(tmp_path):
+    """Added when frame row V3 (the A2 note deciding "unset" over the whole list) survived. v3:
+    reached by clearing the angles an edit filled (G9). Unset at every angle is what the reducer
+    sees: the file is written [] and it fills 1 (on)."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": ["meanTheta"] * 4})
+    doc.set_angle_field(3, "useBS", False)
+    for angle in range(3):
+        doc.set_angle_field(angle, "useBS", None)
+    assert repr(doc.get("useBS")) == "[None, None, None, False]"
+    assert any("(useBS)" in line and re.search(r"\bon\b", line) for line in doc.notes())
+    assert json.loads(doc.save(tmp_path / "out.json").read_text())["useBS"] == []
+
+
+# --------------------------------------------------------------------------
+# editor-angle-count v3 — G9: an edit of one angle of a compact list (one the reducer fills,
+# broadcasts or derives itself) never changes what the reducer reads at another angle, and never
+# leaves a file it refuses or crashes on without a line saying so. Review c286e9b: C-1
+# method_per_run [] -> ['constantQ'], broadcast to every angle with no line; C-2 ThetaShift [] ->
+# [0.01], IndexError at nr_reduction_calc.py:413; C-3 a λ in a surplus row turned derivation off.
+# --------------------------------------------------------------------------
+
+
+def _reducer_reading(path):
+    """What the reducer reads at each angle of a saved file, by the reducer's own code.
+
+    NR_Reduction runs __init__ (the method default, nr_reduction_calc.py:42-43) and _validate_config
+    (the broadcast and lower-casing, :77-82; the default fills, :99-110), and raises on a file it
+    refuses. Per per-angle list, one entry per angle (len(RBnum)): the repr of what it reads, so 1
+    and True differ; "derived" for an optional list left None (:381-383); "IndexError" where the
+    list stops short (:413 indexes ThetaShift unchecked).
+    """
+    from lr_reduction.nr_reduction_calc import NR_Reduction
+
+    config = json_to_config(json.loads(pathlib.Path(path).read_text()))
+    NR_Reduction(config)
+    angles = range(len(config.RBnum))
+    reading = {}
+    for name in fs.PER_ANGLE_NAMES:
+        value = getattr(config, name)
+        if value is None:
+            reading[name] = ["derived" for _ in angles]
+        else:
+            reading[name] = [repr(value[j]) if j < len(value) else "IndexError" for j in angles]
+    return reading
+
+
+def _m1_document():
+    """One angle; useBS and method_per_run three long, so it has two surplus rows."""
+    return SettingsDocument.from_dict({
+        **{name: values[:1] for name, values in _THREE_ANGLES.items()},
+        "useBS": [1] * 3, "method_per_run": ["meanTheta"] * 3,
+    })
+
+
+_G9_DOCUMENTS = {"m1": _m1_document, "surplus": _surplus_document, "aug2026": _aug2026_document}
+
+#: Each list the reducer fills or broadcasts: the value an edit types, as the file holds it; and
+#: the reducer's own value at an angle the list does not give (nr_reduction_calc.py:42-43, :99-110),
+#: as the document holds it and as the file does. Stated here from the reducer, not read from
+#: Field.reducer_default: the S2 tests pin that declaration to the reducer.
+_G9_FILLS = {
+    "ThetaShift": (0.01, 0.01, 0, 0),
+    "useBS": (False, 0, True, 1),
+    "ScaleFactor": (1.05, 1.05, 1, 1),
+    "tof_min": (10.0, 10.0, 0, 0),
+    "tof_max": (50000.0, 50000.0, 100000, 100000),
+    "method_per_run": ("constantQ", "constantQ", "meanTheta", "meanTheta"),
+}
+_G9_LAMBDAS = {"LambdaMin": 2.5, "LambdaMax": 9.5}
+
+
+def _g9_states(name, m):
+    """{compact state: (the list as held, what the reducer reads at every angle while it is so —
+    as held, as written)}. Unset at every angle and None are written as the reducer's own value
+    too ([] and null: _encode_for_file; `if not ...` at :99-110), so they are compact as well."""
+    if name in _G9_LAMBDAS:
+        return {"derived": (None, None, None)}
+    fill_held, fill_written = _G9_FILLS[name][2:]
+    states = {
+        "empty": ([], fill_held, fill_written),
+        "null": (None, fill_held, fill_written),
+        "unset": ([None] * m, fill_held, fill_written),
+    }
+    if fs.get(name).broadcast_ok:
+        states["one-entry"] = (["constantTOF"], "constantTOF", "constantTOF")
+    return states
+
+
+def _g9_cells():
+    """Every document x list x compact state x edited row: the first angle, the last, the first
+    surplus row and the last one (with a gap between them where there is one)."""
+    cells = []
+    for document, build in _G9_DOCUMENTS.items():
+        for name in [*_G9_FILLS, *_G9_LAMBDAS]:
+            m = build().reduction_angles
+            for state, (held, _, _) in _g9_states(name, m).items():
+                doc = build()
+                doc.set(name, held)
+                rows = sorted({0, m - 1, m, doc.n_angles - 1} & set(range(doc.n_angles)))
+                cells += [pytest.param(document, name, state, row, id=f"{document}-{name}-{state}-row{row}")
+                          for row in rows]
+    return cells
+
+
+@pytest.mark.parametrize("document, name, state, index", _g9_cells())
+def test_an_edit_of_a_compact_list_keeps_what_the_reducer_reads_at_every_other_angle(
+        tmp_path, document, name, state, index):
+    """S1 — plan v3's per-cell table (G9). Each cell asserts the list held and the list written,
+    the lines, and the invariant itself, read by the reducer from the saved file: every angle but
+    the edited one reads as it did, or a problem line names it."""
+    doc = _G9_DOCUMENTS[document]()
+    m = doc.reduction_angles
+    held, fill_held, fill_written = _g9_states(name, m)[state]
+    doc.set(name, held)
+    problems_before, notes_before = doc.validate(), doc.notes()
+    reading_before = _reducer_reading(doc.save(tmp_path / "before.json"))
+    if name in _G9_LAMBDAS:
+        value = value_written = _G9_LAMBDAS[name]
+    else:
+        value, value_written = _G9_FILLS[name][:2]
+
+    doc.set_angle_field(index, name, value)
+
+    problems, notes = doc.validate(), doc.notes()
+    saved = doc.save(tmp_path / "after.json")
+    written = json.loads(saved.read_text())[name]
+    reading = _reducer_reading(saved)
+    lines = [line for line in problems if f"({name})" in line]
+    others = [j for j in range(m) if j != index]
+
+    # the invariant: another angle reads as it did, or a problem line names it
+    changed = [j for j in others if reading[name][j] != reading_before[name][j]]
+    if changed:
+        assert any(f"angles {changed}" in line for line in lines), (changed, problems)
+    # an edit of one list says nothing new about another, and changes nothing another list reads
+    assert [line for line in problems if f"({name})" not in line] == [
+        line for line in problems_before if f"({name})" not in line]
+    assert {k: v for k, v in reading.items() if k != name} == {
+        k: v for k, v in reading_before.items() if k != name}
+
+    if name in _G9_LAMBDAS and index >= m:
+        # (b) refused: a λ only in a row the reducer never reads would end derivation at every angle
+        assert doc.get(name) is None and written is None
+        assert len(lines) == 1, lines
+        assert f"surplus row {index + 1}" in lines[0] and "leave it derived" in lines[0]
+        assert reading == reading_before and notes == notes_before
+    elif name in _G9_LAMBDAS:
+        # (b): written out to the reduction's angles with unset entries, which one line names
+        expected = [None] * m
+        expected[index] = value
+        assert repr(doc.get(name)) == repr(expected) == repr(written)
+        assert changed == others and len(lines) == (1 if others else 0)
+        assert notes == notes_before
+    else:
+        # (a): every other angle holds what the reducer would have used. A broadcast list holds no
+        # unset entry anywhere, surplus rows included: the reducer lower-cases all of it (:82)
+        gap_held, gap_written = (fill_held, fill_written) if fs.get(name).broadcast_ok else (None, None)
+        expected = [fill_held] * m + [gap_held] * (index + 1 - m)
+        expected_written = [fill_written] * m + [gap_written] * (index + 1 - m)
+        expected[index], expected_written[index] = value, value_written
+        assert repr(doc.get(name)) == repr(expected)
+        assert repr(written) == repr(expected_written)
+        assert lines == [] and changed == []
+        new, gone = set(notes) - set(notes_before), set(notes_before) - set(notes)
+        if index >= m:
+            assert len(new) == 1, new
+            note = new.pop()
+            assert f"({name})" in note and f"{index + 1 - m} extra" in note
+        else:
+            assert new == set()
+        assert gone == ({line for line in notes_before if "(useBS)" in line} if name == "useBS" else set())
+    if index < m:
+        read_as = value_written.lower() if isinstance(value_written, str) else value_written
+        assert reading[name][index] == repr(read_as)
+    again = SettingsDocument.from_file(saved).save(tmp_path / "again.json")
+    assert again.read_bytes() == saved.read_bytes()
+
+
+@pytest.mark.parametrize("name", fs.DEFAULT_IF_EMPTY_NAMES)
+def test_the_declared_reducer_default_is_what_the_reducer_fills_and_what_an_edit_writes(name):
+    """S2: G9 writes Field.reducer_default at the angles an edit does not touch, so it must be the
+    reducer's own fill exactly (nr_reduction_calc.py:99-110) — by repr, so 1 and True, 0 and 0.0
+    differ — and it must be what the edit writes."""
+    from lr_reduction.nr_reduction_calc import NR_Reduction
+
+    config = json_to_config({**_THREE_ANGLES, name: []})
+    NR_Reduction(config)
+    declared = fs.get(name).reducer_default
+    assert repr(getattr(config, name)) == repr([declared] * 3)
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, name: []})
+    doc.set_angle_field(0, name, _G9_FILLS[name][0])
+    assert repr(doc.normalize()[name][1:]) == repr([declared] * 2)
+
+
+def test_the_declared_method_default_is_the_reducers():
+    """S2: the reducer defaults an empty method_per_run to 'meantheta' (nr_reduction_calc.py:42-43);
+    the declared default is the editor's spelling of that choice, and what an edit writes."""
+    from lr_reduction.nr_reduction_calc import NR_Reduction
+
+    config = json_to_config({**_THREE_ANGLES, "method_per_run": []})
+    NR_Reduction(config)
+    declared = fs.get("method_per_run").reducer_default
+    assert declared in fs.get("method_per_run").allowed
+    assert config.method_per_run == [declared.lower()] * 3
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": []})
+    doc.set_angle_field(0, "method_per_run", "constantQ")
+    assert doc.normalize()["method_per_run"][1:] == [declared] * 2
+
+
+def test_a_reducer_default_is_declared_for_exactly_the_lists_the_reducer_fills():
+    assert {f.name for f in fs.FIELD_SPEC if f.reducer_default is not None} == {
+        f.name for f in fs.FIELD_SPEC if f.default_if_empty or f.broadcast_ok}
+
+
+def test_a_lambda_typed_into_a_surplus_row_of_a_derived_list_is_refused_with_a_line():
+    """S3 (C-3): the list stays None — derived at every angle — and one line names the field, the
+    row as its header shows it, and the remedy. Writing it out ([None] * 4 + [3.0]) ended derivation
+    for the three angles, and the reducer raised at nr_reduction_calc.py:452."""
+    doc = _surplus_document()
+    doc.set_angle_field(3, "LambdaMin", 3.0)
+    assert doc.get("LambdaMin") is None
+    lines = [line for line in doc.validate() if "(LambdaMin)" in line]
+    assert len(lines) == 1
+    assert "surplus row 4" in lines[0] and "leave it derived" in lines[0]
+
+
+@pytest.mark.parametrize(
+    "gesture", ["set-an-angle", "clear-the-cell", "remove-the-row", "add-an-angle", "make-it-an-angle"])
+def test_a_refused_lambda_is_reported_only_while_it_still_applies(gesture):
+    """The refusal is about one gesture on one row. It goes when the field is given a value, when
+    the cell is cleared, when rows move, and when the row becomes an angle: a line naming a row that
+    no longer holds what the user typed into, or is no longer surplus, would be false."""
+    doc = _aug2026_document()
+    doc.set_angle_field(5, "LambdaMin", 3.0)
+    assert any("surplus row 6" in line for line in doc.validate())
+    if gesture == "set-an-angle":
+        doc.set_angle_field(0, "LambdaMin", 2.5)
+    elif gesture == "clear-the-cell":
+        doc.set_angle_field(5, "LambdaMin", None)
+    elif gesture == "remove-the-row":
+        doc.remove_angle(5)
+    elif gesture == "add-an-angle":
+        doc.add_angle(DBname="d.dat")
+    else:
+        doc.set_angle_field(5, "DBname", "d.dat")
+    assert not any("surplus row" in line for line in doc.validate())
+
+
+def test_values_given_to_add_land_on_the_new_angle_and_the_others_read_as_before():
+    """S4 (B-T1): on the surplus document (m = 3, n = 4) every value lands at index m, the
+    reduction's next angle — not n, the table's next row — and each compact list's angles hold
+    what G9 writes: the reducer's own value, or unset and named by a line (λ). Every earlier
+    with-value test ran where m == n, so reverting m to n left them green."""
+    doc = _surplus_document()
+    doc.add_angle(DBname="d.dat", method_per_run="constantQ", ThetaShift=0.1, LambdaMin=2.5)
+    assert doc.get("DBname")[3] == "d.dat"
+    assert repr(doc.get("method_per_run")) == repr(["meanTheta"] * 3 + ["constantQ"])
+    assert repr(doc.get("ThetaShift")) == "[0, 0, 0, 0.1]"
+    assert repr(doc.get("LambdaMin")) == "[None, None, None, 2.5]"
+    assert repr(doc.get("useBS")) == "[True, True, True, None, True]"
+    problems = doc.validate()
+    assert any("(LambdaMin)" in line and "angles [0, 1, 2]" in line for line in problems)
+    assert not any("(method_per_run)" in line or "(ThetaShift)" in line for line in problems)
+
+
+def test_an_unset_list_keeps_its_surplus_entry_behind_an_added_angle():
+    """Add with a value on a list unset at every angle that holds a surplus entry (a loaded file):
+    the angles get the reducer's value, the new angle the value, and the entry stays surplus."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "ThetaShift": [None, None, None, 0.02]})
+    doc.add_angle(DBname="d.dat", ThetaShift=0.1)
+    assert repr(doc.get("ThetaShift")) == "[0, 0, 0, 0.1, 0.02]"
+
+
+def test_the_unset_rule_for_an_optional_list_looks_only_at_the_reductions_angles():
+    """S5 (B-T2): clearing a surplus entry of a λ list leaves every angle set, so no line; clearing
+    an angle's entry is reported, by that angle."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": [1] * 4, "LambdaMin": [2.5] * 4})
+    doc.set_angle_field(3, "LambdaMin", None)
+    assert not any("(LambdaMin)" in line for line in doc.validate())
+    doc.set_angle_field(1, "LambdaMin", None)
+    lines = [line for line in doc.validate() if "(LambdaMin)" in line]
+    assert len(lines) == 1 and "angles [1]" in lines[0]
+
+
+def test_a_broadcast_list_edited_past_its_end_holds_no_unset_entry(tmp_path):
+    """The reducer lower-cases every entry of method_per_run, surplus rows included
+    (nr_reduction_calc.py:82): a gap left unset there is a file it refuses. Surplus rows are no
+    angle's, so the gap holds the reducer's own default, and the file reduces."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": [1] * 6, "method_per_run": ["constantQ"] * 3})
+    doc.set_angle_field(5, "method_per_run", "constantTOF")
+    assert doc.get("method_per_run") == ["constantQ"] * 3 + ["meanTheta"] * 2 + ["constantTOF"]
+    assert doc.validate() == []
+    assert _reducer_reading(doc.save(tmp_path / "out.json"))["method_per_run"] == ["'constantq'"] * 3
+
+
+def test_an_unset_surplus_entry_of_a_broadcast_list_is_a_problem(tmp_path):
+    """Clearing a surplus method cell of an Aug2026-shaped file: the reducer never uses the row, but
+    it lower-cases every entry (nr_reduction_calc.py:82) and fails on the unset one. Nothing said so
+    before v3; the reducer's refusal, run below, is what makes the line true."""
+    from lr_reduction.nr_reduction_calc import NR_Reduction
+
+    doc = _aug2026_document()
+    doc.set_angle_field(5, "method_per_run", None)
+    lines = [line for line in doc.validate() if "(method_per_run)" in line]
+    assert len(lines) == 1 and "surplus row 6" in lines[0]
+    with pytest.raises(AttributeError):
+        NR_Reduction(json_to_config(json.loads(doc.save(tmp_path / "out.json").read_text())))
+
+
+def test_clearing_a_cell_that_holds_no_entry_changes_nothing():
+    """A single broadcast entry shows on row 0 only; the rows below hold no entry. Clearing one of
+    them is not an edit: expanding the list around an unset entry made a file the reducer refuses
+    (nr_reduction_calc.py:82) out of one it reduced."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": ["constantQ"]})
+    doc.set_angle_field(1, "method_per_run", None)
+    assert doc.get("method_per_run") == ["constantQ"]
+    assert doc.validate() == []
+
+
+# Added when rows of the v3 battery survived (ledger scripts/mutations-editor-angle-count.py).
+
+
+def test_clearing_the_one_angle_a_broadcast_entry_shows_on_keeps_it_for_the_others():
+    """F6, N2: the entry shows on row 0 only, but the reducer repeats it at every angle (:77-79).
+    Clearing row 0 unsets angle 0 and no other: the list is expanded to the reduction's count (not
+    the table's rows) first, and the line names angle 0 — the reducer refuses an unset entry (:82)."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": [1] * 4, "method_per_run": ["constantQ"]})
+    doc.set_angle_field(0, "method_per_run", None)
+    assert doc.get("method_per_run") == [None, "constantQ", "constantQ"]
+    lines = [line for line in doc.validate() if "(method_per_run)" in line]
+    assert len(lines) == 1 and "angles [0]" in lines[0]
+
+
+def test_a_refusal_does_not_come_back_after_the_field_is_set_and_cleared():
+    """W11: an accepted edit forgets the field's refusal. Otherwise, once the field is derived again,
+    the old line about a row the user typed into long ago would return."""
+    doc = _aug2026_document()
+    doc.set_angle_field(5, "LambdaMin", 3.0)
+    doc.set_angle_field(0, "LambdaMin", 2.5)
+    doc.set_angle_field(0, "LambdaMin", None)
+    assert doc.get("LambdaMin") is None
+    assert not any("surplus row" in line for line in doc.validate())
+
+
+def test_a_broadcast_list_unset_at_every_angle_holds_no_unset_entry_once_written_out(tmp_path):
+    """W13, W14: a method list unset at every angle (written [], so meanTheta everywhere) that holds an
+    unset and a set surplus entry. An edit or an Add writes it out, and the unset surplus entry gets
+    the reducer's default too: the reducer lower-cases every entry (nr_reduction_calc.py:82)."""
+    shape = {**_THREE_ANGLES, "useBS": [1] * 6, "method_per_run": [None, None, None, None, "constantTOF"]}
+    edited = SettingsDocument.from_dict(shape)
+    edited.set_angle_field(0, "method_per_run", "constantQ")
+    assert edited.get("method_per_run") == ["constantQ"] + ["meanTheta"] * 3 + ["constantTOF"]
+    added = SettingsDocument.from_dict(shape)
+    added.add_angle(DBname="d.dat", method_per_run="constantQ")
+    assert added.get("method_per_run") == ["meanTheta"] * 3 + ["constantQ", "meanTheta", "constantTOF"]
+    for doc in (edited, added):
+        assert not any("(method_per_run)" in line for line in doc.validate())
+    assert _reducer_reading(edited.save(tmp_path / "out.json"))["method_per_run"] == [
+        "'constantq'", "'meantheta'", "'meantheta'"]
+
+
+def test_a_ragged_broadcast_list_padded_past_its_end_leaves_the_missing_angle_unset_and_named():
+    """W16: padding fills a broadcast list's SURPLUS rows with the reducer's default, never an angle.
+    Angle 2 had no method (the list was short, which the panel already reported); filling it would
+    choose one for the scientist, silently."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": [1] * 6, "method_per_run": ["constantQ"] * 2})
+    doc.set_angle_field(5, "method_per_run", "constantTOF")
+    assert doc.get("method_per_run") == ["constantQ", "constantQ", None, "meanTheta", "meanTheta", "constantTOF"]
+    assert any("(method_per_run)" in line and "angles [2]" in line for line in doc.validate())
+
+
+def test_a_broadcast_list_unset_at_every_angle_is_no_problem_for_its_unset_surplus_entry(tmp_path):
+    """W18: unset at every angle, it is written [] and the reducer uses meanTheta; no entry of it
+    reaches the reducer, so its unset surplus entry is no problem."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": [1] * 4, "method_per_run": [None] * 4})
+    assert not any("(method_per_run)" in line for line in doc.validate())
+    assert json.loads(doc.save(tmp_path / "out.json").read_text())["method_per_run"] == []
+
+
+def test_an_explicit_none_given_to_add_leaves_a_compact_list_compact():
+    """W23: None is "no value". Writing a derived λ out as [None, None, None, None] gave a list that
+    reports a length and carries no values (web_report.py:547 indexes it), and a line."""
+    doc = _surplus_document()
+    doc.add_angle(DBname="d.dat", LambdaMin=None, ThetaShift=None)
+    assert doc.get("LambdaMin") is None
+    assert doc.get("ThetaShift") == []
+    assert not any("(LambdaMin)" in line or "(ThetaShift)" in line for line in doc.validate())
