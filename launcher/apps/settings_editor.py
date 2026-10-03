@@ -17,6 +17,11 @@ edit — the selection is used only to choose which row the Remove button
 deletes, where it is the actual input rather than a hidden one. Reading config
 from the selected row instead of the acted-on row is a known reduction-GUI bug
 class, and this table is new code, so the trap would be introduced here.
+
+**Drop-downs.** Every enumerated field is a drop-down, and none of them changes
+with the mouse wheel (``NoWheelComboBox``). In the Angles table they are item
+delegates rather than per-cell widgets: the cells stay text items, a choice is
+written into the item, and ``_on_cell_changed`` remains the one write path.
 """
 
 import functools
@@ -33,6 +38,154 @@ from lr_reduction.settings_document import SettingsDocument
 #: costs ~1100x the file size in memory. A settings file with more angles than
 #: this is a mistake, not a workload.
 MAX_TABLE_ROWS = 500
+
+
+#: Editor property set when the user chooses an item in a table drop-down.
+_CHOSEN = "chosen"
+
+
+class NoWheelComboBox(QtWidgets.QComboBox):
+    """A drop-down that the mouse wheel never changes (the scientists' item 2).
+
+    ``QComboBox`` steps through its items on a wheel event, focused or not. So
+    scrolling the settings list with the pointer crossing one changed a setting,
+    and the document with it (measured: ``DetResFn`` rectangular -> gaussian).
+    The event is ignored instead, which leaves it to the parent. Inferred, not
+    measured: Qt passes a real (spontaneous) wheel event on to the parent, so
+    the list scrolls (``QApplication::notify``). A test cannot send a
+    spontaneous event, which is why the tests assert the event left unaccepted
+    instead. Also inferred: an open pop-up list still scrolls, since the wheel
+    then reaches its list view and not the combo.
+
+    The wheel is ignored even when the combo has focus. After a click the combo
+    keeps focus, and the reported failure was exactly a scroll that followed a
+    click (plan A1). ``StrongFocus`` means the wheel does not take focus either.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFocusPolicy(QtCore.Qt.StrongFocus)
+
+    def wheelEvent(self, event):
+        event.ignore()
+
+
+class _ChoiceDelegate(QtWidgets.QStyledItemDelegate):
+    """The drop-down of an enumerated per-angle column: its declared choices, plus "" for unset.
+
+    It writes only when the user chooses an item (``activated``: a click in the
+    list, or a key on the closed drop-down). The choice goes into the cell's
+    item, so ``_on_cell_changed`` and its row-from-the-signal rule stay the one
+    write path (C6). Opening a cell and leaving it writes nothing, so a loaded
+    case variant keeps the file's spelling until a choice is made (C2).
+
+    What it shows:
+    * a case variant as its declared choice (the reducer lower-cases, ``:82``);
+    * a value outside the domain as itself, never the first item;
+    * an empty cell as the value the reduction uses there, in italics, when the
+      document implies one (``SettingsDocument.implied_entry``, C7).
+
+    The implied value is asked of the document when a cell is drawn or opened,
+    not stored on the items. Only visible cells are drawn, so filling a 500-row
+    table does no implied work. The value also cannot go stale when another
+    edit moves the angle count; ``refresh_marks`` repaints after every change.
+    """
+
+    def __init__(self, tab, field):
+        super().__init__(tab.angle_table)
+        self._tab = tab
+        self._field = field
+        self._choices = ["true", "false"] if field.element_type == "bool" else [str(c) for c in field.allowed]
+
+    def _implied(self, index):
+        """The text of the value the reduction uses in this cell when it holds none, or ``""``."""
+        if index.data(QtCore.Qt.DisplayRole):
+            return ""
+        value = self._tab.document.implied_entry(index.row(), self._field.name)
+        return "" if value is None else self._tab._cell_text(self._field, value)
+
+    def createEditor(self, parent, _option, _index):
+        editor = NoWheelComboBox(parent)
+        editor.addItems(["", *self._choices])
+        editor.setProperty(_CHOSEN, False)
+        editor.activated.connect(lambda _index, editor=editor: editor.setProperty(_CHOSEN, True))
+        return editor
+
+    def setEditorData(self, editor, index):
+        text = index.data(QtCore.Qt.DisplayRole) or ""
+        shown = self._field.canonical(text) if text else self._implied(index)
+        at = editor.findText(shown)
+        if at < 0:
+            editor.addItem(shown)
+            at = editor.count() - 1
+        editor.setCurrentIndex(at)
+
+    def setModelData(self, editor, model, index):
+        if editor.property(_CHOSEN):
+            model.setData(index, editor.currentText(), QtCore.Qt.EditRole)
+
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+        text = index.data(QtCore.Qt.DisplayRole) or ""
+        if text:
+            option.text = self._field.canonical(text)
+            return
+        implied = self._implied(index)
+        if implied:
+            option.text = implied
+            font = QtGui.QFont(option.font)
+            font.setItalic(True)
+            option.font = font
+            palette = QtGui.QPalette(option.palette)
+            palette.setColor(QtGui.QPalette.Text, palette.color(QtGui.QPalette.PlaceholderText))
+            option.palette = palette
+
+    def helpEvent(self, event, view, option, index):
+        """An implied cell's tooltip says where its value comes from."""
+        implied = self._implied(index) if event.type() == QtCore.QEvent.ToolTip else ""
+        if implied:
+            QtWidgets.QToolTip.showText(
+                event.globalPos(),
+                f"Not set here: the reduction uses {implied} for this angle. Choose a value to set it.",
+                view,
+            )
+            return True
+        return super().helpEvent(event, view, option, index)
+
+
+class _CandidatesDelegate(QtWidgets.QStyledItemDelegate):
+    """An editable drop-down of the file names in the folder a column's field declares (``DBname``, C4).
+
+    The names come from ``SettingsDocument.candidates``. They are asked for each
+    time a cell opens, so they follow ``experiment_id`` and the direct-beam path
+    wherever those change (C5), and the folder is listed only when a cell asks:
+    never per keystroke, never in a refresh. A typed name that is not in the
+    folder is stored as typed. When the folder holds more names than the cap,
+    the tooltip says so.
+    """
+
+    def __init__(self, tab, field):
+        super().__init__(tab.angle_table)
+        self._tab = tab
+        self._field = field
+
+    def createEditor(self, parent, _option, _index):
+        editor = NoWheelComboBox(parent)
+        editor.setEditable(True)
+        editor.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
+        names, total = self._tab.document.candidates(self._field.name)
+        editor.addItems(names)
+        if total > len(names):
+            editor.setToolTip(
+                f"Showing the first {len(names)} of {total} files in the folder; type a name to use another."
+            )
+        return editor
+
+    def setEditorData(self, editor, index):
+        editor.setEditText(index.data(QtCore.Qt.DisplayRole) or "")
+
+    def setModelData(self, editor, model, index):
+        model.setData(index, editor.currentText(), QtCore.Qt.EditRole)
 
 
 def guarded(method):
@@ -127,6 +280,19 @@ class SettingsEditorTab(QtWidgets.QWidget):
         # from document index — re-introducing the active-row bug this slug is
         # built to avoid, through the back door.
         self.angle_table.setSortingEnabled(False)
+        # Drop-downs for the enumerated columns and the direct-beam names. Kept
+        # here as well as on the table, so PyQt does not collect them.
+        self._cell_delegates = {}
+        for column, name in enumerate(fs.PER_ANGLE_NAMES):
+            field = fs.get(name)
+            if field.candidates_folder:
+                delegate = _CandidatesDelegate(self, field)
+            elif field.allowed or field.element_type == "bool":
+                delegate = _ChoiceDelegate(self, field)
+            else:
+                continue
+            self.angle_table.setItemDelegateForColumn(column, delegate)
+            self._cell_delegates[name] = delegate
         self.angle_table.cellChanged.connect(self._on_cell_changed)
         box.addWidget(self.angle_table)
 
@@ -188,7 +354,7 @@ class SettingsEditorTab(QtWidgets.QWidget):
             return editor
 
         if field.allowed:
-            editor = QtWidgets.QComboBox()
+            editor = NoWheelComboBox()
             # A blank first entry for the tri-state fields, where a falsy value
             # means "off" and is the class default.
             if field.falsy_means_off:
@@ -450,15 +616,20 @@ class SettingsEditorTab(QtWidgets.QWidget):
             self._populating = populating
 
     def refresh_marks(self):
-        """Mark the rows beyond the reduction's angle count, from the document as it is now.
+        """Mark the rows beyond the reduction's angle count, from the document as it is now, and repaint the cells.
 
-        Run after every change that can move the count: Load, Add, Remove, and
-        a cell edit (an angle-defining value typed into a surplus row makes it an
-        angle). The only place a mark is decided.
+        Run after every change that can move the count or a list's state: Load,
+        Add, Remove, and a cell edit (an angle-defining value typed into a
+        surplus row makes it an angle; a choice writes a compact list out). The
+        only place a mark is decided. The drop-down columns draw an implied value
+        from the document as they paint (``_ChoiceDelegate``). A change elsewhere
+        can alter it without touching their items, so the viewport is repainted
+        here.
         """
         count = self.document.reduction_angles
         for row in range(self.angle_table.rowCount()):
             self.angle_table.setVerticalHeaderItem(row, self._row_header(row, surplus=row >= count))
+        self.angle_table.viewport().update()
 
     def refresh_scalars(self):
         for name, editor in self.editors.items():

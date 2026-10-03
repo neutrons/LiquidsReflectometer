@@ -810,6 +810,14 @@ def _open_cell_editor(tab, row, name):
     return tab.angle_table.indexWidget(index)
 
 
+def _leave(editor):
+    """Press Return in the cell's editor and let the commit happen: Qt 5 queues a delegate's commit on
+    Return (QueuedConnection), so asserting before processing events would see the document unchanged
+    whether or not the cell writes."""
+    QTest.keyClick(editor, QtCore.Qt.Key_Return)
+    QtWidgets.QApplication.processEvents()
+
+
 def _choose(editor, text):
     """Choose `text` the way a keyboard user does: arrow keys on the closed drop-down, then Return."""
     target = editor.findText(text)
@@ -820,8 +828,7 @@ def _choose(editor, text):
             break
         QTest.keyClick(editor, key)
     assert editor.currentText() == text
-    QTest.keyClick(editor, QtCore.Qt.Key_Return)
-    QtWidgets.QApplication.processEvents()
+    _leave(editor)
 
 
 def _items(editor):
@@ -887,7 +894,7 @@ def test_the_wheel_never_changes_a_table_drop_down(tmp_path, monkeypatch, name, 
     shown = editor.currentText()
     _wheel(editor, _away(editor))
     assert editor.currentText() == shown
-    QTest.keyClick(editor, QtCore.Qt.Key_Return)
+    _leave(editor)
     assert tab.document.changed_vs_seed() == {}
 
 
@@ -952,7 +959,7 @@ def test_a_direct_beam_name_not_in_the_folder_can_be_typed_and_is_stored_verbati
     editor = _open_cell_editor(tab, 1, "DBname")
     editor.lineEdit().selectAll()
     QTest.keyClicks(editor.lineEdit(), "elsewhere 1.dat")
-    QTest.keyClick(editor, QtCore.Qt.Key_Return)
+    _leave(editor)
     assert tab.document.get("DBname") == ["db_a.dat", "elsewhere 1.dat", "db_c.dat"]
 
 
@@ -966,7 +973,7 @@ def test_an_empty_or_missing_direct_beam_folder_offers_nothing_and_typing_still_
     assert _items(editor) == []
     editor.lineEdit().selectAll()
     QTest.keyClicks(editor.lineEdit(), "typed.dat")
-    QTest.keyClick(editor, QtCore.Qt.Key_Return)
+    _leave(editor)
     assert tab.document.get("DBname")[0] == "typed.dat"
 
 
@@ -1005,7 +1012,7 @@ def test_a_loaded_case_variant_shows_as_its_choice_and_is_kept_until_one_is_chos
     assert _shown(tab, 0, "method_per_run") == ("meanTheta", False)
     editor = _open_cell_editor(tab, 0, "method_per_run")
     assert editor.currentText() == "meanTheta"
-    QTest.keyClick(editor, QtCore.Qt.Key_Return)
+    _leave(editor)
     assert tab.document.get("method_per_run") == ["meantheta"] * 3
 
 
@@ -1018,7 +1025,7 @@ def test_an_out_of_domain_cell_value_is_shown_as_itself_and_reported(tmp_path, m
     assert _shown(tab, 0, name)[0] == text
     editor = _open_cell_editor(tab, 0, name)
     assert editor.currentText() == text
-    QTest.keyClick(editor, QtCore.Qt.Key_Return)
+    _leave(editor)
     assert tab.document.get(name) == [held] * 3
     assert any(f"({name})" in line for line in tab.document.validate())
 
@@ -1117,3 +1124,17 @@ def test_a_choice_in_a_surplus_row_is_a_surplus_value(tmp_path, monkeypatch):
     notes = tab.report.toPlainText().split("Notes:", 1)[1]
     assert "(method_per_run)" in notes and "1 extra" in notes
     assert "surplus" in _row_label(tab, 3)
+
+
+def test_a_capped_direct_beam_list_says_so(tmp_path, monkeypatch):
+    """Added at GREEN, for a branch the RED set did not construct: a folder holding more names than the
+    cap offers the first MAX_CANDIDATES, and the drop-down's tooltip says how many there were."""
+    from lr_reduction.settings_document import MAX_CANDIDATES
+
+    names = [f"db_{k:05d}.dat" for k in range(MAX_CANDIDATES + 1)]
+    path, _ = _direct_beam_settings(tmp_path, names)
+    tab = SettingsEditorTab()
+    _load(tab, path, monkeypatch)
+    editor = _open_cell_editor(tab, 0, "DBname")
+    assert editor.count() == MAX_CANDIDATES
+    assert f"first {MAX_CANDIDATES} of {MAX_CANDIDATES + 1}" in editor.toolTip()

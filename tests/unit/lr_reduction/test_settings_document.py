@@ -2068,6 +2068,7 @@ def test_only_the_direct_beam_column_offers_candidates_and_from_the_folder_the_r
     """nr_reduction_calc.py:402 calls tools.load_db_file(config.DBpath, config.DBname[i]): a DBname entry
     is a file name in DBpath, so that is the folder its candidates come from."""
     assert {f.name: f.candidates_folder for f in fs.FIELD_SPEC if f.candidates_folder} == {"DBname": "DBpath"}
+    assert SettingsDocument().candidates("ThetaShift") == ([], 0)  # no folder declared, nothing offered
 
 
 def _direct_beam_folder(tmp_path, names):
@@ -2086,7 +2087,8 @@ def test_the_direct_beam_candidates_are_the_folders_txt_and_dat_files_sorted(tmp
     assert doc.candidates("DBname") == (["db 1 é.dat", "db_a.txt", "db_b.dat"], 3)
 
 
-@pytest.mark.parametrize("state", ["missing", "a-file", "unreadable", "scandir-raises", "unresolvable-path"])
+@pytest.mark.parametrize(
+    "state", ["missing", "a-file", "unreadable", "scandir-raises", "unresolvable-path", "null-byte"])
 def test_the_direct_beam_candidates_are_empty_whenever_the_folder_cannot_be_listed(tmp_path, monkeypatch, state):
     """Every failure is an empty list, so a cell never raises into a Qt slot. The folder is on a facility
     mount (F6), where any of these is ordinary; "unresolvable-path" is experiment_id None, for which the
@@ -2106,6 +2108,8 @@ def test_the_direct_beam_candidates_are_empty_whenever_the_folder_cannot_be_list
             raise OSError("stale file handle")
 
         monkeypatch.setattr(os, "scandir", scandir)
+    elif state == "null-byte":
+        values["_DBpath_override"] = str(folder) + "\x00"  # os.scandir raises ValueError
     else:
         values = {"experiment_id": None}
     try:
@@ -2140,3 +2144,27 @@ def test_nothing_is_implied_where_the_reduction_has_no_value_of_its_own():
     assert ragged.implied_entry(1, "method_per_run") is None
     assert surplus.implied_entry(0, "LambdaMin") is None
     assert surplus.implied_entry(0, "DBname") is None
+
+
+def test_an_entry_that_cannot_be_examined_is_left_out_and_the_rest_are_listed(tmp_path, monkeypatch):
+    """Added at GREEN, for a branch the RED set did not construct: on a facility mount one entry's stat can
+    fail (a stale handle) while the folder lists. That entry is not offered; the listing goes on."""
+    class Entry:
+        def __init__(self, name, broken=False):
+            self.name, self._broken = name, broken
+
+        def is_file(self):
+            if self._broken:
+                raise OSError("stale file handle")
+            return True
+
+    class Listing:
+        def __enter__(self):
+            return iter([Entry("db_b.dat"), Entry("db_x.dat", broken=True), Entry("db_a.txt")])
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(os, "scandir", lambda _path: Listing())
+    doc = SettingsDocument.from_dict({"_DBpath_override": str(tmp_path)})
+    assert doc.candidates("DBname") == (["db_a.txt", "db_b.dat"], 2)
