@@ -637,16 +637,26 @@ def test_the_surplus_row_is_marked_and_the_others_are_not(tmp_path, monkeypatch)
     assert [("surplus" in _row_label(tab, row)) for row in range(4)] == [False, False, False, True]
 
 
-def test_add_angle_then_typing_lands_every_list_on_one_row(tmp_path, monkeypatch):
+def test_add_angle_inserts_the_reductions_next_angle_before_the_surplus_rows(tmp_path, monkeypatch):
+    """v2 (G6 revised, review 1568397 Q-1): the new angle is row m, directly after the last
+    real angle; the surplus row moves down and stays surplus. v1 appended after it, so a
+    saved RBnum read [..., null, <new run>]."""
     tab = SettingsEditorTab()
     _load(tab, _surplus_settings(tmp_path), monkeypatch)
     QTest.mouseClick(tab.add_angle_button, QtCore.Qt.LeftButton)
-    new_row = tab.angle_table.rowCount() - 1
-    tab.angle_table.item(new_row, fs.PER_ANGLE_NAMES.index("DBname")).setText("new.dat")
+    for name, text in (("DBname", "new.dat"), ("RBnum", "999999")):
+        tab.angle_table.item(3, fs.PER_ANGLE_NAMES.index(name)).setText(text)
     doc = tab.document
-    assert doc.get("DBname")[new_row] == "new.dat"
-    for name in ("DBname", "RBnum", "RB_Ymin", "RB_Ymax", "BkgROI", "useBS"):
-        assert len(doc.get(name)) == new_row + 1, name
+    assert doc.get("DBname")[3] == "new.dat"
+    assert doc.reduction_angles == 4
+    assert repr(doc.get("useBS")) == "[True, True, True, None, True]"
+    assert [("surplus" in _row_label(tab, row)) for row in range(5)] == [False, False, False, False, True]
+    target = tmp_path / "saved.json"
+    monkeypatch.setattr(
+        QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), ""))
+    )
+    tab.save_settings()
+    assert json.loads(target.read_text())["RBnum"] == [201282, 201283, 201284, 999999]
 
 
 def test_removing_the_surplus_row_clears_its_note(tmp_path, monkeypatch):
@@ -674,3 +684,18 @@ def test_a_new_document_writes_the_reducers_defaults_as_empty_lists(tmp_path, mo
     saved = json.loads(target.read_text())
     assert saved["ThetaShift"] == []
     assert saved["method_per_run"] == []
+
+
+@pytest.mark.parametrize("row, still_surplus", [(0, True), (3, False)], ids=["edit-an-angle", "edit-the-surplus-row"])
+def test_the_surplus_marks_follow_an_edit(tmp_path, monkeypatch, row, still_surplus):
+    """v2 (G8): marks are re-derived after an edit, as after Load, Add and Remove. Editing an
+    angle leaves the surplus row surplus and the panel clean; a DBname typed into the surplus
+    row makes it a real angle."""
+    tab = SettingsEditorTab()
+    _load(tab, _surplus_settings(tmp_path), monkeypatch)
+    tab.angle_table.item(row, fs.PER_ANGLE_NAMES.index("DBname")).setText("edited.dat")
+    assert ("surplus" in _row_label(tab, 3)) is still_surplus
+    if still_surplus:
+        text = tab.report.toPlainText()
+        assert text.startswith("No problems found.")
+        assert "(useBS)" in text.split("Notes:", 1)[1]
