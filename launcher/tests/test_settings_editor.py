@@ -699,3 +699,32 @@ def test_the_surplus_marks_follow_an_edit(tmp_path, monkeypatch, row, still_surp
         text = tab.report.toPlainText()
         assert text.startswith("No problems found.")
         assert "(useBS)" in text.split("Notes:", 1)[1]
+
+
+# --------------------------------------------------------------------------
+# editor-angle-count v3 — G9 at the gesture: an edit of a compact list shows what it wrote; a λ
+# typed into a surplus row of a derived list is refused, visibly
+# --------------------------------------------------------------------------
+
+
+def test_an_edit_of_an_empty_default_list_shows_the_values_it_wrote(tmp_path, monkeypatch):
+    """G9 writes entries the user did not type (the reducer's own value at the other angles), so the
+    column is re-drawn from the document: what is shown is what is held."""
+    tab = SettingsEditorTab()
+    _load(tab, _surplus_settings(tmp_path), monkeypatch)
+    tab.angle_table.item(1, fs.PER_ANGLE_NAMES.index("ThetaShift")).setText("0.01")
+    assert repr(tab.document.get("ThetaShift")) == "[0, 0.01, 0]"
+    assert _column_text(tab, "ThetaShift") == ["0", "0.01", "0", ""]
+    assert tab.report.toPlainText().startswith("No problems found.")
+
+
+def test_a_lambda_typed_into_a_surplus_row_is_refused_and_the_cell_shows_it(tmp_path, monkeypatch):
+    """S3 at the gesture: the document keeps λ derived, the cell goes back to unset, and the panel
+    says why."""
+    tab = SettingsEditorTab()
+    _load(tab, _surplus_settings(tmp_path), monkeypatch)
+    tab.angle_table.item(3, fs.PER_ANGLE_NAMES.index("LambdaMin")).setText("3.0")
+    assert tab.document.get("LambdaMin") is None
+    assert _column_text(tab, "LambdaMin") == ["", "", "", ""]
+    problems = tab.report.toPlainText().split("Notes:", 1)[0]
+    assert "(LambdaMin)" in problems and "surplus row 4" in problems
