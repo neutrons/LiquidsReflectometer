@@ -594,3 +594,83 @@ def test_a_hand_written_integer_useGravity_is_reported_and_saved_as_written(tmp_
     )
     tab.save_settings()
     assert '"useGravity": 1' in target.read_text()
+
+
+# --------------------------------------------------------------------------
+# editor-angle-count — the reduction's angle count; surplus rows; Add keeps one index
+# --------------------------------------------------------------------------
+
+
+def _surplus_settings(directory):
+    """Three angles by RBnum, useBS four long — IPTS-36119's reduce_settings.json shape."""
+    path = directory / "reduce_settings.json"
+    path.write_text(json.dumps({
+        "RBnum": [201282, 201283, 201284],
+        "DBname": ["db_a.dat", "db_b.dat", "db_c.dat"],
+        "RB_Ymin": [140, 141, 142],
+        "RB_Ymax": [150, 151, 152],
+        "BkgROI": [[120, 130], [121, 131], [122, 132]],
+        "useBS": [1, 1, 1, 1],
+    }))
+    return path
+
+
+def _row_label(tab, row):
+    item = tab.angle_table.verticalHeaderItem(row)
+    return item.text() if item is not None else ""
+
+
+def test_a_surplus_file_reads_no_problems_and_shows_its_note(tmp_path, monkeypatch):
+    tab = SettingsEditorTab()
+    _load(tab, _surplus_settings(tmp_path), monkeypatch)
+    text = tab.report.toPlainText()
+    assert text.startswith("No problems found.")
+    notes = text.split("Notes:", 1)[1]
+    assert "(useBS)" in notes and "1 extra" in notes
+
+
+def test_the_surplus_row_is_marked_and_the_others_are_not(tmp_path, monkeypatch):
+    """The queryable property: the row's vertical header says "surplus"."""
+    tab = SettingsEditorTab()
+    _load(tab, _surplus_settings(tmp_path), monkeypatch)
+    assert tab.angle_table.rowCount() == 4
+    assert [("surplus" in _row_label(tab, row)) for row in range(4)] == [False, False, False, True]
+
+
+def test_add_angle_then_typing_lands_every_list_on_one_row(tmp_path, monkeypatch):
+    tab = SettingsEditorTab()
+    _load(tab, _surplus_settings(tmp_path), monkeypatch)
+    QTest.mouseClick(tab.add_angle_button, QtCore.Qt.LeftButton)
+    new_row = tab.angle_table.rowCount() - 1
+    tab.angle_table.item(new_row, fs.PER_ANGLE_NAMES.index("DBname")).setText("new.dat")
+    doc = tab.document
+    assert doc.get("DBname")[new_row] == "new.dat"
+    for name in ("DBname", "RBnum", "RB_Ymin", "RB_Ymax", "BkgROI", "useBS"):
+        assert len(doc.get(name)) == new_row + 1, name
+
+
+def test_removing_the_surplus_row_clears_its_note(tmp_path, monkeypatch):
+    tab = SettingsEditorTab()
+    _load(tab, _surplus_settings(tmp_path), monkeypatch)
+    tab.angle_table.setCurrentCell(3, 0)
+    QTest.mouseClick(tab.remove_angle_button, QtCore.Qt.LeftButton)
+    assert "(useBS)" not in tab.report.toPlainText()
+    assert tab.document.get("useBS") == [True, True, True]
+
+
+def test_a_new_document_writes_the_reducers_defaults_as_empty_lists(tmp_path, monkeypatch):
+    """F5: the editor's own file must reduce; an unset default list is written [] (G7)."""
+    tab = SettingsEditorTab()
+    for _ in range(2):
+        QTest.mouseClick(tab.add_angle_button, QtCore.Qt.LeftButton)
+    for row in range(2):
+        for name, text in (("DBname", f"db_{row}.dat"), ("RB_Ymin", "140"), ("RB_Ymax", "150"), ("BkgROI", "120, 130")):
+            tab.angle_table.item(row, fs.PER_ANGLE_NAMES.index(name)).setText(text)
+    target = tmp_path / "authored.json"
+    monkeypatch.setattr(
+        QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), ""))
+    )
+    tab.save_settings()
+    saved = json.loads(target.read_text())
+    assert saved["ThetaShift"] == []
+    assert saved["method_per_run"] == []

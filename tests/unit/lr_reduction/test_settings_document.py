@@ -10,6 +10,7 @@ import ast
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import textwrap
@@ -1306,3 +1307,186 @@ def test_a_saved_useBS_entry_is_read_as_the_source_entry(tmp_path, value):
     assert type(saved) is int
     assert bool(saved) == bool(value)
     assert (saved == 1) == (value == 1)
+
+
+# --------------------------------------------------------------------------
+# editor-angle-count — the editor counts, adds and saves angles the way the
+# reduction reads them (nr_reduction_calc.py:61-110)
+# --------------------------------------------------------------------------
+
+_THREE_ANGLES = {
+    "RBnum": [201282, 201283, 201284],
+    "DBname": ["db_a.dat", "db_b.dat", "db_c.dat"],
+    "RB_Ymin": [140, 141, 142],
+    "RB_Ymax": [150, 151, 152],
+    "BkgROI": [[120, 130], [121, 131], [122, 132]],
+}
+
+
+def _surplus_document(extra=1):
+    """Three angles by RBnum, with `useBS` longer — the real files' shape
+    (IPTS-36119 reduce_settings.json holds useBS [1, 1, 1, 1] for three runs)."""
+    return SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": [1] * (3 + extra)})
+
+
+def test_a_surplus_entry_is_not_a_problem():
+    assert _surplus_document().validate() == []
+
+
+@pytest.mark.parametrize("extra", [1, 5], ids=["one-extra", "five-extra"])
+def test_a_surplus_entry_is_one_note_naming_the_field_and_the_count(extra):
+    doc = _surplus_document(extra)
+    notes = [line for line in doc.notes() if "(useBS)" in line]
+    assert len(notes) == 1  # one line per field, never per entry
+    assert f"{extra} extra" in notes[0]
+    assert not any("(useBS)" in line for line in doc.validate())
+
+
+def test_the_reduction_counts_its_angles_and_the_table_shows_every_row():
+    doc = _surplus_document()
+    assert doc.reduction_angles == 3
+    assert doc.n_angles == 4
+    # every angle-defining list empty: the count falls back to the longest list, so a
+    # document holding only optional columns still shows them, without a note
+    fallback = SettingsDocument.from_dict({"LambdaMin": [2.5, 2.6], "ThetaShift": [0.1, 0.2]})
+    assert fallback.reduction_angles == 2 == fallback.n_angles
+    assert fallback.notes() == []
+
+
+def test_a_short_angle_defining_list_is_still_reported():
+    """A pin against over-relaxing: the reducer raises on a short DBname (nr_reduction_calc.py:67-68)."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "DBname": ["db_a.dat", "db_b.dat"]})
+    assert "Direct-beam file (DBname) has 2 entries for 3 angles" in doc.validate()
+
+
+def test_the_angle_defining_names_are_derived_and_every_per_angle_field_has_one_kind():
+    assert set(fs.ANGLE_DEFINING_NAMES) == {"DBname", "RBnum", "RB_Ymin", "RB_Ymax", "BkgROI"}
+    for name in fs.PER_ANGLE_NAMES:
+        field = fs.get(name)
+        kinds = [name in fs.ANGLE_DEFINING_NAMES, field.default_if_empty, field.broadcast_ok, field.optional_list]
+        assert sum(kinds) == 1, name
+
+
+def test_an_added_angle_has_one_index_in_every_list():
+    doc = _surplus_document()
+    doc.add_angle(DBname="d.dat", useBS=False)
+    index = doc.n_angles - 1
+    for name in ("DBname", "RBnum", "RB_Ymin", "RB_Ymax", "BkgROI", "useBS"):
+        assert len(doc.get(name)) == doc.n_angles, name
+    assert doc.get("DBname")[index] == "d.dat"
+    assert doc.get("useBS")[index] is False
+    # the compact lists the reducer fills or derives are untouched
+    assert doc.get("method_per_run") == []
+    assert doc.get("ThetaShift") == []
+    assert doc.get("LambdaMin") is None
+
+
+def test_an_added_angle_leaves_a_broadcast_method_broadcast():
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": ["meanTheta"]})
+    doc.add_angle()
+    assert doc.get("method_per_run") == ["meanTheta"]
+    doc.add_angle(method_per_run="constantQ")
+    assert doc.get("method_per_run") == ["meanTheta"] * 4 + ["constantQ"]
+
+
+def test_setting_one_angle_of_a_broadcast_method_keeps_it_for_the_others():
+    """The §5 row "set method_per_run for the new angle only": the earlier angles keep
+    the broadcast value the reducer would have used (nr_reduction_calc.py:77-79)."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": ["meanTheta"]})
+    doc.set_angle_field(0, "method_per_run", "constantQ")
+    assert doc.get("method_per_run") == ["constantQ", "meanTheta", "meanTheta"]
+
+
+def test_an_added_angle_leaves_an_empty_default_list_empty():
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "ThetaShift": []})
+    doc.add_angle()
+    assert doc.get("ThetaShift") == []
+
+
+def test_the_reducer_accepts_what_the_editor_writes():
+    """F5: a file authored in the editor validated clean and could not be reduced.
+
+    Runs the reducer's own path: NR_Reduction.__init__ (which defaults an empty
+    method_per_run, nr_reduction_calc.py:42-43) and _validate_config (:55-110). The
+    module's _bare_reduction skips __init__, so it would not show that default.
+    """
+    from lr_reduction.nr_reduction_calc import NR_Reduction
+
+    doc = SettingsDocument()
+    for k in range(2):
+        doc.add_angle(DBname=f"db_{k}.dat", RB_Ymin=140, RB_Ymax=150, BkgROI=[120, 130])
+    config = json_to_config(doc.normalize())
+    config.RBnum = [201282, 201283]  # as reduce_from_file sets it from the runs (new_reduction_from_file.py:65)
+    NR_Reduction(config)
+    assert config.ThetaShift == [0, 0]
+    assert config.method_per_run == ["meantheta", "meantheta"]
+
+
+def _all_unset_document():
+    return SettingsDocument.from_dict({
+        **_THREE_ANGLES,
+        "DBname": [None, None, None],
+        "ThetaShift": [None, None, None],
+        "method_per_run": [None, None, None],
+        "useBS": [None, None, None],
+    })
+
+
+@pytest.mark.parametrize("output", ["save", "normalize"])
+def test_an_all_unset_default_or_broadcast_list_is_written_empty(tmp_path, output):
+    doc = _all_unset_document()
+    if output == "save":
+        written = json.loads(doc.save(tmp_path / "out.json").read_text())
+    else:
+        written = doc.normalize()
+    for name in ("ThetaShift", "method_per_run", "useBS"):
+        assert written[name] == [], name
+    # an angle-defining list is never collapsed: unset there is not a default
+    assert written["DBname"] == [None, None, None]
+
+
+def test_a_partly_set_default_list_is_a_problem_naming_the_unset_angles_and_is_saved_as_held(tmp_path):
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "ThetaShift": [0.1, None, None]})
+    lines = [m for m in doc.validate() if "(ThetaShift)" in m]
+    assert len(lines) == 1
+    assert "[1, 2]" in lines[0]
+    assert json.loads(doc.save(tmp_path / "out.json").read_text())["ThetaShift"] == [0.1, None, None]
+
+
+def test_an_all_null_default_list_loads_as_unset_and_saves_empty(tmp_path):
+    source = tmp_path / "older_editor_save.json"
+    source.write_text(json.dumps({**_THREE_ANGLES, "ThetaShift": [None, None, None]}))
+    doc = SettingsDocument.from_file(source)
+    assert doc.get("ThetaShift") == [None, None, None]
+    assert doc.validate() == []
+    assert '"ThetaShift": []' in doc.save(tmp_path / "out.json").read_text()
+
+
+def test_removing_the_surplus_angle_clears_the_note_and_trims_only_useBS():
+    doc = _surplus_document()
+    doc.remove_angle(3)
+    assert doc.notes() == []
+    assert doc.get("useBS") == [True, True, True]
+    assert doc.get("DBname") == _THREE_ANGLES["DBname"]
+
+
+def test_an_unset_background_switch_is_noted_as_the_reductions_default():
+    """Plan A2: an all-unset useBS is written [], which the reducer fills with 1 (on) for
+    every angle (nr_reduction_calc.py:102-103), so the panel says so."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": []})
+    notes = [line for line in doc.notes() if "(useBS)" in line]
+    assert len(notes) == 1
+    assert re.search(r"\bon\b", notes[0]), notes[0]
+
+
+def test_the_boolean_default_lists_are_exactly_useBS():
+    """A pin on the derivation the A2 note uses: its "on" is the reducer's fill for useBS
+    (nr_reduction_calc.py:103). Before adding another, read that field's default fill."""
+    assert {f.name for f in fs.FIELD_SPEC if f.default_if_empty and f.element_type == "bool"} == {"useBS"}
+
+
+def test_a_per_angle_value_that_is_not_a_list_is_kept_out_of_the_counts():
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "tof_min": 5})
+    assert doc.reduction_angles == 3
+    assert any("(tof_min)" in m for m in doc.validate())
+    assert doc.notes() == []
