@@ -356,6 +356,7 @@ class SettingsEditorTab(QtWidgets.QWidget):
         item = self.angle_table.item(row, column)
         value = fs.get(name).coerce_element(item.text() if item is not None else "")
         self.document.set_angle_field(row, name, value)
+        self.refresh_column(column)
         self.refresh_marks()
         self.refresh_report()
 
@@ -422,6 +423,31 @@ class SettingsEditorTab(QtWidgets.QWidget):
             self.refresh_marks()
         finally:
             self._populating = False
+
+    def refresh_column(self, column):
+        """Re-draw one column from the document, after an edit to it.
+
+        An edit can change cells the user did not type in: writing out a list
+        the reducer filled itself puts its value at the other angles, and a
+        refused λ leaves the edited cell unset. The text is set on the existing
+        items, never by replacing them, because this runs inside the table's own
+        cellChanged signal for one of them.
+        """
+        field = fs.get(fs.PER_ANGLE_NAMES[column])
+        populating, self._populating = self._populating, True
+        try:
+            for row in range(self.angle_table.rowCount()):
+                # A row past n_angles is left from before an edit that emptied the
+                # last λ entry back to None; it holds nothing.
+                value = self.document.angle_row(row)[field.name] if row < self.document.n_angles else None
+                text = self._cell_text(field, value)
+                item = self.angle_table.item(row, column)
+                if item is None:
+                    self.angle_table.setItem(row, column, QtWidgets.QTableWidgetItem(text))
+                elif item.text() != text:
+                    item.setText(text)
+        finally:
+            self._populating = populating
 
     def refresh_marks(self):
         """Mark the rows beyond the reduction's angle count, from the document as it is now.

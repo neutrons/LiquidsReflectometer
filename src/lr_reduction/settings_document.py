@@ -18,7 +18,12 @@ from, so a short array cannot shift every subsequent angle's settings by one —
 which would happen silently, since nothing in the config class enforces equal
 lengths. Lists the reducer fills, broadcasts or derives stay compact when no
 value is given (empty, one broadcast entry, ``None``): the reducer expands them
-itself. An edit (``set_angle_field``) changes exactly the entry edited.
+itself. An edit (``set_angle_field``) changes what the reducer reads at the
+angle edited and at no other: in a list it reads as held, exactly the entry
+edited; in a compact one, the other angles are written out with what the
+reducer read there before (``Field.reducer_default``, or the broadcast entry),
+except a derived λ, whose other angles are left unset and reported — and a λ
+typed into a row the reduction does not use is refused.
 
 *Validation is not the same as the equal-length invariant.* The reducer
 deliberately broadcasts a single ``method_per_run`` entry across all angles
@@ -44,6 +49,10 @@ from lr_reduction.save_reduced_data import make_json_safe
 #: thread. Truncation is announced, never silent.
 MAX_REPORTED_PROBLEMS = 200
 
+#: Returned by ``SettingsDocument._compact_reading`` for a list the reducer reads
+#: as it is held. ``None`` cannot mark that: it is what a derived λ reads.
+_NOT_COMPACT = object()
+
 
 def _held_as_bool(value):
     """``value`` as a ``bool`` if it is a boolean spelling, otherwise unchanged."""
@@ -59,6 +68,9 @@ class SettingsDocument:
         # The state this document was seeded from, for changed_vs_seed(). Copied
         # so later edits cannot reach back and rewrite the baseline.
         self._seed = copy.deepcopy(self._config.__dict__)
+        # {field name: row} of the λ edits set_angle_field refused, which
+        # validate() reports while they still apply. Not part of the settings.
+        self._refused = {}
 
     # -- construction ------------------------------------------------------
 
@@ -198,6 +210,33 @@ class SettingsDocument:
         """
         return self._defining_length() or self.n_angles
 
+    @staticmethod
+    def _compact_reading(field, current, count):
+        """What the reducer reads at every angle while ``current`` is compact, or ``_NOT_COMPACT``.
+
+        Compact is a state the file holds as the reducer's own spelling of "fill
+        this in", so the reducer, not the list, decides every angle:
+
+        * an optional list left ``None``: derived per angle
+          (``nr_reduction_calc.py:381-383``). Reads ``None`` here;
+        * a ``default_if_empty`` or ``broadcast_ok`` list that is ``None``,
+          empty, or unset at every angle below ``count``: written ``null`` or
+          ``[]`` (``_encode_for_file``), so the reducer's own value applies
+          (``Field.reducer_default``; ``:42-43``, ``:99-110``), held in the
+          document's spelling (``True`` for ``useBS``'s ``1``);
+        * a single broadcast entry: the reducer repeats it (``:77-79``).
+        """
+        if field.optional_list:
+            return None if current is None else _NOT_COMPACT
+        if not (field.default_if_empty or field.broadcast_ok):
+            return _NOT_COMPACT
+        holds = isinstance(current, (list, tuple))
+        if current is None or (holds and all(entry is None for entry in current[:count])):
+            return _held_as_bool(field.reducer_default) if field.int_encoded else field.reducer_default
+        if field.broadcast_ok and holds and len(current) == 1:
+            return current[0]
+        return _NOT_COMPACT
+
     def add_angle(self, **values):
         """Add one angle at index ``reduction_angles`` — the reduction's next one — in every list it touches.
 
@@ -217,9 +256,12 @@ class SettingsDocument:
           ``:381-383``; materialising it as ``[None, None]`` would give a list
           that reports a length and carries no values, and ``web_report.py:547``
           indexes it);
-        * a compact list given a value is expanded: a broadcast list by
-          repeating its single entry for the existing angles, the others with
-          unset entries;
+        * a compact list given a value (``_compact_reading``: also one unset at
+          every angle, or ``None``) is written out the way an edit writes it
+          (G9): the existing angles hold what the reducer read there before —
+          its own value, or the broadcast entry; a derived λ's are left unset,
+          for ``validate()`` to name — and the value sits at index
+          ``reduction_angles``, with any surplus entries after it;
         * any other list gets the new entry at index ``reduction_angles``: a
           shorter list is first padded with unset entries to that index, and a
           longer one's surplus entries follow the new entry;
@@ -227,22 +269,27 @@ class SettingsDocument:
           ``validate()`` to report.
         """
         m = self.reduction_angles
+        self._refused.clear()  # rows move; a refusal names a row
         for name in fs.PER_ANGLE_NAMES:
             field = fs.get(name)
             current = self.get(name)
-            supplied = name in values
-            if current is None:
-                if supplied:
-                    self.set(name, [None] * m + [values[name]])
+            supplied = values.get(name) is not None
+            reading = self._compact_reading(field, current, m)
+            if supplied and reading is not _NOT_COMPACT:
+                surplus = list(current[m:]) if isinstance(current, (list, tuple)) else []
+                if field.broadcast_ok:  # no unset entry anywhere in it (:82)
+                    surplus = [reading if entry is None else entry for entry in surplus]
+                self.set(name, [reading] * m + [values[name]] + surplus)
                 continue
             if not isinstance(current, (list, tuple)):
                 continue
             current = list(current)
+            # Nothing supplied (a compact list given a value was written out above):
+            # a list the reducer expands as it is (empty, or one broadcast entry)
+            # stays so. One unset at every angle still takes the new unset entry
+            # at m, so that its surplus entries move down with the rest.
             compact = (field.default_if_empty and not current) or (field.broadcast_ok and len(current) <= 1)
             if compact:
-                if supplied:
-                    head = current * m if (field.broadcast_ok and len(current) == 1) else [None] * m
-                    self.set(name, head + [values[name]])
                 continue
             angles = current[:m] + [None] * (m - len(current[:m]))
             self.set(name, angles + [values.get(name)] + current[m:])
@@ -251,6 +298,7 @@ class SettingsDocument:
         """Remove one angle from every per-angle field."""
         if not 0 <= index < self.n_angles:
             raise IndexError(f"No angle at index {index} (have {self.n_angles})")
+        self._refused.clear()  # rows move; a refusal names a row
         for name in fs.PER_ANGLE_NAMES:
             current = self.get(name)
             if isinstance(current, list) and index < len(current):
@@ -263,6 +311,18 @@ class SettingsDocument:
         row it is acting on; there is deliberately no notion of a "current row"
         here to fall back on, which is the shape the active-row-as-hidden-input
         bug takes in reduction GUIs.
+
+        What the reducer reads changes at the angle edited and at no other:
+
+        * in a list it reads as held, exactly the entry edited changes;
+        * in a compact list (``_compact_reading``) the angles the edit does not
+          touch are written out with what the reducer read there before — its
+          own value (``Field.reducer_default``) or the broadcast entry — so they
+          reduce as before. A derived λ has no spelling for "derive this one":
+          its other angles are left unset, and ``validate()`` names them. A λ
+          typed into a row the reduction does not use is refused, and
+          ``validate()`` says why;
+        * clearing a cell that holds no entry is not an edit, and changes nothing.
         """
         field = fs.get(name)
         if not field.per_angle:
@@ -270,32 +330,58 @@ class SettingsDocument:
         current = self.get(name)
         if not 0 <= index < self.n_angles:
             raise IndexError(f"No angle at index {index} (have {self.n_angles})")
-        # A single broadcast entry stands for the reduction's angles
-        # (nr_reduction_calc.py:77-79). Setting one of them expands it to the
-        # reduction's count first, so the others keep that value instead of
-        # becoming unset entries the reducer would choke on. It expands to that
-        # count, not to the table's rows, because rows past it are surplus.
-        if field.broadcast_ok and isinstance(current, (list, tuple)) and len(current) == 1:
-            current = list(current) * max(self.reduction_angles, 1)
-        # An edit changes exactly the entry edited. A list is padded only far
-        # enough to reach the edited index, never to the table's row count: v1
-        # padded to n_angles, and on a file with surplus rows one cell edit grew
-        # every edited list into them, which raised the reduction's count (3 -> 7
-        # on a real file) and reported problems that did not exist (review 1568397).
-        # Padding a SHORT list rather than indexing past it matters too: an
-        # IndexError in a Qt slot reaches qFatal() and kills the launcher, and short
-        # lists are ordinary (a length-1 method_per_run; normalize() drops RBnum).
         # isinstance, not len(): a bare string has a length, and list("abc") would
         # explode it into ['a', 'b', 'c'] instead of replacing a wrong type.
-        updated = list(current) if isinstance(current, (list, tuple)) else []
-        updated += [None] * (index + 1 - len(updated))
+        holds = isinstance(current, (list, tuple))
+        if value is None and not (holds and index < len(current) and current[index] is not None):
+            # A one-entry broadcast shows on row 0 only, so the rows below it look
+            # empty. "Clearing" one used to expand the list around an unset entry: a
+            # file the reducer refuses, since it lower-cases every entry (:82).
+            self._refused.pop(name, None)
+            return
+        count = self.reduction_angles
+        reading = self._compact_reading(field, current, count)
+        if reading is not _NOT_COMPACT and value is not None:
+            if field.optional_list and index >= count:
+                # None is "derive it" at every angle. A value only in a row the
+                # reducer never reads would make it a list with nothing at the real
+                # angles, which it then reads (:452 raised; review c286e9b, C-3).
+                self._refused[name] = index
+                return
+            # Padded with v2's unset entries instead, one edit of an empty list
+            # changed every other angle: [] -> ['constantQ'] was broadcast to all of
+            # them, silently, and [] -> [0.01] raised IndexError at :413 (C-1, C-2).
+            updated = [reading] * count + (list(current[count:]) if holds else [])
+            gap = reading if field.broadcast_ok else None
+            if field.broadcast_ok:  # no unset entry anywhere in it, surplus included (:82)
+                updated = [reading if entry is None else entry for entry in updated]
+            updated += [gap] * (index + 1 - len(updated))
+        else:
+            # A single broadcast entry stands for the reduction's angles (:77-79):
+            # clearing one of them expands it to that count first, not to the table's
+            # rows, which are surplus past it.
+            updated = list(current) if holds else []
+            if field.broadcast_ok and len(updated) == 1:
+                updated *= max(count, 1)
+            # Padded only far enough to reach the edited index, never to the table's
+            # row count: v1 padded to n_angles, and on a file with surplus rows one
+            # cell edit grew every edited list into them, which raised the reduction's
+            # count (3 -> 7 on a real file) and reported problems that did not exist
+            # (review 1568397). Padding a SHORT list rather than indexing past it
+            # matters too: an IndexError in a Qt slot reaches qFatal() and kills the
+            # launcher. A broadcast list's surplus rows are no angle's, but the reducer
+            # lower-cases every entry, so padding there holds its default.
+            updated += [
+                field.reducer_default if field.broadcast_ok and position >= count else None
+                for position in range(len(updated), index + 1)
+            ]
         updated[index] = value
-        field = fs.get(name)
         # An optional list that is emptied of every value goes back to None —
         # "derive it from the chopper ranges". Without this, touching one Lambda
         # cell is a one-way door out of that state for the life of the document.
         if field.optional_list and all(entry is None for entry in updated):
             updated = None
+        self._refused.pop(name, None)
         self.set(name, updated)
 
     def angle_row(self, index):
@@ -329,6 +415,18 @@ class SettingsDocument:
 
             if field.per_angle:
                 if value is None:
+                    # A λ edit set_angle_field refused, reported while it still
+                    # applies: the field is still derived and the row still surplus.
+                    # Add and Remove move rows, and forget refusals; an accepted
+                    # edit of the field forgets its own.
+                    row = self._refused.get(field.name)
+                    if row is not None and count <= row < self.n_angles:
+                        messages.append(
+                            f"{field.label} ({field.name}) is derived from the chopper ranges, so the "
+                            f"value typed into surplus row {row + 1} was not kept: the reduction does "
+                            f"not use that row, and a value there alone would stop it deriving the "
+                            f"field at every angle; set it for each angle first, or leave it derived"
+                        )
                     continue
                 # A wrong TYPE is a problem to report, not a thing to iterate.
                 # validate() used to walk straight into len()/enumerate() on
@@ -360,6 +458,19 @@ class SettingsDocument:
                         f"angles {missing}: either give every angle a value or clear "
                         f"the field to use the reduction's default"
                     )
+                # The reducer lower-cases EVERY entry of a broadcast list (:82),
+                # surplus rows included, and fails on an unset one there too —
+                # unless the list is unset at every angle, and so written [].
+                if field.broadcast_ok and len(missing) < len(angles):
+                    unset = [i + 1 for i in range(count, len(value)) if value[i] is None]
+                    if unset:
+                        where = (f"row {unset[0]}" if len(unset) == 1
+                                 else f"rows {', '.join(str(row) for row in unset)}")
+                        messages.append(
+                            f"{field.label} ({field.name}) has no value in surplus {where}: the "
+                            f"reduction never uses a surplus row, but it reads every entry of this "
+                            f"list and fails on an unset one; fill in a value or remove the row"
+                        )
                 length = 0 if fills_itself and len(missing) == len(angles) else len(value)
                 if length < count and not self._length_is_allowed(field, length):
                     messages.append(
