@@ -2666,3 +2666,32 @@ def test_each_operation_on_a_section_in_each_held_state(name, state, operation, 
     assert sorted(tab.document.changed_vs_seed()) == ([edited] if edited else [])
     assert tab._last_error is None
     tab.close()
+
+
+def test_a_clicked_heading_takes_the_focus_so_the_keyboard_continues_from_it():
+    """S3 (battery F2): a heading clicked with the mouse has the focus afterwards, so Space toggles it back. With
+    QToolButton's default focus policy (Tab only), a click left the focus where it was."""
+    tab = _shown_tab(SettingsEditorTab())
+    heading = tab.sections["Dead time"].heading
+    QTest.mouseClick(heading, QtCore.Qt.LeftButton)
+    _settle()
+    assert heading.hasFocus() and not heading.isChecked()
+    QTest.keyClick(QtWidgets.QApplication.focusWidget(), QtCore.Qt.Key_Space)
+    _settle()
+    assert heading.isChecked()
+    tab.close()
+
+
+def test_a_headings_arrow_shows_whether_its_section_is_open():
+    """S3 (battery F5): the arrow beside a heading points down while the section is expanded and right while it is
+    collapsed, both when the tab is built (from the stored state) and after a toggle."""
+    _store_section("Dead time", "false")
+    tab = _shown_tab(SettingsEditorTab())
+    assert tab.sections["Dead time"].heading.arrowType() == QtCore.Qt.RightArrow
+    assert tab.sections["Q-space"].heading.arrowType() == QtCore.Qt.DownArrow
+    QTest.mouseClick(tab.sections["Dead time"].heading, QtCore.Qt.LeftButton)
+    QTest.mouseClick(tab.sections["Q-space"].heading, QtCore.Qt.LeftButton)
+    _settle()
+    assert tab.sections["Dead time"].heading.arrowType() == QtCore.Qt.DownArrow
+    assert tab.sections["Q-space"].heading.arrowType() == QtCore.Qt.RightArrow
+    tab.close()
