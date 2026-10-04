@@ -16,7 +16,7 @@ campaign's signature defect class (S2-v2's double-toggle).
 import json
 
 import pytest
-from qtpy import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets, sip
 from qtpy.QtTest import QTest
 
 from launcher.app_identity import APP_NAME, ORG_NAME
@@ -832,11 +832,14 @@ def _commit(editor):
 
 
 def _dismiss(editor):
-    """Leave a cell without choosing: Escape, in the open list if there is one (APG: Escape closes it and
-    returns to the grid)."""
-    target = editor.view() if editor.view().isVisible() else editor
-    QTest.keyClick(target, QtCore.Qt.Key_Escape)
-    _settle()
+    """Leave a cell without choosing: Escape closes its open list, and Escape on the closed drop-down closes
+    the editor and returns to the grid (APG)."""
+    if editor.view().isVisible():
+        QTest.keyClick(editor.view(), QtCore.Qt.Key_Escape)
+        _settle()
+    if not sip.isdeleted(editor) and not editor.isHidden():  # the view hides an editor it closes
+        QTest.keyClick(editor, QtCore.Qt.Key_Escape)
+        _settle()
 
 
 def _choose(combo, text):
@@ -1447,4 +1450,24 @@ def test_a_scalar_drop_down_lets_go_of_focus_after_a_choice_and_keys_never_step_
         assert tab.document.get("DetResFn") == other
         QTest.keyClick(combo.view(), QtCore.Qt.Key_Escape)
         _settle()
+    tab.close()
+
+
+def test_typing_with_the_direct_beam_list_open_starts_a_new_name(tmp_path, monkeypatch):
+    """C8 with C4: the direct-beam cell opens with its list shown, and the list has the keyboard. A typed
+    character closes the list and starts a new name in the line edit, as typing into the selected text would;
+    Return stores it, and the focus goes back to the table (C10)."""
+    path, _ = _direct_beam_settings(tmp_path, ["db_a.dat", "db_b.dat"])
+    tab = SettingsEditorTab()
+    _load(tab, path, monkeypatch)
+    _shown_tab(tab)
+    editor = _open_cell_editor(tab, 1, "DBname")
+    assert editor.view().isVisible()
+    QTest.keyClicks(editor.view(), "new 1.dat")
+    _settle()
+    assert not editor.view().isVisible()
+    assert editor.currentText() == "new 1.dat"
+    _commit(editor)
+    assert tab.document.get("DBname") == ["db_a.dat", "new 1.dat", "db_c.dat"]
+    assert not isinstance(QtWidgets.QApplication.focusWidget(), QtWidgets.QComboBox)
     tab.close()

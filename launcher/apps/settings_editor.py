@@ -18,10 +18,15 @@ deletes, where it is the actual input rather than a hidden one. Reading config
 from the selected row instead of the acted-on row is a known reduction-GUI bug
 class, and this table is new code, so the trap would be introduced here.
 
-**Drop-downs.** Every enumerated field is a drop-down, and none of them changes
-with the mouse wheel (``NoWheelComboBox``). In the Angles table they are item
-delegates rather than per-cell widgets: the cells stay text items, a choice is
-written into the item, and ``_on_cell_changed`` remains the one write path.
+**Drop-downs.** Every enumerated field is a drop-down, and only a choice in its
+open list changes it. The mouse wheel never does, and the keys that would step a
+closed one open its list instead (``NoWheelComboBox``). After a choice, the focus
+goes to the drop-down's container. In the Angles table they are item delegates
+rather than per-cell widgets: the cells stay text items and show the arrow
+painted at rest. One click, or Enter, Space or Alt+Down on the current cell,
+opens a cell's list, and Down still moves down the grid (APG grid pattern). A
+choice is written into the item, so ``_on_cell_changed`` remains the one write
+path. The choices read as the file spells them (``_in_file_spelling``).
 """
 
 import functools
@@ -43,9 +48,49 @@ MAX_TABLE_ROWS = 500
 #: Editor property set when the user chooses an item in a table drop-down.
 _CHOSEN = "chosen"
 
+#: The keys that open a closed drop-down instead of stepping its value (C10): with the list shut, the
+#: value changes only by a choice in the open list (APG select-only combobox).
+_LIST_KEYS = {
+    QtCore.Qt.Key_Up, QtCore.Qt.Key_Down, QtCore.Qt.Key_PageUp, QtCore.Qt.Key_PageDown,
+    QtCore.Qt.Key_Home, QtCore.Qt.Key_End, QtCore.Qt.Key_F4,
+}
+
+
+def _later(owner, slot):
+    """Run `slot` once on the next pass of the event loop, on a timer owned by `owner`.
+
+    The timer dies with its owner, so a slot meant for an editor that has been closed in the meantime never
+    runs on a deleted widget. PyQt5 sends an exception from a timer slot to qFatal.
+    """
+    timer = QtCore.QTimer(owner)
+    timer.setSingleShot(True)
+    timer.timeout.connect(slot)
+    timer.timeout.connect(timer.deleteLater)
+    timer.start(0)
+
+
+def _in_file_spelling(field, held):
+    """The choices of an enumerated per-angle field, in the column's own spelling (C9).
+
+    The reducer lower-cases ``method_per_run`` (``nr_reduction_calc.py:82``), and its own files hold
+    'meantheta'. When every case variant of a choice that the column holds shares one spelling (all lower
+    case, or all upper case), the choices are offered in that spelling. The list then reads as the file
+    does, and a new choice is written in the file's convention. With no variant (a fresh document, or
+    declared spellings only) or mixed casing, the declared spellings are offered. A held value is always
+    one of the items: ``_ChoiceDelegate.setEditorData`` adds one the list lacks.
+    """
+    declared = [str(choice) for choice in field.allowed]
+    entries = held if isinstance(held, (list, tuple)) else ()
+    variants = {entry for entry in entries if isinstance(entry, str) and field.canonical(entry) in declared}
+    if variants and not all(variant == field.canonical(variant) for variant in variants):
+        for spell in (str.lower, str.upper):
+            if all(variant == spell(variant) for variant in variants):
+                return [spell(choice) for choice in declared]
+    return declared
+
 
 class NoWheelComboBox(QtWidgets.QComboBox):
-    """A drop-down that the mouse wheel never changes (the scientists' item 2).
+    """A drop-down that only a choice in its open list changes (the scientists' item 2; C10).
 
     ``QComboBox`` steps through its items on a wheel event, focused or not. So
     scrolling the settings list with the pointer crossing one changed a setting,
@@ -57,9 +102,14 @@ class NoWheelComboBox(QtWidgets.QComboBox):
     instead. Also inferred: an open pop-up list still scrolls, since the wheel
     then reaches its list view and not the combo.
 
-    The wheel is ignored even when the combo has focus. After a click the combo
-    keeps focus, and the reported failure was exactly a scroll that followed a
-    click (plan A1). ``StrongFocus`` means the wheel does not take focus either.
+    The keys that step a closed ``QComboBox`` open its list here instead
+    (APG's select-only combobox: "the only way users can set its value is by
+    selecting a value in the popup"). That covers the arrows, Page, Home, End
+    and F4. On a non-editable one it also covers Space, Return, Enter and a
+    typed letter. An editable one's typing still reaches its line edit. The
+    wheel is ignored even with focus: after a click the combo keeps focus, and
+    the reported failure was a scroll that followed a click (plan A1).
+    ``StrongFocus`` means the wheel does not take focus either.
     """
 
     def __init__(self, parent=None):
@@ -69,19 +119,81 @@ class NoWheelComboBox(QtWidgets.QComboBox):
     def wheelEvent(self, event):
         event.ignore()
 
+    def keyPressEvent(self, event):
+        key = event.key()
+        opens = key in _LIST_KEYS
+        if not self.isEditable():
+            opens = opens or key in (QtCore.Qt.Key_Space, QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter)
+            opens = opens or (bool(event.text()) and event.text().isprintable())
+        if opens:
+            self.showPopup()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
-class _ChoiceDelegate(QtWidgets.QStyledItemDelegate):
-    """The drop-down of an enumerated per-angle column: its declared choices, plus "" for unset.
 
-    It writes only when the user chooses an item (``activated``: a click in the
-    list, or a key on the closed drop-down). The choice goes into the cell's
+class _DropDownDelegate(QtWidgets.QStyledItemDelegate):
+    """What every table drop-down shares (C8): it shows its arrow at rest and opens on one click.
+
+    The arrow is drawn beside the cell's value whether or not the cell is open, so a drop-down looks like one.
+    A left click opens the cell's editor, which opens its list. That is the menu-button pattern the human
+    cites, without the double-click Qt's default edit trigger needs. The editor opens on the next pass of the
+    event loop, on a persistent index, so a click that also changes the selection lands first. Nothing is
+    built per cell at rest: the arrow is painted, and only visible cells are painted.
+    """
+
+    def __init__(self, tab, field):
+        super().__init__(tab.angle_table)
+        self._tab = tab
+        self._field = field
+
+    def paint(self, painter, option, index):
+        widget = option.widget
+        style = widget.style() if widget is not None else QtWidgets.QApplication.style()
+        side = max(8, min(option.rect.height() - 4, 14))
+        background = QtWidgets.QStyleOptionViewItem(option)
+        self.initStyleOption(background, index)
+        background.text = ""
+        style.drawPrimitive(QtWidgets.QStyle.PE_PanelItemViewItem, background, painter, widget)
+        content = QtWidgets.QStyleOptionViewItem(option)
+        content.rect = option.rect.adjusted(0, 0, -(side + 6), 0)
+        super().paint(painter, content, index)
+        arrow = QtWidgets.QStyleOption()
+        arrow.rect = QtCore.QRect(option.rect.right() - side - 3, option.rect.center().y() - side // 2, side, side)
+        arrow.palette = option.palette
+        arrow.state = QtWidgets.QStyle.State_Enabled
+        style.drawPrimitive(QtWidgets.QStyle.PE_IndicatorArrowDown, arrow, painter, widget)
+
+    def editorEvent(self, event, model, option, index):
+        if event.type() == QtCore.QEvent.MouseButtonRelease and event.button() == QtCore.Qt.LeftButton:
+            view = self.parent()
+            cell = QtCore.QPersistentModelIndex(index)
+            _later(view, lambda: view.edit(QtCore.QModelIndex(cell)) if cell.isValid() else None)
+            return True
+        return super().editorEvent(event, model, option, index)
+
+    def _choose(self, editor):
+        """A choice was made in the editor's list: write it, close the editor, and let go of focus (C10)."""
+        editor.setProperty(_CHOSEN, True)
+        self.commitData.emit(editor)
+        self.closeEditor.emit(editor, QtWidgets.QAbstractItemDelegate.NoHint)
+
+
+class _ChoiceDelegate(_DropDownDelegate):
+    """The drop-down of an enumerated per-angle column: its choices, plus "" for unset.
+
+    It opens with its list shown. A choice in the list writes it into the cell's
     item, so ``_on_cell_changed`` and its row-from-the-signal rule stay the one
-    write path (C6). Opening a cell and leaving it writes nothing, so a loaded
-    case variant keeps the file's spelling until a choice is made (C2).
+    write path (C6). Then the editor closes and the focus goes back to the table
+    (C10). Closing the list without a choice (Escape, a click elsewhere) writes
+    nothing and leaves the closed drop-down, whose keys reopen the list;
+    another Escape returns to the grid. The choices are in the column's own spelling
+    (``_in_file_spelling``, C9), and the held value is always one of them, so
+    choosing the value a cell holds changes no data and writes nothing.
 
     What it shows:
-    * a case variant as its declared choice (the reducer lower-cases, ``:82``);
-    * a value outside the domain as itself, never the first item;
+    * a held value as it is held: the file's spelling, and an out-of-domain
+      value as itself, never the first item (C2);
     * an empty cell as the value the reduction uses there, in italics, when the
       document implies one (``SettingsDocument.implied_entry``, C7).
 
@@ -91,11 +203,10 @@ class _ChoiceDelegate(QtWidgets.QStyledItemDelegate):
     edit moves the angle count; ``refresh_marks`` repaints after every change.
     """
 
-    def __init__(self, tab, field):
-        super().__init__(tab.angle_table)
-        self._tab = tab
-        self._field = field
-        self._choices = ["true", "false"] if field.element_type == "bool" else [str(c) for c in field.allowed]
+    def _choices(self):
+        if self._field.element_type == "bool":
+            return ["true", "false"]
+        return _in_file_spelling(self._field, self._tab.document.get(self._field.name))
 
     def _implied(self, index):
         """The text of the value the reduction uses in this cell when it holds none, or ``""``."""
@@ -104,14 +215,14 @@ class _ChoiceDelegate(QtWidgets.QStyledItemDelegate):
 
     def createEditor(self, parent, _option, _index):
         editor = NoWheelComboBox(parent)
-        editor.addItems(["", *self._choices])
+        editor.addItems(["", *self._choices()])
         editor.setProperty(_CHOSEN, False)
-        editor.activated.connect(lambda _index, editor=editor: editor.setProperty(_CHOSEN, True))
+        editor.activated.connect(lambda _index, editor=editor: self._choose(editor))
+        _later(editor, editor.showPopup)
         return editor
 
     def setEditorData(self, editor, index):
-        text = index.data(QtCore.Qt.DisplayRole) or ""
-        shown = self._field.canonical(text) if text else self._implied(index)
+        shown = index.data(QtCore.Qt.DisplayRole) or self._implied(index)
         at = editor.findText(shown)
         if at < 0:
             editor.addItem(shown)
@@ -124,9 +235,7 @@ class _ChoiceDelegate(QtWidgets.QStyledItemDelegate):
 
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
-        text = index.data(QtCore.Qt.DisplayRole) or ""
-        if text:
-            option.text = self._field.canonical(text)
+        if index.data(QtCore.Qt.DisplayRole):
             return
         implied = self._implied(index)
         if implied:
@@ -141,7 +250,7 @@ class _ChoiceDelegate(QtWidgets.QStyledItemDelegate):
     def helpEvent(self, event, view, option, index):
         """An implied cell's tooltip says where its value comes from."""
         implied = self._implied(index) if event.type() == QtCore.QEvent.ToolTip else ""
-        if implied:
+        if implied and not index.data(QtCore.Qt.DisplayRole):
             QtWidgets.QToolTip.showText(
                 event.globalPos(),
                 f"Not set here: the reduction uses {implied} for this angle. Choose a value to set it.",
@@ -151,36 +260,81 @@ class _ChoiceDelegate(QtWidgets.QStyledItemDelegate):
         return super().helpEvent(event, view, option, index)
 
 
-class _CandidatesDelegate(QtWidgets.QStyledItemDelegate):
-    """An editable drop-down of the file names in the folder a column's field declares (``DBname``, C4).
+class _TypingGoesToTheName(QtCore.QObject):
+    """With an editable drop-down's list open, a typed character closes the list and goes to its line edit.
 
-    The names come from ``SettingsDocument.candidates``. They are asked for each
-    time a cell opens, so they follow ``experiment_id`` and the direct-beam path
-    wherever those change (C5), and the folder is listed only when a cell asks:
-    never per keystroke, never in a refresh. A typed name that is not in the
-    folder is stored as typed. When the folder holds more names than the cap,
-    the tooltip says so.
+    The open list takes the keyboard (measured: typing into an editable combo with its list shown changes
+    nothing), so without this a name could not be typed until the list was closed. Owned by the combo, so
+    it goes when the editor goes.
     """
 
-    def __init__(self, tab, field):
-        super().__init__(tab.angle_table)
-        self._tab = tab
-        self._field = field
+    def __init__(self, combo):
+        super().__init__(combo)
+        self._combo = combo
+        combo.view().installEventFilter(self)
+
+    def eventFilter(self, _watched, event):
+        if event.type() == QtCore.QEvent.KeyPress and event.text() and event.text().isprintable():
+            if self._combo.view().isVisible():
+                # The character that closes the list starts a new name, as typing into the selected text
+                # the cell opened with would; opening the list drops that selection (measured: appended).
+                self._combo.hidePopup()
+                self._combo.lineEdit().selectAll()
+            QtWidgets.QApplication.sendEvent(
+                self._combo.lineEdit(),
+                QtGui.QKeyEvent(QtCore.QEvent.KeyPress, event.key(), event.modifiers(), event.text()),
+            )
+            return True
+        return False
+
+
+class _CandidatesDelegate(_DropDownDelegate):
+    """An editable drop-down of the file names in the folder a column's field declares (``DBname``, C4).
+
+    It opens with the folder's names listed. A character typed then closes the
+    list and goes to the name (``_TypingGoesToTheName``). Typing completes
+    inline from the names. A name picked from the list is written, the editor
+    closes, and the focus goes back to the table (C10). A typed name that is not
+    in the folder is stored as typed on Return.
+
+    The completer stays inline on purpose. A pop-up completer is a parentless
+    top-level window that QCompleter owns through a raw pointer
+    (``qcompleter.cpp``, Qt 5.15). Anything that deletes top-level windows then
+    frees it twice: the launcher tests' teardown did, and aborted
+    (``QCompleter::~QCompleter``, gdb).
+
+    The names come from ``SettingsDocument.candidates``, asked for each time a
+    cell opens, so they follow ``experiment_id`` and the direct-beam path
+    wherever those change (C5). The folder is listed only when a cell asks:
+    never per keystroke, never in a refresh. When the folder holds more names
+    than the cap, the tooltip says so.
+    """
 
     def createEditor(self, parent, _option, _index):
         editor = NoWheelComboBox(parent)
         editor.setEditable(True)
         editor.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
+        editor.completer().setCompletionMode(QtWidgets.QCompleter.InlineCompletion)
+        editor.completer().setCaseSensitivity(QtCore.Qt.CaseInsensitive)
         names, total = self._tab.document.candidates(self._field.name)
         editor.addItems(names)
         if total > len(names):
             editor.setToolTip(
                 f"Showing the first {len(names)} of {total} files in the folder; type a name to use another."
             )
+        _TypingGoesToTheName(editor)
+        editor.activated.connect(lambda _index, editor=editor: self._choose(editor))
+        _later(editor, editor.showPopup)
         return editor
 
     def setEditorData(self, editor, index):
-        editor.setEditText(index.data(QtCore.Qt.DisplayRole) or "")
+        # Select the held name when the folder has it. Opening the list takes the focus from the line edit,
+        # and an editable QComboBox then reads a name that matches an item other than its current one as a
+        # new choice: it emits activated, which closed the cell the moment it opened (traced).
+        text = index.data(QtCore.Qt.DisplayRole) or ""
+        editor.setCurrentIndex(editor.findText(text))
+        editor.setEditText(text)
+        editor.lineEdit().selectAll()
 
     def setModelData(self, editor, model, index):
         model.setData(index, editor.currentText(), QtCore.Qt.EditRole)
@@ -292,6 +446,7 @@ class SettingsEditorTab(QtWidgets.QWidget):
             self.angle_table.setItemDelegateForColumn(column, delegate)
             self._cell_delegates[name] = delegate
         self.angle_table.cellChanged.connect(self._on_cell_changed)
+        self.angle_table.installEventFilter(self)
         box.addWidget(self.angle_table)
 
         buttons = QtWidgets.QHBoxLayout()
@@ -308,6 +463,8 @@ class SettingsEditorTab(QtWidgets.QWidget):
 
     def _build_scalar_panel(self):
         scroll = QtWidgets.QScrollArea()
+        # Where a scalar drop-down hands the focus after a choice (C10).
+        self.scalar_panel = scroll
         scroll.setWidgetResizable(True)
         inner = QtWidgets.QWidget()
         column = QtWidgets.QVBoxLayout()
@@ -358,6 +515,9 @@ class SettingsEditorTab(QtWidgets.QWidget):
             if field.falsy_means_off:
                 editor.addItem("")
             editor.addItems([str(a) for a in field.allowed])
+            # A choice in its list is the last thing it does: the focus goes to the panel, so a later arrow
+            # key or wheel changes nothing (C10).
+            editor.activated.connect(lambda _index: self.scalar_panel.setFocus(QtCore.Qt.OtherFocusReason))
             editor.currentTextChanged.connect(
                 lambda text, name=field.name: self._set_scalar(
                     name, fs.get(name).coerce(text) if text else False
@@ -501,6 +661,31 @@ class SettingsEditorTab(QtWidgets.QWidget):
         self.document.set(name, fs.get(name).coerce(widget.text()))
         self.refresh_report()
 
+    def eventFilter(self, watched, event):
+        """Open a drop-down cell from the keyboard (C8).
+
+        Return, Enter or Space on the current cell enters it, as do Alt+Down and
+        F4: APG's grid pattern (Enter enters a cell's widget) and its combobox
+        (Alt+Down opens the list). F2 already opens any cell (the view's edit
+        key). Down stays the grid's ("Moves focus one cell down"), so a drop-down
+        column can still be walked with the keyboard.
+        """
+        if watched is self.angle_table and event.type() == QtCore.QEvent.KeyPress and self._opens_a_cell(event):
+            index = self.angle_table.currentIndex()
+            if (index.isValid() and fs.PER_ANGLE_NAMES[index.column()] in self._cell_delegates
+                    and self.angle_table.indexWidget(index) is None):
+                self.angle_table.edit(index)
+                return True
+        return super().eventFilter(watched, event)
+
+    @staticmethod
+    def _opens_a_cell(event):
+        key = event.key()
+        modifiers = event.modifiers() & ~QtCore.Qt.KeypadModifier
+        if key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter, QtCore.Qt.Key_Space, QtCore.Qt.Key_F4):
+            return modifiers == QtCore.Qt.NoModifier
+        return key == QtCore.Qt.Key_Down and modifiers == QtCore.Qt.AltModifier
+
     @guarded
     def _on_cell_changed(self, row, column):
         """Write one per-angle value, to the row Qt says was edited.
@@ -518,7 +703,15 @@ class SettingsEditorTab(QtWidgets.QWidget):
             return
         name = fs.PER_ANGLE_NAMES[column]
         item = self.angle_table.item(row, column)
-        value = fs.get(name).coerce_element(item.text() if item is not None else "")
+        text = item.text() if item is not None else ""
+        field = fs.get(name)
+        value = field.coerce_element(text)
+        # An enumerated column's drop-down offers its choices in the file's own
+        # spelling (C9), and a choice is stored as offered. coerce_element would
+        # turn 'constantq' into the declared 'constantQ', rewriting a file
+        # whose convention is lower case (PR #36, finding 2).
+        if field.allowed and isinstance(value, str) and value != text and value.lower() == text.lower():
+            value = text
         self.document.set_angle_field(row, name, value)
         self.refresh_column(column)
         self.refresh_marks()
