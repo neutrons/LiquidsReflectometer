@@ -27,6 +27,46 @@ for _format in (QtCore.QSettings.IniFormat, QtCore.QSettings.NativeFormat):
     QtCore.QSettings.setPath(_format, QtCore.QSettings.UserScope, _SCRATCH_ROOT)
 
 
+# --- What the teardown frees -------------------------------------------------
+# Only the windows a test made and nothing else owns: a parentless top-level
+# widget of one of these types. Everything else is freed by its owner: a pop-up
+# (a QCompleter's list, a QMenu), a tooltip, a splash screen, the rarer types,
+# and any window with a parent. A QCompleter holds its pop-up through a raw
+# pointer and deletes it in its own destructor. When the teardown freed every
+# top-level widget, the pop-up was freed twice whenever Qt listed it before its
+# window. The run then crashed in QCompleter::~QCompleter (gdb) under the flush
+# at the end of _drain_test_windows. That happened in 5, 8, 7, 7 and 8 of 12
+# subprocess runs of
+# test_harness.py::test_teardown_survives_an_open_completer_popup; under this
+# rule, 0 of 12 in each of four runs. The cost: a parentless pop-up that nothing
+# owns is left to die with the process, a leak rather than a crash. Types are
+# compared exactly, since Tool is Popup|Dialog as bits.
+_TEST_WINDOW_TYPES = frozenset(
+    {QtCore.Qt.Window, QtCore.Qt.Dialog, QtCore.Qt.Tool, QtCore.Qt.Sheet, QtCore.Qt.Drawer}
+)
+
+
+def _is_test_window(widget):
+    """True when the teardown frees `widget`: nothing owns it, and a test made it as a window."""
+    return widget.parent() is None and widget.windowType() in _TEST_WINDOW_TYPES
+
+
+def _drain_test_windows(app):
+    """Close and free the windows the test left open, now rather than at some later event loop."""
+    for widget in QtWidgets.QApplication.topLevelWidgets():
+        try:
+            if _is_test_window(widget):
+                widget.close()
+                widget.deleteLater()
+        except RuntimeError:
+            # Already destroyed on the C++ side; nothing to drain.
+            pass
+    app.processEvents()
+    # deleteLater only queues; without this the objects are never freed and the
+    # "drain" drains nothing.
+    app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+
+
 @pytest.fixture
 def isolated_qapp(tmp_path, monkeypatch):
     """QApplication with a per-test QSettings root.
@@ -63,17 +103,7 @@ def isolated_qapp(tmp_path, monkeypatch):
         QtCore.QCoreApplication.setOrganizationName(prev_org)
         QtCore.QCoreApplication.setOrganizationDomain(prev_domain)
         QtCore.QCoreApplication.setApplicationName(prev_app)
-        for widget in QtWidgets.QApplication.topLevelWidgets():
-            try:
-                widget.close()
-                widget.deleteLater()
-            except RuntimeError:
-                # Already destroyed on the C++ side; nothing to drain.
-                pass
-        app.processEvents()
-        # deleteLater only queues; without this the objects are never freed and
-        # the "drain" drains nothing.
-        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+        _drain_test_windows(app)
 
 
 @pytest.fixture
