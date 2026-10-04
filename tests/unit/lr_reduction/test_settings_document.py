@@ -2342,3 +2342,51 @@ def test_a_stored_choice_without_a_label_fails_the_check_run_at_import():
     with pytest.raises(ValueError, match="share a label"):
         fs._check_choice_labels(dataclasses.replace(
             field, choice_labels=((False, "False"), ("detector_angle", "True"), ("sample_angle", "True"))))
+
+
+# --------------------------------------------------------------------------
+# editor-paths-header — the derived paths are what the reduction would use, answered by its own properties; an IPTS
+# typed as a number is stored as the directory name
+# --------------------------------------------------------------------------
+
+
+def test_derived_path_is_what_the_reduction_would_use_if_the_override_were_unset():
+    """U1: answered by NRReductionConfig's own properties with the override disregarded, whether one is held or
+    not, and without touching the document. No IPTS, or one validate() reports, gives None: the header then says
+    so rather than presenting /SNS/REF_L/nexus or a traversed path as the reduction's."""
+    from lr_reduction.settings_document import SettingsDocument as Document
+
+    doc = Document.from_dict({"experiment_id": "IPTS-36119", "_DBpath_override": "/elsewhere/db"})
+    before = repr(doc.to_dict())
+    assert doc.derived_path("_NEXUSpathRB_override") == "/SNS/REF_L/IPTS-36119/nexus"
+    assert doc.derived_path("_DBpath_override") == "/SNS/REF_L/IPTS-36119/shared/transmission"
+    assert repr(doc.to_dict()) == before
+    for unset in ("", None, "../x", "/abs"):
+        assert Document.from_dict({"experiment_id": unset}).derived_path("_DBpath_override") is None, unset
+
+
+def test_derived_path_follows_the_config_class_not_a_copy_of_its_rule():
+    """U1, the leg the "re-implements /SNS/REF_L/..." mutation needs: a config whose base_path differs gives that
+    base, so the helper reads the class's properties (CPKT derived-identifiers)."""
+
+    class Elsewhere(NRReductionConfig):
+        @property
+        def base_path(self):
+            return pathlib.Path("/elsewhere") / self.experiment_id
+
+    config = Elsewhere()
+    config.experiment_id = "IPTS-1"
+    assert SettingsDocument(config).derived_path("_NEXUSpathRB_override") == "/elsewhere/IPTS-1/nexus"
+
+
+@pytest.mark.parametrize("typed, stored", [
+    ("36119", "IPTS-36119"), (" 36119 ", "IPTS-36119"), ("ipts-36119", "IPTS-36119"), ("IPTS-36119", "IPTS-36119"),
+    ("", ""), ("proposal_x", "proposal_x"),
+])
+def test_an_ipts_typed_as_a_number_is_stored_as_the_directory_name(typed, stored):
+    """U2, P5: a bare number and a lower-case ipts- are the directory name IPTS-<n> (file_batch.py's convention);
+    anything else is stored as typed and left to validate(); an empty entry is "", never None (F7)."""
+    from lr_reduction.settings_document import normalise_experiment_id
+
+    value = normalise_experiment_id(typed)
+    assert value == stored and type(value) is str

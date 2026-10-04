@@ -1963,3 +1963,267 @@ def test_a_raw_entry_in_a_plain_drop_down_goes_when_its_value_does():
     assert any("DetResFn" in message for message in tab.document.validate())
     tab.set_document(SettingsDocument.from_dict({"DetResFn": "gaussian"}))
     assert _items(combo) == list(fs.DET_RES_CHOICES) and combo.currentText() == "gaussian"
+
+
+# --------------------------------------------------------------------------
+# editor-paths-header — IPTS and the two input paths at the top of the tab; derived paths are shown, never written
+# --------------------------------------------------------------------------
+
+_HEADER_FIELDS = ("experiment_id", "_NEXUSpathRB_override", "_DBpath_override")
+_PATH_FIELDS = ("_NEXUSpathRB_override", "_DBpath_override")
+_PATH_TAIL = {"_NEXUSpathRB_override": "nexus", "_DBpath_override": "shared/transmission"}
+_NO_IPTS = "set an IPTS or type a path"
+
+
+def _type_into(editor, text):
+    """Replace a line edit's text as a user does: focus it, select all, type (or Delete), Return."""
+    editor.setFocus()
+    _settle()
+    editor.selectAll()
+    if text:
+        QTest.keyClicks(editor, text)
+    else:
+        QTest.keyClick(editor, QtCore.Qt.Key_Delete)
+    QTest.keyClick(editor, QtCore.Qt.Key_Return)
+    _settle()
+
+
+def _focus_through(tab, editor):
+    """Focus a control and leave it without typing."""
+    editor.setFocus()
+    _settle()
+    tab.angle_table.setFocus()
+    _settle()
+
+
+def test_the_header_holds_the_ipts_and_the_two_input_paths_and_the_list_does_not():
+    """V1, P1: moved, not duplicated. Each name is one widget, in the header above the Angles table, and the
+    scrolling list has no editor for it."""
+    tab = SettingsEditorTab()
+    header = tab.paths_header
+    for name in _HEADER_FIELDS:
+        assert header.isAncestorOf(tab.editors[name]), name
+        assert not tab.scalar_panel.isAncestorOf(tab.editors[name]), name
+    listed = {widget.toolTip().split(" — ")[0] for widget in tab.scalar_panel.findChildren(QtWidgets.QWidget)}
+    assert not listed & set(_HEADER_FIELDS)
+    layout = tab.layout()
+    order = [layout.itemAt(i).widget() for i in range(layout.count())]
+    assert order.index(header) < order.index(tab.findChild(QtWidgets.QSplitter))
+
+
+def test_typing_an_ipts_number_updates_both_derived_paths_and_writes_no_override():
+    """V2, P2, P3, P5: the document gets IPTS-36119; both paths display the derived folders as placeholders; both
+    overrides stay None."""
+    tab = _shown_tab(SettingsEditorTab())
+    _type_into(tab.editors["experiment_id"], "36119")
+    assert tab.document.get("experiment_id") == "IPTS-36119"
+    assert tab.editors["experiment_id"].text() == "IPTS-36119"
+    for name in _PATH_FIELDS:
+        assert tab.document.get(name) is None
+        assert tab.editors[name].text() == ""
+        assert tab.editors[name].placeholderText() == f"/SNS/REF_L/IPTS-36119/{_PATH_TAIL[name]}"
+    tab.close()
+
+
+def test_a_save_after_an_ipts_writes_null_for_both_overrides(tmp_path, monkeypatch):
+    """V3, Q5: a written override freezes an absolute path into the file, so a derived one is saved as null."""
+    tab = _shown_tab(SettingsEditorTab())
+    _type_into(tab.editors["experiment_id"], "36119")
+    target = tmp_path / "new.json"
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), "")))
+    tab.save_settings()
+    saved = json.loads(target.read_text())
+    assert saved["experiment_id"] == "IPTS-36119"
+    assert saved["_NEXUSpathRB_override"] is None and saved["_DBpath_override"] is None
+    tab.close()
+
+
+@pytest.mark.parametrize("name", _PATH_FIELDS)
+def test_a_typed_path_is_the_override_and_does_not_follow_the_ipts(name):
+    """V4, P3: typing sets the override; a later IPTS leaves it, while the other path follows."""
+    tab = _shown_tab(SettingsEditorTab())
+    _type_into(tab.editors[name], "/data/typed")
+    assert tab.document.get(name) == "/data/typed"
+    _type_into(tab.editors["experiment_id"], "36119")
+    assert tab.document.get(name) == "/data/typed" and tab.editors[name].text() == "/data/typed"
+    other = next(field for field in _PATH_FIELDS if field != name)
+    assert tab.document.get(other) is None
+    assert tab.editors[other].placeholderText() == f"/SNS/REF_L/IPTS-36119/{_PATH_TAIL[other]}"
+    tab.close()
+
+
+@pytest.mark.parametrize("name", _PATH_FIELDS)
+def test_clearing_a_path_returns_it_to_derived(name):
+    """V5, P4: None, not "" (an override of "" is Path("") to the reduction, the current directory)."""
+    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "IPTS-1", name: "/data/typed"})))
+    _type_into(tab.editors[name], "")
+    assert tab.document.get(name) is None
+    assert tab.editors[name].text() == "" and tab.editors[name].placeholderText() == f"/SNS/REF_L/IPTS-1/{_PATH_TAIL[name]}"
+    tab.close()
+
+
+@pytest.mark.parametrize("held", [None, "/data/loaded"], ids=["derived", "loaded-override"])
+@pytest.mark.parametrize("name", _PATH_FIELDS)
+def test_focusing_through_a_path_without_typing_writes_nothing(name, held):
+    """V6, P3: the real focus path on a shown tab. A line edit reports editingFinished on every focus-out; with no
+    typing nothing is written (the base's data_x_range focus-out corruption is the precedent)."""
+    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "IPTS-1", name: held})))
+    _focus_through(tab, tab.editors[name])
+    _focus_through(tab, tab.editors["experiment_id"])
+    assert tab.document.changed_vs_seed() == {}
+    assert tab.document.get(name) == held
+    tab.close()
+
+
+@pytest.mark.parametrize("name", _PATH_FIELDS)
+def test_a_second_load_shows_the_second_files_paths_and_nothing_of_the_first(name):
+    """V7, P6: file A has an override, file B none; the control shows B's derived path, not A's text."""
+    tab = SettingsEditorTab()
+    tab.set_document(SettingsDocument.from_dict({"experiment_id": "IPTS-1", name: "/data/a"}))
+    assert tab.editors[name].text() == "/data/a"
+    tab.set_document(SettingsDocument.from_dict({"experiment_id": "IPTS-2"}))
+    assert tab.editors[name].text() == ""
+    assert tab.editors[name].placeholderText() == f"/SNS/REF_L/IPTS-2/{_PATH_TAIL[name]}"
+
+
+@pytest.mark.parametrize("name", _PATH_FIELDS)
+def test_browse_sets_the_override_and_a_cancelled_browse_writes_nothing(name, monkeypatch):
+    """V8, P3: a folder chosen with the control's Browse button is an explicit edit; a cancelled dialog ("") is
+    not."""
+    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "IPTS-1"})))
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getExistingDirectory", staticmethod(lambda *_a, **_k: ""))
+    QTest.mouseClick(tab.path_browse[name], QtCore.Qt.LeftButton)
+    _settle()
+    assert tab.document.changed_vs_seed() == {}
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getExistingDirectory",
+                        staticmethod(lambda *_a, **_k: "/data/browsed"))
+    QTest.mouseClick(tab.path_browse[name], QtCore.Qt.LeftButton)
+    _settle()
+    assert tab.document.get(name) == "/data/browsed" and tab.editors[name].text() == "/data/browsed"
+    tab.close()
+
+
+def test_a_derived_path_is_shown_as_a_placeholder_never_as_text():
+    """V9, P2: the queryable property is text() == "" with placeholderText() set to the derived path. A derived
+    value drawn as typed text would be an input the document does not hold."""
+    tab = SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "IPTS-1"}))
+    for name in _PATH_FIELDS:
+        editor = tab.editors[name]
+        assert editor.text() == "" and editor.placeholderText() == f"/SNS/REF_L/IPTS-1/{_PATH_TAIL[name]}"
+
+
+def test_clearing_the_ipts_stores_an_empty_name_never_none(tmp_path, monkeypatch):
+    """V10, P5, F7: "" and a str, not None (with None the path properties raise TypeError); both paths say no IPTS is
+    set; the direct-beam listing answers ([], 0); a save writes "experiment_id": ""."""
+    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "IPTS-1"})))
+    _type_into(tab.editors["experiment_id"], "")
+    value = tab.document.get("experiment_id")
+    assert value == "" and type(value) is str
+    for name in _PATH_FIELDS:
+        assert tab.editors[name].placeholderText() == _NO_IPTS
+    assert tab.document.candidates("DBname") == ([], 0)
+    target = tmp_path / "out.json"
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), "")))
+    tab.save_settings()
+    assert json.loads(target.read_text())["experiment_id"] == ""
+    tab.close()
+
+
+def test_the_direct_beam_list_follows_the_path_typed_in_the_header(tmp_path):
+    """V11, F8: the cell's listing reads the effective DBpath (override if set, else derived), so a folder typed in
+    the header is what the next cell open lists, and clearing it lists the derived folder again (absent here)."""
+    folder = tmp_path / "db"
+    folder.mkdir()
+    (folder / "a.txt").write_text("")
+    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "IPTS-0"})))
+    _type_into(tab.editors["_DBpath_override"], str(folder))
+    assert tab.document.candidates("DBname") == (["a.txt"], 1)
+    _type_into(tab.editors["_DBpath_override"], "")
+    assert tab.document.candidates("DBname") == ([], 0)
+    tab.close()
+
+
+# Held state of a path control (plan §3): D an unset override with an IPTS, N an unset override with no IPTS, S a string
+# override, X a non-string override from a malformed file.
+_PATH_STATES = {"D": None, "N": None, "S": "/data/held", "X": 5}  # the override each state holds
+
+
+def _path_settings(state, name):
+    settings = {"experiment_id": "" if state == "N" else "IPTS-1"}
+    if _PATH_STATES[state] is not None:
+        settings[name] = _PATH_STATES[state]
+    return settings
+
+_PATH_OPERATIONS = ["display", "type-ipts", "clear-ipts", "type-path", "clear-path", "focus-through", "browse",
+                    "browse-cancelled", "save", "load-second"]
+
+
+def _expected_path_cell(state, operation, name):
+    """What §3's table requires of the control and the document after `operation` in `state`: (value, text,
+    placeholder or None when it is not asserted, the changed fields)."""
+    held = _PATH_STATES[state]
+    ipts = "" if state == "N" else "IPTS-1"
+
+    def derived(ipts):
+        return f"/SNS/REF_L/{ipts}/{_PATH_TAIL[name]}" if ipts else _NO_IPTS
+
+    text = "" if held is None else str(held)
+    if operation in ("display", "focus-through", "browse-cancelled", "save"):
+        return held, text, derived(ipts), []
+    if operation == "type-ipts":
+        return held, text, derived("IPTS-36119"), ["experiment_id"]
+    if operation == "clear-ipts":
+        return held, text, _NO_IPTS, [] if state == "N" else ["experiment_id"]
+    if operation == "type-path":
+        return "/data/typed", "/data/typed", None, [name]
+    if operation == "clear-path":
+        return None, "", derived(ipts), [] if held is None else [name]
+    if operation == "browse":
+        return "/data/browsed", "/data/browsed", None, [name]
+    return None, "", derived("IPTS-2"), []  # load-second: the second file's state only
+
+
+@pytest.mark.parametrize("operation", _PATH_OPERATIONS)
+@pytest.mark.parametrize("state", list(_PATH_STATES))
+@pytest.mark.parametrize("name", _PATH_FIELDS)
+def test_each_operation_on_a_path_control_in_each_held_state(name, state, operation, tmp_path, monkeypatch):
+    """V12: plan §3's operation × state table, every cell, for both path controls. Each asserts the document value
+    and its type, the control's text and placeholder, the fields "Changed from the seed", and whether the report
+    names the field (only a non-string override is reported)."""
+    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict(_path_settings(state, name))))
+    editor = tab.editors[name]
+    if operation == "type-ipts":
+        _type_into(tab.editors["experiment_id"], "36119")
+    elif operation == "clear-ipts":
+        _type_into(tab.editors["experiment_id"], "")
+    elif operation == "type-path":
+        _type_into(editor, "/data/typed")
+    elif operation == "clear-path":
+        _type_into(editor, "")
+    elif operation == "focus-through":
+        _focus_through(tab, editor)
+    elif operation in ("browse", "browse-cancelled"):
+        chosen = "/data/browsed" if operation == "browse" else ""
+        monkeypatch.setattr(QtWidgets.QFileDialog, "getExistingDirectory", staticmethod(lambda *_a, **_k: chosen))
+        QTest.mouseClick(tab.path_browse[name], QtCore.Qt.LeftButton)
+        _settle()
+    elif operation == "save":
+        target = tmp_path / "out.json"
+        monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName",
+                            staticmethod(lambda *_a, **_k: (str(target), "")))
+        tab.save_settings()
+        saved = json.loads(target.read_text())[name]
+        held = tab.document.get(name)
+        assert saved == held and type(saved) is type(held)
+    elif operation == "load-second":
+        tab.set_document(SettingsDocument.from_dict({"experiment_id": "IPTS-2"}))
+    value, text, placeholder, changed = _expected_path_cell(state, operation, name)
+    held = tab.document.get(name)
+    assert held == value and type(held) is type(value)
+    assert editor.text() == text
+    if placeholder is not None:
+        assert editor.placeholderText() == placeholder
+    assert sorted(tab.document.changed_vs_seed()) == sorted(changed)
+    reported = any(name in message for message in tab.document.validate())
+    assert reported is (type(held) not in (str, type(None)))
+    tab.close()
