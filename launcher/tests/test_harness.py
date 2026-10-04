@@ -243,8 +243,9 @@ def test_import_scope_redirect_holds_without_any_fixture(tmp_path):
 # launcher-test-teardown: the teardown frees only the windows nothing else owns
 # --------------------------------------------------------------------------
 
-# A run of the old teardown crashed in about half the runs, so 12 passing runs under it would be a (1/2)**12 event.
-_TEARDOWN_RUNS = 12
+# The old teardown crashed in about half the runs: 54 of 96 here, about 0.48 for the test reviewer, and 4 of 12 in
+# its lowest invocation. At those rates, 20 passing runs under it would be an event of 7e-8 to 3e-4.
+_TEARDOWN_RUNS = 20
 
 _FREED_TYPES = ("Window", "Dialog", "Tool", "Sheet", "Drawer")
 _OWNED_TYPES = ("Popup", "ToolTip", "SplashScreen", "SubWindow", "ForeignWindow", "CoverWindow")
@@ -288,7 +289,7 @@ def test_opens_a_menu(isolated_qapp):
 # a fresh one per test, the windows the old one outlived are freed when it goes, which would hide a teardown that
 # drains nothing (measured: no drain, a fresh application, both freed; no drain, the application kept, neither).
 _LEFT_OPEN_WINDOWS_MODULE = """\
-from qtpy import QtWidgets, sip
+from qtpy import QtCore, QtWidgets, sip
 
 _KEPT = []
 _CLOSED = []
@@ -296,7 +297,8 @@ _CLOSED = []
 
 class _Window(QtWidgets.QWidget):
     def closeEvent(self, event):
-        _CLOSED.append(type(self).__name__)
+        # The organization name when the drain closes the window: the fixture's own is test-org-<directory>.
+        _CLOSED.append((type(self).__name__, QtCore.QCoreApplication.organizationName()))
         super().closeEvent(event)
 
 
@@ -311,8 +313,16 @@ def test_leaves_a_window_and_a_dialog_open(isolated_qapp):
 def test_the_teardown_closed_and_freed_them(isolated_qapp):
     app, window, dialog = _KEPT
     assert isolated_qapp is app
-    assert _CLOSED == ["_Window"]
+    assert [name for name, _ in _CLOSED] == ["_Window"]
+    assert not _CLOSED[0][1].startswith("test-org-"), _CLOSED  # the identity was restored before the drain
     assert [sip.isdeleted(window), sip.isdeleted(dialog)] == [True, True]
+
+
+def test_no_fixture_identity_is_left_after_the_fixture():
+    org = QtCore.QCoreApplication.organizationName()
+    domain = QtCore.QCoreApplication.organizationDomain()
+    app = QtCore.QCoreApplication.applicationName()
+    assert not org.startswith("test-org-") and domain != "example.test" and not app.startswith("test-app-")
 """
 
 _FREED_DURING_DRAIN_MODULE = """\
@@ -374,7 +384,7 @@ def _assert_every_run_passed(results, tests):
 
 @pytest.mark.timeout(300)
 def test_teardown_survives_an_open_completer_popup(tmp_path):
-    """H3: a test that leaves a QCompleter's pop-up open survives the teardown, in every one of 12 runs.
+    """H3: a test that leaves a QCompleter's pop-up open survives the teardown, in every run of _TEARDOWN_RUNS.
 
     The pop-up is a parentless top-level window that the completer owns through a raw pointer and deletes in
     its own destructor. A teardown that also deletes it frees it twice. gdb put the crash in
@@ -395,9 +405,11 @@ def test_teardown_survives_an_open_menu(tmp_path):
 @pytest.mark.timeout(120)
 def test_teardown_frees_a_window_and_a_dialog_left_open(tmp_path):
     """H2, through the fixture: a plain window and a dialog left open by one test are closed (the window's
-    closeEvent runs) and freed before the next test, on the same QApplication."""
+    closeEvent runs) and freed before the next test, on the same QApplication. The identity is restored first:
+    when the drain closes the window, the organization name is no longer the fixture's, and after the fixture
+    none of the three names it set is left."""
     status, output = _run_inner_pytest(tmp_path, "test_left_open.py", _LEFT_OPEN_WINDOWS_MODULE, 100)
-    assert status == 0 and b"2 passed" in output, _excerpt(output)
+    assert status == 0 and b"3 passed" in output, _excerpt(output)
 
 
 @pytest.mark.timeout(120)
@@ -426,17 +438,19 @@ def test_the_teardown_frees_a_window_only_when_nothing_owns_it(isolated_qapp, na
 
 
 def test_the_drain_frees_the_test_windows_now_and_leaves_the_owned_ones(isolated_qapp):
-    """H1 and H2 through the drain itself. When it returns, every parentless test window is already freed (by
-    the DeferredDelete flush, not by a later event loop), and every owned top-level is untouched, a dialog
-    whose owner survives included."""
+    """H1 and H2 through the drain itself. When it returns, every parentless test window is already freed,
+    shown or hidden (by the DeferredDelete flush, not by a later event loop). Every owned top-level is
+    untouched, shown or hidden, a dialog whose owner survives included."""
     from launcher.tests.conftest import _drain_test_windows
 
     freed = [QtWidgets.QWidget(None, getattr(QtCore.Qt, name)) for name in _FREED_TYPES]
     owner = QtWidgets.QWidget(None, QtCore.Qt.Popup)
     owned = [QtWidgets.QWidget(None, getattr(QtCore.Qt, name)) for name in _OWNED_TYPES]
     owned += [owner, QtWidgets.QDialog(owner)]
-    for widget in freed + owned:
-        widget.show()
+    for index, widget in enumerate(freed + owned):
+        if index % 2 == 0:
+            widget.show()
+    assert any(not widget.isVisible() for widget in freed) and any(widget.isVisible() for widget in freed)
     _drain_test_windows(isolated_qapp)
     assert [sip.isdeleted(widget) for widget in freed] == [True] * len(freed)
     assert [sip.isdeleted(widget) for widget in owned] == [False] * len(owned)
