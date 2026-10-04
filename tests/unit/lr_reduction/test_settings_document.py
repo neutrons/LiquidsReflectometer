@@ -2237,7 +2237,9 @@ _THETA_LOADS = [
     ("string-TRUE", "TRUE", "TRUE", True),
     ("string-yes", "yes", "yes", True),
     ("one", 1, 1, True),
+    ("string-True", "True", "True", True),
     ("detector", "detector", "detector", True),
+    ("sample", "sample", "sample", True),
     ("a-list", ["detector_angle"], ["detector_angle"], True),
 ]
 
@@ -2268,23 +2270,25 @@ def test_loading_holds_a_theta_value_the_reducer_accepts_canonically_and_keeps_t
 
 
 @pytest.mark.parametrize("loaded", [pytest.param(row[1], id=row[0]) for row in _THETA_LOADS
-                                    if not row[3] and row[1] is not _ABSENT])
+                                    if row[1] is not _ABSENT])
 def test_the_reduction_reads_the_saved_theta_value_as_it_read_the_loaded_one(tmp_path, loaded):
-    """U7, D7: the reducer's own normalisation (NR_Reduction._validate_config, nr_reduction_calc.py:90-97) turns
-    the loaded and the saved value into the same thing, and a falsy one into a falsy one: its readers test
-    truthiness (:92, :543, :574) or compare a name (:550), so no reader sees which falsy value it was."""
+    """U7, D7: the reducer's own normalisation (NR_Reduction._validate_config, nr_reduction_calc.py:90-97) does
+    the same with the saved value as with the loaded one, for every spelling. It reads both as the same name,
+    or both as off, or rejects both: a canonicalisation it does not perform itself ("sample" -> "sample_angle")
+    would turn a file it rejects into one it reduces. Off is compared by truthiness, which is all its readers
+    test (:92, :543, :574; :550 compares a name), so no reader sees which falsy value it was."""
 
-    def read(value):
+    def outcome(value):
         reduction = _bare_reduction(RBnum=[1], DBname=["db.dat"], RB_Ymin=[1], RB_Ymax=[2], useCalcTheta=value)
-        reduction._validate_config()
-        return reduction.config.useCalcTheta
+        try:
+            reduction._validate_config()
+        except (ValueError, AttributeError) as exc:  # AttributeError: .lower() on a non-string
+            return ("rejected", type(exc).__name__)
+        return ("reads", reduction.config.useCalcTheta or False)
 
     doc = _theta_document(tmp_path, loaded)
     saved = json.loads(doc.save(tmp_path / "out.json").read_text())["useCalcTheta"]
-    before, after = read(loaded), read(saved)
-    assert bool(before) is bool(after)
-    if before:
-        assert after == before
+    assert outcome(saved) == outcome(loaded)
 
 
 def test_the_readers_of_use_calc_theta_are_the_ones_d7_cleared():
@@ -2324,3 +2328,17 @@ def test_every_theta_choice_has_one_label_and_every_label_maps_back():
         assert back == stored and type(back) is type(stored)
     assert field.label_for(True) == "True" and field.label_for("Sample_Angle") == "trust sample angle"
     assert field.label_for(None) == "False" and field.label_for("true") is None
+
+
+def test_a_stored_choice_without_a_label_fails_the_check_run_at_import():
+    """§5, pathological: a choice added to CALC_THETA_CHOICES without a label fails at import (the check runs
+    on every field there), never an unlabelled entry. Two choices with one label fail too."""
+    import dataclasses
+
+    field = fs.get("useCalcTheta")
+    fs._check_choice_labels(field)
+    with pytest.raises(ValueError, match="useCalcTheta"):
+        fs._check_choice_labels(dataclasses.replace(field, allowed=(*field.allowed, "fitted_angle")))
+    with pytest.raises(ValueError, match="share a label"):
+        fs._check_choice_labels(dataclasses.replace(
+            field, choice_labels=((False, "False"), ("detector_angle", "True"), ("sample_angle", "True"))))

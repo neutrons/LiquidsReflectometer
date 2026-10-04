@@ -1790,9 +1790,10 @@ def test_loading_an_accepted_theta_spelling_selects_its_entry(loaded, entry):
     assert not [message for message in tab.document.validate() if "useCalcTheta" in message]
 
 
-@pytest.mark.parametrize("loaded", ["true", 1, "detector"])
+@pytest.mark.parametrize("loaded", ["true", "True", 1, "detector"])
 def test_a_theta_value_the_reducer_rejects_is_shown_as_itself_kept_and_reported(loaded):
-    """V6, D6: the reducer raises on these, so the editor does not guess what they meant."""
+    """V6, D6: the reducer raises on these, so the editor does not guess what they meant. The string "True"
+    is an entry of its own, not the entry True: it is found by the value it holds, not by its text."""
     tab = SettingsEditorTab()
     tab.set_document(SettingsDocument.from_dict({"useCalcTheta": loaded}))
     combo = tab.editors["useCalcTheta"]

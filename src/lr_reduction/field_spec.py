@@ -743,19 +743,25 @@ ANGLE_DEFINING_NAMES = tuple(
 #: default (``Field.editor_start``); ``SettingsDocument.for_new_file`` applies them.
 EDITOR_START_NAMES = tuple(f.name for f in FIELD_SPEC if f.editor_start is not _SAME_AS_DEFAULT)
 
-# Asserted at import: a choice the editor offers in words labels every value the
-# field holds canonically (False too, for a tri-state one), and no two the same.
-# A stored choice added to the domain without a label fails here, not as an
-# unlabelled entry.
+def _check_choice_labels(field):
+    """Raise ``ValueError`` unless ``field.choice_labels`` labels every value the field holds canonically
+    (``False`` too, for a tri-state choice), each once, with no two labels the same.
+
+    Run on every field at import, so a stored choice added to a domain without a label fails there rather
+    than reaching the editor as an unlabelled entry. A raise, not an ``assert``: ``python -O`` strips asserts.
+    """
+    stored = [choice for choice, _ in field.choice_labels]
+    texts = [text for _, text in field.choice_labels]
+    held = {False, *field.allowed} if field.falsy_means_off else set(field.allowed)
+    if set(stored) != held or len(stored) != len(set(stored)):
+        raise ValueError(f"{field.name}: choice_labels label {stored}, but the field holds {sorted(held, key=str)}")
+    if len(texts) != len(set(texts)):
+        raise ValueError(f"{field.name}: two choices share a label in {texts}")
+
+
 for _field in FIELD_SPEC:
     if _field.choice_labels:
-        _stored = [choice for choice, _ in _field.choice_labels]
-        _texts = [text for _, text in _field.choice_labels]
-        _held = {False, *_field.allowed} if _field.falsy_means_off else set(_field.allowed)
-        assert set(_stored) == _held and len(_stored) == len(set(_stored)), (
-            f"{_field.name}: choice_labels label {_stored}, but the field holds {sorted(_held, key=str)}"
-        )
-        assert len(_texts) == len(set(_texts)), f"{_field.name}: two choices share a label"
+        _check_choice_labels(_field)
 
 #: Groups in the order the editor should present them.
 GROUPS = tuple(dict.fromkeys(f.group for f in FIELD_SPEC))
