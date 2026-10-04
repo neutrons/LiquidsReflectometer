@@ -66,6 +66,70 @@ _LIST_KEYS = {
     QtCore.Qt.Key_Home, QtCore.Qt.Key_End, QtCore.Qt.Key_F4,
 }
 
+def section_state_key(name):
+    """The QSettings key a list section's state is stored under: the section's declared name, never its position."""
+    return f"settings_editor/sections/{name}"
+
+
+def _stored_expanded(value):
+    """A stored section state, read by its meaning. A new process reads the strings "true"/"false" back from INI
+    (measured, Qt 5.15), and bool("false") is True. Anything else, or nothing stored, is expanded."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.strip().lower() in ("true", "false"):
+        return value.strip().lower() == "true"
+    return True
+
+
+class _SectionHeading(QtWidgets.QToolButton):
+    """A list section's heading: a checkable button, checked while the section is expanded. A click or Space toggles
+    it, as any button does; Return and Enter do too, for a heading reached with Tab."""
+
+    def keyPressEvent(self, event):
+        modifiers = event.modifiers() & ~QtCore.Qt.KeypadModifier
+        if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter) and modifiers == QtCore.Qt.NoModifier:
+            self.click()
+            return
+        super().keyPressEvent(event)
+
+
+class _Section(QtWidgets.QWidget):
+    """One section of the editor's list: a heading that collapses and expands the fields under it.
+
+    Collapsed, the fields are hidden: they take no space, and Tab passes from the heading to the next section's.
+    Nothing else changes. They are still the tab's editors, so a Load refreshes them, and their values are still in
+    the document, in validate() and in a save.
+    """
+
+    def __init__(self, title, expanded, parent=None):
+        super().__init__(parent)
+        self.heading = _SectionHeading()
+        self.heading.setText(title)
+        self.heading.setCheckable(True)
+        self.heading.setChecked(expanded)
+        self.heading.setAutoRaise(True)
+        self.heading.setFocusPolicy(QtCore.Qt.StrongFocus)
+        self.heading.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+        self.heading.setToolTip("Collapse or expand this section. The state is remembered for you.")
+        font = self.heading.font()
+        font.setBold(True)
+        self.heading.setFont(font)
+        self.body = QtWidgets.QWidget()
+        self.form = QtWidgets.QFormLayout()
+        self.body.setLayout(self.form)
+        layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.heading)
+        layout.addWidget(self.body)
+        self.setLayout(layout)
+        self.heading.toggled.connect(self._show_body)
+        self._show_body(expanded)
+
+    def _show_body(self, expanded):
+        self.heading.setArrowType(QtCore.Qt.DownArrow if expanded else QtCore.Qt.RightArrow)
+        self.body.setVisible(expanded)
+
+
 #: The header's path overrides (fs.HEADER_NAMES without the IPTS), and what a path shows when nothing is derived.
 _HEADER_PATHS = tuple(name for name in fs.HEADER_NAMES if name != "experiment_id")
 _NO_IPTS = "set an IPTS or type a path"
@@ -585,20 +649,23 @@ class SettingsEditorTab(QtWidgets.QWidget):
         column = QtWidgets.QVBoxLayout()
         inner.setLayout(column)
 
-        for group in fs.GROUPS:
+        # One collapsible section per declared group, in the scientists' order (fs.SECTION_ORDER), each opened as
+        # this user left it. Keyed by the section's name, so a reordering cannot hand one section another's state.
+        self.sections = {}
+        for group in fs.SECTION_ORDER:
             # The header's fields have their editors there, and only there (fs.HEADER_NAMES).
             scalars = [f for f in fs.fields_in(group) if not f.per_angle and f.name not in fs.HEADER_NAMES]
             if not scalars:
                 continue
-            box = QtWidgets.QGroupBox(group)
-            grid = QtWidgets.QFormLayout()
-            box.setLayout(grid)
+            section = _Section(group, _stored_expanded(self.settings.value(section_state_key(group))))
+            section.heading.toggled.connect(lambda expanded, group=group: self._on_section_toggled(group, expanded))
             for field in scalars:
                 editor = self._build_editor(field)
                 editor.setToolTip(f"{field.name} — {field.help}")
                 self.editors[field.name] = editor
-                grid.addRow(field.label, editor)
-            column.addWidget(box)
+                section.form.addRow(field.label, editor)
+            self.sections[group] = section
+            column.addWidget(section)
 
         column.addStretch(1)
         scroll.setWidget(inner)
@@ -831,6 +898,17 @@ class SettingsEditorTab(QtWidgets.QWidget):
             self.refresh_report()
         except Exception as exc:  # noqa: BLE001
             self.report_problem(exc)
+
+    @guarded
+    def _on_section_toggled(self, name, expanded):
+        """Remember a section's state for this user, under the section's name. The section has already shown or
+        hidden its fields. A store that cannot be written costs only the memory of the state for the next session,
+        so the failure is printed and the slot returns normally. Written as "true"/"false", the text a new process
+        reads back from INI either way."""
+        try:
+            self.settings.setValue(section_state_key(name), "true" if expanded else "false")
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
 
     @guarded
     def _on_ipts_edited(self, widget):
