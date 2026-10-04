@@ -48,6 +48,16 @@ MAX_TABLE_ROWS = 500
 #: Editor property set when the user chooses an item in a table drop-down.
 _CHOSEN = "chosen"
 
+#: Editor property: the text the cell showed when it opened, held or implied. A choice equal to it is the
+#: identity (C9').
+_SHOWN = "shown"
+
+#: Keys that move an open list's current item: a deliberate move (C11).
+_MOVE_KEYS = {
+    QtCore.Qt.Key_Up, QtCore.Qt.Key_Down, QtCore.Qt.Key_PageUp, QtCore.Qt.Key_PageDown,
+    QtCore.Qt.Key_Home, QtCore.Qt.Key_End,
+}
+
 #: The keys that open a closed drop-down instead of stepping its value (C10): with the list shut, the
 #: value changes only by a choice in the open list (APG select-only combobox).
 _LIST_KEYS = {
@@ -173,9 +183,20 @@ class _DropDownDelegate(QtWidgets.QStyledItemDelegate):
         return super().editorEvent(event, model, option, index)
 
     def _choose(self, editor):
-        """A choice was made in the editor's list: write it, close the editor, and let go of focus (C10)."""
-        editor.setProperty(_CHOSEN, True)
-        self.commitData.emit(editor)
+        """A choice was made in the editor's list: write it unless it is what the cell showed, close the editor,
+        and let go of focus (C10).
+
+        Choosing the value a cell shows is the identity (C9'), an implied one included: in a compact column the
+        reduction already uses that value at every angle, so writing it would only turn the list explicit.
+        """
+        gestures = getattr(editor, "gestures", None)
+        if gestures is not None and gestures.deliberate and editor.currentText() != editor.property(_SHOWN):
+            editor.setProperty(_CHOSEN, True)
+            self.commitData.emit(editor)
+        self._leave(editor)
+
+    def _leave(self, editor):
+        """Close the editor; the view takes the focus back."""
         self.closeEditor.emit(editor, QtWidgets.QAbstractItemDelegate.NoHint)
 
 
@@ -217,8 +238,9 @@ class _ChoiceDelegate(_DropDownDelegate):
         editor = NoWheelComboBox(parent)
         editor.addItems(["", *self._choices()])
         editor.setProperty(_CHOSEN, False)
+        editor.gestures = _ListKeys(editor, self._leave)
         editor.activated.connect(lambda _index, editor=editor: self._choose(editor))
-        _later(editor, editor.showPopup)
+        _later(editor, editor.gestures.open_list)
         return editor
 
     def setEditorData(self, editor, index):
@@ -228,6 +250,7 @@ class _ChoiceDelegate(_DropDownDelegate):
             editor.addItem(shown)
             at = editor.count() - 1
         editor.setCurrentIndex(at)
+        editor.setProperty(_SHOWN, shown)
 
     def setModelData(self, editor, model, index):
         if editor.property(_CHOSEN):
@@ -260,24 +283,68 @@ class _ChoiceDelegate(_DropDownDelegate):
         return super().helpEvent(event, view, option, index)
 
 
-class _TypingGoesToTheName(QtCore.QObject):
-    """With an editable drop-down's list open, a typed character closes the list and goes to its line edit.
+class _ListKeys(QtCore.QObject):
+    """The gestures in a table drop-down's open list: only a deliberate choice writes (C11).
 
-    The open list takes the keyboard (measured: typing into an editable combo with its list shown changes
-    nothing), so without this a name could not be typed until the list was closed. Owned by the combo, so
-    it goes when the editor goes.
+    The list opens with no deliberate current item. Qt makes row 0 current when
+    the list takes the focus although the user moved nowhere, and the held value
+    may not be listed at all (a direct-beam name outside the folder, the
+    reducer-written norm). Return there selected that row (QComboBox's own list
+    handling, traced) and wrote the folder's first file (review d3ee364, U-1).
+    With Return taken over, closing the cell still put row 0's text in the
+    direct-beam line edit and committed it (traced, in v3's first attempt). So the
+    delegates write nothing that no deliberate gesture chose.
+
+    So the list is opened on the combo's own current item, or none
+    (``open_list``). What counts as deliberate: an arrow key, Page, Home or End,
+    type-ahead in a list that is not editable, and a mouse press on an item.
+    ``deliberate`` records it, and the delegate writes nothing without it. Return
+    or Enter with no deliberate move closes the list and leaves the cell as held.
+    In an editable list, a typed character closes the list and starts a new name
+    in the line edit, since an open list takes the keystrokes (measured). Owned by
+    the combo, so it goes when the editor goes.
     """
 
-    def __init__(self, combo):
+    def __init__(self, combo, leave):
         super().__init__(combo)
         self._combo = combo
+        self._leave = leave
+        self.deliberate = False
         combo.view().installEventFilter(self)
+        combo.view().viewport().installEventFilter(self)
 
-    def eventFilter(self, _watched, event):
-        if event.type() == QtCore.QEvent.KeyPress and event.text() and event.text().isprintable():
+    def open_list(self):
+        """Show the list on the combo's own current item, or on none when the held value is not listed."""
+        self._combo.showPopup()
+        self._settle_current()
+
+    def _settle_current(self):
+        combo = self._combo
+        combo.view().setCurrentIndex(combo.model().index(combo.currentIndex(), combo.modelColumn()))
+
+    def eventFilter(self, watched, event):
+        if event.type() == QtCore.QEvent.MouseButtonPress and watched is self._combo.view().viewport():
+            self.deliberate = True  # a press on an item; its release is the choice (QComboBox)
+            return False
+        if event.type() != QtCore.QEvent.KeyPress:
+            return False
+        key = event.key()
+        if key in _MOVE_KEYS:
+            self.deliberate = True
+            return False
+        if key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter) and not self.deliberate:
+            self._settle_current()
+            self._combo.hidePopup()
+            self._leave(self._combo)
+            return True
+        if event.text() and event.text().isprintable():
+            if not self._combo.isEditable():
+                self.deliberate = True  # type-ahead moves to an item
+                return False
             if self._combo.view().isVisible():
                 # The character that closes the list starts a new name, as typing into the selected text
                 # the cell opened with would; opening the list drops that selection (measured: appended).
+                self._settle_current()
                 self._combo.hidePopup()
                 self._combo.lineEdit().selectAll()
             QtWidgets.QApplication.sendEvent(
@@ -292,7 +359,7 @@ class _CandidatesDelegate(_DropDownDelegate):
     """An editable drop-down of the file names in the folder a column's field declares (``DBname``, C4).
 
     It opens with the folder's names listed. A character typed then closes the
-    list and goes to the name (``_TypingGoesToTheName``). Typing completes
+    list and goes to the name (``_ListKeys``). Typing completes
     inline from the names. A name picked from the list is written, the editor
     closes, and the focus goes back to the table (C10). A typed name that is not
     in the folder is stored as typed on Return.
@@ -322,9 +389,10 @@ class _CandidatesDelegate(_DropDownDelegate):
             editor.setToolTip(
                 f"Showing the first {len(names)} of {total} files in the folder; type a name to use another."
             )
-        _TypingGoesToTheName(editor)
+        editor.setProperty(_CHOSEN, False)
+        editor.gestures = _ListKeys(editor, self._leave)
         editor.activated.connect(lambda _index, editor=editor: self._choose(editor))
-        _later(editor, editor.showPopup)
+        _later(editor, editor.gestures.open_list)
         return editor
 
     def setEditorData(self, editor, index):
@@ -335,9 +403,13 @@ class _CandidatesDelegate(_DropDownDelegate):
         editor.setCurrentIndex(editor.findText(text))
         editor.setEditText(text)
         editor.lineEdit().selectAll()
+        editor.setProperty(_SHOWN, text)
 
     def setModelData(self, editor, model, index):
-        model.setData(index, editor.currentText(), QtCore.Qt.EditRole)
+        # A name picked deliberately from the list, or typed by the user; never a text Qt put in the line edit
+        # (a row the list made current on its own, applied when it closed).
+        if editor.property(_CHOSEN) or editor.lineEdit().isModified():
+            model.setData(index, editor.currentText(), QtCore.Qt.EditRole)
 
 
 def guarded(method):

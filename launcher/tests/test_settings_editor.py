@@ -1647,3 +1647,32 @@ def test_choosing_the_implied_value_a_cell_shows_writes_nothing():
     _choose(_open_cell_editor(tab, 1, "method_per_run"), "meanTheta")
     assert tab.document.get("method_per_run") == ["constantQ", "meanTheta", "constantQ"]
     tab.close()
+
+
+@pytest.mark.parametrize("name, held", [("DBname", "outside"), ("DBname", "listed"), ("method_per_run", "listed"),
+                                        ("useBS", "listed"), ("method_per_run", "implied")])
+def test_hovering_over_another_item_and_pressing_return_writes_nothing(tmp_path, monkeypatch, name, held):
+    """C11: a hover moves the list's current row, and is not a choice. Return after it, with no arrow-key
+    move, leaves the cell as held. QComboBox's own list would select the hovered row (measured on the v2
+    code)."""
+    values, row, _ = _V19_HELD[name][held]
+    path, _ = _direct_beam_settings(tmp_path, ["db_a.dat", "db_b.dat", "db_c.dat"], values)
+    tab = SettingsEditorTab()
+    _load(tab, path, monkeypatch)
+    _shown_tab(tab)
+    before = _saved_text(tab, tmp_path / "before.json")
+    editor = _open_cell_editor(tab, row, name)
+    view = editor.view()
+    other = next(i for i in range(editor.count()) if editor.itemText(i) not in ("", editor.currentText()))
+    x = view.viewport().rect().center().x()
+    # Two moves: QTest's mouse position is global, so a move to where an earlier test left the pointer would
+    # send no event and hover nothing (measured: the full suite left row 1 current).
+    QTest.mouseMove(view.viewport(), QtCore.QPoint(x, view.visualRect(view.currentIndex()).center().y()))
+    QTest.mouseMove(view.viewport(), QtCore.QPoint(x, view.visualRect(view.model().index(other, 0)).center().y()))
+    _settle()
+    assert view.currentIndex().row() == other  # the hover moved the current row
+    QTest.keyClick(view, QtCore.Qt.Key_Return)
+    _settle()
+    assert tab.document.changed_vs_seed() == {}
+    assert _saved_text(tab, tmp_path / "after.json") == before
+    tab.close()
