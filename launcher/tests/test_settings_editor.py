@@ -845,13 +845,18 @@ def _choose(combo, text):
     """Choose `text` the way a user does: open the list if it is not open (one click on the drop-down), move
     to the item with the arrow keys inside the list, and press Return there. With the list closed, the arrow
     keys do not change the value at all (C10)."""
+    target = combo.findText(text)
+    assert target >= 0, text
+    _choose_at(combo, target)
+
+
+def _choose_at(combo, target):
+    """`_choose` by position: two entries can show the same text (a raw string "True" beside the entry True)."""
     if not combo.view().isVisible():
         QTest.mouseClick(combo, QtCore.Qt.LeftButton)
         _settle()
     view = combo.view()
     assert view.isVisible()
-    target = combo.findText(text)
-    assert target >= 0, text
     for _ in range(combo.count() + 1):
         row = view.currentIndex().row()
         if row == target:
@@ -1790,13 +1795,17 @@ def test_loading_an_accepted_theta_spelling_selects_its_entry(loaded, entry):
     assert not [message for message in tab.document.validate() if "useCalcTheta" in message]
 
 
-@pytest.mark.parametrize("loaded", ["true", "True", 1, "detector"])
+@pytest.mark.parametrize("loaded", ["true", "TRUE", "True", "False", "trust sample angle", 1, "detector",
+                                    ["detector_angle"]])
 def test_a_theta_value_the_reducer_rejects_is_shown_as_itself_kept_and_reported(loaded):
-    """V6, D6: the reducer raises on these, so the editor does not guess what they meant. The string "True"
-    is an entry of its own, not the entry True: it is found by the value it holds, not by its text."""
+    """V6, D6: the reducer raises on these, so the editor does not guess what they meant. A string that spells
+    an entry ("True", "False", "trust sample angle") is an entry of its own, not that entry: it is found by the
+    value it holds, so the selection is asserted by position and type (advisory A1), not by its text."""
     tab = SettingsEditorTab()
     tab.set_document(SettingsDocument.from_dict({"useCalcTheta": loaded}))
     combo = tab.editors["useCalcTheta"]
+    assert combo.currentIndex() == 3
+    assert combo.currentData() == loaded and type(combo.currentData()) is type(loaded)
     assert combo.currentText() == str(loaded)
     assert _items(combo) == [*_THETA_ENTRIES, str(loaded)]
     held = tab.document.get("useCalcTheta")
@@ -1811,27 +1820,38 @@ def test_a_document_given_to_the_tab_keeps_its_own_resolution_values():
     assert tab.editors["DetResFn"].currentText() == "rectangular" and tab.editors["DetSigma"].text() == "0.8"
 
 
-# held state: (settings, the entry shown, another entry, the value that entry stores)
+# held state: (settings, the position of the entry shown, the position of another entry, the value it stores)
 _THETA_HELD = {
-    "false": ({}, "False", "True", "detector_angle"),
-    "detector_angle": ({"useCalcTheta": "detector_angle"}, "True", "trust sample angle", "sample_angle"),
-    "sample_angle": ({"useCalcTheta": "sample_angle"}, "trust sample angle", "False", False),
-    "rejected": ({"useCalcTheta": "true"}, "true", "True", "detector_angle"),
+    "false": ({}, 0, 1, "detector_angle"),
+    "detector_angle": ({"useCalcTheta": "detector_angle"}, 1, 2, "sample_angle"),
+    "sample_angle": ({"useCalcTheta": "sample_angle"}, 2, 0, False),
+    "rejected": ({"useCalcTheta": "true"}, 3, 1, "detector_angle"),
+    "rejected-True": ({"useCalcTheta": "True"}, 3, 1, "detector_angle"),  # a raw entry that spells the entry True
 }
+_THETA_REJECTED = ("rejected", "rejected-True")
+
+
+def _theta_state(tab):
+    combo = tab.editors["useCalcTheta"]
+    held = tab.document.get("useCalcTheta")
+    return (held, type(held), combo.currentIndex(), _items(combo), tab.document.changed_vs_seed(),
+            tab.report.toPlainText())
 
 
 @pytest.mark.parametrize("operation", ["choose-shown", "choose-another", "escape"])
 @pytest.mark.parametrize("held", list(_THETA_HELD))
 def test_each_gesture_on_the_theta_control_in_each_held_state(held, operation):
-    """§3's operation x state table for useCalcTheta. Re-choosing the shown entry is the identity: a rejected
-    value and its problem line stay. Another entry writes its canonical value, as the one change, and clears a
-    problem line. Escape in the open list writes nothing. (The wheel and the arrow keys on the closed combo are
-    every scalar drop-down's tests, this field included.)"""
+    """§3's operation x state table for useCalcTheta, the rows with the list open. Re-choosing the shown entry is
+    the identity: a rejected value, its entry and its problem line stay. Another entry writes its canonical value
+    as the one change and clears a problem line; once the choice has returned, exactly the three entries are left
+    (D3′, V10). Escape in the open list writes nothing. The closed-combo rows (Tab out, click-away, wheel, Up,
+    Down) are V8, test_the_closed_theta_control_ignores_every_gesture_in_each_held_state; the second-Load rows
+    are V9's two tests."""
     values, shown, other, stored = _THETA_HELD[held]
     tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict(values)))
     combo = tab.editors["useCalcTheta"]
-    before = tab.document.get("useCalcTheta")
-    assert combo.currentText() == shown
+    before = _theta_state(tab)
+    assert combo.currentIndex() == shown
     if operation == "escape":
         QTest.mouseClick(combo, QtCore.Qt.LeftButton)
         _settle()
@@ -1839,15 +1859,107 @@ def test_each_gesture_on_the_theta_control_in_each_held_state(held, operation):
         QTest.keyClick(combo.view(), QtCore.Qt.Key_Escape)
         _settle()
     else:
-        _choose(combo, shown if operation == "choose-shown" else other)
+        _choose_at(combo, shown if operation == "choose-shown" else other)
     after = tab.document.get("useCalcTheta")
     reported = any("useCalcTheta" in message for message in tab.document.validate())
     if operation == "choose-another":
         assert after == stored and type(after) is type(stored)
         assert list(tab.document.changed_vs_seed()) == ["useCalcTheta"]
         assert not reported
+        assert _items(combo) == _THETA_ENTRIES and combo.currentIndex() == other
     else:
-        assert after == before and type(after) is type(before)
-        assert tab.document.changed_vs_seed() == {}
-        assert reported is (held == "rejected")
+        assert _theta_state(tab) == before
+        assert reported is (held in _THETA_REJECTED)
     tab.close()
+
+
+@pytest.mark.parametrize("gesture", ["tab-out", "click-away", "wheel", "up", "down"])
+@pytest.mark.parametrize("held", list(_THETA_HELD))
+def test_the_closed_theta_control_ignores_every_gesture_in_each_held_state(held, gesture):
+    """V8, §3 (T-1): with the combo closed and focused, and no deliberate choice, Tab out, a click elsewhere,
+    the wheel, Up and Down change nothing. The held value and its type, the entry shown, the item list, "Changed
+    from the seed" and the report all stay. Up and Down open the list, the scalars' menu-button convention, and
+    do not step the value; the list is then closed with Escape."""
+    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict(_THETA_HELD[held][0])))
+    combo = tab.editors["useCalcTheta"]
+    combo.setFocus()
+    _settle()
+    assert combo.hasFocus() and not combo.view().isVisible()
+    before = _theta_state(tab)
+    if gesture == "tab-out":
+        QTest.keyClick(combo, QtCore.Qt.Key_Tab)
+        _settle()
+        assert not combo.hasFocus()
+    elif gesture == "click-away":
+        QTest.mouseClick(tab.report, QtCore.Qt.LeftButton)
+        _settle()
+        assert not combo.hasFocus()
+    elif gesture == "wheel":
+        _wheel(combo, _away(combo))
+        _settle()
+    else:
+        QTest.keyClick(combo, QtCore.Qt.Key_Up if gesture == "up" else QtCore.Qt.Key_Down)
+        _settle()
+        assert combo.view().isVisible()
+        QTest.keyClick(combo.view(), QtCore.Qt.Key_Escape)
+        _settle()
+    assert _theta_state(tab) == before
+    tab.close()
+
+
+@pytest.mark.parametrize("held", list(_THETA_HELD))
+def test_loading_a_second_file_that_omits_the_key_leaves_exactly_the_three_entries(held):
+    """V9, the rejection's D-1 reproduced from every held state: the second file holds no useCalcTheta, so the
+    document holds False, the control shows False, and the list is exactly the three entries (D3′)."""
+    tab = SettingsEditorTab()
+    tab.set_document(SettingsDocument.from_dict(_THETA_HELD[held][0]))
+    tab.set_document(SettingsDocument.from_dict({"Sname": "second"}))
+    combo = tab.editors["useCalcTheta"]
+    assert tab.document.get("useCalcTheta") is False
+    assert combo.currentIndex() == 0 and _items(combo) == _THETA_ENTRIES
+    assert not [message for message in tab.document.validate() if "useCalcTheta" in message]
+
+
+@pytest.mark.parametrize("second, index, raw", [
+    ("detector_angle", 1, None), (True, 1, None), ("sample_angle", 2, None), ("yes", 3, "yes"), ("True", 3, "True"),
+])
+@pytest.mark.parametrize("held", list(_THETA_HELD))
+def test_loading_a_second_file_shows_its_value_with_only_its_own_raw_entry(held, second, index, raw):
+    """V9, D3′: after a second Load the list is the three entries plus, at most, the raw form of the value now
+    held, found by type and value. From the string "True", a JSON true is the entry True (position 1), and no
+    fourth entry is left."""
+    tab = SettingsEditorTab()
+    tab.set_document(SettingsDocument.from_dict(_THETA_HELD[held][0]))
+    tab.set_document(SettingsDocument.from_dict({"useCalcTheta": second}))
+    combo = tab.editors["useCalcTheta"]
+    assert _items(combo) == _THETA_ENTRIES + ([raw] if raw is not None else [])
+    assert combo.currentIndex() == index
+    if raw is not None:
+        assert combo.currentData() == second and type(combo.currentData()) is type(second)
+
+
+@pytest.mark.parametrize("held", _THETA_REJECTED)
+def test_choosing_true_over_a_rejected_value_leaves_exactly_the_three_entries(held):
+    """V10, D3′: the choice replaces the raw value. Once it has returned, the raw entry is gone, the problem line
+    with it, and "Changed from the seed" has the one line. From the string "True" the entry True differs only by
+    position, and the choice is still made."""
+    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict(_THETA_HELD[held][0])))
+    combo = tab.editors["useCalcTheta"]
+    _choose_at(combo, 1)
+    assert tab.document.get("useCalcTheta") == "detector_angle"
+    assert _items(combo) == _THETA_ENTRIES and combo.currentIndex() == 1
+    assert not [message for message in tab.document.validate() if "useCalcTheta" in message]
+    assert list(tab.document.changed_vs_seed()) == ["useCalcTheta"]
+    tab.close()
+
+
+def test_a_raw_entry_in_a_plain_drop_down_goes_when_its_value_does():
+    """V11, D3′'s plain path, on DetResFn: its list is the declared spellings, and a held value outside them is
+    an entry of its own only while it is held."""
+    tab = SettingsEditorTab()
+    tab.set_document(SettingsDocument.from_dict({"DetResFn": "foo"}))
+    combo = tab.editors["DetResFn"]
+    assert combo.currentText() == "foo" and _items(combo) == [*fs.DET_RES_CHOICES, "foo"]
+    assert any("DetResFn" in message for message in tab.document.validate())
+    tab.set_document(SettingsDocument.from_dict({"DetResFn": "gaussian"}))
+    assert _items(combo) == list(fs.DET_RES_CHOICES) and combo.currentText() == "gaussian"
