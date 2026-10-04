@@ -30,6 +30,7 @@ path. The choices read as the file spells them (``_in_file_spelling``).
 """
 
 import functools
+import os
 import traceback
 from pathlib import Path
 
@@ -846,22 +847,38 @@ class SettingsEditorTab(QtWidgets.QWidget):
 
     @guarded
     def _on_path_edited(self, name, widget):
-        """A path typed in the header is that override. Emptied, it is ``None`` again and derived, never ``""``:
-        an override of "" is ``Path("")`` to the reduction, the current directory. No typing, no write."""
+        """A path typed in the header is that override, stripped. Emptied, or only spaces, it is ``None`` again and
+        derived, never ``""``: an override of "" or "   " is ``Path("")`` / ``Path("   ")`` to the reduction, not
+        the folder it derives. No typing, no write."""
         if not widget.isModified():
             return
         widget.setModified(False)
-        self.document.set(name, widget.text() or None)
+        self.document.set(name, widget.text().strip() or None)
+        self._show(fs.get(name), widget, self.document.get(name))
         self.refresh_report()
 
     @guarded
     def _browse_path(self, name):
-        """A folder chosen with a header path's Browse button is that override; a cancelled dialog writes nothing."""
+        """A folder chosen with a header path's Browse button is that override, unless it is the folder the
+        reduction derives now. A cancelled dialog writes nothing.
+
+        The derived folder is never written as an override: written, it would freeze an absolute path into the
+        file, and a file reused for another experiment would then read this one's folders. So choosing the derived
+        folder holds no override. That writes nothing when there is none (the dialog opens there, and Choose
+        without navigating re-chooses what is shown), and returns a held override to derived, as clearing does.
+        Folders are compared with os.path.normpath, never resolve(), which follows symlinks on a facility mount and
+        differs between machines.
+        """
         editor = self.editors[name]
-        start = editor.text() or self.document.derived_path(name) or ""
+        derived = self.document.derived_path(name)
+        start = editor.text() or derived or ""
         folder = QtWidgets.QFileDialog.getExistingDirectory(self, f"Choose the {fs.get(name).label.lower()}", start)
         if not folder:
             return
+        if derived is not None and os.path.normpath(folder) == os.path.normpath(derived):
+            if self.document.get(name) is None:
+                return
+            folder = None
         self.document.set(name, folder)
         self._show(fs.get(name), editor, folder)
         self.refresh_report()
