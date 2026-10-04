@@ -597,11 +597,7 @@ class SettingsEditorTab(QtWidgets.QWidget):
             # A choice in its list is the last thing it does: the focus goes to the panel, so a later arrow
             # key or wheel changes nothing (C10).
             editor.activated.connect(lambda _index: self.scalar_panel.setFocus(QtCore.Qt.OtherFocusReason))
-            editor.currentTextChanged.connect(
-                lambda text, name=field.name, editor=editor: self._set_scalar(
-                    name, self._chosen_value(fs.get(name), editor, text)
-                )
-            )
+            editor.currentIndexChanged.connect(lambda _index, name=field.name, editor=editor: self._on_choice(name, editor))
             self._show(field, editor, value)
             return editor
 
@@ -656,6 +652,19 @@ class SettingsEditorTab(QtWidgets.QWidget):
         finally:
             editor.blockSignals(was)
 
+    def _on_choice(self, name, editor):
+        """Store a choice made in a scalar combo, then show the document's value again once the signal has returned.
+
+        The second step drops a raw entry the choice replaced (D3′, ``_show_in_combo``). It waits for the signal to
+        return because removing items inside the combo's own signal changes the model under the handler, the known
+        Qt trap. The write follows ``currentIndexChanged``, not ``currentTextChanged``: a raw entry can show the
+        same text as an entry (the string "True" beside the entry True), and moving between the two changes only
+        the position. Re-choosing the entry shown changes neither, so it writes nothing (C9′).
+        """
+        field = fs.get(name)
+        self._set_scalar(name, self._chosen_value(field, editor, editor.currentText()))
+        _later(editor, lambda: self._show(field, editor, self.document.get(name)))
+
     @staticmethod
     def _chosen_value(field, editor, text):
         """What a choice in an enumerated combo stores: the item's value where the entries are words
@@ -676,30 +685,48 @@ class SettingsEditorTab(QtWidgets.QWidget):
 
         Where the entries are words, a value the reducer accepts shows its word
         (``Field.label_for``: ``True`` and any case of a name included), and any
-        other value is an entry of its own, found by the value it holds rather than
-        by its text: the string ``"True"`` is not the entry ``True``.
+        other value is an entry of its own.
+
+        A raw entry lives exactly as long as the value it shows is held (D3′). Each
+        refresh removes the raw entries and adds back one only for the value held
+        now, so a Load, a new document, or a choice that replaced a raw value leaves
+        the offered entries plus at most one raw entry: nothing in the list writes a
+        value no loaded file holds. One rule for every scalar combo, labelled or not.
+        Whether a value has an offered entry is decided by type and value
+        (``_offered_index``), never by its text: the string ``"True"`` is not the
+        entry ``True``.
         """
+        at = SettingsEditorTab._offered_index(field, value)
+        offered = SettingsEditorTab._offered_count(field)
+        while editor.count() > offered:
+            editor.removeItem(editor.count() - 1)
+        if at is None:
+            editor.addItem(str(value), value)
+            at = editor.count() - 1
+        editor.setCurrentIndex(at)
+
+    @staticmethod
+    def _offered_count(field):
+        """The entries a scalar combo offers before any raw one: its words, or its choices after a blank first entry
+        where falsy means off."""
+        if field.choice_labels:
+            return len(field.choice_labels)
+        return len(field.allowed) + (1 if field.falsy_means_off else 0)
+
+    @staticmethod
+    def _offered_index(field, value):
+        """The position of the offered entry that shows `value`: ``-1`` for none (an unset plain choice), ``None``
+        when `value` needs a raw entry of its own. Matched by type and value."""
         if field.choice_labels:
             label = field.label_for(value)
-            if label is not None:
-                editor.setCurrentIndex([text for _, text in field.choice_labels].index(label))
-                return
-            for at in range(len(field.choice_labels), editor.count()):
-                held = editor.itemData(at)
-                if type(held) is type(value) and held == value:
-                    break
-            else:
-                editor.addItem(str(value), value)
-                at = editor.count() - 1
-            editor.setCurrentIndex(at)
-            return
+            return None if label is None else [text for _, text in field.choice_labels].index(label)
         if value is None or value is False or value == "":
-            editor.setCurrentIndex(0 if field.falsy_means_off else -1)
-            return
-        text = str(value)
-        if editor.findText(text) < 0:
-            editor.addItem(text)
-        editor.setCurrentText(text)
+            return 0 if field.falsy_means_off else -1
+        blank = 1 if field.falsy_means_off else 0
+        for position, choice in enumerate(field.allowed):
+            if type(choice) is type(value) and choice == value:
+                return blank + position
+        return None
 
     @staticmethod
     def _as_text(value):
