@@ -1556,6 +1556,12 @@ _V19_HELD = {
         "new-row": ({}, 3, True),
     },
 }
+_V19_SHOWS = {
+    # what each held state's cell opens showing: the value as held (C2), the implied one (C7), or "" for unset
+    "method_per_run": {"listed": "meanTheta", "empty": "", "new-row": "", "implied": "constantQ"},
+    "useBS": {"listed": "true", "empty": "", "new-row": "", "implied": "true"},
+    "DBname": {"listed": "db_b.dat", "outside": "A2_div10_Cd.txt", "empty": "", "new-row": ""},
+}
 _V19_GESTURES = ["return", "escape", "tab", "click-away", "arrow-return", "click-item"]
 _V19_CASES = [
     pytest.param(name, held, gesture, id=f"{name}-{held}-{gesture}")
@@ -1595,6 +1601,10 @@ def test_only_a_deliberate_choice_in_a_cell_writes(tmp_path, monkeypatch, name, 
     assert isinstance(editor, QtWidgets.QComboBox) and editor.view().isVisible()
     view = editor.view()
     shown = editor.currentText()
+    # The cell opens on what it shows, and its list on that item, or on none when the held name is not listed.
+    # Qt makes row 0 current there when the list takes the focus, and Return then chose it (U-1).
+    assert shown == _V19_SHOWS[name][held]
+    assert view.currentIndex().row() == editor.findText(shown)
     chosen = None
     if gesture == "return":
         QTest.keyClick(view, QtCore.Qt.Key_Return)
@@ -1620,12 +1630,41 @@ def test_only_a_deliberate_choice_in_a_cell_writes(tmp_path, monkeypatch, name, 
         QTest.mouseClick(view.viewport(), QtCore.Qt.LeftButton,
                          pos=QtCore.QPoint(view.viewport().rect().center().x(), row_rect.center().y()))
     _settle()
+    if gesture in ("return", "arrow-return", "click-item"):
+        # Return, and a choice, close the cell and give the focus back to the table (C10), whether or not the list
+        # had a row to choose.
+        assert tab.angle_table.indexWidget(index) is None
+        assert QtWidgets.QApplication.focusWidget() is tab.angle_table
     if chosen is None:
+        # Then the user goes on to another cell. Qt's delegate commits an editor that is still open when it loses
+        # the focus, and that commit must write nothing either.
+        if not sip.isdeleted(editor) and view.isVisible():
+            QTest.keyClick(view, QtCore.Qt.Key_Escape)
+        tab.angle_table.setFocus()
+        _settle()
         assert tab.document.changed_vs_seed() == before_changes
         assert _saved_text(tab, tmp_path / "after.json") == before_text
     else:
         assert chosen not in ("", shown)
         assert repr(tab.document.get(name)[row]) == repr(fs.get(name).coerce_element(chosen))
+    tab.close()
+
+
+@pytest.mark.parametrize("name, letter", [("method_per_run", "c"), ("useBS", "f")])
+def test_typing_to_another_item_in_a_cells_list_and_pressing_return_writes_it(name, letter):
+    """C11: in a list that is not editable, typing moves to the item it names, a deliberate move as an arrow key
+    is. Return then chooses that item, and the focus goes back to the table (C10)."""
+    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict(
+        {**_THREE_ANGLES, "method_per_run": ["meanTheta"] * 3, "useBS": [1, 1, 1]})))
+    editor = _open_cell_editor(tab, 1, name)
+    shown = editor.currentText()
+    QTest.keyClick(editor.view(), letter)
+    chosen = editor.itemText(editor.view().currentIndex().row())
+    assert chosen not in ("", shown) and chosen.startswith(letter)
+    QTest.keyClick(editor.view(), QtCore.Qt.Key_Return)
+    _settle()
+    assert repr(tab.document.get(name)[1]) == repr(fs.get(name).coerce_element(chosen))
+    assert QtWidgets.QApplication.focusWidget() is tab.angle_table
     tab.close()
 
 

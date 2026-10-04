@@ -286,20 +286,25 @@ class _ChoiceDelegate(_DropDownDelegate):
 class _ListKeys(QtCore.QObject):
     """The gestures in a table drop-down's open list: only a deliberate choice writes (C11).
 
-    The list opens with no deliberate current item. Qt makes row 0 current when
-    the list takes the focus although the user moved nowhere, and the held value
-    may not be listed at all (a direct-beam name outside the folder, the
-    reducer-written norm). Return there selected that row (QComboBox's own list
-    handling, traced) and wrote the folder's first file (review d3ee364, U-1).
-    With Return taken over, closing the cell still put row 0's text in the
-    direct-beam line edit and committed it (traced, in v3's first attempt). So the
-    delegates write nothing that no deliberate gesture chose.
+    Qt makes row 0 current when the list takes the focus although the user moved
+    nowhere, and the held value may not be listed at all (a direct-beam name
+    outside the folder, the reducer-written norm). Return there chose that row
+    and wrote the folder's first file (review d3ee364, U-1). QComboBox's list
+    chooses its current row on the ShortcutOverride event that comes before the
+    key press (Qt 5.15, traced), so a key-press filter cannot take Return over.
+    Instead:
 
-    So the list is opened on the combo's own current item, or none
-    (``open_list``). What counts as deliberate: an arrow key, Page, Home or End,
-    type-ahead in a list that is not editable, and a mouse press on an item.
-    ``deliberate`` records it, and the delegate writes nothing without it. Return
-    or Enter with no deliberate move closes the list and leaves the cell as held.
+    * the list opens on the combo's own current item, or on none when the held
+      value is not listed (``open_list``). Return with no move then chooses the
+      value the cell shows, which is the identity (C9'), or no row at all;
+    * ``deliberate`` records a deliberate move: an arrow key, Page, Home or End,
+      type-ahead in a list that is not editable, or a mouse press on an item. A
+      hover moves the current row too, and Return chooses the hovered row, so
+      ``_choose`` writes nothing without ``deliberate``;
+    * a Return that reaches this filter with the list still open found no row to
+      choose: it closes the list and leaves the cell as held. After a choice the
+      cell is already closed, and closing it again does nothing.
+
     In an editable list, a typed character closes the list and starts a new name
     in the line edit, since an open list takes the keystrokes (measured). Owned by
     the combo, so it goes when the editor goes.
@@ -315,11 +320,8 @@ class _ListKeys(QtCore.QObject):
 
     def open_list(self):
         """Show the list on the combo's own current item, or on none when the held value is not listed."""
-        self._combo.showPopup()
-        self._settle_current()
-
-    def _settle_current(self):
         combo = self._combo
+        combo.showPopup()
         combo.view().setCurrentIndex(combo.model().index(combo.currentIndex(), combo.modelColumn()))
 
     def eventFilter(self, watched, event):
@@ -332,8 +334,7 @@ class _ListKeys(QtCore.QObject):
         if key in _MOVE_KEYS:
             self.deliberate = True
             return False
-        if key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter) and not self.deliberate:
-            self._settle_current()
+        if key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
             self._combo.hidePopup()
             self._leave(self._combo)
             return True
@@ -344,7 +345,6 @@ class _ListKeys(QtCore.QObject):
             if self._combo.view().isVisible():
                 # The character that closes the list starts a new name, as typing into the selected text
                 # the cell opened with would; opening the list drops that selection (measured: appended).
-                self._settle_current()
                 self._combo.hidePopup()
                 self._combo.lineEdit().selectAll()
             QtWidgets.QApplication.sendEvent(
