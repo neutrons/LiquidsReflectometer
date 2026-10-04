@@ -443,7 +443,9 @@ class SettingsEditorTab(QtWidgets.QWidget):
         ensure_identity()
         super().__init__(parent)
 
-        self.document = document if document is not None else SettingsDocument()
+        # A tab opened with no document is a new file: it starts at the instrument's current operation
+        # (SettingsDocument.for_new_file). A document given to the tab is shown as it holds.
+        self.document = document if document is not None else SettingsDocument.for_new_file()
         self.settings = QtCore.QSettings()
         self.editors = {}
         # Guards the table's cellChanged signal while the view writes into it,
@@ -582,17 +584,22 @@ class SettingsEditorTab(QtWidgets.QWidget):
 
         if field.allowed:
             editor = NoWheelComboBox()
-            # A blank first entry for the tri-state fields, where a falsy value
-            # means "off" and is the class default.
-            if field.falsy_means_off:
-                editor.addItem("")
-            editor.addItems([str(a) for a in field.allowed])
+            if field.choice_labels:
+                # Entries in words (Field.choice_labels): each item carries the value it stores.
+                for choice, text in field.choice_labels:
+                    editor.addItem(text, choice)
+            else:
+                # A blank first entry for the tri-state fields, where a falsy value
+                # means "off" and is the class default.
+                if field.falsy_means_off:
+                    editor.addItem("")
+                editor.addItems([str(a) for a in field.allowed])
             # A choice in its list is the last thing it does: the focus goes to the panel, so a later arrow
             # key or wheel changes nothing (C10).
             editor.activated.connect(lambda _index: self.scalar_panel.setFocus(QtCore.Qt.OtherFocusReason))
             editor.currentTextChanged.connect(
-                lambda text, name=field.name: self._set_scalar(
-                    name, fs.get(name).coerce(text) if text else False
+                lambda text, name=field.name, editor=editor: self._set_scalar(
+                    name, self._chosen_value(fs.get(name), editor, text)
                 )
             )
             self._show(field, editor, value)
@@ -650,6 +657,14 @@ class SettingsEditorTab(QtWidgets.QWidget):
             editor.blockSignals(was)
 
     @staticmethod
+    def _chosen_value(field, editor, text):
+        """What a choice in an enumerated combo stores: the item's value where the entries are words
+        (``Field.choice_labels``), else the text coerced to the field's type, "" being off."""
+        if field.choice_labels:
+            return editor.currentData()
+        return field.coerce(text) if text else False
+
+    @staticmethod
     def _show_in_combo(editor, field, value):
         """Display `value`, even when it is not one of the offered choices.
 
@@ -658,7 +673,26 @@ class SettingsEditorTab(QtWidgets.QWidget):
         one — and saving would then write the substituted value back. Adding the
         stray value as an entry keeps what is shown equal to what is held;
         validate() is what reports it as a problem.
+
+        Where the entries are words, a value the reducer accepts shows its word
+        (``Field.label_for``: ``True`` and any case of a name included), and any
+        other value is an entry of its own, found by the value it holds rather than
+        by its text: the string ``"True"`` is not the entry ``True``.
         """
+        if field.choice_labels:
+            label = field.label_for(value)
+            if label is not None:
+                editor.setCurrentIndex([text for _, text in field.choice_labels].index(label))
+                return
+            for at in range(len(field.choice_labels), editor.count()):
+                held = editor.itemData(at)
+                if type(held) is type(value) and held == value:
+                    break
+            else:
+                editor.addItem(str(value), value)
+                at = editor.count() - 1
+            editor.setCurrentIndex(at)
+            return
         if value is None or value is False or value == "":
             editor.setCurrentIndex(0 if field.falsy_means_off else -1)
             return

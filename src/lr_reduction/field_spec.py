@@ -72,9 +72,13 @@ __all__ = [
     "CALC_THETA_CHOICES", "DET_RES_CHOICES", "METHOD_CHOICES", "PEAK_TYPE_CHOICES",
     "Field", "FIELD_SPEC", "BY_NAME", "PER_ANGLE_NAMES", "OPTIONAL_LIST_NAMES",
     "RUNTIME_OWNED_NAMES", "INT_ENCODED_NAMES", "DEFAULT_IF_EMPTY_NAMES", "ANGLE_DEFINING_NAMES",
-    "GROUPS", "TYPES",
+    "EDITOR_START_NAMES", "GROUPS", "TYPES",
     "as_boolean", "get", "fields_in",
 ]
+
+
+#: ``Field.editor_start`` when a new file starts at the library's default.
+_SAME_AS_DEFAULT = object()
 
 
 @dataclass(frozen=True)
@@ -136,6 +140,21 @@ class Field:
         ``nr_reduction_calc.py:402`` joins the two). The editor offers that
         folder's files as the column's choices
         (``SettingsDocument.candidates``). ``None`` for every other field.
+    editor_start
+        The value a settings file the editor creates from nothing starts at, where
+        that differs from ``default``: the instrument's current operation
+        (``DetResFn`` ``gaussian``, ``DetSigma`` ``1.0``; the scientists' item 3).
+        Only that: ``NRReductionConfig`` keeps ``default``, and a loaded file that
+        omits the field still holds ``default``, which is what reducing it uses
+        (``json_to_config`` starts from a fresh config). Read through
+        ``starting_value()``; listed in ``EDITOR_START_NAMES``.
+    choice_labels
+        For a choice the editor offers in words other than its stored values:
+        ``(stored value, entry text)`` pairs, in the order the editor lists them.
+        ``useCalcTheta`` is the case (item 4): ``False`` / ``True`` / ``trust
+        sample angle`` store ``False`` / ``"detector_angle"`` / ``"sample_angle"``.
+        One mapping, read both ways (``label_for``, ``value_for``); asserted at
+        import to label every value the field holds canonically, exactly once.
     """
 
     name: str
@@ -159,6 +178,8 @@ class Field:
     value_notes: Tuple[Tuple[str, str], ...] = ()
     reducer_default: Any = None
     candidates_folder: Optional[str] = None
+    editor_start: Any = _SAME_AS_DEFAULT
+    choice_labels: Tuple[Tuple[Any, str], ...] = ()
 
     # -- type vocabulary ------------------------------------------------
 
@@ -188,6 +209,46 @@ class Field:
         if isinstance(self.default, list):
             return [list(e) if isinstance(e, list) else e for e in self.default]
         return self.default
+
+    def starting_value(self):
+        """The value a settings file the editor creates starts at: ``editor_start``, else the default (a copy)."""
+        if self.editor_start is _SAME_AS_DEFAULT:
+            return self.default_value()
+        return self.editor_start
+
+    # -- stored value <-> what the reducer reads <-> entry text --------------
+
+    def canonical_choice(self, value):
+        """For a tri-state choice, the stored value the reducer acts on when it accepts `value`; else `value`.
+
+        The reducer reads ``useCalcTheta`` (``nr_reduction_calc.py:92-97``) as off when it is falsy, maps a
+        legacy ``True`` to ``detector_angle``, and lower-cases a name before matching it. So a falsy value is
+        ``False``, ``True`` is the first choice, and a name in any case is its declared spelling. A value the
+        reducer rejects (it raises on ``"true"``) comes back unchanged, to be shown and reported as itself.
+        Every other field's value comes back unchanged.
+        """
+        if not (self.falsy_means_off and self.allowed):
+            return value
+        if not value:
+            return False
+        if value is True:
+            return self.allowed[0]
+        return self.canonical(value)
+
+    def label_for(self, value):
+        """The entry text for `value` as the reducer reads it (``canonical_choice``), or ``None`` if none."""
+        stored = self.canonical_choice(value)
+        for choice, text in self.choice_labels:
+            if type(choice) is type(stored) and choice == stored:
+                return text
+        return None
+
+    def value_for(self, text):
+        """The stored value an entry text stands for. Raises ``KeyError`` for a text the field does not offer."""
+        for choice, label in self.choice_labels:
+            if label == text:
+                return choice
+        raise KeyError(f"{self.name} offers no entry {text!r}")
 
     # -- text -> value ---------------------------------------------------
 
@@ -281,10 +342,7 @@ class Field:
                 for noted, reason in self.value_notes:
                     if str(value).lower() == noted.lower():
                         return f"{self.label} ({self.name}){where}: {value!r} — {reason}"
-                return (
-                    f"{self.label} ({self.name}){where}: {value!r} is not one of "
-                    f"{', '.join(str(a) for a in self.allowed)}"
-                )
+                return f"{self.label} ({self.name}){where}: {value!r} is not one of {self._accepted_forms()}"
             return ""
         expected = self.element_type
         problem = _type_problem(value, expected, ints=self.int_encoded)
@@ -312,6 +370,16 @@ class Field:
         if self.maximum is not None and value > self.maximum:
             return f"{self.label} ({self.name}){where}: {value} is above {self.maximum}"
         return ""
+
+
+    def _accepted_forms(self):
+        """The forms a problem line names: the entry texts where there are labels (with the stored value
+        where it differs), else the declared choices."""
+        if not self.choice_labels:
+            return ", ".join(str(a) for a in self.allowed)
+        return ", ".join(
+            text if str(choice) == text else f"{text} ({choice})" for choice, text in self.choice_labels
+        )
 
 
 #: Every type string a Field may declare. Asserted below, so a typo like
@@ -542,10 +610,17 @@ FIELD_SPEC = (
     # the former (nr_reduction_calc, NRReduction.__init__). Declaring it bool
     # rendered a checkbox that could not express 'sample_angle' at all and
     # silently downgraded a loaded one on any toggle.
-    Field("useCalcTheta", "Theta source", PROCESSING, "str", False,
-          "Where theta comes from: the detector angle, or the fitted sample "
-          "angle. Leave blank to keep the THS/THI log values.",
-          allowed=CALC_THETA_CHOICES, falsy_means_off=True),
+    #
+    # Offered as False / True / trust sample angle (the scientists' item 4), which
+    # store False / "detector_angle" / "sample_angle": the reducer's own reading
+    # of a legacy True is detector_angle.
+    Field("useCalcTheta", "Apply theta calculation", PROCESSING, "str", False,
+          "Whether theta is calculated from the fitted peak position. False: not "
+          "calculated; the THS/THI log values are used. True: calculated trusting "
+          "the detector angle (TTHD). Trust sample angle: calculated trusting the "
+          "sample angle.",
+          allowed=CALC_THETA_CHOICES, falsy_means_off=True,
+          choice_labels=((False, "False"), ("detector_angle", "True"), ("sample_angle", "trust sample angle"))),
     Field("plotON", "Show plots", PROCESSING, "bool", True,
           "Display plots during reduction. Turn off for batch processing."),
     Field("plotQ4", "Plot as R*Q^4", PROCESSING, "bool", False,
@@ -602,11 +677,13 @@ FIELD_SPEC = (
           "TOF bin width used when computing the dead-time correction.",
           minimum=0.0),
 
+    # A new file starts at gaussian / 1.0, the instrument's current operation
+    # (item 3); the library and a file that omits them keep rectangular / 0.8.
     Field("DetResFn", "Resolution function", RESOLUTION, "str", "rectangular",
           "Shape of the detector resolution function.", allowed=DET_RES_CHOICES,
-          value_notes=DET_RES_NOTES, case_sensitive=True),
+          value_notes=DET_RES_NOTES, case_sensitive=True, editor_start="gaussian"),
     Field("DetSigma", "Resolution sigma", RESOLUTION, "float", 0.8,
-          "Width of the detector resolution function.", minimum=0.0),
+          "Width of the detector resolution function.", minimum=0.0, editor_start=1.0),
 
     Field("peak_pad", "Peak fit padding (pixels)", PEAK, "int", 1,
           "Extra pixels included outside the background range when fitting the "
@@ -661,6 +738,24 @@ ANGLE_DEFINING_NAMES = tuple(
     f.name for f in FIELD_SPEC
     if f.per_angle and not (f.default_if_empty or f.broadcast_ok or f.optional_list)
 )
+
+#: Fields a settings file the editor creates starts at a value other than the
+#: default (``Field.editor_start``); ``SettingsDocument.for_new_file`` applies them.
+EDITOR_START_NAMES = tuple(f.name for f in FIELD_SPEC if f.editor_start is not _SAME_AS_DEFAULT)
+
+# Asserted at import: a choice the editor offers in words labels every value the
+# field holds canonically (False too, for a tri-state one), and no two the same.
+# A stored choice added to the domain without a label fails here, not as an
+# unlabelled entry.
+for _field in FIELD_SPEC:
+    if _field.choice_labels:
+        _stored = [choice for choice, _ in _field.choice_labels]
+        _texts = [text for _, text in _field.choice_labels]
+        _held = {False, *_field.allowed} if _field.falsy_means_off else set(_field.allowed)
+        assert set(_stored) == _held and len(_stored) == len(set(_stored)), (
+            f"{_field.name}: choice_labels label {_stored}, but the field holds {sorted(_held, key=str)}"
+        )
+        assert len(_texts) == len(set(_texts)), f"{_field.name}: two choices share a label"
 
 #: Groups in the order the editor should present them.
 GROUPS = tuple(dict.fromkeys(f.group for f in FIELD_SPEC))

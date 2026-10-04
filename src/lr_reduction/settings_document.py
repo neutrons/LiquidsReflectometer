@@ -92,6 +92,23 @@ class SettingsDocument:
     # -- construction ------------------------------------------------------
 
     @classmethod
+    def for_new_file(cls):
+        """A document for a settings file the editor starts from nothing.
+
+        It holds each field's starting value (``Field.starting_value``): the
+        library's default, except where the instrument's current operation
+        differs (``fs.EDITOR_START_NAMES``: ``DetResFn`` ``gaussian``,
+        ``DetSigma`` ``1.0``). They go in before the seed is taken, so a new
+        file shows nothing as changed. Every other document keeps the library's
+        values: ``SettingsDocument()``, and a loaded file that omits a field,
+        which holds what reducing that file would use.
+        """
+        config = NRReductionConfig()
+        for name in fs.EDITOR_START_NAMES:
+            setattr(config, name, fs.get(name).starting_value())
+        return cls(config)
+
+    @classmethod
     def from_dict(cls, values):
         """Build from a settings mapping, reporting an unknown key by name.
 
@@ -137,21 +154,27 @@ class SettingsDocument:
 
     @staticmethod
     def _migrate_legacy(config):
-        """Rewrite values the reducer accepts only as legacy aliases.
+        """Hold a tri-state choice as the value the reducer acts on, when the reducer accepts it.
 
-        ``useCalcTheta = True`` is the case: the reducer maps it to
+        ``useCalcTheta = True`` is the first case: the reducer maps it to
         ``detector_angle`` and then works normally
         (``nr_reduction_calc``, ``NRReduction.__init__``). Reporting it as a
         problem would cry wolf on a file that reduces perfectly well; leaving it
         alone would keep re-saving the deprecated spelling. Migrating it on load
         does what the reducer would have done, so the panel stays quiet and the
         file the scientist saves is explicit.
+
+        The reducer also lower-cases a name and reads any falsy value as off
+        (``nr_reduction_calc.py:92-97``), so a name in any case is held as its
+        declared spelling and a falsy value as ``False`` (``Field.canonical_choice``).
+        No reader of the field tells those apart: its readers test truthiness
+        or compare a name, pinned by
+        ``test_the_readers_of_use_calc_theta_are_the_ones_d7_cleared``. A value the
+        reducer rejects is left as loaded, for ``validate()`` to report.
         """
         for field in fs.FIELD_SPEC:
-            if not (field.falsy_means_off and field.allowed):
-                continue
-            if getattr(config, field.name, None) is True:
-                setattr(config, field.name, field.allowed[0])
+            if field.falsy_means_off and field.allowed:
+                setattr(config, field.name, field.canonical_choice(getattr(config, field.name, None)))
 
     @classmethod
     def from_file(cls, path):
