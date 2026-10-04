@@ -1353,16 +1353,24 @@ def test_down_in_the_table_moves_to_the_next_row():
 
 
 class _ArrowRecorder(QtWidgets.QProxyStyle):
-    """Records where the style is asked to draw a drop-down arrow: the painted control's state, queryable."""
+    """Records what the style is asked to draw in the table: drop-down arrows, item backgrounds (panels) and
+    item bodies (text). The painted control's state, queryable."""
 
     def __init__(self):
         super().__init__()
-        self.arrows = []
+        self.arrows, self.panels, self.items = [], [], []
 
     def drawPrimitive(self, element, option, painter, widget=None):
         if element == QtWidgets.QStyle.PE_IndicatorArrowDown:
             self.arrows.append(QtCore.QRect(option.rect))
+        elif element == QtWidgets.QStyle.PE_PanelItemViewItem:
+            self.panels.append(QtCore.QRect(option.rect))
         super().drawPrimitive(element, option, painter, widget)
+
+    def drawControl(self, element, option, painter, widget=None):
+        if element == QtWidgets.QStyle.CE_ItemViewItem:
+            self.items.append(QtCore.QRect(option.rect))
+        super().drawControl(element, option, painter, widget)
 
 
 def test_a_table_drop_down_shows_its_arrow_at_rest():
@@ -1375,7 +1383,12 @@ def test_a_table_drop_down_shows_its_arrow_at_rest():
     model = tab.angle_table.model()
     for name in _DROP_DOWN_COLUMNS:
         cell = tab.angle_table.visualRect(model.index(0, fs.PER_ANGLE_NAMES.index(name)))
-        assert any(cell.contains(arrow) for arrow in recorder.arrows), name
+        arrows = [arrow for arrow in recorder.arrows if cell.contains(arrow)]
+        assert arrows, name
+        # the whole cell keeps its item background (selection), and the value's text stays clear of the arrow
+        assert cell in recorder.panels, name
+        bodies = [item for item in recorder.items if cell.contains(item)]
+        assert bodies and not any(body.intersects(arrows[0]) for body in bodies), name
     text_cell = tab.angle_table.visualRect(model.index(0, fs.PER_ANGLE_NAMES.index("ThetaShift")))
     assert not any(text_cell.intersects(arrow) for arrow in recorder.arrows)
     tab.close()
@@ -1443,7 +1456,10 @@ def test_a_scalar_drop_down_lets_go_of_focus_after_a_choice_and_keys_never_step_
     assert QtWidgets.QApplication.focusWidget() is not combo
     combo.setFocus()
     _settle()
-    for key in (QtCore.Qt.Key_Down, QtCore.Qt.Key_Up, QtCore.Qt.Key_Space):
+    letter = next(combo.itemText(i)[0] for i in range(combo.count()) if combo.itemText(i)[0] != other[0])
+    keys = (QtCore.Qt.Key_Down, QtCore.Qt.Key_Up, QtCore.Qt.Key_Space, QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter,
+            getattr(QtCore.Qt, "Key_" + letter.upper()))
+    for key in keys:
         QTest.keyClick(combo, key)
         _settle()
         assert combo.view().isVisible()
@@ -1463,6 +1479,7 @@ def test_typing_with_the_direct_beam_list_open_starts_a_new_name(tmp_path, monke
     _shown_tab(tab)
     editor = _open_cell_editor(tab, 1, "DBname")
     assert editor.view().isVisible()
+    assert editor.currentText() == "db_b.dat"  # it opens on the held name
     QTest.keyClicks(editor.view(), "new 1.dat")
     _settle()
     assert not editor.view().isVisible()
@@ -1470,4 +1487,32 @@ def test_typing_with_the_direct_beam_list_open_starts_a_new_name(tmp_path, monke
     _commit(editor)
     assert tab.document.get("DBname") == ["db_a.dat", "new 1.dat", "db_c.dat"]
     assert not isinstance(QtWidgets.QApplication.focusWidget(), QtWidgets.QComboBox)
+    tab.close()
+
+
+
+def test_leaving_a_cell_without_a_choice_writes_nothing():
+    """C2, C7: moving the focus off an open cell commits it (Qt's delegate does so on focus-out), but no
+    choice was made, so nothing is written. Here an implied value would otherwise be written out."""
+    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": ["constantQ"]})))
+    index = tab.angle_table.model().index(1, fs.PER_ANGLE_NAMES.index("method_per_run"))
+    editor = _open_cell_editor(tab, 1, "method_per_run")
+    QTest.keyClick(editor.view(), QtCore.Qt.Key_Escape)
+    _settle()
+    tab.angle_table.setFocus()
+    _settle()
+    assert tab.angle_table.indexWidget(index) is None
+    assert tab.document.changed_vs_seed() == {}
+    tab.close()
+
+
+def test_return_on_a_text_cell_opens_no_drop_down():
+    """C8's keys open a drop-down cell. Return on a plain text cell is not one of them."""
+    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict(_THREE_ANGLES)))
+    column = fs.PER_ANGLE_NAMES.index("ThetaShift")
+    tab.angle_table.setFocus()
+    tab.angle_table.setCurrentCell(1, column)
+    QTest.keyClick(tab.angle_table, QtCore.Qt.Key_Return)
+    _settle()
+    assert tab.angle_table.indexWidget(tab.angle_table.model().index(1, column)) is None
     tab.close()
