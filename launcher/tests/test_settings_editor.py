@@ -818,11 +818,8 @@ def _open_cell_editor(tab, row, name):
 
 
 def _list_shown(combo):
-    """Is the drop-down's list open? An editable one shows its folder's names in its completer's pop-up, which
-    leaves the keyboard to the line edit; the others show their own list."""
-    if combo.view().isVisible():
-        return True
-    return combo.isEditable() and combo.completer() is not None and combo.completer().popup().isVisible()
+    """Is the drop-down's list open?"""
+    return combo.view().isVisible()
 
 
 def _commit(editor):
@@ -916,13 +913,19 @@ def test_the_wheel_never_changes_a_drop_down_that_has_focus():
 @pytest.mark.parametrize("row", [0, 3], ids=["angle", "surplus-row"])
 @pytest.mark.parametrize("name", ["method_per_run", "useBS", "DBname"])
 def test_the_wheel_never_changes_a_table_drop_down(tmp_path, monkeypatch, name, row):
-    """V3, V15: the open editor is a closed drop-down until its list is shown."""
+    """V3', V15 (v3, T-1): a cell opens with its list shown, and an open list ignores the wheel whatever
+    the combo does. So the list is closed first (Escape in it) to leave the closed drop-down C10 leaves,
+    and the wheel goes to that."""
     path, _ = _direct_beam_settings(tmp_path, ["db_a.dat", "db_z.dat"], {"useBS": [1, 1, 1, 1]})
     tab = SettingsEditorTab()
     _load(tab, path, monkeypatch)
     editor = _open_cell_editor(tab, row, name)
     assert isinstance(editor, QtWidgets.QComboBox)
     assert editor.count() > 1  # something the wheel could move to
+    QTest.keyClick(editor.view(), QtCore.Qt.Key_Escape)
+    _settle()
+    assert not editor.view().isVisible()
+    assert tab.angle_table.indexWidget(tab.angle_table.model().index(row, fs.PER_ANGLE_NAMES.index(name))) is editor
     shown = editor.currentText()
     _wheel(editor, _away(editor))
     assert editor.currentText() == shown
@@ -1432,16 +1435,23 @@ def test_a_fresh_declared_or_mixed_column_offers_the_declared_spellings(tmp_path
     assert mixed.document.changed_vs_seed() == {}
 
 
-def test_a_cell_drop_down_lets_go_of_focus_after_a_choice():
-    """V18, C10 (finding 3): after a choice the cell's drop-down is gone and the table has the focus, so a
-    later arrow key moves in the grid and changes no value."""
-    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": ["meanTheta"] * 3})))
-    _choose(_open_cell_editor(tab, 1, "method_per_run"), "constantQ")
-    focus = QtWidgets.QApplication.focusWidget()
-    assert not isinstance(focus, QtWidgets.QComboBox)
-    QTest.keyClick(focus, QtCore.Qt.Key_Down)
+@pytest.mark.parametrize("name, choice, stored", [
+    ("method_per_run", "constantQ", "constantQ"), ("useBS", "false", False), ("DBname", "db_c.dat", "db_c.dat")])
+def test_a_cell_drop_down_lets_go_of_focus_after_a_choice(tmp_path, monkeypatch, name, choice, stored):
+    """V18, C10 (finding 3; widened in v3 for T-2). After a choice in the open list of any cell column,
+    including a direct-beam name picked from the folder's list, the choice is written, the drop-down is
+    gone, and the table has the focus, so a later arrow key moves in the grid and changes no value."""
+    path, _ = _direct_beam_settings(tmp_path, ["db_a.dat", "db_b.dat", "db_c.dat"],
+                                    {"method_per_run": ["meanTheta"] * 3, "useBS": [1, 1, 1]})
+    tab = SettingsEditorTab()
+    _load(tab, path, monkeypatch)
+    _shown_tab(tab)
+    _choose(_open_cell_editor(tab, 1, name), choice)
+    assert repr(tab.document.get(name)[1]) == repr(stored)
+    assert QtWidgets.QApplication.focusWidget() is tab.angle_table
+    QTest.keyClick(tab.angle_table, QtCore.Qt.Key_Down)
     _settle()
-    assert tab.document.get("method_per_run") == ["meanTheta", "constantQ", "meanTheta"]
+    assert repr(tab.document.get(name)[1]) == repr(stored)
     tab.close()
 
 
@@ -1453,7 +1463,7 @@ def test_a_scalar_drop_down_lets_go_of_focus_after_a_choice_and_keys_never_step_
     other = next(combo.itemText(i) for i in range(combo.count()) if combo.itemText(i) != combo.currentText())
     _choose(combo, other)
     assert tab.document.get("DetResFn") == other
-    assert QtWidgets.QApplication.focusWidget() is not combo
+    assert QtWidgets.QApplication.focusWidget() in (tab.scalar_panel, tab.scalar_panel.focusProxy())
     combo.setFocus()
     _settle()
     letter = next(combo.itemText(i)[0] for i in range(combo.count()) if combo.itemText(i)[0] != other[0])
@@ -1515,4 +1525,125 @@ def test_return_on_a_text_cell_opens_no_drop_down():
     QTest.keyClick(tab.angle_table, QtCore.Qt.Key_Return)
     _settle()
     assert tab.angle_table.indexWidget(tab.angle_table.model().index(1, column)) is None
+    tab.close()
+
+
+
+# --------------------------------------------------------------------------
+# editor-combos v3 — review/editor-combos @ d3ee364: C11 only a deliberate choice writes (U-1: click + Return
+# on a direct-beam cell holding a name outside the listed folder wrote the folder's first file); C8' the
+# grid convention in the table; C9' re-choosing the value a cell shows is the identity, implied included.
+# --------------------------------------------------------------------------
+
+_V19_HELD = {
+    # column: {held state: (settings over _THREE_ANGLES, the row, Add first?)}
+    "method_per_run": {
+        "listed": ({"method_per_run": ["meanTheta"] * 3}, 1, False),
+        "empty": ({"method_per_run": ["meanTheta", None, "meanTheta"]}, 1, False),
+        "new-row": ({"method_per_run": ["meanTheta"] * 3}, 3, True),
+        "implied": ({"method_per_run": ["constantQ"]}, 1, False),
+    },
+    "useBS": {
+        "listed": ({"useBS": [1, 1, 0]}, 1, False),
+        "empty": ({"useBS": [1, None, 1]}, 1, False),
+        "new-row": ({"useBS": [1, 1, 0]}, 3, True),
+        "implied": ({"useBS": []}, 1, False),
+    },
+    "DBname": {
+        "listed": ({}, 1, False),  # db_b.dat, in the folder
+        "outside": ({"DBname": ["A2_div10_Cd.txt", "A2_div10_Cd.txt", "db_c.dat"]}, 1, False),
+        "empty": ({"DBname": ["db_a.dat", None, "db_c.dat"]}, 1, False),
+        "new-row": ({}, 3, True),
+    },
+}
+_V19_GESTURES = ["return", "escape", "tab", "click-away", "arrow-return", "click-item"]
+_V19_CASES = [
+    pytest.param(name, held, gesture, id=f"{name}-{held}-{gesture}")
+    for name, states in _V19_HELD.items() for held in states for gesture in _V19_GESTURES
+]
+
+
+def _saved_text(tab, path):
+    tab.document.save(path)
+    return path.read_bytes()
+
+
+@pytest.mark.parametrize("name, held, gesture", _V19_CASES)
+def test_only_a_deliberate_choice_in_a_cell_writes(tmp_path, monkeypatch, name, held, gesture):
+    """V19, C11: three columns x held state x gesture, each cell opened with one click on a shown tab. Only
+    a deliberate choice writes: a move to another item with the arrow keys and then Return, or a click on an
+    item. Return, Escape, Tab or a click elsewhere, with no move, leave the cell exactly as held. The "outside"
+    state is the reducer-written norm for the direct-beam column: a held name the listed folder does not
+    contain. For the file, the names live in shared/transmission/Aug2026/ while the editor lists
+    shared/transmission; here the folder simply lacks the held name."""
+    values, row, add = _V19_HELD[name][held]
+    path, _ = _direct_beam_settings(tmp_path, ["db_a.dat", "db_b.dat", "db_c.dat"], values)
+    tab = SettingsEditorTab()
+    _load(tab, path, monkeypatch)
+    _shown_tab(tab)
+    if add:
+        QTest.mouseClick(tab.add_angle_button, QtCore.Qt.LeftButton)
+        _settle()
+    before_changes = tab.document.changed_vs_seed()
+    before_text = _saved_text(tab, tmp_path / "before.json")
+    index = tab.angle_table.model().index(row, fs.PER_ANGLE_NAMES.index(name))
+    tab.angle_table.scrollTo(index)
+    _settle()
+    QTest.mouseClick(tab.angle_table.viewport(), QtCore.Qt.LeftButton, pos=tab.angle_table.visualRect(index).center())
+    _settle()
+    editor = tab.angle_table.indexWidget(index)
+    assert isinstance(editor, QtWidgets.QComboBox) and editor.view().isVisible()
+    view = editor.view()
+    shown = editor.currentText()
+    chosen = None
+    if gesture == "return":
+        QTest.keyClick(view, QtCore.Qt.Key_Return)
+    elif gesture == "escape":
+        QTest.keyClick(view, QtCore.Qt.Key_Escape)
+    elif gesture == "tab":
+        QTest.keyClick(view, QtCore.Qt.Key_Tab)
+    elif gesture == "click-away":
+        QTest.mouseClick(tab.report, QtCore.Qt.LeftButton)
+    elif gesture == "arrow-return":
+        QTest.keyClick(view, QtCore.Qt.Key_Down)
+        chosen = editor.itemText(view.currentIndex().row())
+        if chosen in ("", shown):  # move once more to a different, non-empty item
+            QTest.keyClick(view, QtCore.Qt.Key_Down)
+            chosen = editor.itemText(view.currentIndex().row())
+        QTest.keyClick(view, QtCore.Qt.Key_Return)
+    else:
+        target = next(i for i in range(editor.count()) if editor.itemText(i) not in ("", shown))
+        chosen = editor.itemText(target)
+        # The item's rect can be wider than the list's viewport (measured: 217 px in a 101 px list), so the
+        # click goes to the viewport's horizontal centre on the item's row, inside both.
+        row_rect = view.visualRect(view.model().index(target, 0))
+        QTest.mouseClick(view.viewport(), QtCore.Qt.LeftButton,
+                         pos=QtCore.QPoint(view.viewport().rect().center().x(), row_rect.center().y()))
+    _settle()
+    if chosen is None:
+        assert tab.document.changed_vs_seed() == before_changes
+        assert _saved_text(tab, tmp_path / "after.json") == before_text
+    else:
+        assert chosen not in ("", shown)
+        assert repr(tab.document.get(name)[row]) == repr(fs.get(name).coerce_element(chosen))
+    tab.close()
+
+
+def test_choosing_the_implied_value_a_cell_shows_writes_nothing():
+    """V21, C9' (the Integrator's D-b, decided): in a compact column, choosing the implied value a cell
+    shows is the identity, and the list stays compact. Choosing a different value writes the list out
+    (G9)."""
+    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict(
+        {**_THREE_ANGLES, "method_per_run": ["constantQ"], "useBS": []})))
+    for name, implied in (("method_per_run", "constantQ"), ("useBS", "true")):
+        editor = _open_cell_editor(tab, 1, name)
+        assert editor.currentText() == implied
+        QTest.keyClick(editor.view(), QtCore.Qt.Key_Down)
+        QTest.keyClick(editor.view(), QtCore.Qt.Key_Up)  # a deliberate move, back to the shown value
+        QTest.keyClick(editor.view(), QtCore.Qt.Key_Return)
+        _settle()
+        assert tab.document.changed_vs_seed() == {}, name
+    assert tab.document.get("method_per_run") == ["constantQ"] and tab.document.get("useBS") == []
+    _choose(_open_cell_editor(tab, 1, "method_per_run"), "meanTheta")
+    assert tab.document.get("method_per_run") == ["constantQ", "meanTheta", "constantQ"]
     tab.close()
