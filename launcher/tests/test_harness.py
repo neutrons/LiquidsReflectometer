@@ -284,22 +284,65 @@ def test_opens_a_menu(isolated_qapp):
     _LEFT_OPEN.append(window)
 """
 
+# Both modules keep the QApplication across their two tests: the shared application the drain exists for. With
+# a fresh one per test, the windows the old one outlived are freed when it goes, which would hide a teardown that
+# drains nothing (measured: no drain, a fresh application, both freed; no drain, the application kept, neither).
 _LEFT_OPEN_WINDOWS_MODULE = """\
 from qtpy import QtWidgets, sip
 
-_LEFT_OPEN = []
+_KEPT = []
+_CLOSED = []
+
+
+class _Window(QtWidgets.QWidget):
+    def closeEvent(self, event):
+        _CLOSED.append(type(self).__name__)
+        super().closeEvent(event)
 
 
 def test_leaves_a_window_and_a_dialog_open(isolated_qapp):
-    window = QtWidgets.QWidget()
+    window = _Window()
     dialog = QtWidgets.QDialog()
     window.show()
     dialog.show()
-    _LEFT_OPEN.extend([window, dialog])
+    _KEPT.extend([isolated_qapp, window, dialog])
 
 
-def test_the_teardown_freed_them(isolated_qapp):
-    assert [sip.isdeleted(widget) for widget in _LEFT_OPEN] == [True, True]
+def test_the_teardown_closed_and_freed_them(isolated_qapp):
+    app, window, dialog = _KEPT
+    assert isolated_qapp is app
+    assert _CLOSED == ["_Window"]
+    assert [sip.isdeleted(window), sip.isdeleted(dialog)] == [True, True]
+"""
+
+_FREED_DURING_DRAIN_MODULE = """\
+from qtpy import QtWidgets, sip
+
+_KEPT = []
+
+
+class _Partner(QtWidgets.QWidget):
+    # Closing either window frees the other at once, so the one the drain reaches second is already destroyed.
+    partner = None
+
+    def closeEvent(self, event):
+        if self.partner is not None and not sip.isdeleted(self.partner):
+            sip.delete(self.partner)
+        super().closeEvent(event)
+
+
+def test_leaves_two_windows_that_free_each_other(isolated_qapp):
+    first, second = _Partner(), _Partner()
+    first.partner, second.partner = second, first
+    first.show()
+    second.show()
+    _KEPT.extend([isolated_qapp, first, second])
+
+
+def test_the_teardown_got_past_the_destroyed_one(isolated_qapp):
+    app, first, second = _KEPT
+    assert isolated_qapp is app
+    assert [sip.isdeleted(first), sip.isdeleted(second)] == [True, True]
 """
 
 
@@ -351,9 +394,18 @@ def test_teardown_survives_an_open_menu(tmp_path):
 
 @pytest.mark.timeout(120)
 def test_teardown_frees_a_window_and_a_dialog_left_open(tmp_path):
-    """H2, through the fixture: a plain window and a dialog left open by one test are freed before the next."""
+    """H2, through the fixture: a plain window and a dialog left open by one test are closed (the window's
+    closeEvent runs) and freed before the next test, on the same QApplication."""
     status, output = _run_inner_pytest(tmp_path, "test_left_open.py", _LEFT_OPEN_WINDOWS_MODULE, 100)
-    assert status == 0 and b"2 passed" in output, output.decode(errors="replace")[-1500:]
+    assert status == 0 and b"2 passed" in output, _excerpt(output)
+
+
+@pytest.mark.timeout(120)
+def test_teardown_gets_past_a_window_already_freed_during_the_drain(tmp_path):
+    """H2: a window freed while the drain closes another one is already destroyed when the drain reaches it.
+    The RuntimeError that raises is swallowed and the drain goes on, so the teardown does not error."""
+    status, output = _run_inner_pytest(tmp_path, "test_freed_during_drain.py", _FREED_DURING_DRAIN_MODULE, 100)
+    assert status == 0 and b"2 passed" in output, _excerpt(output)
 
 
 @pytest.mark.parametrize("name", _FREED_TYPES + _OWNED_TYPES)
