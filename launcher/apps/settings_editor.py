@@ -657,9 +657,10 @@ class SettingsEditorTab(QtWidgets.QWidget):
 
         The second step drops a raw entry the choice replaced (D3′, ``_show_in_combo``). It waits for the signal to
         return because removing items inside the combo's own signal changes the model under the handler, the known
-        Qt trap. The write follows ``currentIndexChanged``, not ``currentTextChanged``: a raw entry can show the
-        same text as an entry (the string "True" beside the entry True), and moving between the two changes only
-        the position. Re-choosing the entry shown changes neither, so it writes nothing (C9′).
+        Qt trap. The write follows ``currentIndexChanged``: the position is what tells two entries with the same
+        text apart (the string "True" beside the entry True). Qt 5.15 emits ``currentTextChanged`` on every index
+        change of a non-editable combo as well (measured), so the two agree there. The position is the one that does
+        not depend on that. Re-choosing the entry shown changes no position, so it writes nothing (C9′).
         """
         field = fs.get(name)
         self._set_scalar(name, self._chosen_value(field, editor, editor.currentText()))
