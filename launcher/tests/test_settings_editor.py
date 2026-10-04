@@ -347,11 +347,13 @@ def test_a_per_angle_nested_cell_survives_a_round_trip():
 # --------------------------------------------------------------------------
 
 
-def test_theta_source_is_a_choice_not_a_checkbox():
+def test_the_theta_control_is_a_choice_not_a_checkbox():
+    """C5, rewritten for editor-defaults-and-theta: its entries are labels now, and the document gets the stored
+    value the label stands for."""
     tab = SettingsEditorTab()
     editor = tab.editors["useCalcTheta"]
     assert isinstance(editor, QtWidgets.QComboBox)
-    editor.setCurrentText("sample_angle")
+    editor.setCurrentText("trust sample angle")
     assert tab.document.get("useCalcTheta") == "sample_angle"
 
 
@@ -378,11 +380,11 @@ def test_a_combo_follows_the_document_when_a_field_is_omitted():
     """
     tab = SettingsEditorTab()
     tab.set_document(SettingsDocument.from_dict({"useCalcTheta": "sample_angle"}))
-    assert tab.editors["useCalcTheta"].currentText() == "sample_angle"
+    assert tab.editors["useCalcTheta"].currentText() == "trust sample angle"
 
     tab.set_document(SettingsDocument.from_dict({"Sname": "week2"}))
     assert tab.document.get("useCalcTheta") is False
-    assert tab.editors["useCalcTheta"].currentText() == ""
+    assert tab.editors["useCalcTheta"].currentText() == "False"  # V5 (editor-defaults-and-theta): no blank entry
 
 
 def test_an_injected_document_renders_its_angles():
@@ -1714,4 +1716,137 @@ def test_hovering_over_another_item_and_pressing_return_writes_nothing(tmp_path,
     _settle()
     assert tab.document.changed_vs_seed() == {}
     assert _saved_text(tab, tmp_path / "after.json") == before
+    tab.close()
+
+
+
+# --------------------------------------------------------------------------
+# editor-defaults-and-theta — a new file starts at gaussian / 1.0; "Apply theta calculation" offers False / True /
+# trust sample angle and stores the canonical value
+# --------------------------------------------------------------------------
+
+_THETA_ENTRIES = ["False", "True", "trust sample angle"]
+
+
+def _scalar_label(tab, name):
+    editor = tab.editors[name]
+    return editor.parentWidget().layout().labelForField(editor).text()
+
+
+def test_a_new_file_in_the_tab_starts_at_gaussian_and_1():
+    """V1, D1: the tab opened with no document. The starting values are the seed, so nothing shows as changed."""
+    tab = SettingsEditorTab()
+    assert tab.editors["DetResFn"].currentText() == "gaussian"
+    assert tab.editors["DetSigma"].text() == "1.0"
+    assert tab.document.changed_vs_seed() == {}
+
+
+def test_a_new_file_saved_from_the_tab_states_the_resolution_pair_and_false(tmp_path, monkeypatch):
+    """§5, common: open the tab, add an angle, save."""
+    tab = SettingsEditorTab()
+    tab.add_angle_button.click()
+    target = tmp_path / "new.json"
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), "")))
+    tab.save_settings()
+    saved = json.loads(target.read_text())
+    assert (saved["DetResFn"], saved["DetSigma"]) == ("gaussian", 1.0)
+    assert saved["useCalcTheta"] is False
+
+
+def test_the_theta_control_reads_apply_theta_calculation_and_offers_three_entries():
+    """V2, D3: exactly the scientists' three entries, in their order, and no blank one."""
+    tab = SettingsEditorTab()
+    assert _scalar_label(tab, "useCalcTheta") == "Apply theta calculation"
+    assert _items(tab.editors["useCalcTheta"]) == _THETA_ENTRIES
+
+
+@pytest.mark.parametrize("entry, stored", [("True", "detector_angle"), ("trust sample angle", "sample_angle"),
+                                           ("False", False)])
+def test_choosing_a_theta_entry_stores_its_canonical_value(entry, stored):
+    """V3, D4: from the keyboard, through the combo's own list. The stored value is the canonical one, never the
+    label text, and the off entry stores False itself (not 0, not None)."""
+    held = "sample_angle" if stored is False else False
+    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict({"useCalcTheta": held})))
+    combo = tab.editors["useCalcTheta"]
+    combo.setFocus()
+    QTest.keyClick(combo, QtCore.Qt.Key_Space)  # the menu-button key opens the list
+    _settle()
+    _choose(combo, entry)
+    value = tab.document.get("useCalcTheta")
+    assert value == stored and type(value) is type(stored)
+    tab.close()
+
+
+@pytest.mark.parametrize("loaded, entry", [
+    (True, "True"), ("detector_angle", "True"), ("Detector_Angle", "True"),
+    ("sample_angle", "trust sample angle"), ("SAMPLE_ANGLE", "trust sample angle"),
+    (False, "False"), (None, "False"), (0, "False"), ("", "False"),
+])
+def test_loading_an_accepted_theta_spelling_selects_its_entry(loaded, entry):
+    """V4, D5: through set_document, the Load path; the panel is quiet about it."""
+    tab = SettingsEditorTab()
+    tab.set_document(SettingsDocument.from_dict({"useCalcTheta": loaded}))
+    assert tab.editors["useCalcTheta"].currentText() == entry
+    assert not [message for message in tab.document.validate() if "useCalcTheta" in message]
+
+
+@pytest.mark.parametrize("loaded", ["true", 1, "detector"])
+def test_a_theta_value_the_reducer_rejects_is_shown_as_itself_kept_and_reported(loaded):
+    """V6, D6: the reducer raises on these, so the editor does not guess what they meant."""
+    tab = SettingsEditorTab()
+    tab.set_document(SettingsDocument.from_dict({"useCalcTheta": loaded}))
+    combo = tab.editors["useCalcTheta"]
+    assert combo.currentText() == str(loaded)
+    assert _items(combo) == [*_THETA_ENTRIES, str(loaded)]
+    held = tab.document.get("useCalcTheta")
+    assert held == loaded and type(held) is type(loaded)
+    assert "useCalcTheta" in tab.report.toPlainText()
+
+
+def test_a_document_given_to_the_tab_keeps_its_own_resolution_values():
+    """V7, D2: the tab does not re-initialise a document it was given."""
+    tab = SettingsEditorTab(SettingsDocument())
+    assert (tab.document.get("DetResFn"), tab.document.get("DetSigma")) == ("rectangular", 0.8)
+    assert tab.editors["DetResFn"].currentText() == "rectangular" and tab.editors["DetSigma"].text() == "0.8"
+
+
+# held state: (settings, the entry shown, another entry, the value that entry stores)
+_THETA_HELD = {
+    "false": ({}, "False", "True", "detector_angle"),
+    "detector_angle": ({"useCalcTheta": "detector_angle"}, "True", "trust sample angle", "sample_angle"),
+    "sample_angle": ({"useCalcTheta": "sample_angle"}, "trust sample angle", "False", False),
+    "rejected": ({"useCalcTheta": "true"}, "true", "True", "detector_angle"),
+}
+
+
+@pytest.mark.parametrize("operation", ["choose-shown", "choose-another", "escape"])
+@pytest.mark.parametrize("held", list(_THETA_HELD))
+def test_each_gesture_on_the_theta_control_in_each_held_state(held, operation):
+    """§3's operation x state table for useCalcTheta. Re-choosing the shown entry is the identity: a rejected
+    value and its problem line stay. Another entry writes its canonical value, as the one change, and clears a
+    problem line. Escape in the open list writes nothing. (The wheel and the arrow keys on the closed combo are
+    every scalar drop-down's tests, this field included.)"""
+    values, shown, other, stored = _THETA_HELD[held]
+    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict(values)))
+    combo = tab.editors["useCalcTheta"]
+    before = tab.document.get("useCalcTheta")
+    assert combo.currentText() == shown
+    if operation == "escape":
+        QTest.mouseClick(combo, QtCore.Qt.LeftButton)
+        _settle()
+        assert combo.view().isVisible()
+        QTest.keyClick(combo.view(), QtCore.Qt.Key_Escape)
+        _settle()
+    else:
+        _choose(combo, shown if operation == "choose-shown" else other)
+    after = tab.document.get("useCalcTheta")
+    reported = any("useCalcTheta" in message for message in tab.document.validate())
+    if operation == "choose-another":
+        assert after == stored and type(after) is type(stored)
+        assert list(tab.document.changed_vs_seed()) == ["useCalcTheta"]
+        assert not reported
+    else:
+        assert after == before and type(after) is type(before)
+        assert tab.document.changed_vs_seed() == {}
+        assert reported is (held == "rejected")
     tab.close()
