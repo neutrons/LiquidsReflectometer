@@ -2075,6 +2075,28 @@ def test_focusing_through_a_path_without_typing_writes_nothing(name, held):
     tab.close()
 
 
+def test_focusing_through_an_ipts_the_file_spelled_as_a_number_writes_nothing():
+    """V6's IPTS leg (battery F2): a file may hold a bare number. Normalising is for what the user types, so a focus
+    change with no typing leaves the file's spelling as loaded."""
+    tab = _shown_tab(SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "36119"})))
+    _focus_through(tab, tab.editors["experiment_id"])
+    assert tab.document.get("experiment_id") == "36119"
+    assert tab.document.changed_vs_seed() == {}
+    tab.close()
+
+
+@pytest.mark.parametrize("ipts", ["../x", "/abs"])
+def test_an_ipts_the_panel_reports_is_not_shown_as_the_reductions_folder(ipts):
+    """§5, pathological (battery F6): a traversed or absolute IPTS is kept as loaded and reported, and neither path
+    presents a folder derived from it; each says the IPTS is not a folder name, not that none is set."""
+    tab = SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": ipts}))
+    assert tab.document.get("experiment_id") == ipts
+    assert any("experiment_id" in message for message in tab.document.validate())
+    for name in _PATH_FIELDS:
+        assert tab.editors[name].text() == ""
+        assert tab.editors[name].placeholderText() == "the IPTS is not a folder name; type a path"
+
+
 @pytest.mark.parametrize("name", _PATH_FIELDS)
 def test_a_second_load_shows_the_second_files_paths_and_nothing_of_the_first(name):
     """V7, P6: file A has an override, file B none; the control shows B's derived path, not A's text."""
