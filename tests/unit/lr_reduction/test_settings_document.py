@@ -2444,3 +2444,19 @@ def test_the_merged_section_holds_what_the_header_left_of_naming_and_paths():
 def test_groups_are_the_declared_sections_then_the_groups_with_no_list_field():
     """U5: GROUPS derives from the declaration; the per-angle-only groups (no list field, no section) follow."""
     assert fs.GROUPS == (*_SECTIONS, "Background", "Theta and scaling")
+
+
+def test_the_import_itself_rejects_a_group_the_order_does_not_declare():
+    """U2 (v2, B-1): the wiring, not the function. An edited copy of the module's source, with a field in a group
+    SECTION_ORDER does not declare, fails while it is imported, with a ValueError naming the group. Calling
+    _check_section_order directly (v1's U2) could not see the module-level call removed."""
+    import importlib.util
+
+    source = pathlib.Path(fs.__file__).read_text()
+    anchor = "\n)\n\n\nBY_NAME = {f.name: f for f in FIELD_SPEC}"
+    assert source.count(anchor) == 1
+    edited = source.replace(
+        anchor, '\n    Field("new_field", "New field", "Brand new group", "float", 0.0, "A field of its own."),' + anchor)
+    module = importlib.util.module_from_spec(importlib.util.spec_from_loader("field_spec_edited_copy", loader=None))
+    with pytest.raises(ValueError, match="Brand new group"):
+        exec(compile(edited, fs.__file__, "exec"), module.__dict__)  # noqa: S102 — this module's own source

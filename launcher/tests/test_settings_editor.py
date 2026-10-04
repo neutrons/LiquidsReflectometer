@@ -2443,18 +2443,32 @@ def test_the_sections_are_laid_out_in_the_declared_order_and_start_expanded():
     assert all(editor.isVisibleTo(tab) for name in _SECTIONS for editor in _section_editors(tab, name))
 
 
-def test_a_section_collapses_and_expands_from_its_heading_by_keyboard():
-    """V2, S3: with the heading focused, Space collapses the section (its fields hidden) and Return expands it."""
+@pytest.mark.parametrize("key, modifier", [
+    (QtCore.Qt.Key_Space, QtCore.Qt.NoModifier), (QtCore.Qt.Key_Return, QtCore.Qt.NoModifier),
+    (QtCore.Qt.Key_Enter, QtCore.Qt.KeypadModifier),
+], ids=["space", "return", "keypad-enter"])
+def test_a_section_collapses_and_expands_from_its_heading_by_keyboard(key, modifier):
+    """V2, S3, with the heading focused, for Space, Return and keypad Enter (v2, advisory A-1). The key collapses
+    the section: its fields are hidden, and they take no space. The next section's heading, mapped to the panel's
+    contents (so a scroll cannot move it), moves up by at least the body's height (v2, B-3). The same key expands
+    the section, and the heading returns to where it was."""
     tab = _shown_tab(SettingsEditorTab())
-    heading = tab.sections["Dead time"].heading
-    heading.setFocus()
+    panel = tab.scalar_panel.widget()
+    section = tab.sections["Dead time"]
+    following = tab.sections["Detector resolution"].heading
+    section.heading.setFocus()
     _settle()
-    QTest.keyClick(heading, QtCore.Qt.Key_Space)
+    top = following.mapTo(panel, QtCore.QPoint(0, 0)).y()
+    body = section.body.height()
+    assert body > 0
+    QTest.keyClick(section.heading, key, modifier)
     _settle()
     assert not any(editor.isVisibleTo(tab) for editor in _section_editors(tab, "Dead time"))
-    QTest.keyClick(heading, QtCore.Qt.Key_Return)
+    assert top - following.mapTo(panel, QtCore.QPoint(0, 0)).y() >= body
+    QTest.keyClick(section.heading, key, modifier)
     _settle()
     assert all(editor.isVisibleTo(tab) for editor in _section_editors(tab, "Dead time"))
+    assert following.mapTo(panel, QtCore.QPoint(0, 0)).y() == top
     tab.close()
 
 
@@ -2486,11 +2500,14 @@ def test_a_stored_state_is_read_as_its_meaning_not_by_bool(stored, expanded):
 @pytest.mark.parametrize("stored", ["maybe", [1], ""], ids=["word", "list", "empty"])
 def test_a_garbage_or_orphaned_stored_state_leaves_every_section_expanded(stored):
     """V5, S4: garbage for a section, or a key for a section that no longer exists ("Paths"), is read as expanded
-    or ignored. The constructor raises nothing, and the bad values stay in the store as they were."""
+    or ignored. The constructor raises nothing, and the bad values stay in the store as they were: each garbage
+    form reads back raw, value and type (v2, B-4), and so does the orphaned key."""
     _store_section("Dead time", stored)
     _store_section("Paths", "false")
     tab = SettingsEditorTab()
     assert _collapsed(tab) == set()
+    raw = _stored_section("Dead time")
+    assert raw == stored and type(raw) is type(stored)
     assert _stored_section("Paths") == "false"
     assert tab._last_error is None
 
@@ -2540,13 +2557,21 @@ def test_collapsing_every_section_changes_nothing_in_the_document_or_the_panel()
 
 
 def test_the_header_is_not_a_section_and_holds_no_section_field():
-    """V10, S7: the "Experiment" header is above the splitter, has no toggle, and its three fields are in no
-    section."""
-    tab = SettingsEditorTab()
-    assert tab.paths_header not in tab.sections.values()
-    assert not any(section.isAncestorOf(tab.paths_header) for section in tab.sections.values())
+    """V10, S7 (v2, advisory A-3: v1's membership check was vacuous). The "Experiment" header:
+    - is a group box that cannot be checked (no toggle);
+    - is a direct child of the tab's own layout, not wrapped in a section;
+    - sits above the first section's heading.
+    Its three fields are in no section."""
+    tab = _shown_tab(SettingsEditorTab())
+    header = tab.paths_header
+    assert isinstance(header, QtWidgets.QGroupBox) and header.isCheckable() is False
+    assert tab.layout().indexOf(header) >= 0
+    assert not any(section.isAncestorOf(header) for section in tab.sections.values())
+    first = tab.sections[_SECTIONS[0]].heading
+    assert header.mapTo(tab, QtCore.QPoint(0, 0)).y() < first.mapTo(tab, QtCore.QPoint(0, 0)).y()
     for name in fs.HEADER_NAMES:
         assert not any(section.isAncestorOf(tab.editors[name]) for section in tab.sections.values()), name
+    tab.close()
 
 
 # Plan §3's held states of a section: E expanded (nothing stored, a first run), C collapsed (stored "false"),
@@ -2694,4 +2719,41 @@ def test_a_headings_arrow_shows_whether_its_section_is_open():
     _settle()
     assert tab.sections["Dead time"].heading.arrowType() == QtCore.Qt.DownArrow
     assert tab.sections["Q-space"].heading.arrowType() == QtCore.Qt.RightArrow
+    tab.close()
+
+
+def _shown_value(editor):
+    if isinstance(editor, QtWidgets.QCheckBox):
+        return editor.isChecked()
+    if isinstance(editor, QtWidgets.QComboBox):
+        return editor.currentText()
+    return editor.text()
+
+
+@pytest.mark.parametrize("name, field, loaded, shown", [
+    ("Instrument geometry", "mmpix", 0.71, "0.71"),
+    ("Detector resolution", "DetResFn", "gaussian", "gaussian"),
+    ("Detector resolution", "DetResFn", "rectangular", "rectangular"),
+    ("Processing", "Normalize", True, True),
+    ("Processing", "Normalize", False, False),
+], ids=["line-edit", "combo-gaussian", "combo-rectangular", "check-box-on", "check-box-off"])
+def test_collapsing_and_expanding_leaves_each_editor_showing_the_documents_value(name, field, loaded, shown):
+    """V11 (v2, B-2): collapse, then expand, with no Load in between. Every editor under the section shows what it
+    showed before, and the named one shows the document's value (text, current entry, check state).
+    - The line edits write on editingFinished, so a collapse that cleared them would leave the document intact,
+      and only this read can see it.
+    - The combo (two entries) and the check box are loaded with each of their values in turn. A collapse that set
+      either to one fixed value, with its signals blocked so the document is not written, shows in one leg."""
+    tab = _shown_tab(SettingsEditorTab())
+    tab.set_document(SettingsDocument.from_dict({field: loaded}))
+    before = [_shown_value(editor) for editor in _section_editors(tab, name)]
+    heading = tab.sections[name].heading
+    QTest.mouseClick(heading, QtCore.Qt.LeftButton)
+    _settle()
+    assert name in _collapsed(tab)
+    QTest.mouseClick(heading, QtCore.Qt.LeftButton)
+    _settle()
+    assert [_shown_value(editor) for editor in _section_editors(tab, name)] == before
+    assert _shown_value(tab.editors[field]) == shown
+    assert tab.document.get(field) == loaded and tab.document.changed_vs_seed() == {}
     tab.close()
