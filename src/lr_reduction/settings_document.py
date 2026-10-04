@@ -71,6 +71,21 @@ def _is_file(entry):
         return False
 
 
+def normalise_experiment_id(text):
+    """The ``experiment_id`` an IPTS typed in the editor is stored as.
+
+    A bare number, or one after ``ipts-`` in any case, is the directory name ``IPTS-<n>``, as ``file_batch.py``
+    writes it. Anything else is stored as typed, for ``validate()`` to judge (it reports separators and ``..``).
+    An empty entry is ``""``, never ``None``: the config's path properties join ``experiment_id`` onto
+    ``/SNS/REF_L`` and raise ``TypeError`` on ``None``.
+    """
+    stripped = text.strip()
+    number = stripped[len("ipts-"):] if stripped.lower().startswith("ipts-") else stripped
+    if number.isascii() and number.isdigit():
+        return f"IPTS-{number}"
+    return text if stripped else ""
+
+
 def _held_as_bool(value):
     """``value`` as a ``bool`` if it is a boolean spelling, otherwise unchanged."""
     boolean = fs.as_boolean(value)
@@ -445,6 +460,25 @@ class SettingsDocument:
             return None
         reading = self._compact_reading(field, current, count)
         return None if reading is _NOT_COMPACT else reading
+
+    #: The path property of NRReductionConfig each override the editor's header shows sets.
+    _OVERRIDE_PROPERTY = {"_NEXUSpathRB_override": "NEXUSpathRB", "_DBpath_override": "DBpath"}
+
+    def derived_path(self, name):
+        """The folder the reduction would use for override field `name` if the override were unset, as text.
+
+        Answered by the config's own properties, read on a copy with the override cleared: the document is not
+        touched, and the rule is the class's (CPKT ``derived-identifiers.md``). ``None`` when there is no IPTS,
+        or one ``validate()`` reports. ``/SNS/REF_L/nexus`` is what the class computes for an empty IPTS, and it
+        is never what anyone means; a traversed or absolute IPTS is not presented as the reduction's folder.
+        ``candidates()`` keeps reading the effective folder, override and all: a different question.
+        """
+        experiment = self._config.experiment_id
+        if not experiment or fs.get("experiment_id").check(experiment):
+            return None
+        config = copy.copy(self._config)
+        setattr(config, name, None)
+        return str(getattr(config, self._OVERRIDE_PROPERTY[name]))
 
     def candidates(self, name, limit=MAX_CANDIDATES):
         """The file names a per-angle cell offers, as ``(names, total)``.
