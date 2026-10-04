@@ -2390,3 +2390,57 @@ def test_an_ipts_typed_as_a_number_is_stored_as_the_directory_name(typed, stored
 
     value = normalise_experiment_id(typed)
     assert value == stored and type(value) is str
+
+
+# --------------------------------------------------------------------------
+# editor-sections — the list's sections in the scientists' order, declared, and checked at import
+# --------------------------------------------------------------------------
+
+_SECTIONS = ("Runs and angles", "Processing", "Q-space", "Wavelength and TOF", "Dead time", "Detector resolution",
+             "Peak fitting", "Output naming and paths", "Instrument geometry", "Runtime record")
+
+
+def _list_groups(fields):
+    return {f.group for f in fields if not f.per_angle and f.name not in fs.HEADER_NAMES}
+
+
+def test_the_sections_are_declared_in_the_scientists_order():
+    """U1, S1 (item 7): an explicit declaration, not the order the groups first appear in FIELD_SPEC."""
+    assert fs.SECTION_ORDER == _SECTIONS
+
+
+def test_the_declared_sections_are_exactly_the_groups_with_a_list_field():
+    """U2, S5: each group a list field uses is declared once, and nothing else is. The check that enforces it at
+    import fails, naming the group, on a field with a new group, on an order missing a group, and on a group
+    listed twice. It is run on copies, not by editing the module."""
+    import dataclasses
+
+    assert _list_groups(fs.FIELD_SPEC) == set(fs.SECTION_ORDER)
+    fs._check_section_order(fs.FIELD_SPEC, fs.SECTION_ORDER)
+    stray = dataclasses.replace(fs.get("tof_bin"), name="new_field", group="Brand new")
+    with pytest.raises(ValueError, match="Brand new"):
+        fs._check_section_order((*fs.FIELD_SPEC, stray), fs.SECTION_ORDER)
+    with pytest.raises(ValueError, match="Dead time"):
+        fs._check_section_order(fs.FIELD_SPEC, tuple(g for g in fs.SECTION_ORDER if g != "Dead time"))
+    with pytest.raises(ValueError, match="twice"):
+        fs._check_section_order(fs.FIELD_SPEC, (*fs.SECTION_ORDER, "Q-space"))
+
+
+def test_the_per_angle_names_and_their_order_are_unchanged():
+    """U3, S5's pin: the Angles table's columns and other code index this tuple; the regrouping leaves it alone."""
+    assert fs.PER_ANGLE_NAMES == ("method_per_run", "DBname", "RBnum", "RB_Ymin", "RB_Ymax", "BkgROI", "useBS",
+                                  "tof_min", "tof_max", "LambdaMin", "LambdaMax", "ThetaShift", "ScaleFactor")
+
+
+def test_the_merged_section_holds_what_the_header_left_of_naming_and_paths():
+    """U4, S2: Sname, subname, the three suffixes and the two output paths; the IPTS and the input paths are the
+    header's."""
+    merged = [f.name for f in fs.fields_in("Output naming and paths")
+              if not f.per_angle and f.name not in fs.HEADER_NAMES]
+    assert merged == ["Sname", "subname", "DTCsubname", "BINsubname", "errBINsubname",
+                      "_Spath_override", "_BINpath_override"]
+
+
+def test_groups_are_the_declared_sections_then_the_groups_with_no_list_field():
+    """U5: GROUPS derives from the declaration; the per-angle-only groups (no list field, no section) follow."""
+    assert fs.GROUPS == (*_SECTIONS, "Background", "Theta and scaling")
