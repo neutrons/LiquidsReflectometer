@@ -1496,7 +1496,8 @@ def test_an_all_null_default_list_loads_as_unset_and_saves_empty(tmp_path):
 def test_removing_the_surplus_angle_clears_the_note_and_trims_only_useBS():
     doc = _surplus_document()
     doc.remove_angle(3)
-    assert doc.notes() == []
+    # editor-notes-and-report-spelling K1: the other lists the reducer fills are [] here, and keep their notes
+    assert not any("extra" in line for line in doc.notes()), doc.notes()
     assert doc.get("useBS") == [True, True, True]
     assert doc.get("DBname") == _THREE_ANGLES["DBname"]
 
@@ -1834,7 +1835,9 @@ def test_an_edit_of_a_compact_list_keeps_what_the_reducer_reads_at_every_other_a
             assert f"({name})" in note and f"{index + 1 - m} extra" in note
         else:
             assert new == set()
-        assert gone == ({line for line in notes_before if "(useBS)" in line} if name == "useBS" else set())
+        # editor-notes-and-report-spelling K1: every list the reducer fills has its default note while unset, not
+        # only useBS, so the edit takes away that list's own note, whichever list it is.
+        assert gone == {line for line in notes_before if f"({name}) is not set" in line}
     if index < m:
         read_as = value_written.lower() if isinstance(value_written, str) else value_written
         assert reading[name][index] == repr(read_as)

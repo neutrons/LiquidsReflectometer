@@ -494,7 +494,10 @@ def test_a_loaded_background_switch_reads_true_or_false(tmp_path, monkeypatch):
 def test_a_reducer_written_file_reports_no_problems(tmp_path, monkeypatch):
     tab = SettingsEditorTab()
     _load(tab, _reducer_written_settings(tmp_path), monkeypatch)
-    assert tab.report.toPlainText() == "No problems found."
+    # editor-notes-and-report-spelling K2: the lists the reducer fills that the file leaves [] (tof_min, tof_max,
+    # ThetaShift, ScaleFactor) are notes, never problems.
+    text = tab.report.toPlainText()
+    assert text.startswith("No problems found.") and "Problems:" not in text, text
 
 
 @pytest.mark.parametrize("name", ["LambdaMinUse", "LambdaMaxUse"])
@@ -2837,3 +2840,16 @@ def test_a_scalar_change_is_reported_in_the_files_spelling():
     assert "  - useGravity: false -> true" in lines, lines
     assert '  - useCalcTheta: false -> "sample_angle"' in lines, lines
     tab.close()
+
+
+def test_the_report_spells_values_through_the_one_helper():
+    """K4 (the plan's one-definition check): refresh_report spells a changed value only through
+    settings_document.file_spelling, and the tab defines no renderer of its own."""
+    import inspect
+
+    from launcher.apps import settings_editor
+
+    source = inspect.getsource(SettingsEditorTab.refresh_report)
+    assert "file_spelling(" in source
+    assert "!r}" not in source and "repr(" not in source and "json.dumps" not in source
+    assert "def file_spelling" not in inspect.getsource(settings_editor)
