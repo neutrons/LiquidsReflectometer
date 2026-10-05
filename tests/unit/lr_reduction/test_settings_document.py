@@ -1503,17 +1503,12 @@ def test_removing_the_surplus_angle_clears_the_note_and_trims_only_useBS():
 
 def test_an_unset_background_switch_is_noted_as_the_reductions_default():
     """Plan A2: an all-unset useBS is written [], which the reducer fills with 1 (on) for
-    every angle (nr_reduction_calc.py:102-103), so the panel says so."""
+    every angle (nr_reduction_calc.py:102-103), so the panel says so. U4
+    (editor-notes-and-report-spelling): in K1's words, the default as the file spells it."""
     doc = SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": []})
     notes = [line for line in doc.notes() if "(useBS)" in line]
     assert len(notes) == 1
-    assert re.search(r"\bon\b", notes[0]), notes[0]
-
-
-def test_the_boolean_default_lists_are_exactly_useBS():
-    """A pin on the derivation the A2 note uses: its "on" is the reducer's fill for useBS
-    (nr_reduction_calc.py:103). Before adding another, read that field's default fill."""
-    assert {f.name for f in fs.FIELD_SPEC if f.default_if_empty and f.element_type == "bool"} == {"useBS"}
+    assert "will use 1 at every angle" in notes[0], notes[0]
 
 
 def test_a_per_angle_value_that_is_not_a_list_is_kept_out_of_the_counts():
@@ -1678,7 +1673,7 @@ def test_an_unset_background_switch_with_a_surplus_value_is_still_noted_as_the_d
     for angle in range(3):
         doc.set_angle_field(angle, "useBS", None)
     assert repr(doc.get("useBS")) == "[None, None, None, False]"
-    assert any("(useBS)" in line and re.search(r"\bon\b", line) for line in doc.notes())
+    assert any("(useBS)" in line and "will use 1 at every angle" in line for line in doc.notes())
     assert json.loads(doc.save(tmp_path / "out.json").read_text())["useBS"] == []
 
 
@@ -2460,3 +2455,124 @@ def test_the_import_itself_rejects_a_group_the_order_does_not_declare():
     module = importlib.util.module_from_spec(importlib.util.spec_from_loader("field_spec_edited_copy", loader=None))
     with pytest.raises(ValueError, match="Brand new group"):
         exec(compile(edited, fs.__file__, "exec"), module.__dict__)  # noqa: S102 — this module's own source
+
+
+# --------------------------------------------------------------------------
+# editor-notes-and-report-spelling (plan @ triage 0e333ca) — K1-K4. Every list the reducer fills or
+# broadcasts, unset at every angle the reduction uses, gets the same note, in words that do not read
+# as a problem. One helper, file_spelling, spells a value the way save() writes it, for the notes and
+# for the change report. U1-U4 here, V1-V3 in launcher/tests/test_settings_editor.py.
+# The old pin test_the_boolean_default_lists_are_exactly_useBS guarded the A2 note's hard-coded "on";
+# K1 takes the words from Field.reducer_default, so the pin on the six fields and U2 replace it.
+# --------------------------------------------------------------------------
+
+# What the reducer uses at an angle such a list does not give, as the file spells it
+# (nr_reduction_calc.py:42-43, :76-80, :99-110), written here independently of field_spec.
+_FILLED_DEFAULT_SPELLING = {
+    "useBS": "1",
+    "method_per_run": '"meanTheta"',
+    "tof_min": "0",
+    "tof_max": "100000",
+    "ThetaShift": "0",
+    "ScaleFactor": "1",
+}
+
+
+def _default_note(name):
+    field = fs.BY_NAME[name]
+    return (f"{field.label} ({name}) is not set; the reduction will use {_FILLED_DEFAULT_SPELLING[name]} at "
+            f"every angle — leave it, or choose a value to write it explicitly")
+
+
+def test_the_lists_the_reducer_fills_are_the_six_the_notes_cover():
+    """U1's domain, pinned (F1): the lists the reducer fills or broadcasts when empty."""
+    assert {f.name for f in fs.FIELD_SPEC if f.default_if_empty or f.broadcast_ok} == set(_FILLED_DEFAULT_SPELLING)
+
+
+@pytest.mark.parametrize("unset", [[], [None, None, None]], ids=["empty", "all-None"])
+@pytest.mark.parametrize("name", sorted(_FILLED_DEFAULT_SPELLING))
+def test_a_reducer_filled_list_unset_at_every_angle_gets_one_note_in_the_reducers_words(name, unset):
+    """U1/K1: one note per such list, whatever its element type, with the default as the file spells it."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, name: unset})
+    assert [line for line in doc.notes() if f"({name})" in line] == [_default_note(name)]
+
+
+@pytest.mark.parametrize("name, held", [
+    ("useBS", [True, None, None]),
+    ("useBS", [True, False, True]),
+    ("method_per_run", ["constantQ"]),
+    ("method_per_run", ["constantQ", None, None]),
+    ("ThetaShift", [0.5, 0, 0]),
+    ("tof_max", [None, 90000, None]),
+])
+def test_a_reducer_filled_list_set_at_some_angle_gets_no_default_note(name, held):
+    """U1: set at some angle is not unset: partly set is validate()'s to report (as today), and a single
+    method_per_run entry is broadcast."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, name: held})
+    assert not any(f"({name}) is not set" in line for line in doc.notes())
+
+
+def test_a_list_the_reducer_does_not_fill_gets_no_default_note():
+    """U1: an unset list the reducer does not fill (the peak window) is no default of the reducer's."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "RB_Ymin": [None, None, None]})
+    assert not any("(RB_Ymin) is not set" in line for line in doc.notes())
+
+
+def test_no_default_note_without_angles_to_describe():
+    """U1: with no angle-defining entries there is no reduction to describe (as today)."""
+    assert not any("is not set" in line for line in SettingsDocument.from_dict({}).notes())
+
+
+def test_the_default_notes_are_notes_and_never_problems():
+    """K2: a file whose only remarks are these notes reads no problems; one note per unset list."""
+    doc = SettingsDocument.from_dict(dict(_THREE_ANGLES))
+    assert doc.validate() == []
+    assert sorted(line for line in doc.notes() if "is not set" in line) == sorted(
+        _default_note(name) for name in _FILLED_DEFAULT_SPELLING)
+
+
+def test_every_reducer_filled_list_declares_what_the_reducer_fills():
+    """U2: the notes' words come from the Field, so every such field declares reducer_default (a pin)."""
+    assert [f.name for f in fs.FIELD_SPEC
+            if (f.default_if_empty or f.broadcast_ok) and f.reducer_default is None] == []
+
+
+def test_the_notes_carry_no_python_spelling_and_no_source_reference():
+    """U2: words for the scientists: no None/True/False, and no `.py:` line reference."""
+    for line in SettingsDocument.from_dict(dict(_THREE_ANGLES)).notes():
+        assert not re.search(r"\b(None|True|False)\b|\.py:", line), line
+
+
+def test_file_spelling_spells_each_kind_of_value_as_the_file_does():
+    """U3/K3: the int-encoded booleans as 1/0, an all-unset reducer-filled list as [], a scalar boolean
+    and None as JSON writes them, strings quoted."""
+    from lr_reduction.settings_document import file_spelling
+
+    assert file_spelling(fs.BY_NAME["useBS"], [True, False, True], 3) == "[1, 0, 1]"
+    assert file_spelling(fs.BY_NAME["ThetaShift"], [None, None, None], 3) == "[]"
+    assert file_spelling(fs.BY_NAME["ThetaShift"], [0.5, 0, 0], 3) == "[0.5, 0, 0]"
+    assert file_spelling(fs.BY_NAME["method_per_run"], ["constantQ"], 3) == '["constantQ"]'
+    assert file_spelling(fs.BY_NAME["useGravity"], False) == "false"
+    assert file_spelling(fs.BY_NAME["useCalcTheta"], "detector_angle") == '"detector_angle"'
+    assert file_spelling(fs.BY_NAME["LambdaMin"], None) == "null"
+
+
+def test_file_spelling_agrees_with_what_save_writes_key_by_key(tmp_path):
+    """U3/K4: one helper, beside the file encoding: for every field, the spelling equals the JSON of the
+    value save() wrote for that key."""
+    from lr_reduction.settings_document import file_spelling
+
+    doc = SettingsDocument.from_dict({
+        **_THREE_ANGLES,
+        "useBS": [True, False, True],
+        "tof_min": [1.5, 2, 3],
+        "method_per_run": ["constantQ", "meanTheta", "constantQ"],
+        "ThetaShift": [None, None, None],
+        "useGravity": False,
+        "useCalcTheta": "detector_angle",
+        "LambdaMin": None,
+    })
+    saved = json.loads(doc.save(tmp_path / "out.json").read_text())
+    for field in fs.FIELD_SPEC:
+        if field.name in saved:
+            assert file_spelling(field, doc.get(field.name), doc.reduction_angles) == json.dumps(saved[field.name]), field.name

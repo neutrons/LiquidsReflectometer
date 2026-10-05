@@ -14,6 +14,7 @@ campaign's signature defect class (S2-v2's double-toggle).
 """
 
 import json
+import os
 
 import pytest
 from qtpy import QtCore, QtGui, QtWidgets, sip
@@ -542,7 +543,8 @@ def test_toggling_a_loaded_switch_saves_ones_and_zeros(tmp_path, monkeypatch):
     tab = SettingsEditorTab()
     _load(tab, _reducer_written_settings(tmp_path), monkeypatch)
     tab.angle_table.item(1, fs.PER_ANGLE_NAMES.index("useBS")).setText("false")
-    assert "useBS: [True, True, False] -> [True, False, False]" in tab.report.toPlainText()
+    # editor-notes-and-report-spelling K3: the report spells the list as the file does (it was repr).
+    assert "useBS: [1, 1, 0] -> [1, 0, 0]" in tab.report.toPlainText()
 
     target = tmp_path / "saved.json"
     monkeypatch.setattr(
@@ -2756,4 +2758,82 @@ def test_collapsing_and_expanding_leaves_each_editor_showing_the_documents_value
     assert [_shown_value(editor) for editor in _section_editors(tab, name)] == before
     assert _shown_value(tab.editors[field]) == shown
     assert tab.document.get(field) == loaded and tab.document.changed_vs_seed() == {}
+    tab.close()
+
+
+# --------------------------------------------------------------------------
+# editor-notes-and-report-spelling (plan @ triage 0e333ca) — V1-V3. The human's file from a from-scratch
+# session (PR #38, 2026-10-04: three angles, every list the reducer fills left []), committed as a fixture.
+# --------------------------------------------------------------------------
+
+_FROM_SCRATCH = os.path.join(os.path.dirname(__file__), "data", "REFL_229197_settings-try1-start-from-scratch.json")
+_REDUCER_FILLED = ("useBS", "method_per_run", "ThetaShift", "ScaleFactor", "tof_min", "tof_max")
+
+
+def _report_lines(tab):
+    return tab.report.toPlainText().splitlines()
+
+
+def test_the_from_scratch_file_reads_no_problems_and_notes_each_list_the_reducer_fills(monkeypatch):
+    """V1/K1/K2: every list the reducer fills is [] in the human's file. That is useBS and method_per_run, as
+    they reported, and ThetaShift, ScaleFactor, tof_min and tof_max too. Each gets its note, under "Notes:", and
+    the panel still reads "No problems found." (The plan's V1 names two notes; the file holds six such lists,
+    and K1 notes each.)"""
+    tab = SettingsEditorTab()
+    _load(tab, _FROM_SCRATCH, monkeypatch)
+    text = tab.report.toPlainText()
+    assert text.startswith("No problems found.") and "Problems:" not in text
+    notes = text.split("Notes:", 1)[1]
+    for name in _REDUCER_FILLED:
+        assert f"({name}) is not set; the reduction will use" in notes, name
+    tab.close()
+
+
+def test_one_choice_reports_each_list_as_the_file_then_holds_it(tmp_path, monkeypatch):
+    """V2/K3: re-choosing the implied value is the identity: no "Changed" line, and the note stays. A different
+    value prints the list in the file's spelling (1/0, quoted strings), and the saved file holds exactly that.
+    One list of each kind the reducer fills: a boolean, a choice, a number."""
+    tab = _shown_tab(SettingsEditorTab())
+    _load(tab, _FROM_SCRATCH, monkeypatch)
+    editor = _open_cell_editor(tab, 0, "useBS")
+    assert editor.currentText() == "true"
+    QTest.keyClick(editor.view(), QtCore.Qt.Key_Down)
+    QTest.keyClick(editor.view(), QtCore.Qt.Key_Up)  # a deliberate move, back to the shown value
+    QTest.keyClick(editor.view(), QtCore.Qt.Key_Return)
+    _settle()
+    assert tab.document.changed_vs_seed() == {}
+    assert "Changed from the seed:" not in _report_lines(tab)
+    assert any("(useBS) is not set" in line for line in _report_lines(tab))
+
+    _choose(_open_cell_editor(tab, 0, "useBS"), "false")
+    _choose(_open_cell_editor(tab, 0, "method_per_run"), "constantQ")
+    tab.angle_table.item(0, fs.PER_ANGLE_NAMES.index("ThetaShift")).setText("0.5")
+    _settle()
+    printed = {
+        "useBS": "[] -> [0, 1, 1]",
+        "method_per_run": '[] -> ["constantQ", "meanTheta", "meanTheta"]',
+        "ThetaShift": "[] -> [0.5, 0, 0]",
+    }
+    lines = _report_lines(tab)
+    for name, change in printed.items():
+        assert f"  - {name}: {change}" in lines, (name, lines)
+
+    target = tmp_path / "saved.json"
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), "")))
+    tab.save_settings()
+    saved = json.loads(target.read_text())
+    for name, change in printed.items():
+        assert json.dumps(saved[name]) == change.split(" -> ", 1)[1], name
+    tab.close()
+
+
+def test_a_scalar_change_is_reported_in_the_files_spelling():
+    """V3/K3: a boolean scalar as JSON writes it (false -> true, not False -> True); a string choice quoted."""
+    tab = SettingsEditorTab(SettingsDocument.from_dict({**_THREE_ANGLES, "useGravity": False}))
+    tab.editors["useGravity"].click()
+    tab.editors["useCalcTheta"].setCurrentText("trust sample angle")
+    tab.refresh_report()
+    lines = _report_lines(tab)
+    assert "  - useGravity: false -> true" in lines, lines
+    assert '  - useCalcTheta: false -> "sample_angle"' in lines, lines
     tab.close()
