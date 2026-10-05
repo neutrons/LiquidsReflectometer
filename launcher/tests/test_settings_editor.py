@@ -30,6 +30,17 @@ from lr_reduction.settings_document import SettingsDocument
 pytestmark = pytest.mark.usefixtures("isolated_qapp", "no_qmessagebox")
 
 
+@pytest.fixture(autouse=True)
+def _no_facility_lookup(tmp_path_factory, monkeypatch):
+    """editor-ipts-inference: every Load in this module looks its runs up under an empty folder, never the facility
+    tree. /SNS is mounted on the analysis nodes and not here, and no test may depend on which. A test that wants
+    runs to resolve fabricates a tree and points the lookup at it (_facility)."""
+    from lr_reduction import settings_document
+
+    monkeypatch.setattr(settings_document, "IPTS_LOOKUP_ROOT", str(tmp_path_factory.mktemp("no-facility")),
+                        raising=False)
+
+
 def test_tab_constructs():
     tab = SettingsEditorTab()
     assert tab.document is not None
@@ -2777,11 +2788,16 @@ def _report_lines(tab):
     return tab.report.toPlainText().splitlines()
 
 
-def test_the_from_scratch_file_reads_no_problems_and_notes_each_list_the_reducer_fills(monkeypatch):
+def test_the_from_scratch_file_reads_no_problems_and_notes_each_list_the_reducer_fills(tmp_path, monkeypatch):
     """V1/K1/K2: every list the reducer fills is [] in the human's file. That is useBS and method_per_run, as
     they reported, and ThetaShift, ScaleFactor, tof_min and tof_max too. Each gets its note, under "Notes:", and
     the panel still reads "No problems found." (The plan's V1 names two notes; the file holds six such lists,
-    and K1 notes each.)"""
+    and K1 notes each.)
+
+    editor-ipts-inference: the file names no IPTS. Its runs resolve under IPTS-36119 in a fabricated tree, so
+    the Load takes that IPTS (2a) and the file reduces. Where no IPTS holds them, the empty IPTS is a problem
+    (I4): test_an_empty_ipts_with_runs_is_a_problem_until_one_is_typed."""
+    _facility(tmp_path, monkeypatch, {"IPTS-36119": [229197, 229198, 229199]})
     tab = SettingsEditorTab()
     _load(tab, _FROM_SCRATCH, monkeypatch)
     text = tab.report.toPlainText()
@@ -2874,3 +2890,177 @@ def test_a_list_left_only_in_a_surplus_row_is_reported_as_the_file_holds_it(tmp_
     tab.save_settings()
     assert json.loads(target.read_text())["ThetaShift"] == []
     tab.close()
+
+
+# --------------------------------------------------------------------------
+# editor-ipts-inference (plan @ triage 2650210) — V1-V6. Every lookup goes to a fabricated tree (_facility) or to
+# the empty folder _no_facility_lookup gives each test: never /SNS.
+# --------------------------------------------------------------------------
+
+
+def _facility(tmp_path, monkeypatch, layout, folders=()):
+    """A fabricated facility tree under tmp_path/SNS: ``{IPTS: [runs]}`` as <IPTS>/nexus/REF_L_<run>.nxs.h5, plus
+    `folders` (relative paths) made empty. The IPTS lookup is pointed at it."""
+    from lr_reduction import settings_document
+
+    root = tmp_path / "SNS"
+    for ipts, runs in layout.items():
+        folder = root / ipts / "nexus"
+        folder.mkdir(parents=True, exist_ok=True)
+        for run in runs:
+            (folder / f"REF_L_{run}.nxs.h5").touch()
+    for relative in folders:
+        (root / relative).mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(settings_document, "IPTS_LOOKUP_ROOT", str(root), raising=False)
+    return root
+
+
+def _sections(tab):
+    """The panel's text split into its Problems, Notes and Changed sections (each "" when absent)."""
+    text = tab.report.toPlainText()
+    head, _, changed = text.partition("Changed from the seed:")
+    problems, _, notes = head.partition("Notes:")
+    return problems, notes, changed
+
+
+_I4 = "IPTS (experiment_id) is empty and 3 run numbers are set"
+
+
+def test_the_from_scratch_file_takes_the_ipts_its_runs_resolve_under(tmp_path, monkeypatch):
+    """V1 (2a): the human's from-scratch file (experiment_id "", runs 229197-229199), with the runs under IPTS-36119
+    in a fabricated tree. The header shows IPTS-36119 and both derived folders. "Changed from the seed" shows the
+    IPTS, which the file does not hold until it is saved, and a Save writes it."""
+    _facility(tmp_path, monkeypatch, {"IPTS-36119": [229197, 229198, 229199]})
+    tab = _shown_tab(SettingsEditorTab())
+    _load(tab, _FROM_SCRATCH, monkeypatch)
+    assert tab.editors["experiment_id"].text() == "IPTS-36119"
+    for name in _PATH_FIELDS:
+        assert tab.editors[name].text() == ""
+        assert tab.editors[name].placeholderText() == f"/SNS/REF_L/IPTS-36119/{_PATH_TAIL[name]}"
+    problems, _notes, changed = _sections(tab)
+    assert '  - experiment_id: "" -> "IPTS-36119"' in changed.splitlines()
+    assert problems.startswith("No problems found.")
+    target = tmp_path / "saved.json"
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), "")))
+    tab.save_settings()
+    assert json.loads(target.read_text())["experiment_id"] == "IPTS-36119"
+    tab.close()
+
+
+def test_a_load_without_runs_keeps_the_fields_ipts_or_takes_the_files_folder(tmp_path, monkeypatch):
+    """V2 (2b, 2c): the header held IPTS-1 and the file names neither an IPTS nor runs: IPTS-1 is kept, and shown
+    as a change. With the header empty, a file loaded from under <root>/IPTS-7/ takes IPTS-7."""
+    root = _facility(tmp_path, monkeypatch, {})
+    tab = SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "IPTS-1"}))
+    _load(tab, _settings_file(tmp_path / "home", {"Sname": "x"}), monkeypatch)
+    assert tab.document.get("experiment_id") == "IPTS-1" and tab.editors["experiment_id"].text() == "IPTS-1"
+    assert '  - experiment_id: "" -> "IPTS-1"' in _sections(tab)[2].splitlines()
+    tab.close()
+    tab = SettingsEditorTab()
+    _load(tab, _settings_file(root / "IPTS-7" / "shared", {"Sname": "y"}), monkeypatch)
+    assert tab.document.get("experiment_id") == "IPTS-7" and tab.editors["experiment_id"].text() == "IPTS-7"
+    tab.close()
+
+
+def test_an_empty_ipts_with_runs_is_a_problem_until_one_is_typed(monkeypatch):
+    """V3 (I4): the from-scratch file, its runs under no IPTS (this module's empty lookup folder). The panel's
+    Problems name the empty IPTS, and a note says the runs resolved nowhere. Typing an IPTS clears the problem,
+    and clearing the field brings it back."""
+    tab = _shown_tab(SettingsEditorTab())
+    _load(tab, _FROM_SCRATCH, monkeypatch)
+    problems, notes, _changed = _sections(tab)
+    assert any(line.startswith(f"  - {_I4}") for line in problems.splitlines()), problems
+    assert any("holds the run numbers 229197, 229198, 229199" in line for line in notes.splitlines()), notes
+    _type_into(tab.editors["experiment_id"], "36119")
+    assert _I4 not in tab.report.toPlainText()
+    _type_into(tab.editors["experiment_id"], "")
+    assert tab.document.get("experiment_id") == ""
+    assert any(line.startswith(f"  - {_I4}") for line in _sections(tab)[0].splitlines())
+    tab.close()
+
+
+def test_typing_an_ipts_runs_no_lookup_and_stands(tmp_path, monkeypatch):
+    """V4 (I6): the Load inferred IPTS-36119. A typed IPTS is the user's: no lookup runs on it, and it stands
+    through later refreshes."""
+    from lr_reduction import settings_document
+
+    _facility(tmp_path, monkeypatch, {"IPTS-36119": [229197, 229198, 229199]})
+    tab = _shown_tab(SettingsEditorTab())
+    _load(tab, _FROM_SCRATCH, monkeypatch)
+    assert tab.document.get("experiment_id") == "IPTS-36119"
+    calls = []
+    monkeypatch.setattr(settings_document, "_run_ipts", lambda *a, **_k: calls.append(a) or (), raising=False)
+    monkeypatch.setattr(settings_document, "lookup_runs", lambda *a, **_k: calls.append(a), raising=False)
+    _type_into(tab.editors["experiment_id"], "9")
+    tab.refresh_scalars()
+    tab.refresh_report()
+    assert calls == []
+    assert tab.document.get("experiment_id") == "IPTS-9" and tab.editors["experiment_id"].text() == "IPTS-9"
+    tab.close()
+
+
+def _capture_dialog(monkeypatch, method, answer=""):
+    """Stand in for QFileDialog.<method> as the static call behaves: build a QFileDialog with the folder and
+    options it is given and show it. Record the folder, the options and the sidebar the shown dialog has, then
+    answer `answer`."""
+    seen = {}
+
+    def fake(parent=None, caption="", directory="", filters="", selected="", options=None):
+        dialog = QtWidgets.QFileDialog(parent, caption, directory, filters)
+        if options is not None:
+            dialog.setOptions(options)
+        dialog.show()
+        _settle()
+        seen.update(directory=directory, options=options,
+                    sidebar=[url.toLocalFile() for url in dialog.sidebarUrls()])
+        dialog.close()
+        dialog.deleteLater()
+        _settle()
+        return answer, ""
+
+    monkeypatch.setattr(QtWidgets.QFileDialog, method, staticmethod(fake))
+    return seen
+
+
+_SIDEBAR = ("IPTS-36119/shared", "IPTS-36119/shared/reduced", "IPTS-36119/shared/autoreduce")
+
+
+@pytest.mark.parametrize("method, slot", [("getOpenFileName", "load_settings"), ("getSaveFileName", "save_settings")])
+def test_the_file_dialogs_open_where_the_ipts_keeps_its_settings(tmp_path, monkeypatch, method, slot):
+    """V5 (I5, A5): with IPTS-36119 in the header and a remembered folder elsewhere, Load and Save open in
+    <root>/IPTS-36119/shared. The sidebar offers the IPTS's three settings folders, set on Qt's own dialog
+    (DontUseNativeDialog: a native dialog builds no sidebar). A remembered folder under the IPTS wins; with no
+    IPTS, the remembered folder, as before."""
+    root = _facility(tmp_path, monkeypatch, {}, folders=_SIDEBAR)
+    tab = SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "IPTS-36119"}))
+    tab.settings.setValue("settings_editor_dir", "/home/u")
+    seen = _capture_dialog(monkeypatch, method)
+    getattr(tab, slot)()
+    assert seen["directory"] == str(root / "IPTS-36119" / "shared")
+    assert seen["sidebar"] == [str(root / relative) for relative in _SIDEBAR]
+    assert seen["options"] is not None and seen["options"] & QtWidgets.QFileDialog.DontUseNativeDialog
+    remembered = str(root / "IPTS-36119" / "shared" / "reduced")
+    tab.settings.setValue("settings_editor_dir", remembered)
+    getattr(tab, slot)()
+    assert seen["directory"] == remembered
+    tab.close()
+    tab = SettingsEditorTab()
+    tab.settings.setValue("settings_editor_dir", "/home/u")
+    getattr(tab, slot)()
+    assert seen["directory"] == "/home/u"
+    tab.close()
+
+
+def test_the_ipts_notes_sit_under_notes_not_problems(tmp_path, monkeypatch):
+    """V6: the file-wins note (I3) and the disagreeing-runs note (2a) are information: under "Notes:", never under
+    "Problems:"."""
+    _facility(tmp_path, monkeypatch, {"IPTS-38016": [229197], "IPTS-36119": [229198, 229199]})
+    with open(_FROM_SCRATCH) as handle:
+        scratch = json.load(handle)
+    for values, note in (({**scratch, "experiment_id": "IPTS-36119"}, "229197 resolves under IPTS-38016"),
+                         (scratch, "229198, 229199 resolve under IPTS-36119")):
+        tab = SettingsEditorTab()
+        _load(tab, _settings_file(tmp_path / "home", values), monkeypatch)
+        problems, notes, _changed = _sections(tab)
+        assert note in notes and note not in problems, (problems, notes)
+        tab.close()

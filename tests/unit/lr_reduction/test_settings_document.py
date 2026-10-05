@@ -18,6 +18,7 @@ import textwrap
 import pytest
 
 from lr_reduction import field_spec as fs
+from lr_reduction import settings_document as sd
 from lr_reduction.new_reduction_from_file import json_to_config, save_config_json
 from lr_reduction.nr_reduction_config import NRReductionConfig
 from lr_reduction.save_reduced_data import make_json_safe
@@ -2579,3 +2580,345 @@ def test_file_spelling_agrees_with_what_save_writes_key_by_key(tmp_path):
     for field in fs.FIELD_SPEC:
         if field.name in saved:
             assert file_spelling(field, doc.get(field.name), doc.reduction_angles) == json.dumps(saved[field.name]), field.name
+
+
+# --------------------------------------------------------------------------
+# editor-ipts-inference (plan @ triage 2650210) — U1-U6. The facility tree is fabricated under tmp_path: every
+# lookup here is given its root, so no test reads /SNS (F6: it is not mounted on every machine).
+# --------------------------------------------------------------------------
+
+
+def _nexus_tree(root, layout):
+    """``{IPTS: [runs]}`` as ``<root>/<IPTS>/nexus/REF_L_<run>.nxs.h5``: the folder and name the reducer opens (F1)."""
+    for ipts, runs in layout.items():
+        folder = pathlib.Path(root) / ipts / "nexus"
+        folder.mkdir(parents=True, exist_ok=True)
+        for run in runs:
+            (folder / f"REF_L_{run}.nxs.h5").touch()
+    return pathlib.Path(root)
+
+
+def _settings_at(path, values):
+    """A settings file at `path` (folders made), holding `values` over a fresh config."""
+    path = pathlib.Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    config = NRReductionConfig()
+    for name, value in values.items():
+        setattr(config, name, value)
+    save_config_json(path, config)
+    return path
+
+
+def _ipts_notes(doc):
+    """The notes this slug adds: the ones that speak of an IPTS or a run's place, not K1's list defaults."""
+    return [line for line in doc.notes() if "IPTS" in line or "run number" in line]
+
+
+def test_ipts_of_run_is_the_folder_whose_nexus_holds_the_run(tmp_path):
+    """U1 (F1, F6): the IPTS of a run is the directory whose nexus folder holds REF_L_<run>.nxs.h5. No hit is (), a
+    run in two IPTS folders (a copied NeXus) is both, in IPTS-number order, and a folder that is not named
+    IPTS-<n> is not an IPTS."""
+    root = _nexus_tree(tmp_path, {"IPTS-36119": [229197, 229198], "IPTS-38016": [229199], "IPTS-2": [5],
+                                  "IPTS-10": [5], "IPTS-old": [229199], "notes": [229197]})
+    (tmp_path / "IPTS-99" / "shared").mkdir(parents=True)
+    assert sd.ipts_of_run(229197, root=root) == ("IPTS-36119",)
+    assert sd.ipts_of_run(229199, root=root) == ("IPTS-38016",)
+    assert sd.ipts_of_run(123, root=root) == ()
+    assert sd.ipts_of_run(5, root=root) == ("IPTS-2", "IPTS-10")
+
+
+def test_ipts_of_run_reads_an_unreadable_root_as_no_hit(tmp_path):
+    """U1: a root that cannot be listed (not mounted, a stale handle) is no hit, never an exception out of a Qt
+    slot (candidates()'s precedent)."""
+    assert sd.ipts_of_run(229197, root=tmp_path / "not-mounted") == ()
+    afile = tmp_path / "a-file"
+    afile.write_text("")
+    assert sd.ipts_of_run(229197, root=afile) == ()
+
+
+def test_the_lookup_root_defaults_to_the_reducers_own_base(monkeypatch):
+    """U1, frame: with no root given and no override, the lookup searches the folder the reducer joins an IPTS
+    onto (NRReductionConfig.base_path for an empty IPTS: /SNS/REF_L), not a second spelling of it."""
+    monkeypatch.setattr(sd, "IPTS_LOOKUP_ROOT", None, raising=False)
+    seen = []
+
+    def spy(path):
+        seen.append(os.fspath(path))
+        raise OSError("the test stops here: nothing under the facility root is read")
+
+    monkeypatch.setattr(sd.os, "scandir", spy)
+    assert sd.ipts_of_run(229197) == ()
+    assert seen == [os.fspath(NRReductionConfig().base_path)]
+
+
+_FILE_RUNS = [229197, 229198, 229199]
+
+
+def _resolved(tmp_path, root, file_value, runs, field_value="", path=None):
+    """Load a file holding `file_value` and `runs` from `path` (a folder outside the root by default) and resolve
+    its IPTS with the header field holding `field_value`."""
+    values = {"experiment_id": file_value, "RBnum": list(runs)}
+    if runs:
+        n = len(runs)
+        values.update(DBname=[f"db_{i}.dat" for i in range(n)], RB_Ymin=[140] * n, RB_Ymax=[150] * n,
+                      BkgROI=[[120, 130]] * n)
+    doc = SettingsDocument.from_file(_settings_at(path or tmp_path / "home" / "u" / "x.json", values))
+    doc.resolve_ipts(field_value, root=root)
+    return doc
+
+
+def test_a_file_whose_runs_are_under_its_ipts_keeps_it_and_says_nothing(tmp_path):
+    """U2, row 1: the file's own clean IPTS, its runs under it: held, nothing changed, no note."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-36119": _FILE_RUNS})
+    doc = _resolved(tmp_path, root, "IPTS-36119", _FILE_RUNS)
+    assert doc.get("experiment_id") == "IPTS-36119"
+    assert doc.changed_vs_seed() == {} and _ipts_notes(doc) == []
+
+
+def test_the_files_ipts_wins_over_runs_that_resolve_elsewhere_with_a_note(tmp_path):
+    """U2, row 2 (I3): the file's IPTS is never overridden. The runs resolve under another IPTS, and a note says
+    so, naming the runs, both IPTSs and the folder a reduction of this file reads."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-38016": _FILE_RUNS, "IPTS-36119": []})
+    doc = _resolved(tmp_path, root, "IPTS-36119", _FILE_RUNS)
+    assert doc.get("experiment_id") == "IPTS-36119" and doc.changed_vs_seed() == {}
+    assert _ipts_notes(doc) == [
+        "The run numbers 229197, 229198, 229199 resolve under IPTS-38016, not IPTS-36119; reduced as it stands, "
+        "this file looks for them in /SNS/REF_L/IPTS-36119/nexus"]
+    assert doc.validate() == []
+
+
+def test_an_empty_ipts_follows_runs_that_all_resolve_under_one(tmp_path):
+    """U2, row 3 (2a): the file names no IPTS and every run resolves under IPTS-36119: that IPTS is held, and
+    "Changed from the seed" shows it, since the file does not hold it until it is saved."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-36119": _FILE_RUNS})
+    doc = _resolved(tmp_path, root, "", _FILE_RUNS)
+    assert doc.get("experiment_id") == "IPTS-36119"
+    assert doc.changed_vs_seed() == {"experiment_id": ("", "IPTS-36119")}
+    assert _ipts_notes(doc) == [] and doc.validate() == []
+
+
+def test_runs_in_two_ipts_take_the_first_runs_with_a_note_naming_the_others(tmp_path):
+    """U2, row 4 (2a, the human: "choose the 1st IPTS that resolves"): the first run's IPTS, and a note names the
+    runs that resolve elsewhere."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-38016": [229197], "IPTS-36119": [229198, 229199]})
+    doc = _resolved(tmp_path, root, "", _FILE_RUNS)
+    assert doc.get("experiment_id") == "IPTS-38016"
+    assert _ipts_notes(doc) == [
+        "The run numbers 229198, 229199 resolve under IPTS-36119, not IPTS-38016; reduced as it stands, "
+        "this file looks for them in /SNS/REF_L/IPTS-38016/nexus"]
+
+
+def test_runs_that_resolve_nowhere_fall_back_to_the_field_with_a_note(tmp_path):
+    """U2, row 5 (2b): no run resolves, so the IPTS the header held before the Load is kept, and a note says the
+    runs resolved nowhere."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-1": []})
+    doc = _resolved(tmp_path, root, "", _FILE_RUNS, field_value="IPTS-1")
+    assert doc.get("experiment_id") == "IPTS-1"
+    assert doc.changed_vs_seed() == {"experiment_id": ("", "IPTS-1")}
+    assert _ipts_notes(doc) == [f"No IPTS in {root} holds the run numbers 229197, 229198, 229199"]
+
+
+def test_no_runs_keep_the_fields_ipts(tmp_path):
+    """U2, row 6 (2b): no angles, so no runs to resolve: the header's IPTS holds, shown as a change."""
+    doc = _resolved(tmp_path, _nexus_tree(tmp_path / "SNS", {}), "", [], field_value="IPTS-1")
+    assert doc.get("experiment_id") == "IPTS-1" and _ipts_notes(doc) == []
+    assert doc.changed_vs_seed() == {"experiment_id": ("", "IPTS-1")}
+
+
+def test_no_runs_and_no_field_take_the_ipts_of_the_folder_the_file_came_from(tmp_path):
+    """U2, row 7 (2c): no angles, an empty field, and the file loaded from under <root>/IPTS-7/: IPTS-7."""
+    root = _nexus_tree(tmp_path / "SNS", {})
+    doc = _resolved(tmp_path, root, "", [], path=root / "IPTS-7" / "shared" / "x.json")
+    assert doc.get("experiment_id") == "IPTS-7"
+    assert doc.changed_vs_seed() == {"experiment_id": ("", "IPTS-7")}
+
+
+def test_no_runs_no_field_and_a_file_from_elsewhere_stay_empty_without_a_problem(tmp_path):
+    """U2, row 8 (2d): nothing to infer from: "" kept, nothing changed, no note, no problem (no runs)."""
+    doc = _resolved(tmp_path, _nexus_tree(tmp_path / "SNS", {}), "", [])
+    assert doc.get("experiment_id") == "" and doc.changed_vs_seed() == {}
+    assert _ipts_notes(doc) == [] and doc.validate() == []
+
+
+def test_runs_that_resolve_nowhere_with_no_field_stay_empty_with_a_problem_and_a_note(tmp_path):
+    """U2, row 9 (2d, "and say so"): "" kept; the note says the runs resolved nowhere, and validate() reports the
+    empty IPTS (I4). The file's own folder is not consulted: it has runs (2c is for files without angles)."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-1": []})
+    doc = _resolved(tmp_path, root, "", _FILE_RUNS, path=root / "IPTS-7" / "shared" / "x.json")
+    assert doc.get("experiment_id") == "" and doc.changed_vs_seed() == {}
+    assert _ipts_notes(doc) == [f"No IPTS in {root} holds the run numbers 229197, 229198, 229199"]
+    assert any(line.startswith("IPTS (experiment_id) is empty") for line in doc.validate())
+
+
+def test_a_reported_ipts_is_held_as_loaded_and_nothing_is_looked_up(tmp_path, monkeypatch):
+    """U2, row 10 (A2, editor-load-fidelity B8): a file whose IPTS validate() reports keeps it as loaded; no
+    lookup runs (its runs would resolve) and today's problem stands."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-36119": _FILE_RUNS})
+    calls = []
+    monkeypatch.setattr(sd, "ipts_of_run", lambda *a, **_k: calls.append(a) or ())
+    monkeypatch.setattr(sd, "lookup_runs", lambda *a, **_k: calls.append(a) or None)
+    doc = _resolved(tmp_path, root, "../x", _FILE_RUNS)
+    assert doc.get("experiment_id") == "../x" and calls == []
+    assert _ipts_notes(doc) == []
+    assert any("experiment_id" in line for line in doc.validate())
+
+
+def test_a_dat_seed_resolves_like_a_json_file(tmp_path):
+    """U2, row 11: a reduced .dat's # Config: header with an empty IPTS and runs under IPTS-36119 resolves as the
+    .json does (2a), and records its path."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-36119": _FILE_RUNS})
+    config = NRReductionConfig()
+    config.RBnum = list(_FILE_RUNS)
+    path = tmp_path / "home" / "run.dat"
+    path.parent.mkdir(parents=True)
+    path.write_text(f"# Config: {json.dumps(make_json_safe(config.__dict__))}\n0.01 1.0 0.1 0.001\n")
+    doc = SettingsDocument.from_file(path)
+    assert doc.source_path == os.path.abspath(path)
+    doc.resolve_ipts("", root=root)
+    assert doc.get("experiment_id") == "IPTS-36119"
+
+
+def test_an_injected_document_without_runs_or_field_stays_empty(tmp_path):
+    """U2, row 12: no file, so no folder to infer from; no runs, an empty field: "" and nothing to say."""
+    doc = SettingsDocument.from_dict({"Sname": "x"})
+    doc.resolve_ipts("", root=_nexus_tree(tmp_path, {}))
+    assert doc.get("experiment_id") == "" and doc.changed_vs_seed() == {} and _ipts_notes(doc) == []
+
+
+def test_the_field_beats_the_files_folder(tmp_path):
+    """U2, the order (3) before (4): no runs, the field held IPTS-1, the file came from under IPTS-7: IPTS-1."""
+    root = _nexus_tree(tmp_path / "SNS", {})
+    doc = _resolved(tmp_path, root, "", [], field_value="IPTS-1", path=root / "IPTS-7" / "shared" / "x.json")
+    assert doc.get("experiment_id") == "IPTS-1"
+
+
+def test_a_field_validate_reports_is_not_carried_into_the_next_file(tmp_path):
+    """U2, (3) takes a clean IPTS only: a field holding "../x" (which validate() reports) is not inherited."""
+    doc = _resolved(tmp_path, _nexus_tree(tmp_path / "SNS", {}), "", [], field_value="../x")
+    assert doc.get("experiment_id") == ""
+
+
+def test_a_run_under_two_ipts_is_named_with_both(tmp_path):
+    """U2, the pathological copied NeXus: the run is under two IPTS folders. The first in IPTS-number order is
+    used, and a note names both (never silent)."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-10": [229197], "IPTS-2": [229197]})
+    doc = _resolved(tmp_path, root, "", [229197])
+    assert doc.get("experiment_id") == "IPTS-2"
+    assert _ipts_notes(doc) == ["The run number 229197 has a NeXus file under more than one IPTS: IPTS-2, IPTS-10"]
+
+
+def test_a_run_that_resolves_nowhere_is_named_beside_ones_that_do(tmp_path):
+    """U2, a partial lookup: two runs resolve under IPTS-36119 and one nowhere. IPTS-36119 is held, and the run no
+    IPTS holds is named: the reduction would not find its file."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-36119": [229197, 229198]})
+    doc = _resolved(tmp_path, root, "", _FILE_RUNS)
+    assert doc.get("experiment_id") == "IPTS-36119"
+    assert _ipts_notes(doc) == [f"No IPTS in {root} holds the run number 229199"]
+
+
+def test_a_lookup_that_cannot_run_says_so_when_the_file_named_no_ipts(tmp_path):
+    """U2, /SNS not mounted (a laptop): the runs cannot be looked up. The fallbacks apply, and a note says why no
+    IPTS came from the runs. A file with its own IPTS says nothing: there was nothing to infer."""
+    missing = tmp_path / "not-mounted"
+    doc = _resolved(tmp_path, missing, "", _FILE_RUNS, field_value="IPTS-1")
+    assert doc.get("experiment_id") == "IPTS-1"
+    assert _ipts_notes(doc) == [f"The IPTS could not be looked up from the run numbers: {missing} is not available here"]
+    assert _ipts_notes(_resolved(tmp_path, missing, "IPTS-36119", _FILE_RUNS)) == []
+
+
+def test_the_notes_follow_the_ipts_typed_after_the_load(tmp_path):
+    """U2, I6 with the notes: typing the IPTS the other runs resolve under re-reads the same lookup against it
+    (no new lookup) and the note now names the runs under the first IPTS; removing a run's angle drops it."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-38016": [229197], "IPTS-36119": [229198, 229199]})
+    doc = _resolved(tmp_path, root, "", _FILE_RUNS)
+    doc.set("experiment_id", "IPTS-36119")
+    assert _ipts_notes(doc) == [
+        "The run number 229197 resolves under IPTS-38016, not IPTS-36119; reduced as it stands, "
+        "this file looks for it in /SNS/REF_L/IPTS-36119/nexus"]
+    doc.remove_angle(0)
+    assert _ipts_notes(doc) == []
+
+
+def test_validate_reports_an_empty_ipts_when_runs_are_named():
+    """U3 (I4): "" with runs and no NeXus override is a problem naming the first run and the folder the reduction
+    would search; with no runs, or with an override, or with an IPTS, there is nothing to report."""
+    doc = SettingsDocument.from_dict({"RBnum": list(_FILE_RUNS)})
+    i4 = ("IPTS (experiment_id) is empty and 3 run numbers are set: the reduction would look for "
+          "REF_L_229197.nxs.h5 under /SNS/REF_L/nexus and not find it — enter the IPTS, or choose a NeXus path")
+    assert i4 in doc.validate()
+    one = SettingsDocument.from_dict({"RBnum": [229199]})
+    assert ("IPTS (experiment_id) is empty and 1 run number is set: the reduction would look for "
+            "REF_L_229199.nxs.h5 under /SNS/REF_L/nexus and not find it — enter the IPTS, or choose a NeXus path"
+            ) in one.validate()
+    for quiet in ({}, {"RBnum": []}, {"RBnum": [None, None]},
+                  {"RBnum": list(_FILE_RUNS), "_NEXUSpathRB_override": "/data/nexus"},
+                  {"RBnum": list(_FILE_RUNS), "experiment_id": "IPTS-1"}):
+        assert not [line for line in SettingsDocument.from_dict(quiet).validate() if "experiment_id) is empty" in line], quiet
+
+
+def test_from_file_records_where_the_document_came_from(tmp_path):
+    """U4: from_file records the absolute path it read (an attribute, never a config key: save() must not write
+    it); a document built any other way records none."""
+    path = _settings_at(tmp_path / "a" / "x.json", {"experiment_id": "IPTS-1"})
+    doc = SettingsDocument.from_file(path)
+    assert doc.source_path == os.path.abspath(path)
+    assert "source_path" not in doc.to_dict()
+    assert SettingsDocument.from_dict({}).source_path is None
+    assert SettingsDocument.for_new_file().source_path is None
+    assert SettingsDocument().source_path is None
+
+
+@pytest.mark.parametrize("ipts, remembered, expected", [
+    ("IPTS-36119", "/home/u", "{root}/IPTS-36119/shared"),
+    ("IPTS-36119", "{root}/IPTS-36119/shared/reduced", "{root}/IPTS-36119/shared/reduced"),
+    ("IPTS-36119", "{root}/IPTS-361190/shared", "{root}/IPTS-36119/shared"),
+    ("IPTS-36119", "", "{root}/IPTS-36119/shared"),
+    ("", "/home/u", "/home/u"),
+    ("../x", "/home/u", "/home/u"),
+    ("IPTS-404", "/home/u", "/home/u"),
+], ids=["ipts-remembered-elsewhere", "remembered-under-the-ipts", "a-prefix-is-not-under", "nothing-remembered",
+        "no-ipts", "a-reported-ipts", "no-shared-folder"])
+def test_load_start_folder(tmp_path, ipts, remembered, expected):
+    """U5 (I5): with a clean IPTS the dialog starts in its shared folder, unless the remembered folder is already
+    under that IPTS (a path prefix, not a string prefix); without one, or without the folder, where it was."""
+    root = tmp_path / "SNS"
+    for sub in ("IPTS-36119/shared/reduced", "IPTS-361190/shared"):
+        (root / sub).mkdir(parents=True)
+    fill = {"root": str(root)}
+    assert sd.load_start_folder(ipts, remembered.format(**fill), root=root) == expected.format(**fill)
+
+
+def test_settings_folders_are_the_ipts_folders_that_exist(tmp_path):
+    """U5 (I5, F7): the sidebar offers <IPTS>/shared, shared/reduced and shared/autoreduce, those that exist, in
+    that order; none without a clean IPTS."""
+    root = tmp_path / "SNS"
+    (root / "IPTS-1" / "shared" / "autoreduce").mkdir(parents=True)
+    assert sd.settings_folders("IPTS-1", root=root) == [str(root / "IPTS-1" / "shared"),
+                                                        str(root / "IPTS-1" / "shared" / "autoreduce")]
+    (root / "IPTS-1" / "shared" / "reduced").mkdir()
+    assert sd.settings_folders("IPTS-1", root=root)[1] == str(root / "IPTS-1" / "shared" / "reduced")
+    assert sd.settings_folders("", root=root) == [] and sd.settings_folders("../x", root=root) == []
+    assert sd.settings_folders("IPTS-404", root=root) == []
+
+
+def test_the_lookup_is_bounded(tmp_path, monkeypatch):
+    """U6 (A3): a file naming more distinct runs than MAX_RUN_LOOKUPS looks up only that many, once each, and a
+    note says the lookup was capped; within the cap, each distinct run is looked up once."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-1": range(1000, 1030)})
+    calls = []
+    real = sd._run_ipts
+
+    def counting(run, *args, **kwargs):
+        calls.append(run)
+        return real(run, *args, **kwargs)
+
+    monkeypatch.setattr(sd, "_run_ipts", counting)
+    runs = list(range(1000, 1000 + sd.MAX_RUN_LOOKUPS + 5)) * 2
+    doc = _resolved(tmp_path, root, "", runs)
+    assert calls == list(range(1000, 1000 + sd.MAX_RUN_LOOKUPS))
+    assert doc.get("experiment_id") == "IPTS-1"
+    assert (f"Only the first {sd.MAX_RUN_LOOKUPS} of {sd.MAX_RUN_LOOKUPS + 5} distinct run numbers were looked up "
+            f"for their IPTS") in _ipts_notes(doc)
+    calls.clear()
+    _resolved(tmp_path, root, "", [1000, 1001, 1000])
+    assert calls == [1000, 1001]
