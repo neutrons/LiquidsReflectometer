@@ -14,6 +14,7 @@ detector geometry, distance or band arithmetic lives here.
 """
 
 import functools
+import math
 import traceback
 
 import numpy as np
@@ -97,6 +98,21 @@ def _plain_log_ticks(axis):
     axis.set_minor_formatter(LogFormatter(labelOnlyBase=True))
 
 
+def _number(value):
+    """True for an int or a finite float, never for a bool (which Python counts as an int)."""
+    if isinstance(value, (bool, np.bool_)):
+        return False
+    return isinstance(value, (int, np.integer)) or (isinstance(value, (float, np.floating)) and math.isfinite(value))
+
+
+def _pixel(value, top):
+    """``value`` as a pixel index in ``0..top``, or None. A whole number is one, as an int or an integral float (a
+    JSON ``150.0``, which the data layer's ``_whole`` also takes); a bool, a fraction or text is not."""
+    if not _number(value) or not 0 <= value <= top or not float(value).is_integer():
+        return None
+    return int(value)
+
+
 class ROISelectionDialog(QDialog):
     """
     One Angles row's peak, background and the shared x range, shown on the run's detector images and profiles, and
@@ -119,7 +135,7 @@ class ROISelectionDialog(QDialog):
         self._bkg_edited = False
         self._notes = []
 
-        stride = f" (every {events.stride}th event)" if getattr(events, "stride", 1) > 1 else ""
+        stride = f" (1 event in {events.stride})" if events.stride > 1 else ""  # load_event_pixels' sampling
         self.setWindowTitle(f"{title}: peak, background and ranges{stride}" if title else "Select the ranges")
         self.resize(1000, 1000)
 
@@ -177,38 +193,38 @@ class ROISelectionDialog(QDialog):
     # ------------------------------------------------------- opening values
 
     def _opening_values(self, values, tof_band):
-        """The row's values as the spins hold them, and why any of them cannot be shown (B5, types table)."""
-        def pixel(value, top):
-            return int(value) if isinstance(value, (int, np.integer)) and 0 <= value <= top else UNSET
-
-        y_min, y_max = pixel(values.get("RB_Ymin"), self.n_y - 1), pixel(values.get("RB_Ymax"), self.n_y - 1)
+        """The row's values as the spins hold them, and a note for each one this detector cannot show (B5, the plan's
+        types table). Such a value starts "not set" (a peak edge) or at the whole detector (``data_x_range``), and it
+        is written only if it is changed here."""
+        peak = []
+        for name in ("RB_Ymin", "RB_Ymax"):
+            value = values.get(name)
+            edge = _pixel(value, self.n_y - 1)
+            if edge is None and value is not None:
+                self._notes.append(f"{name} {value!r} is not a row of this detector (0-{self.n_y - 1}); not set")
+            peak.append(UNSET if edge is None else edge)
         self._bkg_entry = values.get("BkgROI")
-        self._bkg_reason = None
-        bkg = [UNSET] * 4
-        if self._bkg_entry is None:
-            self._bkg_reason = "no background is set for this angle"
-        else:
-            try:
-                if UNSET in (y_min, y_max) and self._adjacent(self._bkg_entry):
-                    raise ValueError("the background is adjacent to the peak (two zero bounds), and the peak is not set")
-                bands = roi_estimate.background_bands(self._bkg_entry, y_min, y_max)
-                bkg = [int(round(v)) for band in bands for v in band]
-            except ValueError as exc:
-                self._bkg_reason = str(exc)
+        bands, _reason = self._row_background(None if UNSET in peak else tuple(peak))
+        bkg = [int(round(v)) for band in bands for v in band] if bands else [UNSET] * 4
         x_range = values.get("data_x_range")
-        if (isinstance(x_range, (list, tuple)) and len(x_range) == 2
-                and all(isinstance(v, (int, np.integer)) and 0 <= v < self.n_x for v in x_range)):
-            x_values = [int(x_range[0]), int(x_range[1])]
-        else:
+        x_values = ([_pixel(v, self.n_x - 1) for v in x_range]
+                    if isinstance(x_range, (list, tuple)) and len(x_range) == 2 else [None, None])
+        if None in x_values or x_values[0] > x_values[1]:
             x_values = [0, self.n_x - 1]
-            self._notes.append(f"data_x_range {x_range!r} is not two pixels on this detector; showing every X "
-                               f"pixel (written only if you change it)")
+            self._notes.append(f"data_x_range {x_range!r} is not two ascending pixels on this detector; showing every "
+                               f"X pixel (written only if you change it)")
         band = tof_band if tof_band is not None else (self.tof_edges[0], self.tof_edges[-1])
         tof = [int(np.floor(band[0])), int(np.ceil(band[1]))]
         window = (values.get("tof_min"), values.get("tof_max"))
-        self._tof_window = window if None not in window else None
-        self._use_bs = values.get("useBS") is not False and values.get("useBS") != 0
-        return {"peak": [y_min, y_max], "bkg": bkg, "x": x_values, "tof": tof}
+        self._tof_window = None
+        if None not in window:
+            if all(_number(v) for v in window) and window[0] <= window[1]:
+                self._tof_window = (float(window[0]), float(window[1]))
+            else:
+                self._notes.append(f"the reduction's TOF window {list(window)!r} is not two ascending numbers; not "
+                                   f"drawn")
+        self._use_bs = values.get("useBS") != 0  # off for False and 0 (False == 0); on for True, 1, None and []
+        return {"peak": peak, "bkg": bkg, "x": x_values, "tof": tof}
 
     @staticmethod
     def _adjacent(entry):
@@ -303,14 +319,10 @@ class ROISelectionDialog(QDialog):
     def _y_range_selected(self, low, high):
         mode = self._mode()
         if mode == self.PEAK:
-            spins = self.peak_spins
-        elif mode == self.BACKGROUND_LEFT:
-            spins = self.bkg_spins[:2]
+            self._apply_range(self.peak_spins, low, high)
         else:
-            spins = self.bkg_spins[2:]
-        if mode != self.PEAK:
-            self._bkg_edited = True
-        self._apply_range(spins, low, high)
+            self._apply_range(self.bkg_spins[:2] if mode == self.BACKGROUND_LEFT else self.bkg_spins[2:], low, high,
+                              background=True)
 
     def _x_range_selected(self, low, high):
         self._apply_range(self.x_spins, low, high)
@@ -318,15 +330,24 @@ class ROISelectionDialog(QDialog):
     def _tof_range_selected(self, low, high):
         self._apply_range(self.tof_spins, low, high)
 
-    def _apply_range(self, spins, low, high):
-        low, high = sorted((int(round(low)), int(round(high))))
+    def _apply_range(self, spins, low, high, background=False):
+        """A drag's span, matplotlib's ascending ``(low, high)``, as whole pixels inside the spins' range (V4). A click
+        is not a drag: once a span has been drawn, matplotlib reports a click as a span of zero width, and the range
+        stays. A drag wholly off the detector changes nothing and says so."""
+        if low == high:
+            return
+        low, high = int(round(low)), int(round(high))
         bottom = 0 if spins[0].minimum() == UNSET else spins[0].minimum()  # a drag never sets "not set"
-        low = max(bottom, min(spins[0].maximum(), low))
-        high = max(low, min(spins[1].maximum(), high))
+        top = spins[1].maximum()
+        if high < bottom or low > top:
+            self.status.setText(f"The drag ({low} to {high}) was off the detector; nothing changed")
+            return
+        if background:
+            self._bkg_edited = True
         self._updating = True
         try:
-            spins[0].setValue(low)
-            spins[1].setValue(high)
+            spins[0].setValue(max(bottom, low))  # Qt alone would stop at "not set"
+            spins[1].setValue(high)  # Qt stops at the last row
         finally:
             self._updating = False
         self._values_changed()
@@ -353,25 +374,24 @@ class ROISelectionDialog(QDialog):
             self.status.setText(f"Estimate refused: {exc}")
             return
         try:
-            background = list(roi_estimate.default_bkg_roi((y_min, y_max), self.n_y))
+            background = roi_estimate.default_bkg_roi((y_min, y_max), self.n_y)
             note = None
         except ValueError as exc:
-            background = [UNSET] * 4
-            note = f"Estimate set the peak; background not set: {exc}"
+            background = None
+            note = f"Estimate set the peak and left the background as it was: {exc}"
         self._updating = True
         try:
             self.peak_spins[0].setValue(int(y_min))
             self.peak_spins[1].setValue(int(y_max))
-            for spin, value in zip(self.bkg_spins, background):
-                spin.setValue(int(value))
-            self._bkg_edited = True
+            if background is not None:
+                for spin, value in zip(self.bkg_spins, background):
+                    spin.setValue(int(value))
+                self._bkg_edited = True
         finally:
             self._updating = False
         self._update()
         self._reset_limits()
-        self._report_states()
-        if note:
-            self.status.setText(note)
+        self._report_states(note)
 
     # ------------------------------------------------------------ plotting
 
@@ -448,13 +468,7 @@ class ROISelectionDialog(QDialog):
                 span = axis.axvspan(0, 1, **kwargs) if vertical else axis.axhspan(0, 1, **kwargs)
                 self.overlays[name][axis_name] = span
                 self._vertical[(name, axis_name)] = vertical
-        if self._tof_window is not None:
-            for axis_name, artist in self.overlays["tof_window"].items():
-                _move_span(artist, float(self._tof_window[0]), float(self._tof_window[1]),
-                           self._vertical[("tof_window", axis_name)])
-        else:
-            for artist in self.overlays["tof_window"].values():
-                artist.set_visible(False)
+        self._move("tof_window", self._tof_window)
         for axis in (self.y_axis, self.tof_axis, self.x_axis):
             axis.legend(loc="upper right", fontsize="small")
 
@@ -465,28 +479,40 @@ class ROISelectionDialog(QDialog):
         y_min, y_max = self._spin_values(self.peak_spins)
         return (y_min, y_max) if UNSET not in (y_min, y_max) and y_min <= y_max else None
 
-    def _bands(self):
-        """The background bands the reducer will average, or None: from the spins once the background has been
-        edited, else from the row's own entry and the current peak (an untouched ``[a, b, 0, 0]`` follows the peak,
-        as the reducer's does)."""
-        if self._bkg_edited:
-            bkg = self._spin_values(self.bkg_spins)
-            if UNSET in bkg:
-                return None
-            entry = bkg
-        else:
-            if self._bkg_reason is not None:
-                return None
-            entry = self._bkg_entry
-        peak = self._peak()
-        if peak is None:
-            if not self._bkg_edited and self._adjacent(entry):
-                return None  # the adjacent form needs the peak's edges
-            peak = (UNSET, UNSET)  # four explicit bounds do not use the peak
-        try:
-            return roi_estimate.background_bands(entry, *peak)
-        except ValueError:
+    def _row_background(self, peak):
+        """The row's own ``BkgROI`` entry with ``peak`` (None when not set): ``(bands, None)``, the bands the reducer
+        averages, or ``(None, reason)`` when it could not (B5). An ``[a, b, 0, 0]`` follows the peak, as the
+        reducer's does, so a reason can go once the peak is set (V14)."""
+        entry = self._bkg_entry
+        if peak is None and self._adjacent(entry):
+            return None, "the background is adjacent to the peak (two zero bounds), and the peak is not set"
+        try:  # four explicit bounds do not use the peak
+            return roi_estimate.background_bands(entry, *(peak or (UNSET, UNSET))), None
+        except ValueError as exc:
+            return None, str(exc)
+
+    def _edited_bounds(self):
+        """The four bounds typed, dragged or estimated here, or None while the background is the row's own: never
+        edited, or cleared to "not set" in all four again."""
+        bkg = self._spin_values(self.bkg_spins)
+        if not self._bkg_edited or all(value == UNSET for value in bkg):
             return None
+        return bkg
+
+    def _background(self):
+        """``(bands, reason)``: the bands the reducer will average for this row once OK is pressed, or None and why.
+        Bounds edited here are written only as four ascending non-zero pixels (B10), so anything else draws nothing
+        and says why."""
+        bkg = self._edited_bounds()
+        if bkg is None:
+            return self._row_background(self._peak())
+        if UNSET in bkg:
+            return None, "give all four bounds, or clear all four to keep the row's own"
+        if 0 in bkg:
+            return None, "pixel 0 is the reducer's sentinel; give four non-zero bounds"
+        if bkg != sorted(bkg):
+            return None, "the four bounds must ascend"
+        return roi_estimate.background_bands(bkg, UNSET, UNSET), None
 
     def _reversed(self):
         """The ranges that are reversed now. Typing "190" into an x bound passes through 1 and 19: a step on the way
@@ -518,15 +544,16 @@ class ROISelectionDialog(QDialog):
         self.tof_line.set_data((self.tof_edges[:-1] + self.tof_edges[1:]) / 2.0, tof_profile)
 
         self._move("peak", peak)
-        bands = self._bands()
+        bands, _reason = self._background()
         self._move("bkg_low", bands[0] if bands else None)
         self._move("bkg_high", bands[1] if bands else None)
         self._move("x_range", x_range)
         self._move("tof_filter", tof_filter)
 
-        for axis in (self.y_axis, self.tof_axis, self.x_axis):
+        for axis, line in ((self.y_axis, self.y_line), (self.tof_axis, self.tof_line), (self.x_axis, self.x_line)):
             axis.relim()
-            axis.autoscale_view(scalex=False)
+            if axis.get_yscale() == "linear" or np.any(line.get_ydata() > 0):  # a log axis has no scale for no counts
+                axis.autoscale_view(scalex=False)
         self.canvas.draw_idle()
 
     def _move(self, name, edges):
@@ -555,45 +582,53 @@ class ROISelectionDialog(QDialog):
         self.x_axis.set_xlim(0, self.n_x - 1)
         self.canvas.draw_idle()
 
-    def _report_states(self):
+    def _report_states(self, extra=None):
         """The status line (B5) and whether OK is available (B10)."""
         notes = list(self._notes) + [f"{name} is reversed" for name in self._reversed()]
-        if self._bands() is None:
-            if self._bkg_edited:
-                notes.append("Background (BkgROI): not set — give all four bounds, or none")
-            elif self._bkg_reason is not None:
-                notes.append(f"Background (BkgROI): not set — {self._bkg_reason}")
+        y_min, y_max = self._spin_values(self.peak_spins)
+        if UNSET in (y_min, y_max):
+            notes.append("OK waits for a peak (RB_Ymin, RB_Ymax)")
+        elif y_min > y_max:
+            notes.append("the peak is reversed")
+        bands, reason = self._background()
+        edited = self._edited_bounds() is not None
+        if bands is None:
+            notes.append(f"Background (BkgROI): {'OK waits' if edited else 'not set'} — {reason}")
         elif not self._use_bs:
             notes.append("Background drawn but not subtracted: useBS is off for this angle")
+        if self._bkg_edited and not edited:
+            notes.append("Background (BkgROI): cleared here, so the row keeps its own")
+        if extra:
+            notes.append(extra)
         self.status.setText("; ".join(notes))
         self.ok_button.setEnabled(self._valid())
 
     def _valid(self):
-        """B10: OK needs a peak, low <= high, and a background either untouched or four ascending non-zero
-        integers (never pixel 0, the reducer's sentinel), or not set at all."""
+        """B10: OK needs a set, ascending peak and no reversed range. A background edited here must be four ascending
+        non-zero bounds (never pixel 0, the reducer's sentinel); one never edited, or cleared again, is the row's own,
+        and OK leaves it as it is."""
         if self._peak() is None or self._reversed():
             return False
-        if not self._bkg_edited:
-            return True
-        bkg = self._spin_values(self.bkg_spins)
-        if all(value == UNSET for value in bkg):
-            return True
-        return UNSET not in bkg and 0 not in bkg and bkg == sorted(bkg)
+        return self._edited_bounds() is None or self._background()[0] is not None
 
     # ------------------------------------------------------------- results
 
     def changes(self):
         """B9: the fields whose values differ from those the dialog opened with, as the document holds them.
-        ``RB_Ymin``/``RB_Ymax`` (ints), ``BkgROI`` (four ascending ints, only once the background was edited) and
-        ``data_x_range`` (two ints, for every angle). The TOF view filter is never among them (B8)."""
+        ``RB_Ymin``/``RB_Ymax`` (ints, never "not set"), ``BkgROI`` and ``data_x_range`` (two ints, for every angle).
+        ``BkgROI`` is four ascending non-zero ints edited here, reported when they differ from what the row's own entry
+        gives for the final peak: an untouched ``[a, b, 0, 0]`` stays, and follows the peak as drawn (V7). The TOF view
+        filter is never among them (B8)."""
         out = {}
         opening = self._opening
         for name, value, before in zip(("RB_Ymin", "RB_Ymax"), self._spin_values(self.peak_spins), opening["peak"]):
             if value != before and value != UNSET:
                 out[name] = int(value)
-        bkg = self._spin_values(self.bkg_spins)
-        if self._bkg_edited and UNSET not in bkg and bkg != opening["bkg"]:
-            out["BkgROI"] = [int(v) for v in bkg]
+        bkg = self._edited_bounds()
+        if bkg is not None and self._background()[0] is not None:
+            own, _reason = self._row_background(self._peak())
+            if own is None or [v for band in own for v in band] != bkg:
+                out["BkgROI"] = [int(v) for v in bkg]
         x_range = self._spin_values(self.x_spins)
         if x_range != opening["x"]:
             out["data_x_range"] = [int(v) for v in x_range]
