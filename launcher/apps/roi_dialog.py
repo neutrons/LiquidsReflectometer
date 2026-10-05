@@ -7,10 +7,11 @@ dialog only by 65c83d9's ``parse_math=False`` title): ``_move_span`` (:396-406) 
 (3f74d41). The lift is commit b041aa2, verbatim; the changes since are this slug's.
 
 The dialog is a view over one run's events (``lr_reduction.roi_estimate.RunEvents``) and one Angles row's values.
-It reads no file and writes no document: the tab's slot resolves the run, loads its events once and applies what
-:meth:`ROISelectionDialog.changes` reports. Every number it draws comes from ``lr_reduction.roi_estimate``: the
-images, the profiles, the background bands the reducer averages, the estimate and the default background. No
-detector geometry, distance or band arithmetic lives here.
+It reads no file and writes no document (E4, and acceptance 4's literal check): the tab's slot resolves the run,
+loads its events once and applies what :meth:`ROISelectionDialog.changes` reports. Every number it draws comes from
+``lr_reduction.roi_estimate``: the images, the profiles, the background bands the reducer averages, the estimate and
+the default background (V2, V3, V10, ``test_each_plot_is_the_data_layers_for_the_ranges_shown``). No detector
+geometry, distance or band arithmetic lives here (V12).
 """
 
 import functools
@@ -64,8 +65,8 @@ def _move_span(patch, low, high, vertical=True):
 
 def _guarded(method):
     """A slot that raises reports into the status line instead of leaving the slot: an exception out of a PyQt slot
-    reaches qFatal() and aborts the launcher (L3). Typing a value passes through intermediate ones, and none may be
-    fatal."""
+    reaches qFatal() and aborts the launcher (L3; ``test_an_error_inside_a_slot_is_a_status_line_not_an_abort``, and
+    the battery's M5 aborts the run). Typing a value passes through intermediate ones, and none may be fatal."""
 
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
@@ -81,7 +82,7 @@ def _guarded(method):
 
 def _plain_log_ticks(axis):
     """Log tick labels as plain text ("1e+02"). The default formatter writes mathtext, which a font without the
-    glyphs sends into matplotlib's fallback recursion (F7, L6); no ``parse_math`` setting reaches a tick label."""
+    glyphs sends into matplotlib's fallback recursion (F7, L6); no ``parse_math`` setting reaches a tick label (V11)."""
     axis.set_major_formatter(LogFormatter())
     axis.set_minor_formatter(LogFormatter(labelOnlyBase=True))
 
@@ -109,8 +110,9 @@ class ROISelectionDialog(QDialog):
     The peak and the background belong to the row. The x pixel range is ``data_x_range``, shared by every angle.
     The TOF range is a view filter only: it selects the events the profiles and the XY image are made of (at the
     highest angles nearly every count outside the reflected signal is background, and narrowing the TOF range
-    brings the peak out), and it is never reported. The reduction's own TOF window (``tof_min``/``tof_max``) is
-    drawn when the row has one, and edited in the table.
+    brings the peak out), and it is never reported (V8). The reduction's own TOF window (``tof_min``/``tof_max``) is
+    drawn when the row has one (``test_the_reductions_tof_window_is_drawn_when_the_row_has_one``), and edited in the
+    table.
     """
 
     PEAK, BACKGROUND_LEFT, BACKGROUND_RIGHT = "peak", "left", "right"
@@ -321,7 +323,8 @@ class ROISelectionDialog(QDialog):
     def _apply_range(self, spins, low, high, background=False):
         """A drag's span, matplotlib's ascending ``(low, high)``, as whole pixels inside the spins' range (V4). A click
         is not a drag: once a span has been drawn, matplotlib reports a click as a span of zero width, and the range
-        stays. A drag wholly off the detector changes nothing and says so."""
+        stays. A drag wholly off the detector changes nothing and says so
+        (``test_a_drag_past_the_detector_edge_stops_at_the_edge``)."""
         if low == high:
             return
         low, high = int(round(low)), int(round(high))
@@ -354,7 +357,8 @@ class ROISelectionDialog(QDialog):
     @_guarded
     def _estimate(self, *_checked):
         """B7: the data layer's estimate on the Y profile shown, and its default background. A refusal is a
-        message and changes no value; a peak with no room for a background sets the peak and says so."""
+        message and changes no value (V9); a peak with no room for a background sets the peak and says so
+        (``test_estimate_near_a_detector_edge_sets_the_peak_and_leaves_the_background``)."""
         try:
             y_min, y_max = roi_estimate.estimate_peak_range(self.y_profile)
         except roi_estimate.CannotEstimateError as exc:
@@ -420,7 +424,7 @@ class ROISelectionDialog(QDialog):
         (self.x_line,) = self.x_axis.plot([], [], drawstyle="steps-mid", color="tab:blue")
 
     def _build_overlays(self):
-        """The overlays are made once and moved (B11). Each is drawn on every plot that has its axis (B4):
+        """The overlays are made once and moved (B11, V13). Each is drawn on every plot that has its axis (B4, V3, V5):
         ``overlays[name][axis]`` is the artist, a span along the data x axis on a profile and along the data y axis
         on an image's Y."""
         ax = {"y_axis": self.y_axis, "xy_axis": self.xy_axis, "ytof_axis": self.ytof_axis,
@@ -489,7 +493,7 @@ class ROISelectionDialog(QDialog):
     def _background(self):
         """``(bands, reason)``: the bands the reducer will average for this row once OK is pressed, or None and why.
         Bounds edited here are written only as four ascending non-zero pixels (B10), so anything else draws nothing
-        and says why."""
+        and says why (``test_a_background_edited_into_one_the_dialog_cannot_write_waits_with_the_reason``)."""
         bkg = self._edited_bounds()
         if bkg is None:
             return self._row_background(self._peak())
@@ -503,13 +507,14 @@ class ROISelectionDialog(QDialog):
 
     def _reversed(self):
         """The ranges that are reversed now. Typing "190" into an x bound passes through 1 and 19: a step on the way
-        to a value, never data. The plots keep their last state and OK waits."""
+        to a value, never data. The plots keep their last state and OK waits
+        (``test_a_reversed_range_is_named_and_ok_waits``)."""
         return [name for name, spins in (("the x range", self.x_spins), ("the TOF filter", self.tof_spins))
                 if spins[0].value() > spins[1].value()]
 
     def _update(self, images=True):
         """Recompute the profiles for the current ranges and move the overlays. An image is recomputed only when
-        its own input changed: the XY image's view filter, the Y-TOF image's x range (B11)."""
+        its own input changed: the XY image's view filter, the Y-TOF image's x range (B11, V13)."""
         if self._reversed():
             return
         x_range = tuple(self._spin_values(self.x_spins))
@@ -605,7 +610,7 @@ class ROISelectionDialog(QDialog):
         ``RB_Ymin``/``RB_Ymax`` (ints, never "not set"), ``BkgROI`` and ``data_x_range`` (two ints, for every angle).
         ``BkgROI`` is four ascending non-zero ints edited here, reported when they differ from what the row's own entry
         gives for the final peak: an untouched ``[a, b, 0, 0]`` stays, and follows the peak as drawn (V7). The TOF view
-        filter is never among them (B8)."""
+        filter is never among them (B8, V8)."""
         out = {}
         opening = self._opening
         for name, value, before in zip(("RB_Ymin", "RB_Ymax"), self._spin_values(self.peak_spins), opening["peak"]):

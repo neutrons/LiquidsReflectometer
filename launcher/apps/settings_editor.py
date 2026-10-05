@@ -1137,10 +1137,10 @@ class SettingsEditorTab(QtWidgets.QWidget):
         """B1, B2, B9: the ROI pop-out for the selected row, and what it reports written to that row.
 
         The row is read once, at the gesture, and passed on: nothing later consults the selection, so the row the
-        dialog was opened for is the row written (the active-row trap). Only the fields the dialog reports changed
-        are written, through the document: RB_Ymin, RB_Ymax and BkgROI with ``set_angle_field``, which keeps every
-        column one length; data_x_range, shared by every angle, with ``set``. The dialog writes nothing, and no
-        file is opened for writing.
+        dialog was opened for is the row written (the active-row trap; E2). Only the fields the dialog reports
+        changed are written, through the document: RB_Ymin, RB_Ymax and BkgROI with ``set_angle_field``, which pads a
+        short column only as far as the row (review 1568397; E2's short leg); data_x_range, shared by every angle,
+        with ``set`` (E8). The dialog writes nothing, and no file is opened for writing (E4).
         """
         row = self.angle_table.currentRow()
         if row < 0:
