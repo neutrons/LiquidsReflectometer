@@ -3,8 +3,10 @@
 Source: neutrons/LiquidsReflectometer PR #197, ``launcher/apps/json_settings_builder.py`` as hardened at
 ``agentic/feature/harden-review-branch`` @ 65c83d9 (upstream ``exp-json-settings-builder`` @ 3ce5e20 differs in the
 dialog only by 65c83d9's ``parse_math=False`` title): ``_move_span`` (:396-406) and ``ROISelectionDialog``
-(:409-690). Authors of the lifted lines: Mathieu Doucet (f5513c7, 8191e49, 1e692c7, ab22307) and welbournR
-(3f74d41). The lift is commit b041aa2, verbatim; the changes since are this slug's.
+(:409-690). Authors of the lifted lines: Mathieu Doucet (f5513c7, 8191e49, 1e692c7, ab22307), and the hardening commit
+65c83d9's ``parse_math=False`` title (8 lines); measured with ``git log -L 396,690`` and ``git blame -w -M -C`` on that
+file. b041aa2's body also names welbournR (3f74d41) in error: that commit wrote none of the lifted lines. The lift is
+commit b041aa2, verbatim; the changes since are this slug's.
 
 The dialog is a view over one run's events (``lr_reduction.roi_estimate.RunEvents``) and one Angles row's values.
 It reads no file and writes no document (E4, and acceptance 4's literal check): the tab's slot resolves the run,
@@ -47,6 +49,12 @@ except ImportError:  # the editor works without the ROI plots; its button says w
 
 #: A spin box's "not set": one below every pixel index, shown as the words.
 UNSET = -1
+
+#: Rows shown beyond the peak and background on each side when the Y profile opens or Estimate moves it.
+VIEW_MARGIN = 30
+
+#: The TOF view filter's spin step, in microseconds.
+TOF_STEP = 100
 
 
 def _move_span(patch, low, high, vertical=True):
@@ -137,7 +145,7 @@ class ROISelectionDialog(QDialog):
 
         layout = QVBoxLayout()
         self.setLayout(layout)
-        # A layout engine would run on every redraw, which is too slow while dragging
+        # No layout engine: it would run on every redraw, too slow while dragging (#197's comment; inferred, not timed)
         self.figure = Figure(figsize=(9, 9))
         grid = self.figure.add_gridspec(4, 2, height_ratios=[2.2, 1.6, 1, 1])
         self.xy_axis = self.figure.add_subplot(grid[0, 0])
@@ -167,7 +175,7 @@ class ROISelectionDialog(QDialog):
         self._report_states()
 
         # Dragging on a profile sets the range it shows; on the Y profile, the range the radio buttons choose.
-        # useblit keeps a drag from redrawing the whole figure at every mouse move.
+        # useblit: a drag does not redraw the whole figure at every move (#197's comment; inferred, not timed).
         self.selectors = [
             SpanSelector(
                 axis, callback, "horizontal", useblit=True,
@@ -265,7 +273,7 @@ class ROISelectionDialog(QDialog):
         self.tof_spins = []
         for value in opening["tof"]:
             spin = self._make_spin(value, high, unset=False, minimum=low)  # Qt holds a band past the span at its edge
-            spin.setSingleStep(100)
+            spin.setSingleStep(TOF_STEP)
             spin.setToolTip("Only the events of this TOF range make the Y and X profiles and the XY image; "
                             "never written (the reduction's TOF window is edited in the table)")
             self.tof_spins.append(spin)
@@ -282,11 +290,11 @@ class ROISelectionDialog(QDialog):
         self.log_check.toggled.connect(self._set_log_scale)
         grid.addWidget(self.log_check, 5, 1)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        self.ok_button = buttons.button(QDialogButtonBox.Ok)
-        grid.addWidget(buttons, 5, 3, 1, 2)
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        self.ok_button = self.buttons.button(QDialogButtonBox.Ok)
+        grid.addWidget(self.buttons, 5, 3, 1, 2)
         return box
 
     def _make_spin(self, value, maximum, unset=True, background=False, minimum=0):
@@ -565,12 +573,15 @@ class ROISelectionDialog(QDialog):
         self.canvas.draw_idle()
 
     def _reset_limits(self):
-        """Show the region around the ROIs, or around the peak of the profile if there is none yet."""
+        """Each axis on its data (B3′, V18): the Y profile around the ROIs (or the profile's peak when there are none),
+        the TOF profile and the Y-TOF image across the TOF edges, the X profile across the detector. Set here because
+        the overlays are made as spans at (0, 1), which would pull x = 0 into an axis left to autoscale (A1)."""
         edges = [value for value in self._spin_values(self.peak_spins + self.bkg_spins) if value != UNSET]
         if not edges:
             edges = [int(np.argmax(self.y_profile))] if np.any(self.y_profile) else [self.n_y // 2]
-        self.y_axis.set_xlim(max(0, min(edges) - 30), min(self.n_y - 1, max(edges) + 30))
+        self.y_axis.set_xlim(max(0, min(edges) - VIEW_MARGIN), min(self.n_y - 1, max(edges) + VIEW_MARGIN))
         self.tof_axis.set_xlim(self.tof_edges[0], self.tof_edges[-1])
+        self.ytof_axis.set_xlim(self.tof_edges[0], self.tof_edges[-1])
         self.x_axis.set_xlim(0, self.n_x - 1)
         self.canvas.draw_idle()
 

@@ -1140,7 +1140,9 @@ class SettingsEditorTab(QtWidgets.QWidget):
         dialog was opened for is the row written (the active-row trap; E2). Only the fields the dialog reports
         changed are written, through the document: RB_Ymin, RB_Ymax and BkgROI with ``set_angle_field``, which pads a
         short column only as far as the row (review 1568397; E2's short leg); data_x_range, shared by every angle,
-        with ``set`` (E8). The dialog writes nothing, and no file is opened for writing (E4).
+        with ``set`` (E8). The dialog writes nothing. The slot writes no settings file and no data file: the one thing
+        it records is the folder a chosen run came from, in the launcher's QSettings (``roi_nexus_dir``), so that the
+        next file dialog opens there (B2; E4 watches every file and key).
         """
         row = self.angle_table.currentRow()
         if row < 0:
@@ -1190,8 +1192,10 @@ class SettingsEditorTab(QtWidgets.QWidget):
         except TypeError:  # an experiment_id of None makes the path property raise
             folder = None
         path = None
-        if run is not None and folder is not None and (folder / f"REF_L_{run}.nxs.h5").is_file():
-            path = folder / f"REF_L_{run}.nxs.h5"
+        if run is not None and folder is not None:
+            path = folder / f"REF_L_{run}.nxs.h5"  # the reducer's own name for the run (nr_reduction_calc.py:325)
+            if not path.is_file():
+                path = None
         if path is None:
             start = str(folder) if folder is not None and folder.is_dir() else self.settings.value("roi_nexus_dir", "")
             chosen, _ = QtWidgets.QFileDialog.getOpenFileName(
