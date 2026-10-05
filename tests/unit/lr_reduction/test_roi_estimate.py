@@ -772,16 +772,19 @@ def test_profiles_are_marginals_of_the_images(nexus):
 
 # -- B6: the reducer's background bands --------------------------------------
 
-_ACCEPTED = [[133, 149, 0, 0], [120, 130, 150, 160], [160, 150, 130, 120], [0, 0, 10, 300]]
-_REFUSED = [[0, 10, 150, 160], [0, 0, 0, 0], [0, 140, 150, 160], [121, 130], [133, 149, 0], [], None, "120, 130"]
+_ACCEPTED = [[133, 149, 0, 0], [120, 130, 150, 160], [160, 150, 130, 120], [0, 0, 10, 300], [133.5, 149.5, 0, 0]]
+_REFUSED = [[0, 10, 150, 160], [0, 0, 0, 0], [0, 140, 150, 160], [121, 130], [133, 149, 0], [], None, "120, 130",
+            [float("nan"), 149, 0, 0], [133, float("inf"), 0, 0], [[133, 149, 0, 0], [120, 130, 150, 160]]]
 
 
 @pytest.mark.parametrize("bkg", _ACCEPTED)
 def test_background_bands_are_the_rows_the_reducer_averages(bkg):
-    """T8 (F6): point-wise equal to the reducer's _background_roi_sorter where it returns four bounds."""
+    """T8 (F6): point-wise equal to the reducer's _background_roi_sorter where it returns four bounds, values
+    and types: a fractional bound stays as the sorter keeps it (the reducer's mask then starts at the next row),
+    never truncated to an int."""
     from lr_reduction.nr_reduction_calc import NR_Reduction
 
-    expected = [int(v) for v in NR_Reduction._background_roi_sorter(None, bkg, 136, 146)]
+    expected = NR_Reduction._background_roi_sorter(None, bkg, 136, 146).tolist()
     (b0, b1), (b2, b3) = re_mod.background_bands(bkg, 136, 146)
     assert [b0, b1, b2, b3] == expected
 
@@ -789,7 +792,9 @@ def test_background_bands_are_the_rows_the_reducer_averages(bkg):
 @pytest.mark.parametrize("bkg", _REFUSED)
 def test_background_bands_refuses_what_the_reducer_cannot_use(bkg):
     """T8 (F6): one, three or four zeros (pixel 0 is the reducer's sentinel), a length other than four, no
-    entry, not numbers: ValueError naming the background, never None or two bounds."""
+    entry, not numbers: ValueError naming the background, never None or two bounds. So is a bound that is not
+    finite, which the sorter passes through: a NaN band selects no rows and its centre is NaN, and an infinite
+    one's centre is infinite. So is the per-angle list of entries in place of one angle's entry."""
     with pytest.raises(ValueError, match="background"):
         re_mod.background_bands(bkg, 136, 146)
 
