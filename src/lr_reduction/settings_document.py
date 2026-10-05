@@ -66,7 +66,8 @@ CANDIDATE_SUFFIXES = (".txt", ".dat")
 IPTS_LOOKUP_ROOT = None
 
 #: At most this many distinct run numbers are looked up per Load (I2, A3). A lookup lists the root once, then
-#: stats one file per IPTS folder per run: ~0.1 s a run on the facility tree (the Advisor's F6), so ~2 s at most.
+#: stats one file per IPTS folder per run. Measured by the Integrator on the analysis node (I-42, 2026-10-05): 571
+#: IPTS folders; ~1.35 s for the first lookup on a cold mount, ~13 ms a run after it; a capped Load 0.04-0.33 s.
 MAX_RUN_LOOKUPS = 20
 
 #: Where an IPTS keeps its settings files (F7: 101 of 104 real files): the Load and Save dialogs' sidebar (I5).
@@ -112,9 +113,15 @@ def _held_as_bool(value):
 # -- the IPTS a Load holds (editor-ipts-inference) ----------------------------
 
 
+def _empty_ipts(value):
+    """No IPTS: ``""``, ``None`` (a file's ``null`` or missing key) or only spaces. One definition, for the
+    resolution, I4 and the notes (v2)."""
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
 def _clean_ipts(value):
     """``value`` if it is an IPTS ``validate()`` accepts, else ``""``."""
-    if not isinstance(value, str) or not value:
+    if not isinstance(value, str) or _empty_ipts(value):
         return ""
     return "" if fs.get("experiment_id").check(value) else value
 
@@ -183,16 +190,15 @@ class RunLookup:
 def _distinct_runs(runs):
     """The run numbers a lookup names, once each, in the file's order. Only ints (``RBnum`` is ``list[int]``):
     an unset entry or anything else is skipped, for ``validate()`` to report, and never reaches a path."""
-    distinct = []
-    for run in runs if isinstance(runs, (list, tuple)) else ():
-        if isinstance(run, int) and not isinstance(run, bool) and run not in distinct:
-            distinct.append(run)
-    return distinct
+    if not isinstance(runs, (list, tuple)):
+        return []
+    return list(dict.fromkeys(run for run in runs if isinstance(run, int) and not isinstance(run, bool)))
 
 
-def lookup_runs(runs, root=None, cap=MAX_RUN_LOOKUPS, config_class=NRReductionConfig):
-    """Look up where each distinct run's NeXus file is, at most ``cap`` runs: one listing of the root, then one
-    ``_run_ipts`` per run. A :class:`RunLookup`."""
+def lookup_runs(runs, root=None, cap=None, config_class=NRReductionConfig):
+    """Look up where each distinct run's NeXus file is, at most ``cap`` runs (``MAX_RUN_LOOKUPS``, read when
+    called): one listing of the root, then one ``_run_ipts`` per run. A :class:`RunLookup`."""
+    cap = MAX_RUN_LOOKUPS if cap is None else cap
     root, nexus = _facility_layout(root, config_class)
     distinct = _distinct_runs(runs)
     folders = _ipts_folders(root)
@@ -236,7 +242,7 @@ def resolve_experiment_id(file_value, runs, field_value, source_path, root=None,
     """
     root, _ = _facility_layout(root, config_class)
     distinct = _distinct_runs(runs)
-    if file_value not in ("", None):
+    if not _empty_ipts(file_value):
         if fs.get("experiment_id").check(file_value):
             return file_value, None
         return file_value, (lookup_runs(distinct, root, config_class=config_class) if distinct else None)
@@ -273,6 +279,7 @@ def load_start_folder(ipts, remembered, root=None):
     the IPTS, where the user last was in this experiment. Otherwise the remembered folder, as before. "Under" is a
     path prefix of normalised paths, never a string prefix: ``IPTS-361190`` is not under ``IPTS-36119``.
     """
+    remembered = remembered or ""  # QSettings gives None for a value it cannot read (the security advisory F4)
     ipts = _clean_ipts(ipts)
     if not ipts:
         return remembered
@@ -749,12 +756,16 @@ class SettingsDocument:
         # folder an empty IPTS gives, which never holds one. Unreducible, so a problem; first, it blocks the rest.
         runs = self.get("RBnum")
         named = [run for run in runs if run is not None] if isinstance(runs, list) else []
-        if self.get("experiment_id") == "" and named and self.get("_NEXUSpathRB_override") is None:
+        if _empty_ipts(self.get("experiment_id")) and named and self.get("_NEXUSpathRB_override") is None:
+            # The folder an empty IPTS gives, read from the class on a copy: None makes base_path raise, and
+            # spaces name a folder of spaces (v2: one definition of empty).
+            empty = copy.copy(self._config)
+            empty.experiment_id = ""
             many = len(named) != 1
             messages.append(
                 f"{fs.get('experiment_id').label} (experiment_id) is empty and {len(named)} run "
                 f"number{'s are' if many else ' is'} set: the reduction would look for REF_L_{named[0]}.nxs.h5 "
-                f"under {self._config.NEXUSpathRB} and not find it — enter the IPTS, or choose a NeXus path"
+                f"under {empty.NEXUSpathRB} and not find it — enter the IPTS, or choose a NeXus path"
             )
         # Lengths are measured against the reduction's count, not the table's
         # rows: a list longer than that is surplus (notes()), and only a list
@@ -909,12 +920,15 @@ class SettingsDocument:
             return []
         runs = _distinct_runs(self.get("RBnum"))
         if not lookup.available:
-            if runs and self._seed.get("experiment_id") in ("", None):
+            if runs and _empty_ipts(self._seed.get("experiment_id")):
                 return [f"The IPTS could not be looked up from the run numbers: {lookup.root} is not available here"]
             return []
         found = [(run, lookup.found[run]) for run in runs if run in lookup.found]
         lines = []
         held = _clean_ipts(self.get("experiment_id"))
+
+        def spell(ipts):  # as the file holds an IPTS: K1's one renderer (the plan's §2)
+            return file_spelling(fs.get("experiment_id"), ipts)
         if held:
             elsewhere = {}
             for run, hits in found:
@@ -924,11 +938,11 @@ class SettingsDocument:
                 many = len(named) > 1
                 lines.append(
                     f"The run number{'s' if many else ''} {', '.join(map(str, named))} "
-                    f"resolve{'' if many else 's'} under {ipts}, not {held}; reduced as it stands, this file looks "
-                    f"for {'them' if many else 'it'} in {self._config.NEXUSpathRB}"
+                    f"resolve{'' if many else 's'} under {spell(ipts)}, not {spell(held)}; reduced as it stands, "
+                    f"this file looks for {'them' if many else 'it'} in {self._config.NEXUSpathRB}"
                 )
         lines.extend(
-            f"The run number {run} has a NeXus file under more than one IPTS: {', '.join(hits)}"
+            f"The run number {run} has a NeXus file under more than one IPTS: {', '.join(map(spell, hits))}"
             for run, hits in found
             if len(hits) > 1
         )

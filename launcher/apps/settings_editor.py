@@ -1117,14 +1117,9 @@ class SettingsEditorTab(QtWidgets.QWidget):
 
         The single entry point a resolution layer uses: replacing the document
         without the three refreshes leaves the view showing the previous one.
-
-        First the document's IPTS is resolved (editor-ipts-inference, I1), with
-        the IPTS the header holds now as the field's: the file's own; else its
-        runs'; else the header's; else the folder a file without runs came from.
-        An inferred IPTS shows under "Changed from the seed". A typed IPTS
-        (``_on_ipts_edited``) never comes through here, so nothing infers over it.
+        A document adopted here is shown as it holds: its IPTS is resolved by a
+        Load only (``load_settings``; editor-ipts-inference v2, design A3).
         """
-        document.resolve_ipts(normalise_experiment_id(self.editors["experiment_id"].text()))
         self.document = document
         self.refresh_angles()
         self.refresh_scalars()
@@ -1272,7 +1267,13 @@ class SettingsEditorTab(QtWidgets.QWidget):
         # a sequence ({"tof_min": 5}) raised TypeError out of the slot and
         # aborted the launcher.
         try:
-            self.set_document(SettingsDocument.from_file(path))
+            document = SettingsDocument.from_file(path)
+            # The Load's IPTS (editor-ipts-inference, I1), with the IPTS the header holds now as the field's: the
+            # file's own; else its runs'; else the header's; else the folder a file without runs came from. Here
+            # only (v2, A3): a document injected or adopted again is not resolved, so nothing infers over an IPTS
+            # the user cleared or typed (I6).
+            document.resolve_ipts(normalise_experiment_id(self.editors["experiment_id"].text()))
+            self.set_document(document)
         except Exception as exc:  # noqa: BLE001
             QtWidgets.QMessageBox.warning(self, "Could not load settings", str(exc))
             self.report_problem(exc)

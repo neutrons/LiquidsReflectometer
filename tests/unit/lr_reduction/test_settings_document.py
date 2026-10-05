@@ -2916,6 +2916,16 @@ def test_load_start_folder(tmp_path, ipts, remembered, expected):
     assert sd.load_start_folder(ipts, remembered.format(**fill), root=root) == expected.format(**fill)
 
 
+def test_load_start_folder_reads_a_missing_remembered_folder_as_none(tmp_path):
+    """U5 (v2, the security advisory F4): QSettings gives None for a stored value it cannot read. With an IPTS the
+    dialog still opens in its shared folder; without one it gets "" (Qt's default folder), never None."""
+    root = tmp_path / "SNS"
+    (root / "IPTS-1" / "shared").mkdir(parents=True)
+    assert sd.load_start_folder("IPTS-1", None, root=root) == str(root / "IPTS-1" / "shared")
+    assert sd.load_start_folder("", None, root=root) == ""
+    assert sd.load_start_folder("IPTS-404", None, root=root) == ""
+
+
 def test_settings_folders_are_the_ipts_folders_that_exist(tmp_path):
     """U5 (I5, F7): the sidebar offers <IPTS>/shared, shared/reduced and shared/autoreduce, those that exist, in
     that order; none without a clean IPTS."""
