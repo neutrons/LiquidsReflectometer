@@ -2915,8 +2915,15 @@ def test_select_roi_is_enabled_only_with_a_row_selected():
     """E1 (B1): "Select ROI" sits after "Remove angle" and is enabled exactly while the Angles table has a current
     row."""
     tab = SettingsEditorTab(document=_three_peaks())
-    buttons = tab.add_angle_button.parentWidget().layout()
-    order = [buttons.itemAt(i).widget() for i in range(buttons.count()) if buttons.itemAt(i).widget()]
+    def widgets(layout):
+        for index in range(layout.count()):
+            item = layout.itemAt(index)
+            if item.widget():
+                yield item.widget()
+            elif item.layout():
+                yield from widgets(item.layout())
+
+    order = list(widgets(tab.add_angle_button.parentWidget().layout()))
     assert order.index(tab.select_roi_button) == order.index(tab.remove_angle_button) + 1
     assert not tab.select_roi_button.isEnabled()
     tab.angle_table.setCurrentCell(1, 0)
@@ -2929,8 +2936,10 @@ def test_select_roi_is_enabled_only_with_a_row_selected():
 @pytest.mark.parametrize("short", [False, True], ids=["full columns", "a short RB_Ymin column"])
 def test_select_roi_writes_the_row_it_was_opened_for(monkeypatch, events, short):
     """E2 (B1, B9; the active-row trap, L1): the row is captured at the click. The selection moving before OK changes
-    nothing: row 1 is written, rows 0 and 2 and every other column are unchanged, the untouched [137, 149, 0, 0]
-    background is not rewritten, and every per-angle column stays one length (set_angle_field)."""
+    nothing: row 1 is written, rows 0 and 2 and every other column are unchanged, and the untouched [137, 149, 0, 0]
+    background is not rewritten. A short column is written through set_angle_field, which pads it only to the
+    edited row, never to the row count (review 1568397): [130] becomes [130, 141], and the reduction's count stays
+    3. The plan's F6 ("pads ... to n_angles") predates that rule."""
     doc = _three_peaks(**({"RB_Ymin": [130]} if short else {}))
     tab = SettingsEditorTab(document=doc)
     tab.angle_table.setCurrentCell(1, 0)
@@ -2943,11 +2952,13 @@ def test_select_roi_writes_the_row_it_was_opened_for(monkeypatch, events, short)
 
     _replace_exec(monkeypatch, accept_after_the_selection_moves)
     QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
-    assert doc.get("RB_Ymin") == ([130, 141, None] if short else [130, 141, 150])
+    assert doc.get("RB_Ymin") == ([130, 141] if short else [130, 141, 150])
     assert doc.get("RB_Ymax") == [136, 146, 156]
     assert doc.get("BkgROI")[1] == [137, 149, 0, 0]  # untouched in the dialog, so not rewritten
-    lengths = {len(doc.get(name)) for name in fs.PER_ANGLE_NAMES if isinstance(doc.get(name), list) and doc.get(name)}
-    assert lengths == {3}, lengths
+    assert doc.reduction_angles == 3
+    lengths = {name: len(doc.get(name)) for name in fs.PER_ANGLE_NAMES
+               if name != "RB_Ymin" and isinstance(doc.get(name), list) and doc.get(name)}
+    assert set(lengths.values()) == {3}, lengths
     tab.close()
 
 
