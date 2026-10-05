@@ -1324,6 +1324,9 @@ def test_a_saved_useBS_entry_is_read_as_the_source_entry(tmp_path, value):
 # --------------------------------------------------------------------------
 
 _THREE_ANGLES = {
+    # editor-ipts-inference: a file that reduces names its IPTS. Runs with none are I4's problem, which is not
+    # what any test of this shape is about.
+    "experiment_id": "IPTS-00000",
     "RBnum": [201282, 201283, 201284],
     "DBname": ["db_a.dat", "db_b.dat", "db_c.dat"],
     "RB_Ymin": [140, 141, 142],

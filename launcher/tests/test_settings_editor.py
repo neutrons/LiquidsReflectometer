@@ -620,9 +620,11 @@ def test_a_hand_written_integer_useGravity_is_reported_and_saved_as_written(tmp_
 
 
 def _surplus_settings(directory):
-    """Three angles by RBnum, useBS four long — IPTS-36119's reduce_settings.json shape."""
+    """Three angles by RBnum, useBS four long — IPTS-36119's reduce_settings.json shape. With its IPTS, as the real
+    file has it (editor-ipts-inference: runs with no IPTS are I4's problem, which these tests are not about)."""
     path = directory / "reduce_settings.json"
     path.write_text(json.dumps({
+        "experiment_id": "IPTS-36119",
         "RBnum": [201282, 201283, 201284],
         "DBname": ["db_a.dat", "db_b.dat", "db_c.dat"],
         "RB_Ymin": [140, 141, 142],
