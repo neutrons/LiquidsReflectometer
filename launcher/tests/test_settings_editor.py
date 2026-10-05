@@ -2399,3 +2399,361 @@ def test_a_second_load_with_an_override_shows_it_as_text(name):
     tab.set_document(SettingsDocument.from_dict({"experiment_id": "IPTS-2", name: "/data/b"}))
     assert tab.editors[name].text() == "/data/b"
     assert tab.editors["experiment_id"].text() == "IPTS-2"
+
+
+# --------------------------------------------------------------------------
+# editor-sections — the list's sections in the scientists' order, collapsible, remembered per user
+# --------------------------------------------------------------------------
+
+_SECTIONS = ("Runs and angles", "Processing", "Q-space", "Wavelength and TOF", "Dead time", "Detector resolution",
+             "Peak fitting", "Output naming and paths", "Instrument geometry", "Runtime record")
+
+
+def _section_editors(tab, name):
+    fields = [f.name for f in fs.fields_in(name) if not f.per_angle and f.name not in fs.HEADER_NAMES]
+    return [tab.editors[field] for field in fields]
+
+
+def _store_section(name, value):
+    """Put a raw value for a section's state into this test's store, before a tab reads it."""
+    from launcher.apps.settings_editor import section_state_key
+
+    QtCore.QSettings().setValue(section_state_key(name), value)
+
+
+def _stored_section(name):
+    from launcher.apps.settings_editor import section_state_key
+
+    return QtCore.QSettings().value(section_state_key(name))
+
+
+def _collapsed(tab):
+    return {name for name, section in tab.sections.items() if not section.heading.isChecked()}
+
+
+def test_the_sections_are_laid_out_in_the_declared_order_and_start_expanded():
+    """V1, S1, A1: headings top to bottom in the declared order; on a first run every section is expanded."""
+    tab = SettingsEditorTab()
+    assert tuple(tab.sections) == _SECTIONS
+    assert [tab.sections[name].heading.text() for name in _SECTIONS] == list(_SECTIONS)
+    column = tab.sections[_SECTIONS[0]].parentWidget().layout()
+    positions = [column.indexOf(tab.sections[name]) for name in _SECTIONS]
+    assert positions == sorted(positions) and -1 not in positions
+    assert _collapsed(tab) == set()
+    assert all(editor.isVisibleTo(tab) for name in _SECTIONS for editor in _section_editors(tab, name))
+
+
+@pytest.mark.parametrize("key, modifier", [
+    (QtCore.Qt.Key_Space, QtCore.Qt.NoModifier), (QtCore.Qt.Key_Return, QtCore.Qt.NoModifier),
+    (QtCore.Qt.Key_Enter, QtCore.Qt.KeypadModifier),
+], ids=["space", "return", "keypad-enter"])
+def test_a_section_collapses_and_expands_from_its_heading_by_keyboard(key, modifier):
+    """V2, S3, with the heading focused, for Space, Return and keypad Enter (v2, advisory A-1). The key collapses
+    the section: its fields are hidden, and they take no space. The next section's heading, mapped to the panel's
+    contents (so a scroll cannot move it), moves up by at least the body's height (v2, B-3). The same key expands
+    the section, and the heading returns to where it was."""
+    tab = _shown_tab(SettingsEditorTab())
+    panel = tab.scalar_panel.widget()
+    section = tab.sections["Dead time"]
+    following = tab.sections["Detector resolution"].heading
+    section.heading.setFocus()
+    _settle()
+    top = following.mapTo(panel, QtCore.QPoint(0, 0)).y()
+    body = section.body.height()
+    assert body > 0
+    QTest.keyClick(section.heading, key, modifier)
+    _settle()
+    assert not any(editor.isVisibleTo(tab) for editor in _section_editors(tab, "Dead time"))
+    assert top - following.mapTo(panel, QtCore.QPoint(0, 0)).y() >= body
+    QTest.keyClick(section.heading, key, modifier)
+    _settle()
+    assert all(editor.isVisibleTo(tab) for editor in _section_editors(tab, "Dead time"))
+    assert following.mapTo(panel, QtCore.QPoint(0, 0)).y() == top
+    tab.close()
+
+
+def test_the_collapsed_sections_are_remembered_by_name_for_the_next_tab(monkeypatch):
+    """V3, S4: two sections collapsed in one tab are collapsed in the next tab built on the same store, even
+    when the declared order changes in between: the state is keyed by the section's name, not its position."""
+    tab = _shown_tab(SettingsEditorTab())
+    for name in ("Dead time", "Instrument geometry"):
+        QTest.mouseClick(tab.sections[name].heading, QtCore.Qt.LeftButton)
+    _settle()
+    tab.close()
+    assert _collapsed(SettingsEditorTab()) == {"Dead time", "Instrument geometry"}
+    monkeypatch.setattr(fs, "SECTION_ORDER", tuple(reversed(fs.SECTION_ORDER)))
+    assert _collapsed(SettingsEditorTab()) == {"Dead time", "Instrument geometry"}
+
+
+@pytest.mark.parametrize("stored, expanded", [("false", False), ("true", True), (False, False), (True, True)])
+def test_a_stored_state_is_read_as_its_meaning_not_by_bool(stored, expanded):
+    """V4, S4: a stored state is parsed, never passed to bool(): bool("false") is True. Measured on Qt 5.15.15,
+    INI format: a value read back in the process that wrote it is the cached one (a bool stays a bool), but a new
+    process, which is what a relaunch is, reads the strings "true" and "false". Both kinds are read by meaning."""
+    _store_section("Dead time", stored)
+    assert _stored_section("Dead time") == stored
+    tab = SettingsEditorTab()
+    assert tab.sections["Dead time"].heading.isChecked() is expanded
+    assert all(editor.isVisibleTo(tab) is expanded for editor in _section_editors(tab, "Dead time"))
+
+
+@pytest.mark.parametrize("stored", ["maybe", [1], ""], ids=["word", "list", "empty"])
+def test_a_garbage_or_orphaned_stored_state_leaves_every_section_expanded(stored):
+    """V5, S4: garbage for a section, or a key for a section that no longer exists ("Paths"), is read as expanded
+    or ignored. The constructor raises nothing, and the bad values stay in the store as they were: each garbage
+    form reads back raw, value and type (v2, B-4), and so does the orphaned key."""
+    _store_section("Dead time", stored)
+    _store_section("Paths", "false")
+    tab = SettingsEditorTab()
+    assert _collapsed(tab) == set()
+    raw = _stored_section("Dead time")
+    assert raw == stored and type(raw) is type(stored)
+    assert _stored_section("Paths") == "false"
+    assert tab._last_error is None
+
+
+def test_collapsing_hides_nothing_from_a_save_or_from_the_problems(tmp_path, monkeypatch):
+    """V6, S3, S6: a value typed before its section is collapsed is saved; a problem in a collapsed section is
+    still listed in the panel, and the section stays collapsed."""
+    tab = _shown_tab(SettingsEditorTab())
+    _type_into(tab.editors["dead_time"], "7.5")
+    QTest.mouseClick(tab.sections["Dead time"].heading, QtCore.Qt.LeftButton)
+    _settle()
+    target = tmp_path / "out.json"
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), "")))
+    tab.save_settings()
+    assert json.loads(target.read_text())["dead_time"] == 7.5
+    tab.set_document(SettingsDocument.from_dict({"dead_time": -1.0}))
+    assert "(dead_time)" in tab.report.toPlainText()
+    assert "Dead time" in _collapsed(tab)
+    tab.close()
+
+
+def test_a_load_refreshes_the_fields_of_a_collapsed_section():
+    """V7, S3: the editors inside a collapsed section are the tab's editors, so a Load shows the file's value in
+    them; expanded afterwards, they read it. The section stays collapsed through the Load."""
+    tab = _shown_tab(SettingsEditorTab())
+    QTest.mouseClick(tab.sections["Dead time"].heading, QtCore.Qt.LeftButton)
+    _settle()
+    tab.set_document(SettingsDocument.from_dict({"dead_time": 9.5}))
+    assert "Dead time" in _collapsed(tab)
+    QTest.mouseClick(tab.sections["Dead time"].heading, QtCore.Qt.LeftButton)
+    _settle()
+    assert tab.editors["dead_time"].text() == "9.5"
+    tab.close()
+
+
+def test_collapsing_every_section_changes_nothing_in_the_document_or_the_panel():
+    """V8, S3: collapsing is view state. With every section collapsed, "Changed from the seed" is empty and the
+    panel text (tab.report) is what it was."""
+    tab = _shown_tab(SettingsEditorTab())
+    panel = tab.report.toPlainText()
+    for section in tab.sections.values():
+        QTest.mouseClick(section.heading, QtCore.Qt.LeftButton)
+    _settle()
+    assert _collapsed(tab) == set(_SECTIONS)
+    assert tab.document.changed_vs_seed() == {} and tab.report.toPlainText() == panel
+    tab.close()
+
+
+def test_the_header_is_not_a_section_and_holds_no_section_field():
+    """V10, S7 (v2, advisory A-3: v1's membership check was vacuous). The "Experiment" header:
+    - is a group box that cannot be checked (no toggle);
+    - is a direct child of the tab's own layout, not wrapped in a section;
+    - sits above the first section's heading.
+    Its three fields are in no section."""
+    tab = _shown_tab(SettingsEditorTab())
+    header = tab.paths_header
+    assert isinstance(header, QtWidgets.QGroupBox) and header.isCheckable() is False
+    assert tab.layout().indexOf(header) >= 0
+    assert not any(section.isAncestorOf(header) for section in tab.sections.values())
+    first = tab.sections[_SECTIONS[0]].heading
+    assert header.mapTo(tab, QtCore.QPoint(0, 0)).y() < first.mapTo(tab, QtCore.QPoint(0, 0)).y()
+    for name in fs.HEADER_NAMES:
+        assert not any(section.isAncestorOf(tab.editors[name]) for section in tab.sections.values()), name
+    tab.close()
+
+
+# Plan §3's held states of a section: E expanded (nothing stored, a first run), C collapsed (stored "false"),
+# G garbage stored ("maybe"), U a key stored for a section that no longer exists ("Paths"; the section under test
+# has nothing stored). The operation x state cells marked n/a or "—" in the plan are not generated.
+_SECTION_STATE_CELLS = [
+    (state, operation)
+    for state, operations in {
+        "E": ["build", "toggle-mouse", "toggle-keyboard", "tab-through", "edit-collapse-save", "load-collapsed",
+              "problem", "second-tab", "unwritable"],
+        "C": ["build", "toggle-mouse", "toggle-keyboard", "tab-through", "load-collapsed", "problem", "second-tab",
+              "unwritable"],
+        "G": ["build", "toggle-mouse", "toggle-keyboard", "tab-through", "edit-collapse-save", "problem",
+              "second-tab", "unwritable"],
+        "U": ["build", "second-tab"],
+    }.items()
+    for operation in operations
+]
+_NEXT_SECTION = {"Dead time": "Detector resolution", "Output naming and paths": "Instrument geometry"}
+_A_FIELD = {"Dead time": ("dead_time", "7.5", 7.5, -1.0), "Output naming and paths": ("Sname", "week2", "week2", "a/b")}
+
+
+@pytest.mark.parametrize("state, operation", _SECTION_STATE_CELLS)
+@pytest.mark.parametrize("name", list(_NEXT_SECTION))
+def test_each_operation_on_a_section_in_each_held_state(name, state, operation, tmp_path, monkeypatch):
+    """V9, plan §3's operation x state table, on a shown tab, for two sections (one with numbers, the merged one).
+    Every cell asserts that the section's fields are visible exactly when it is expanded (isVisibleTo(tab)), that
+    "Changed from the seed" is empty unless the cell edits a field, and that tab._last_error is None. The cells
+    that say so also assert:
+    - after a toggle, the store's value read back raw ("true"/"false") and parsed;
+    - the Tab order from the heading: its fields when expanded, the next section's heading when collapsed;
+    - the panel text (tab.report) left unchanged by a toggle, or naming a problem in the section;
+    - the saved file holding an edit made before collapsing;
+    - the store's bad or orphaned value left as it was."""
+    from launcher.apps.settings_editor import section_state_key
+
+    if state == "C":
+        _store_section(name, "false")
+    elif state == "G":
+        _store_section(name, "maybe")
+    elif state == "U":
+        _store_section("Paths", "false")
+    tab = _shown_tab(SettingsEditorTab())
+    section = tab.sections[name]
+    expanded = state != "C"
+    edited = None
+    panel = tab.report.toPlainText()
+    if operation in ("toggle-mouse", "toggle-keyboard", "unwritable"):
+        if operation == "unwritable":
+            def refuse(*_args, **_kwargs):
+                raise OSError("the settings store is read-only")
+            monkeypatch.setattr(tab.settings, "setValue", refuse)
+        before = _stored_section(name)
+        if operation == "toggle-keyboard":
+            section.heading.setFocus()
+            _settle()
+            QTest.keyClick(section.heading, QtCore.Qt.Key_Space)
+        else:
+            QTest.mouseClick(section.heading, QtCore.Qt.LeftButton)
+        _settle()
+        expanded = not expanded
+        if operation == "unwritable":
+            assert _stored_section(name) == before
+        else:
+            assert _stored_section(name) == ("true" if expanded else "false")
+        assert tab.report.toPlainText() == panel
+    elif operation == "tab-through":
+        section.heading.setFocus()
+        _settle()
+        reached = []
+        for _ in _section_editors(tab, name) if expanded else [None]:
+            QTest.keyClick(QtWidgets.QApplication.focusWidget(), QtCore.Qt.Key_Tab)
+            _settle()
+            reached.append(QtWidgets.QApplication.focusWidget())
+        if expanded:
+            assert reached == _section_editors(tab, name)
+        else:
+            assert reached == [tab.sections[_NEXT_SECTION[name]].heading]
+    elif operation == "edit-collapse-save":
+        field, typed, saved_value, _bad = _A_FIELD[name]
+        _type_into(tab.editors[field], typed)
+        QTest.mouseClick(section.heading, QtCore.Qt.LeftButton)
+        _settle()
+        expanded = False
+        target = tmp_path / "out.json"
+        monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName",
+                            staticmethod(lambda *_a, **_k: (str(target), "")))
+        tab.save_settings()
+        assert json.loads(target.read_text())[field] == saved_value
+        edited = field
+    elif operation == "load-collapsed":
+        field, _typed, value, _bad = _A_FIELD[name]
+        if expanded:
+            QTest.mouseClick(section.heading, QtCore.Qt.LeftButton)
+            _settle()
+            expanded = False
+        tab.set_document(SettingsDocument.from_dict({field: value}))
+        assert not section.heading.isChecked()
+        QTest.mouseClick(section.heading, QtCore.Qt.LeftButton)
+        _settle()
+        expanded = True
+        assert tab.editors[field].text() == str(value)
+    elif operation == "problem":
+        field, _typed, _value, bad = _A_FIELD[name]
+        tab.set_document(SettingsDocument.from_dict({field: bad}))
+        assert f"({field})" in tab.report.toPlainText()
+    elif operation == "second-tab":
+        tab.close()
+        tab = _shown_tab(SettingsEditorTab())
+        section = tab.sections[name]
+    if state == "G" and operation == "build":
+        assert _stored_section(name) == "maybe"
+    if state == "U":
+        assert _stored_section("Paths") == "false" and section_state_key("Paths") != section_state_key(name)
+    assert section.heading.isChecked() is expanded
+    assert all(editor.isVisibleTo(tab) is expanded for editor in _section_editors(tab, name))
+    assert sorted(tab.document.changed_vs_seed()) == ([edited] if edited else [])
+    assert tab._last_error is None
+    tab.close()
+
+
+def test_a_clicked_heading_takes_the_focus_so_the_keyboard_continues_from_it():
+    """S3 (battery F2): a heading clicked with the mouse has the focus afterwards, so Space toggles it back. With
+    QToolButton's default focus policy (Tab only), a click left the focus where it was."""
+    tab = _shown_tab(SettingsEditorTab())
+    heading = tab.sections["Dead time"].heading
+    QTest.mouseClick(heading, QtCore.Qt.LeftButton)
+    _settle()
+    assert heading.hasFocus() and not heading.isChecked()
+    QTest.keyClick(QtWidgets.QApplication.focusWidget(), QtCore.Qt.Key_Space)
+    _settle()
+    assert heading.isChecked()
+    tab.close()
+
+
+def test_a_headings_arrow_shows_whether_its_section_is_open():
+    """S3 (battery F5): the arrow beside a heading points down while the section is expanded and right while it is
+    collapsed, both when the tab is built (from the stored state) and after a toggle."""
+    _store_section("Dead time", "false")
+    tab = _shown_tab(SettingsEditorTab())
+    assert tab.sections["Dead time"].heading.arrowType() == QtCore.Qt.RightArrow
+    assert tab.sections["Q-space"].heading.arrowType() == QtCore.Qt.DownArrow
+    QTest.mouseClick(tab.sections["Dead time"].heading, QtCore.Qt.LeftButton)
+    QTest.mouseClick(tab.sections["Q-space"].heading, QtCore.Qt.LeftButton)
+    _settle()
+    assert tab.sections["Dead time"].heading.arrowType() == QtCore.Qt.DownArrow
+    assert tab.sections["Q-space"].heading.arrowType() == QtCore.Qt.RightArrow
+    tab.close()
+
+
+def _shown_value(editor):
+    if isinstance(editor, QtWidgets.QCheckBox):
+        return editor.isChecked()
+    if isinstance(editor, QtWidgets.QComboBox):
+        return editor.currentText()
+    return editor.text()
+
+
+@pytest.mark.parametrize("name, field, loaded, shown", [
+    ("Instrument geometry", "mmpix", 0.71, "0.71"),
+    ("Detector resolution", "DetResFn", "gaussian", "gaussian"),
+    ("Detector resolution", "DetResFn", "rectangular", "rectangular"),
+    ("Processing", "Normalize", True, True),
+    ("Processing", "Normalize", False, False),
+], ids=["line-edit", "combo-gaussian", "combo-rectangular", "check-box-on", "check-box-off"])
+def test_collapsing_and_expanding_leaves_each_editor_showing_the_documents_value(name, field, loaded, shown):
+    """V11 (v2, B-2): collapse, then expand, with no Load in between. Every editor under the section shows what it
+    showed before, and the named one shows the document's value (text, current entry, check state).
+    - The line edits write on editingFinished, so a collapse that cleared them would leave the document intact,
+      and only this read can see it.
+    - The combo (two entries) and the check box are loaded with each of their values in turn. A collapse that set
+      either to one fixed value, with its signals blocked so the document is not written, shows in one leg."""
+    tab = _shown_tab(SettingsEditorTab())
+    tab.set_document(SettingsDocument.from_dict({field: loaded}))
+    before = [_shown_value(editor) for editor in _section_editors(tab, name)]
+    heading = tab.sections[name].heading
+    QTest.mouseClick(heading, QtCore.Qt.LeftButton)
+    _settle()
+    assert name in _collapsed(tab)
+    QTest.mouseClick(heading, QtCore.Qt.LeftButton)
+    _settle()
+    assert [_shown_value(editor) for editor in _section_editors(tab, name)] == before
+    assert _shown_value(tab.editors[field]) == shown
+    assert tab.document.get(field) == loaded and tab.document.changed_vs_seed() == {}
+    tab.close()
