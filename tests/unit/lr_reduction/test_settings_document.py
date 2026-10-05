@@ -2925,3 +2925,86 @@ def test_the_lookup_is_bounded(tmp_path, monkeypatch):
     calls.clear()
     _resolved(tmp_path, root, "", [1000, 1001, 1000])
     assert calls == [1000, 1001]
+
+
+# -- the battery's survivors (frame rows F2, F3, F7, F11, F12, F17, F21, F22 SURVIVED the first run) --------
+
+
+def test_the_lookup_and_the_empty_ipts_problem_follow_the_config_class(tmp_path, monkeypatch):
+    """F2, F3, F21: with no root given, the lookup searches the folder the document's own config class joins an IPTS
+    onto, in the NeXus folder that class names, and I4 names the folder that class would read. A config whose base
+    and NeXus folder are not /SNS/REF_L and nexus is what tells a re-spelled literal apart (equal values cannot)."""
+    monkeypatch.setattr(sd, "IPTS_LOOKUP_ROOT", None)
+
+    class Site(NRReductionConfig):
+        @property
+        def base_path(self):
+            return tmp_path / "site" / self.experiment_id
+
+        @property
+        def NEXUSpathRB(self):  # noqa: N802 -- the config's own name
+            if self._NEXUSpathRB_override is not None:
+                return pathlib.Path(self._NEXUSpathRB_override)
+            return self.base_path / "raw"
+
+    (tmp_path / "site" / "IPTS-1" / "raw").mkdir(parents=True)
+    (tmp_path / "site" / "IPTS-1" / "raw" / "REF_L_229197.nxs.h5").touch()
+    config = Site()
+    config.RBnum = [229197]
+    doc = SettingsDocument(config)
+    assert (f"IPTS (experiment_id) is empty and 1 run number is set: the reduction would look for REF_L_229197.nxs.h5 "
+            f"under {tmp_path / 'site' / 'raw'} and not find it — enter the IPTS, or choose a NeXus path"
+            ) in doc.validate()
+    assert doc.resolve_ipts("") == "IPTS-1"
+
+
+def test_only_int_runs_reach_the_lookup(tmp_path, monkeypatch):
+    """F7: RBnum is list[int]. An unset entry, text (here a path) or a bool never reaches the lookup's file name."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-1": [229197]})
+    calls = []
+    real = sd._run_ipts
+    monkeypatch.setattr(sd, "_run_ipts", lambda run, *args, **kwargs: calls.append(run) or real(run, *args, **kwargs))
+    doc = SettingsDocument.from_dict({"RBnum": [None, "../../x", True, 229197]})
+    assert doc.resolve_ipts("", root=root) == "IPTS-1"
+    assert calls == [229197]
+
+
+def test_a_null_ipts_with_nothing_to_infer_stays_as_the_file_holds_it(tmp_path):
+    """F11: 2d leaves the file's value as it is, a null included (the human's d: "no harm in leaving it that
+    way"). Nothing changes from the seed."""
+    path = tmp_path / "home" / "x.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({"experiment_id": None, "Sname": "x"}))
+    doc = SettingsDocument.from_file(path)
+    doc.resolve_ipts("", root=_nexus_tree(tmp_path / "SNS", {}))
+    assert doc.get("experiment_id") is None and doc.changed_vs_seed() == {}
+
+
+def test_only_a_file_inside_an_ipts_folder_is_in_that_ipts(tmp_path):
+    """F12: 2c takes the IPTS folder a file is inside. Something named IPTS-7 directly under the root, and the root
+    itself, are inside no IPTS."""
+    root = tmp_path / "SNS"
+    assert sd._ipts_of_folder(root / "IPTS-7" / "shared" / "x.json", root) == "IPTS-7"
+    assert sd._ipts_of_folder(root / "IPTS-7", root) == ""
+    assert sd._ipts_of_folder(root, root) == ""
+
+
+def test_a_run_under_two_ipts_is_named_once_whichever_is_held(tmp_path):
+    """F17: a run under two IPTSs is named once, as ambiguous, also when the IPTS held is not the first of them (the
+    file holds IPTS-10; the run is under IPTS-2 and IPTS-10). It is not "elsewhere" too."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-10": [229197], "IPTS-2": [229197]})
+    doc = _resolved(tmp_path, root, "IPTS-10", [229197])
+    assert _ipts_notes(doc) == ["The run number 229197 has a NeXus file under more than one IPTS: IPTS-2, IPTS-10"]
+
+
+def test_the_elsewhere_note_names_the_folder_a_nexus_override_reads(tmp_path):
+    """F22: with a NeXus override set, a reduction of this file reads the override's folder, and the note names
+    that folder, not the IPTS's."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-38016": _FILE_RUNS, "IPTS-36119": []})
+    path = _settings_at(tmp_path / "home" / "x.json", {"experiment_id": "IPTS-36119", "RBnum": list(_FILE_RUNS),
+                                                         "_NEXUSpathRB_override": "/data/nexus"})
+    doc = SettingsDocument.from_file(path)
+    doc.resolve_ipts("", root=root)
+    assert _ipts_notes(doc) == [
+        "The run numbers 229197, 229198, 229199 resolve under IPTS-38016, not IPTS-36119; reduced as it stands, "
+        "this file looks for them in /data/nexus"]

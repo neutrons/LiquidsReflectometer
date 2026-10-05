@@ -3016,8 +3016,8 @@ def _capture_dialog(monkeypatch, method, answer=""):
         seen.update(directory=directory, options=options,
                     sidebar=[url.toLocalFile() for url in dialog.sidebarUrls()])
         dialog.close()
-        dialog.deleteLater()
         _settle()
+        sip.delete(dialog)  # as in the static call: destroyed before it returns, and Qt saves its state then
         return answer, ""
 
     monkeypatch.setattr(QtWidgets.QFileDialog, method, staticmethod(fake))
@@ -3027,6 +3027,13 @@ def _capture_dialog(monkeypatch, method, answer=""):
 _SIDEBAR = ("IPTS-36119/shared", "IPTS-36119/shared/reduced", "IPTS-36119/shared/autoreduce")
 
 
+def _saved_sidebar():
+    """The sidebar Qt saved for every later file dialog of this user: QtProject.conf's FileDialog/shortcuts
+    (redirected per test by isolated_qapp)."""
+    value = QtCore.QSettings(QtCore.QSettings.UserScope, "QtProject").value("FileDialog/shortcuts") or []
+    return [value] if isinstance(value, str) else list(value)
+
+
 @pytest.mark.parametrize("method, slot", [("getOpenFileName", "load_settings"), ("getSaveFileName", "save_settings")])
 def test_the_file_dialogs_open_where_the_ipts_keeps_its_settings(tmp_path, monkeypatch, method, slot):
     """V5 (I5, A5): with IPTS-36119 in the header and a remembered folder elsewhere, Load and Save open in
@@ -3034,6 +3041,10 @@ def test_the_file_dialogs_open_where_the_ipts_keeps_its_settings(tmp_path, monke
     (DontUseNativeDialog: a native dialog builds no sidebar). A remembered folder under the IPTS wins; with no
     IPTS, the remembered folder, as before."""
     root = _facility(tmp_path, monkeypatch, {}, folders=_SIDEBAR)
+    default = QtWidgets.QFileDialog(None, "", "", "")
+    default.setOptions(QtWidgets.QFileDialog.DontUseNativeDialog)
+    qt_sidebar = [url.toLocalFile() for url in default.sidebarUrls()]
+    sip.delete(default)
     tab = SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "IPTS-36119"}))
     tab.settings.setValue("settings_editor_dir", "/home/u")
     seen = _capture_dialog(monkeypatch, method)
@@ -3050,7 +3061,47 @@ def test_the_file_dialogs_open_where_the_ipts_keeps_its_settings(tmp_path, monke
     tab.settings.setValue("settings_editor_dir", "/home/u")
     getattr(tab, slot)()
     assert seen["directory"] == "/home/u"
+    assert seen["sidebar"] == qt_sidebar and qt_sidebar, "no IPTS: Qt's own sidebar, untouched (frame row F33)"
     tab.close()
+
+
+@pytest.mark.parametrize("method, slot", [("getOpenFileName", "load_settings"), ("getSaveFileName", "save_settings")])
+def test_the_ipts_sidebar_is_not_saved_over_the_users_own(tmp_path, monkeypatch, method, slot):
+    """I5, found while measuring the sidebar: Qt saves a file dialog's sidebar ("shortcuts") to the user's
+    QtProject.conf when the dialog is destroyed, and every later Qt 5 file dialog of the user's starts from it. The
+    IPTS's folders are this dialog's alone: the user's own sidebar is what Qt saves, before and after."""
+    _facility(tmp_path, monkeypatch, {}, folders=_SIDEBAR)
+    mine = QtCore.QUrl.fromLocalFile(str(tmp_path / "my" / "own")).toString()
+    QtCore.QSettings(QtCore.QSettings.UserScope, "QtProject").setValue("FileDialog/shortcuts", [mine])
+    tab = SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "IPTS-36119"}))
+    seen = _capture_dialog(monkeypatch, method)
+    getattr(tab, slot)()
+    assert len(seen["sidebar"]) == 3
+    assert _saved_sidebar() == [mine]
+    tab.close()
+
+
+def test_the_sidebar_filter_acts_on_a_file_dialog_shown_and_hidden_and_nothing_else(capfd):
+    """F31, F32: the filter gives a QFileDialog the IPTS's folders when it is shown, and its own sidebar back when it
+    hides. On no other event (through the application, that mutant re-entered the filter until the process
+    aborted) and on no other widget (where it would raise, which the filter catches and prints)."""
+    from launcher.apps.settings_editor import _FileDialogSidebar
+
+    sidebar = _FileDialogSidebar(["/data/a", "/data/b"])
+    dialog = QtWidgets.QFileDialog(None, "", "", "")
+    dialog.setOptions(QtWidgets.QFileDialog.DontUseNativeDialog)
+    own = dialog.sidebarUrls()
+    assert sidebar.eventFilter(dialog, QtCore.QEvent(QtCore.QEvent.Resize)) is False
+    assert dialog.sidebarUrls() == own
+    assert sidebar.eventFilter(dialog, QtGui.QShowEvent()) is False
+    assert [url.toLocalFile() for url in dialog.sidebarUrls()] == ["/data/a", "/data/b"]
+    assert sidebar.eventFilter(dialog, QtGui.QHideEvent()) is False
+    assert dialog.sidebarUrls() == own
+    widget = QtWidgets.QWidget()
+    assert sidebar.eventFilter(widget, QtGui.QShowEvent()) is False
+    assert "Traceback" not in capfd.readouterr().err
+    sip.delete(widget)
+    sip.delete(dialog)
 
 
 def test_the_ipts_notes_sit_under_notes_not_problems(tmp_path, monkeypatch):
