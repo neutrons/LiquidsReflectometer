@@ -3043,3 +3043,21 @@ def test_the_elsewhere_note_names_the_folder_a_nexus_override_reads(tmp_path):
     assert _ipts_notes(doc) == [
         'The run numbers 229197, 229198, 229199 resolve under "IPTS-38016", not "IPTS-36119"; reduced as it stands, '
         "this file looks for them in /data/nexus"]
+
+
+
+def test_the_cap_is_read_when_the_lookup_runs(tmp_path, monkeypatch):
+    """v2, the design advisory A4: lookup_runs reads MAX_RUN_LOOKUPS when it is called. A default bound at
+    definition would ignore a changed constant."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-1": [1000, 1001, 1002]})
+    monkeypatch.setattr(sd, "MAX_RUN_LOOKUPS", 2)
+    lookup = sd.lookup_runs([1000, 1001, 1002], root=root)
+    assert list(lookup.found) == [1000, 1001] and lookup.skipped == (1002,)
+
+
+def test_a_null_ipts_that_cannot_be_looked_up_says_so(tmp_path):
+    """v2, one definition of empty, in the cannot-look-up note: a file holding null names no IPTS either, so a
+    lookup that cannot run says why none came from the runs."""
+    missing = tmp_path / "not-mounted"
+    _three(_resolved(tmp_path, missing, None, _FILE_RUNS), None, {},
+           [f"The IPTS could not be looked up from the run numbers: {missing} is not available here"], True)
