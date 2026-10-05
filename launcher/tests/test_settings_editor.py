@@ -2853,3 +2853,24 @@ def test_the_report_spells_values_through_the_one_helper():
     assert "file_spelling(" in source
     assert "!r}" not in source and "repr(" not in source and "json.dumps" not in source
     assert "def file_spelling" not in inspect.getsource(settings_editor)
+
+
+def test_a_list_left_only_in_a_surplus_row_is_reported_as_the_file_holds_it(tmp_path, monkeypatch):
+    """Added when frame row F6 (the report's current value spelled without the reduction's count) survived the
+    battery. ThetaShift is set at the three angles, then unset at each, with a value left only in the surplus row
+    (useBS has four entries, as real files do). The reducer never reads that row, so save() writes [], and the
+    report prints [] too, not the held [null, null, null, 0.01]."""
+    tab = SettingsEditorTab(SettingsDocument.from_dict(
+        {**_THREE_ANGLES, "useBS": [1, 1, 1, 1], "ThetaShift": [0.5, 0, 0]}))
+    doc = tab.document
+    doc.set_angle_field(3, "ThetaShift", 0.01)
+    for angle in range(3):
+        doc.set_angle_field(angle, "ThetaShift", None)
+    tab.refresh_report()
+    assert repr(doc.get("ThetaShift")) == "[None, None, None, 0.01]"
+    assert "  - ThetaShift: [0.5, 0, 0] -> []" in _report_lines(tab), _report_lines(tab)
+    target = tmp_path / "saved.json"
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), "")))
+    tab.save_settings()
+    assert json.loads(target.read_text())["ThetaShift"] == []
+    tab.close()
