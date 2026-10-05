@@ -38,6 +38,7 @@ def _write_nexus(
     with_chopper=True,
     proton_charge=1.0e12,
     start_time="2025-03-04T11:22:33-05:00",
+    events=None,
 ):
     """Write a minimal REF_L-shaped NeXus file.
 
@@ -60,6 +61,11 @@ def _write_nexus(
     x = rng.integers(100, 160, len(y))
     event_id = x * N_Y + y
     tof = rng.uniform(10000.0, 40000.0, len(y))
+    if events is not None:
+        # roi-popout-data: the caller's own (event_id, tof) arrays, for the cases a random draw cannot pin:
+        # off-detector ids, an event order, no events at all.
+        event_id = np.asarray(events[0], dtype=np.int64)
+        tof = np.asarray(events[1], dtype=float)
 
     with h5py.File(path, "w") as f:
         entry = f.create_group("entry")
@@ -256,8 +262,9 @@ def test_estimate_peak_range_reports_its_contrast_when_asked(nexus):
 
 
 def test_default_bkg_roi_sits_outside_the_peak_with_a_gap():
-    low, high = re_mod.default_bkg_roi((140, 160), n_y=N_Y, gap=5, width=10)
-    assert high < 140 - 5 or low > 160 + 5
+    """roi-popout-data B7: a band on each side, in the reducer's four-bound form (F5)."""
+    b0, b1, b2, b3 = re_mod.default_bkg_roi((140, 160), n_y=N_Y, gap=5, width=10)
+    assert b1 < 140 - 5 and b2 > 160 + 5
 
 
 def test_default_bkg_roi_never_returns_a_band_off_the_detector():
@@ -271,11 +278,10 @@ def test_default_bkg_roi_never_returns_a_band_off_the_detector():
     for peak_low in range(0, N_Y - 1, 7):
         peak = (peak_low, min(peak_low + 12, N_Y - 1))
         try:
-            low, high = re_mod.default_bkg_roi(peak, n_y=N_Y, gap=5, width=10)
+            b0, b1, b2, b3 = re_mod.default_bkg_roi(peak, n_y=N_Y, gap=5, width=10)
         except ValueError:
             continue  # refused for want of room, which is the other contract
-        assert 0 <= low <= high <= N_Y - 1, f"off-detector band {(low, high)} for peak {peak}"
-        assert high < peak[0] or low > peak[1], f"band {(low, high)} overlaps peak {peak}"
+        assert 0 < b0 <= b1 < peak[0] and peak[1] < b2 <= b3 <= N_Y - 1, f"bands {(b0, b1, b2, b3)} for peak {peak}"
 
 
 def test_default_bkg_roi_refuses_a_peak_that_leaves_no_room():
@@ -298,24 +304,19 @@ def test_the_module_imports_without_any_gui_package():
     import sys
     import textwrap
 
+    # roi-popout-data I8 (F12): asserted on sys.modules in a fresh interpreter, as test_settings_document.py
+    # does, not through a find_module finder: Python 3.12 dropped that hook, and the guard would pass vacuously.
     program = textwrap.dedent(
         """
         import sys
-
-        class _Blocker:
-            def find_module(self, name, path=None):
-                if name.split(".")[0] in ("qtpy", "PyQt5", "PyQt6", "PySide2", "PySide6"):
-                    raise ImportError(f"{name} must not be imported by roi_estimate")
-                return None
-
-        sys.meta_path.insert(0, _Blocker())
         import lr_reduction.roi_estimate  # noqa: F401
-        print("OK")
+        bindings = ("qtpy", "PyQt5", "PyQt6", "PySide2", "PySide6")
+        print(sorted(m for m in sys.modules if m.split(".")[0] in bindings))
         """
     )
     proc = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=120)
     assert proc.returncode == 0, proc.stderr
-    assert "OK" in proc.stdout
+    assert proc.stdout.strip().splitlines()[-1] == "[]", proc.stdout
 
 
 def test_the_geometry_comes_from_the_instrument_database_not_a_literal(monkeypatch):
@@ -450,56 +451,413 @@ def test_counts_vs_y_refuses_an_inverted_band(nexus):
         re_mod.counts_vs_y(nexus, lowres=(100, 160), tof_band=(40000.0, 10000.0))
 
 
-def test_the_mutation_battery_refuses_a_dirty_baseline():
-    """G: the committed battery adopted whatever was on disk as "clean".
+# ===========================================================================
+# roi-popout-data (plan v1, triage 5fa056b). PR #31's advisories I1-I8, and the pop-out's data contract
+# B1-B9 on this module. Counts are raw event counts (the web report's quantity). Pixel ranges are inclusive
+# [low, high], as the reducer's lowres and peak masks are.
+# ===========================================================================
 
-    It took `sha(MOD)` of the working tree with zero git references, so a
-    leftover from a killed run became the baseline and the battery printed
-    `restored: OK` with the mutation still in the file. This is the campaign's
-    reference battery and it had the exact failure
-    `todo-mutation-harness-restore-safety` was written about.
-    """
+_BINDINGS_ROOT = Path(__file__).resolve().parents[3]
+_BATTERY = _BINDINGS_ROOT / "scripts" / "test" / "roi_estimate_mutations.py"
+
+
+def _load_battery():
+    """The committed battery, by the path anchored to this file (the gate runs from tests/)."""
     import importlib.util
 
-    # Anchored to THIS FILE, not the process CWD. `pixi run test-reduction` is
-    # `cd tests/ && python -m pytest`, so a relative path resolves to
-    # <repo>/tests/plans/... and raises FileNotFoundError — the gate goes red
-    # while running pytest from the repo root stays green. That asymmetry is
-    # `scaling-factor-path-anchor-learning.md` #1 ("a gate command that changes
-    # directory hides every cwd-dependent defect behind it"), and I hit it by
-    # verifying with pytest instead of with the gate command itself.
-    repo_root = Path(__file__).resolve().parents[3]
-    spec = importlib.util.spec_from_file_location(
-        "roi_batt", str(repo_root / "scripts" / "test" / "roi_estimate_mutations.py")
-    )
+    spec = importlib.util.spec_from_file_location("roi_batt", str(_BATTERY))
     batt = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(batt)
+    return batt
 
+
+def _events_file(tmp_path, ids, tofs, name="ev.nxs.h5", **kwargs):
+    return _write_nexus(tmp_path / name, events=(ids, tofs), **kwargs)
+
+
+def _ids(x, y):
+    return np.asarray(x, dtype=np.int64) * N_Y + np.asarray(y, dtype=np.int64)
+
+
+# -- I1-I3: counts_vs_y ------------------------------------------------------
+
+
+def _spy_get_y_tof(monkeypatch):
+    from lr_reduction import binary_processing
+
+    calls = []
+    real = binary_processing.get_y_tof
+
+    def spy(tof_array, event_id, e_offset, lowres, *args, **kwargs):
+        calls.append(list(lowres))
+        return real(tof_array, event_id, e_offset, lowres, *args, **kwargs)
+
+    monkeypatch.setattr(binary_processing, "get_y_tof", spy)
+    return calls
+
+
+def test_counts_vs_y_default_lowres_follows_the_detector_database(nexus, monkeypatch):
+    """I1 (L3): the default means every X pixel of this run's detector. A literal (0, 255) agrees with the
+    database today, so the pin moves the database: the default must follow it."""
+    calls = _spy_get_y_tof(monkeypatch)
+    re_mod.counts_vs_y(nexus)
+    assert calls[-1] == [0, N_X - 1]
+
+    real = re_mod.nr_tools.read_settings
+
+    def moved(time):
+        settings = dict(real(time))
+        settings["num_x_pixels"] = 512
+        settings["num_y_pixels"] = 608
+        return settings
+
+    monkeypatch.setattr(re_mod.nr_tools, "read_settings", moved)
+    re_mod.counts_vs_y(nexus)
+    assert calls[-1] == [0, 511]
+
+
+def test_counts_vs_y_with_a_band_counts_exactly_the_events_inside_it(tmp_path):
+    """I2: a narrow band selects strictly fewer counts than no band, and exactly the in-band events (charge 1)."""
+    ids = _ids([120] * 4000, [150] * 4000)
+    tofs = np.r_[np.full(1000, 15000.0), np.full(3000, 30000.0)]
+    path = _events_file(tmp_path, ids, tofs, proton_charge=1.0)
+    total = re_mod.counts_vs_y(path, lowres=(100, 160)).sum()
+    in_band = re_mod.counts_vs_y(path, lowres=(100, 160), tof_band=(14000.0, 16000.0)).sum()
+    assert in_band < total
+    assert in_band == pytest.approx(1000)
+
+
+def test_counts_vs_y_calls_the_histogrammer_once_with_or_without_a_band(nexus, monkeypatch):
+    """I3: one get_y_tof call per counts_vs_y call (the band is applied to the events first)."""
+    calls = _spy_get_y_tof(monkeypatch)
+    re_mod.counts_vs_y(nexus, lowres=(100, 160))
+    assert len(calls) == 1
+    re_mod.counts_vs_y(nexus, lowres=(100, 160), tof_band=(12000.0, 30000.0))
+    assert len(calls) == 2
+
+
+# -- I5-I7: the battery ------------------------------------------------------
+
+
+def test_the_battery_table_lists_the_rows_it_runs():
+    """I5: the battery's documented table and MUTATIONS name the same rows. A row in the table that no longer
+    runs is in RETIRED with its reason, and every anchor occurs exactly once in the module (no ANCHOR MISS)."""
+    import re
+
+    batt = _load_battery()
+    source = _BATTERY.read_text(encoding="utf-8")
+    table = {int(m) for m in re.findall(r"^# \|\s*(\d+)\s*\|", source, flags=re.MULTILINE)}
+    running = {row for row, *_ in batt.MUTATIONS}
+    retired = getattr(batt, "RETIRED", {})
+    assert table == running | set(retired), (sorted(table), sorted(running), sorted(retired))
+    assert all(isinstance(reason, str) and reason.strip() for reason in retired.values())
+    module = open(batt.MOD, encoding="utf-8").read()
+    assert [row for row, _desc, old, _new in batt.MUTATIONS if module.count(old) != 1] == []
+
+
+def _battery_copy(tmp_path, slow_test=None):
+    """A git repository in tmp_path holding copies of the module and the battery (I6, I7)."""
+    import shutil
     import subprocess
 
-    assert hasattr(batt, "verify_baseline_matches_head"), "no git-backed baseline check"
-    assert hasattr(batt, "signal"), "no signal module — a SIGTERM'd run cannot restore"
+    repo = tmp_path / "repo"
+    (repo / "src" / "lr_reduction").mkdir(parents=True)
+    (repo / "scripts" / "test").mkdir(parents=True)
+    (repo / "tests" / "unit" / "lr_reduction").mkdir(parents=True)
+    shutil.copy(re_mod.__file__, repo / "src" / "lr_reduction" / "roi_estimate.py")
+    shutil.copy(_BATTERY, repo / "scripts" / "test" / "roi_estimate_mutations.py")
+    (repo / "tests" / "unit" / "lr_reduction" / "test_roi_estimate.py").write_text(
+        slow_test or "def test_nothing():\n    pass\n")
+    git = ["git", "-c", "user.name=test", "-c", "user.email=test@example.invalid"]
+    subprocess.run([*git, "init", "-q"], cwd=repo, check=True)
+    subprocess.run([*git, "add", "-A"], cwd=repo, check=True)
+    subprocess.run([*git, "commit", "-q", "-m", "copy"], cwd=repo, check=True)
+    return repo
 
-    original = open(batt.MOD, encoding="utf-8").read()
-    rel = os.path.relpath(batt.MOD, batt.REPO)
-    head_blob = subprocess.run(
-        ["git", "show", f"HEAD:{rel}"], cwd=batt.REPO, capture_output=True, check=True
-    ).stdout.decode()
 
-    try:
-        # Matches HEAD -> accepted. Written explicitly rather than relying on the
-        # working tree being clean, so the test is deterministic while the slug
-        # is mid-edit.
-        with open(batt.MOD, "w", encoding="utf-8") as fh:
-            fh.write(head_blob)
+def test_the_mutation_battery_refuses_a_dirty_baseline(tmp_path, monkeypatch):
+    """G (v2), and I6: on a tmp_path copy, never on the tracked module. The battery adopted whatever was on
+    disk as "clean", so a leftover from a killed run became the baseline. It must compare against HEAD. The
+    tracked module's mtime is unchanged across this test."""
+    tracked = Path(re_mod.__file__)
+    mtime = os.stat(tracked).st_mtime_ns
+    repo = _battery_copy(tmp_path)
+    batt = _load_battery()
+    module = repo / "src" / "lr_reduction" / "roi_estimate.py"
+    monkeypatch.setattr(batt, "REPO", str(repo))
+    monkeypatch.setattr(batt, "MOD", str(module))
+    batt.verify_baseline_matches_head()  # matches HEAD: accepted
+    module.write_text(module.read_text(encoding="utf-8") + "\n# leftover from a killed run\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="dirty|HEAD|baseline"):
         batt.verify_baseline_matches_head()
+    assert os.stat(tracked).st_mtime_ns == mtime
 
-        # Differs from HEAD -> refused. This is the case that matters: a
-        # leftover from a killed run must not become the baseline.
-        with open(batt.MOD, "w", encoding="utf-8") as fh:
-            fh.write(head_blob + "\n# leftover from a killed run\n")
-        with pytest.raises(SystemExit, match="dirty|HEAD|baseline"):
-            batt.verify_baseline_matches_head()
+
+def test_a_sigterm_during_the_battery_leaves_the_module_restored(tmp_path):
+    """I7: the behaviour the hasattr(batt, "signal") stand-in only implied. On a tmp_path copy, the battery is
+    stopped by SIGTERM while a mutation is in the file (its pytest is sleeping), and the module must be as
+    committed afterwards."""
+    import signal
+    import subprocess
+    import sys
+    import time
+
+    repo = _battery_copy(tmp_path, slow_test="import time\n\n\ndef test_slow():\n    time.sleep(60)\n")
+    module = repo / "src" / "lr_reduction" / "roi_estimate.py"
+    original = module.read_text(encoding="utf-8")
+    proc = subprocess.Popen([sys.executable, str(repo / "scripts" / "test" / "roi_estimate_mutations.py")],
+                            cwd=repo, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    try:
+        deadline = time.monotonic() + 60
+        while module.read_text(encoding="utf-8") == original and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert module.read_text(encoding="utf-8") != original, "the battery never wrote a mutation"
+        os.kill(proc.pid, signal.SIGTERM)
+        assert proc.wait(timeout=30) == 128 + signal.SIGTERM
+        assert module.read_text(encoding="utf-8") == original
     finally:
-        with open(batt.MOD, "w", encoding="utf-8") as fh:
-            fh.write(original)
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)  # the battery's sleeping pytest, left behind by its exit
+        except ProcessLookupError:
+            pass
+
+
+# -- B1, B8: one read of the file, into RunEvents ----------------------------
+
+
+def test_load_event_pixels_holds_the_events_and_the_detector_shape(tmp_path):
+    """B1: x = id // n_y, y = id % n_y (get_y_tof's packing); n_x, n_y from the database; stride 1."""
+    ids = _ids([100, 120, 159], [150, 3, 300])
+    path = _events_file(tmp_path, ids, [11000.0, 12000.0, 13000.0])
+    events = re_mod.load_event_pixels(path)
+    assert (events.n_x, events.n_y) == (N_X, N_Y)
+    assert list(events.x) == [100, 120, 159] and list(events.y) == [150, 3, 300]
+    assert list(events.tof) == [11000.0, 12000.0, 13000.0]
+    assert events.stride == 1 and events.n_off_detector == 0
+
+
+def test_load_event_pixels_reads_the_file_once(nexus, monkeypatch):
+    """B1 and acceptance 4: one read of the file per load (an h5py.File spy)."""
+    opened = []
+    real = re_mod.h5py.File
+
+    def spy(*args, **kwargs):
+        opened.append(args[0])
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(re_mod.h5py, "File", spy)
+    re_mod.load_event_pixels(nexus)
+    assert len(opened) == 1
+
+
+def test_the_event_geometry_follows_the_instrument_database(nexus, monkeypatch):
+    """B8: no geometry literal. Move the database, and the shapes follow."""
+    real = re_mod.nr_tools.read_settings
+
+    def moved(time):
+        settings = dict(real(time))
+        settings["num_x_pixels"] = 512
+        settings["num_y_pixels"] = 608
+        return settings
+
+    monkeypatch.setattr(re_mod.nr_tools, "read_settings", moved)
+    events = re_mod.load_event_pixels(nexus)
+    assert (events.n_x, events.n_y) == (512, 608)
+    assert re_mod.xy_image(events).shape == (608, 512)
+
+
+# -- B2: the XY image --------------------------------------------------------
+
+
+def test_xy_image_is_what_the_web_report_plots(nexus_dir):
+    """T1 (F4): equal, cell for cell, to the web report's XY array (web_report.py:579-583)."""
+    from mantid.simpleapi import Integration, LoadEventNexus
+
+    path = os.path.join(nexus_dir, "REF_L_201288.nxs.h5")
+    events = re_mod.load_event_pixels(path)
+    workspace = LoadEventNexus(Filename=path, OutputWorkspace="xy_cross_check")
+    signal = Integration(InputWorkspace=workspace, OutputWorkspace="xy_cross_check_sum").extractY()
+    expected = np.reshape(signal, (events.n_x, events.n_y)).T
+    assert np.array_equal(re_mod.xy_image(events), expected)
+
+
+def test_xy_image_puts_the_injected_peak_at_its_row_and_columns(nexus):
+    """T2: image[y, x], shape (n_y, n_x); the builder's peak is row 150 at x 100-159."""
+    image = re_mod.xy_image(re_mod.load_event_pixels(nexus))
+    assert image.shape == (N_Y, N_X)
+    assert image[150, 100:160].sum() > 0.5 * image.sum()
+    assert image[:, :100].sum() == 0 and image[:, 160:].sum() == 0
+
+
+def test_off_detector_ids_are_dropped_and_counted(tmp_path):
+    """T3: ids outside [0, n_x*n_y) are dropped and counted, never reshaped into an edge pixel."""
+    ids = np.r_[_ids([120] * 10, [150] * 10), [N_X * N_Y, N_X * N_Y + 5, -1]]
+    path = _events_file(tmp_path, ids, np.full(13, 20000.0))
+    events = re_mod.load_event_pixels(path)
+    assert events.n_off_detector == 3
+    assert re_mod.xy_image(events).sum() == 10
+
+
+# -- B3, B4: TOF edges and the Y-TOF image -----------------------------------
+
+
+def test_tof_edges_span_every_event_not_the_chopper_band(nexus):
+    """T4 (R14): the edges cover the events' full TOF span (50 us bins, the web report's); the chopper band is
+    an overlay, not a crop. An event outside the band is inside the edges and counted."""
+    events = re_mod.load_event_pixels(nexus)
+    band = re_mod.lambda_to_tof(re_mod.chopper_lambda_range(nexus), re_mod.read_nexus_metadata(nexus)["start_time"])
+    outside = (events.tof < band[0]) | (events.tof > band[1])
+    assert outside.any(), "precondition: the builder has events outside the chopper band"
+    edges = re_mod.tof_edges(events)
+    assert edges[0] <= events.tof.min() and edges[-1] >= events.tof.max()
+    assert np.allclose(np.diff(edges), 50.0)
+    image = re_mod.y_tof_image(events, (0, N_X - 1), edges)
+    assert image.shape == (N_Y, len(edges) - 1)
+    assert image.sum() == len(events.tof)
+
+
+def test_y_tof_image_counts_only_the_x_range(nexus):
+    """T5: events outside the inclusive x range contribute nothing; inside, every event is counted."""
+    events = re_mod.load_event_pixels(nexus)
+    edges = re_mod.tof_edges(events)
+    assert re_mod.y_tof_image(events, (0, 99), edges).sum() == 0
+    assert re_mod.y_tof_image(events, (100, 159), edges).sum() == len(events.tof)
+    inside = (events.x >= 100) & (events.x <= 129)
+    assert re_mod.y_tof_image(events, (100, 129), edges).sum() == inside.sum()
+
+
+def test_y_tof_image_keeps_the_event_at_the_last_edge(tmp_path):
+    """T5 (F4): an event at exactly the last edge is counted. Mantid's half-open last bin drops it."""
+    path = _events_file(tmp_path, _ids([120] * 3, [150] * 3), [1000.0, 1050.0, 1100.0])
+    events = re_mod.load_event_pixels(path)
+    image = re_mod.y_tof_image(events, (0, N_X - 1), np.array([1000.0, 1050.0, 1100.0]))
+    assert image.sum() == 3 and image[150, 1] == 2
+
+
+# -- B5: the three profiles --------------------------------------------------
+
+
+def test_profile_y_agrees_with_the_library_histogrammer(nexus_dir):
+    """T6 (F8): profile_y over the run's proton charge equals counts_vs_y, through get_y_tof."""
+    path = os.path.join(nexus_dir, "REF_L_201288.nxs.h5")
+    with h5py.File(path, "r") as f:
+        charge = float(np.sum(f["entry/proton_charge"][:]))
+    events = re_mod.load_event_pixels(path)
+    expected = re_mod.counts_vs_y(path, lowres=(50, 200))
+    assert np.allclose(re_mod.profile_y(events, (50, 200)) / charge, expected, rtol=1e-12, atol=0)
+
+
+def test_profiles_are_marginals_of_the_images(nexus):
+    """T7: profile_y is the Y-TOF image summed over TOF; profile_x is the XY image summed over Y; profile_tof
+    counts every event."""
+    events = re_mod.load_event_pixels(nexus)
+    edges = re_mod.tof_edges(events)
+    assert np.array_equal(re_mod.profile_y(events, (100, 159)), re_mod.y_tof_image(events, (100, 159), edges).sum(axis=1))
+    assert np.array_equal(re_mod.profile_x(events), re_mod.xy_image(events).sum(axis=0))
+    assert re_mod.profile_tof(events, edges).sum() == len(events.tof)
+    band = (15000.0, 25000.0)
+    in_band = (events.tof >= band[0]) & (events.tof <= band[1])
+    assert re_mod.profile_x(events, tof_band=band).sum() == in_band.sum()
+    assert re_mod.profile_y(events, (100, 159), tof_band=band).sum() == in_band.sum()
+
+
+# -- B6: the reducer's background bands --------------------------------------
+
+_ACCEPTED = [[133, 149, 0, 0], [120, 130, 150, 160], [160, 150, 130, 120], [0, 0, 10, 300]]
+_REFUSED = [[0, 10, 150, 160], [0, 0, 0, 0], [0, 140, 150, 160], [121, 130], [133, 149, 0], [], None, "120, 130"]
+
+
+@pytest.mark.parametrize("bkg", _ACCEPTED)
+def test_background_bands_are_the_rows_the_reducer_averages(bkg):
+    """T8 (F6): point-wise equal to the reducer's _background_roi_sorter where it returns four bounds."""
+    from lr_reduction.nr_reduction_calc import NR_Reduction
+
+    expected = [int(v) for v in NR_Reduction._background_roi_sorter(None, bkg, 136, 146)]
+    (b0, b1), (b2, b3) = re_mod.background_bands(bkg, 136, 146)
+    assert [b0, b1, b2, b3] == expected
+
+
+@pytest.mark.parametrize("bkg", _REFUSED)
+def test_background_bands_refuses_what_the_reducer_cannot_use(bkg):
+    """T8 (F6): one, three or four zeros (pixel 0 is the reducer's sentinel), a length other than four, no
+    entry, not numbers: ValueError naming the background, never None or two bounds."""
+    with pytest.raises(ValueError, match="background"):
+        re_mod.background_bands(bkg, 136, 146)
+
+
+# -- B7: a default background the reducer accepts ----------------------------
+
+
+def test_default_bkg_roi_survives_the_reducer():
+    """T9 (F5): swept over every peak position, the result is four ascending ints, inside the detector and
+    never 0 (the sentinel). The reducer's sorter returns it unchanged, and a side with no room is refused."""
+    from lr_reduction.nr_reduction_calc import NR_Reduction
+
+    gap, width = 3, 5
+    for peak_low in range(0, N_Y - 1):
+        peak = (peak_low, min(peak_low + 8, N_Y - 1))
+        room = peak[0] - gap - width >= 1 and peak[1] + gap + width <= N_Y - 1
+        if not room:
+            with pytest.raises(ValueError, match="room"):
+                re_mod.default_bkg_roi(peak, n_y=N_Y, gap=gap, width=width)
+            continue
+        bounds = re_mod.default_bkg_roi(peak, n_y=N_Y, gap=gap, width=width)
+        assert len(bounds) == 4 and all(isinstance(b, int) for b in bounds)
+        assert 0 < bounds[0] <= bounds[1] < peak[0] and peak[1] < bounds[2] <= bounds[3] <= N_Y - 1
+        assert [int(v) for v in NR_Reduction._background_roi_sorter(None, list(bounds), *peak)] == list(bounds)
+
+
+def test_default_bkg_roi_defaults_are_the_reviewed_three_and_five():
+    """A3: gap 3 and width 5 either side, #197's values that the scientists reviewed."""
+    assert re_mod.default_bkg_roi((140, 160), n_y=N_Y) == (132, 136, 164, 168)
+
+
+# -- B9, T10-T12: refusals, sparse and empty runs, sampling -------------------
+
+
+def test_a_sparse_real_run_gives_images_and_a_refused_estimate(nexus_dir):
+    """T10 (F8): 201284 has ~6 000 events. The images and profiles are returned, and the estimator refuses."""
+    events = re_mod.load_event_pixels(os.path.join(nexus_dir, "REF_L_201284.nxs.h5"))
+    assert re_mod.xy_image(events).sum() > 0
+    with pytest.raises(re_mod.CannotEstimateError):
+        re_mod.estimate_peak_range(re_mod.profile_y(events, (50, 200)))
+
+
+def test_stride_sampling_is_not_a_time_slice(tmp_path):
+    """T11: a peak only in the second half of the event list is present at max_events = n // 4 (stride 4). A
+    head slice would hold none of it."""
+    rng = np.random.default_rng(7)
+    half = 4000
+    ids = np.r_[_ids(rng.integers(100, 160, half), rng.integers(0, N_Y, half)), _ids([120] * half, [200] * half)]
+    path = _events_file(tmp_path, ids, rng.uniform(10000.0, 40000.0, 2 * half))
+    events = re_mod.load_event_pixels(path, max_events=len(ids) // 4)
+    assert events.stride == 4
+    profile = re_mod.profile_y(events, (100, 159))
+    assert int(np.argmax(profile)) == 200
+
+
+def test_an_empty_run_gives_zero_images_and_refuses_edges(tmp_path):
+    """T12 (§3 states): no events gives all-zero arrays of the right shape; tof_edges refuses, with
+    CannotEstimateError, never a bare min() error."""
+    path = _events_file(tmp_path, np.array([], dtype=np.int64), np.array([], dtype=float))
+    events = re_mod.load_event_pixels(path)
+    assert len(events.tof) == 0
+    assert re_mod.xy_image(events).shape == (N_Y, N_X) and re_mod.xy_image(events).sum() == 0
+    assert re_mod.profile_y(events, (0, N_X - 1)).shape == (N_Y,) and re_mod.profile_x(events).shape == (N_X,)
+    assert re_mod.y_tof_image(events, (0, N_X - 1), np.array([0.0, 50.0])).shape == (N_Y, 1)
+    with pytest.raises(re_mod.CannotEstimateError):
+        re_mod.tof_edges(events)
+
+
+def test_called_wrong_is_a_value_error_not_an_empty_answer(nexus):
+    """B9: a reversed range or band, a bin width <= 0, max_events <= 0: ValueError, never an empty selection
+    reported as "no counts"."""
+    events = re_mod.load_event_pixels(nexus)
+    for call in (lambda: re_mod.profile_y(events, (160, 100)),
+                 lambda: re_mod.xy_image(events, tof_band=(30000.0, 10000.0)),
+                 lambda: re_mod.profile_x(events, y_range=(200, 100)),
+                 lambda: re_mod.y_tof_image(events, (160, 100), re_mod.tof_edges(events)),
+                 lambda: re_mod.tof_edges(events, bin_width=0),
+                 lambda: re_mod.load_event_pixels(nexus, max_events=0)):
+        with pytest.raises(ValueError):
+            call()
