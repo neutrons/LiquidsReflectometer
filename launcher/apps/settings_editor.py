@@ -37,13 +37,20 @@ from pathlib import Path
 from qtpy import QtCore, QtGui, QtWidgets
 
 from launcher.app_identity import ensure_identity
+from launcher.apps import roi_dialog
+from launcher.apps.roi_dialog import ROISelectionDialog
 from lr_reduction import field_spec as fs
+from lr_reduction import roi_estimate
 from lr_reduction.settings_document import SettingsDocument, file_spelling, normalise_experiment_id
 
 #: Above this, populating the table freezes the GUI thread for seconds and
 #: costs ~1100x the file size in memory. A settings file with more angles than
 #: this is a mistake, not a workload.
 MAX_TABLE_ROWS = 500
+
+#: Events the ROI pop-out reads from a run (roi-popout-data's stride sampling over the whole run, never its first
+#: N): a choice of pixel ranges needs a sample, and a long run then opens quickly. #197's value (A7).
+MAX_ROI_EVENTS = 2_000_000
 
 
 #: Editor property set when the user chooses an item in a table drop-down.
@@ -636,9 +643,25 @@ class SettingsEditorTab(QtWidgets.QWidget):
         self.remove_angle_button = QtWidgets.QPushButton("Remove angle")
         self.remove_angle_button.clicked.connect(lambda _checked=False: self.remove_selected_angle())
         buttons.addWidget(self.remove_angle_button)
+
+        # roi-popout-dialog (B1): the selected row's run on its detector images and profiles, its ROIs adjustable.
+        self.select_roi_button = QtWidgets.QPushButton("Select ROI")
+        self.select_roi_button.clicked.connect(lambda _checked=False: self.select_roi())
+        buttons.addWidget(self.select_roi_button)
+        self.angle_table.currentCellChanged.connect(lambda *_cells: self._update_select_roi_button())
+        self._update_select_roi_button()
         buttons.addStretch(1)
         box.addLayout(buttons)
         return panel
+
+    def _update_select_roi_button(self):
+        """B1: enabled exactly while the Angles table has a current row, and the ROI plots can be drawn."""
+        if roi_dialog.Figure is None:
+            self.select_roi_button.setEnabled(False)
+            self.select_roi_button.setToolTip("Unavailable: matplotlib's Qt backend could not be imported")
+            return
+        self.select_roi_button.setToolTip("Show the selected angle's run on the detector and adjust its ROIs")
+        self.select_roi_button.setEnabled(self.angle_table.currentRow() >= 0)
 
     def _build_scalar_panel(self):
         scroll = QtWidgets.QScrollArea()
@@ -1051,6 +1074,89 @@ class SettingsEditorTab(QtWidgets.QWidget):
         self.document.remove_angle(row)
         self.refresh_angles()
         self.refresh_report()
+
+    @guarded
+    def select_roi(self):
+        """B1, B2, B9: the ROI pop-out for the selected row, and what it reports written to that row.
+
+        The row is read once, at the gesture, and passed on: nothing later consults the selection, so the row the
+        dialog was opened for is the row written (the active-row trap). Only the fields the dialog reports changed
+        are written, through the document: RB_Ymin, RB_Ymax and BkgROI with ``set_angle_field``, which keeps every
+        column one length; data_x_range, shared by every angle, with ``set``. The dialog writes nothing, and no
+        file is opened for writing.
+        """
+        row = self.angle_table.currentRow()
+        if row < 0:
+            return
+        loaded = self._events_for_row(row)
+        if loaded is None:  # the file dialog was cancelled
+            return
+        events, title, *more = loaded
+        values = self._roi_values(row)
+        dialog = ROISelectionDialog(events, values, title=title, tof_band=more[0] if more else None, parent=self)
+        try:
+            if dialog.exec_() != QtWidgets.QDialog.Accepted:
+                return
+            changes = dialog.changes()
+        finally:
+            dialog.close()
+            dialog.deleteLater()  # released, never destroy(): Qt frees it when control returns to the loop
+        if row >= self.document.n_angles:
+            raise IndexError(f"angle {row + 1} no longer exists, so nothing was written")
+        for name in ("RB_Ymin", "RB_Ymax", "BkgROI"):
+            if name in changes:
+                self.document.set_angle_field(row, name, changes[name])
+        if "data_x_range" in changes:
+            self.document.set("data_x_range", changes["data_x_range"])
+        self.refresh_angles()
+        self.refresh_scalars()
+        self.refresh_report()
+
+    def _roi_values(self, row):
+        """The row's values the pop-out shows, as the document holds them (a short column reads None)."""
+        angle = self.document.angle_row(row)
+        values = {name: angle.get(name) for name in ("RB_Ymin", "RB_Ymax", "BkgROI", "tof_min", "tof_max", "useBS")}
+        values["data_x_range"] = self.document.get("data_x_range")
+        return values
+
+    def _events_for_row(self, row):
+        """B2: the row's run, as ``(events, title, tof_band)``, or None when the user cancels choosing a file.
+
+        The file is the reducer's own name for the row's run, ``NEXUSpathRB / REF_L_<RBnum>.nxs.h5``
+        (``nr_reduction_calc.py:325``), when RBnum is set and the file exists. Otherwise (an authored file holds no
+        RBnum) a file dialog asks, starting in that NeXus folder when it exists, else where it was last. The view
+        filter starts at the run's chopper band when it has a chopper log, else the full TOF span (B8). A read
+        failure raises, and ``@guarded`` reports it in the panel.
+        """
+        runs = self.document.get("RBnum")
+        run = runs[row] if isinstance(runs, list) and row < len(runs) else None
+        try:
+            folder = Path(self.document.config.NEXUSpathRB)
+        except TypeError:  # an experiment_id of None makes the path property raise
+            folder = None
+        path = None
+        if run is not None and folder is not None and (folder / f"REF_L_{run}.nxs.h5").is_file():
+            path = folder / f"REF_L_{run}.nxs.h5"
+        if path is None:
+            start = str(folder) if folder is not None and folder.is_dir() else self.settings.value("roi_nexus_dir", "")
+            chosen, _ = QtWidgets.QFileDialog.getOpenFileName(
+                self, f"The NeXus file of angle {row + 1}", start, "NeXus (*.nxs.h5);;All files (*)"
+            )
+            if not chosen:
+                return None
+            path = Path(chosen)
+            self.settings.setValue("roi_nexus_dir", str(path.parent))
+        events = roi_estimate.load_event_pixels(path, max_events=MAX_ROI_EVENTS)
+        try:
+            meta = roi_estimate.read_nexus_metadata(path)
+            title = f"{meta['title']} (run {meta['run_number']})"
+        except (OSError, KeyError, ValueError):
+            meta, title = None, path.name
+        try:
+            band = roi_estimate.lambda_to_tof(roi_estimate.chopper_lambda_range(path), meta["start_time"])
+        except (OSError, KeyError, ValueError, TypeError):
+            band = None  # no chopper log: the view filter starts at the full span
+        return events, title, band
 
     # -- refresh -----------------------------------------------------------
 
