@@ -758,7 +758,8 @@ def test_profile_y_agrees_with_the_library_histogrammer(nexus_dir):
 
 def test_profiles_are_marginals_of_the_images(nexus):
     """T7: profile_y is the Y-TOF image summed over TOF; profile_x is the XY image summed over Y; profile_tof
-    counts every event."""
+    counts every event. Each restriction is pinned the same way: profile_x's rows and band, xy_image's band,
+    profile_tof's columns and rows."""
     events = re_mod.load_event_pixels(nexus)
     edges = re_mod.tof_edges(events)
     assert np.array_equal(re_mod.profile_y(events, (100, 159)), re_mod.y_tof_image(events, (100, 159), edges).sum(axis=1))
@@ -768,6 +769,33 @@ def test_profiles_are_marginals_of_the_images(nexus):
     in_band = (events.tof >= band[0]) & (events.tof <= band[1])
     assert re_mod.profile_x(events, tof_band=band).sum() == in_band.sum()
     assert re_mod.profile_y(events, (100, 159), tof_band=band).sum() == in_band.sum()
+    assert re_mod.xy_image(events, tof_band=band).sum() == in_band.sum()
+    assert np.array_equal(re_mod.profile_x(events, tof_band=band), re_mod.xy_image(events, tof_band=band).sum(axis=0))
+    assert np.array_equal(re_mod.profile_x(events, y_range=(148, 152)), re_mod.xy_image(events)[148:153].sum(axis=0))
+    assert np.array_equal(re_mod.profile_tof(events, edges, x_range=(100, 129), y_range=(148, 152)),
+                          re_mod.y_tof_image(events, (100, 129), edges)[148:153].sum(axis=0))
+
+
+def test_tof_edges_give_one_bin_when_every_event_shares_a_tof(tmp_path):
+    """B3: a span of zero is one bin, [t, t + bin_width], never a single edge that bins nothing."""
+    path = _events_file(tmp_path, _ids([120] * 3, [150] * 3), np.full(3, 20000.0))
+    events = re_mod.load_event_pixels(path)
+    edges = re_mod.tof_edges(events)
+    assert np.array_equal(edges, [20000.0, 20050.0])
+    assert re_mod.y_tof_image(events, (0, N_X - 1), edges).sum() == 3
+
+
+def test_tof_edges_hold_the_latest_event_when_rounding_falls_short(tmp_path):
+    """B3: this span is 1532 bins of 50 us plus one rounding ulp. ceil((high - low) / 50) is 1532, and low +
+    50 * 1532 lands one ulp short of the latest event (a measured float64 pair). The edges are extended, so
+    the event is binned, not dropped past the last edge."""
+    tofs = np.array([34429.573096232525, 111029.57309623253])
+    assert tofs[0] + 50.0 * 1532 < tofs[1], "precondition: the pair still falls short"
+    path = _events_file(tmp_path, _ids([120, 120], [150, 150]), tofs)
+    events = re_mod.load_event_pixels(path)
+    edges = re_mod.tof_edges(events)
+    assert edges[-1] >= tofs[1]
+    assert re_mod.y_tof_image(events, (0, N_X - 1), edges).sum() == 2
 
 
 # -- B6: the reducer's background bands --------------------------------------
@@ -874,4 +902,22 @@ def test_called_wrong_is_a_value_error_not_an_empty_answer(nexus):
                  lambda: re_mod.tof_edges(events, bin_width=0),
                  lambda: re_mod.load_event_pixels(nexus, max_events=0)):
         with pytest.raises(ValueError):
+            call()
+
+
+def test_called_wrong_names_what_is_wrong(nexus):
+    """B9: the refusals numpy would not make. One TOF edge bins nothing (numpy returns an empty histogram), and
+    an edge repeated is a zero-width bin that counts an event on it; a reversed profile_tof range selects
+    nothing; a negative gap or a zero width puts the default band inside the peak or reverses it."""
+    events = re_mod.load_event_pixels(nexus)
+    edges = re_mod.tof_edges(events)
+    for call, match in ((lambda: re_mod.y_tof_image(events, (100, 159), [20000.0]), "edges"),
+                        (lambda: re_mod.y_tof_image(events, (100, 159), [20000.0, 20000.0, 20050.0]), "edges"),
+                        (lambda: re_mod.profile_tof(events, [20000.0]), "edges"),
+                        (lambda: re_mod.profile_tof(events, [20000.0, 20000.0, 20050.0]), "edges"),
+                        (lambda: re_mod.profile_tof(events, edges, x_range=(160, 100)), "reversed"),
+                        (lambda: re_mod.profile_tof(events, edges, y_range=(200, 100)), "reversed"),
+                        (lambda: re_mod.default_bkg_roi((140, 160), n_y=N_Y, gap=-1), "gap"),
+                        (lambda: re_mod.default_bkg_roi((140, 160), n_y=N_Y, width=0), "width")):
+        with pytest.raises(ValueError, match=match):
             call()
