@@ -292,7 +292,7 @@ class ROISelectionDialog(QDialog):
         spin.setRange(UNSET if unset else minimum, maximum)
         if unset:
             spin.setSpecialValueText("not set")
-        spin.setValue(int(value))
+        spin.setValue(value)  # an int already: _pixel, round() and floor/ceil make it one, and Qt refuses a float
         spin.valueChanged.connect(self._background_edited if background else self._values_changed)
         return spin
 
