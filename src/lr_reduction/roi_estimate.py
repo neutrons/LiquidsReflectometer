@@ -488,16 +488,14 @@ def background_bands(bkg_roi, y_min, y_max):
     """
     if bkg_roi is None:
         raise ValueError("no background is set for this angle (its BkgROI entry is None)")
-    if isinstance(bkg_roi, (str, bytes)):
-        raise ValueError(f"a background is four pixel bounds, not the text {bkg_roi!r}")
     try:
         bounds = np.asarray(bkg_roi)
     except ValueError as exc:  # ragged nesting
         raise ValueError(f"a background is one angle's four pixel bounds, not {bkg_roi!r}") from exc
-    if bounds.ndim != 1:
+    if bounds.ndim != 1:  # text is 0-d; the per-angle BkgROI list is 2-d
         raise ValueError(
-            f"a background is one angle's four bounds, not a {bounds.shape} array (the per-angle "
-            f"BkgROI list?): {bkg_roi!r}"
+            f"a background is one angle's four bounds, as a flat list; {bkg_roi!r} is not "
+            f"(shape {bounds.shape})"
         )
     if len(bounds) != 4:
         raise ValueError(
@@ -530,8 +528,8 @@ def default_bkg_roi(peak_range, n_y, gap=3, width=5):
     returns it unchanged. The defaults, 3 and 5, are #197's, which the
     scientists reviewed.
 
-    Refused, never clamped. A peak off the detector is refused, because clamping
-    returns a band from the wrong end (``RB_Ymin``/``RB_Ymax`` arrive as unvalidated
+    Refused, never clamped. A peak off the detector, or reversed, is refused,
+    because clamping returns a band from the wrong end (``RB_Ymin``/``RB_Ymax`` arrive as unvalidated
     file input). So is a side with no room: a band may not reach row 0, which is
     the reducer's sentinel and turns its sorter's answer into ``None``, nor run
     past the last row.
@@ -541,9 +539,9 @@ def default_bkg_roi(peak_range, n_y, gap=3, width=5):
         raise ValueError(f"gap must be >= 0 and width >= 1, not gap={gap!r}, width={width!r}")
     if not 0 <= peak_low <= peak_high <= n_y - 1:
         raise ValueError(
-            f"peak {peak_range} is not on a {n_y}-pixel detector (rows 0-{n_y - 1}); "
-            f"refusing rather than clamping, which would return a band from the "
-            f"wrong end"
+            f"peak {peak_range} is not an ascending range of rows on a {n_y}-pixel "
+            f"detector (rows 0-{n_y - 1}); refusing rather than clamping, which "
+            f"would return a band from the wrong end"
         )
     b1 = peak_low - gap - 1
     b0 = b1 - width + 1
