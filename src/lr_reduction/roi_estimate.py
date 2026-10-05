@@ -12,7 +12,18 @@ function, this module calls it; where the geometry is time-dependent, it comes
 from the instrument database (``nr_tools.read_settings``) and never from a
 literal, because the detector was 256x304 at 15.75 m only for part of the
 instrument's life.
+
+The ROI pop-out's data (roi-popout-data) is here too, Qt-free: one read of a
+run's events (:func:`load_event_pixels`), the two detector images the web report
+draws (:func:`xy_image`, :func:`y_tof_image` over :func:`tof_edges`), the three
+profiles (:func:`profile_y`, :func:`profile_x`, :func:`profile_tof`), the
+background bands as the reducer will use them (:func:`background_bands`), and a
+default background in the reducer's shape (:func:`default_bkg_roi`). Counts are
+raw event counts, the web report's quantity; pixel ranges are inclusive
+``[low, high]``, as the reducer's ``lowres`` and peak masks are.
 """
+
+from dataclasses import dataclass
 
 import h5py
 import numpy as np
@@ -149,32 +160,171 @@ def detector_shape(start_time):
     return int(settings["num_x_pixels"]), int(settings["num_y_pixels"])
 
 
+@dataclass(frozen=True)
+class RunEvents:
+    """One run's bank-1 events, read once, for the pop-out's images and profiles.
+
+    ``x`` and ``y`` are pixel indices, ``x = id // n_y`` and ``y = id % n_y``
+    (the packing ``binary_processing.get_y_tof`` uses); ``tof`` is the event time
+    offset in microseconds. ``n_x`` and ``n_y`` are the detector shape for the
+    run's start time, from the instrument database. ``stride`` is 1 when every
+    event is held and k when every k-th is. ``n_off_detector`` counts the ids
+    outside ``[0, n_x * n_y)``, which are dropped.
+    """
+
+    x: np.ndarray
+    y: np.ndarray
+    tof: np.ndarray
+    n_x: int
+    n_y: int
+    stride: int = 1
+    n_off_detector: int = 0
+
+
 def load_event_pixels(path, max_events=None):
-    """Event ``(x, y, tof)`` arrays for bank 1, optionally sub-sampled.
+    """Bank 1's events as :class:`RunEvents`: one read of the file.
 
     The id packing is the instrument's, taken from
-    ``binary_processing.get_y_tof``: ``x = id // n_y``, ``y = id % n_y``. ``n_y``
-    comes from the instrument database for this run's start time, so a run from
-    a period with a different detector is unpacked with that period's geometry.
+    ``binary_processing.get_y_tof``: ``x = id // n_y``, ``y = id % n_y``. The
+    shape comes from the instrument database for this run's start time, so a
+    run from a period with a different detector is unpacked with that period's
+    geometry. Ids outside the detector are dropped and counted
+    (``n_off_detector``), never reshaped into an edge pixel. With
+    ``max_events``, every k-th event is held (``stride`` = k): a sample of the
+    whole run, never its first N events, which would be a time slice of it.
     """
+    if max_events is not None and max_events <= 0:
+        raise ValueError(f"max_events must be positive, or None for every event, not {max_events!r}")
     with h5py.File(str(path), "r") as f:
-        event_id = np.asarray(f["entry/bank1_events/event_id"][:])
-        tof = np.asarray(f["entry/bank1_events/event_time_offset"][:])
+        event_id = np.asarray(f["entry/bank1_events/event_id"][:], dtype=np.int64)
+        tof = np.asarray(f["entry/bank1_events/event_time_offset"][:], dtype=float)
         start_time = _text(f["entry/start_time"])
 
+    n_x, n_y = detector_shape(start_time)
+    on_detector = (event_id >= 0) & (event_id < n_x * n_y)
+    n_off_detector = int(np.count_nonzero(~on_detector))
+    event_id, tof = event_id[on_detector], tof[on_detector]
+
+    stride = 1
     if max_events is not None and len(event_id) > max_events:
-        # Stride rather than head: the first N events are the first N
-        # microseconds of the run, which is a time slice, not a sample of it.
-        step = int(np.ceil(len(event_id) / max_events))
-        event_id = event_id[::step]
-        tof = tof[::step]
+        stride = int(np.ceil(len(event_id) / max_events))
+        event_id, tof = event_id[::stride], tof[::stride]
 
-    _, n_y = detector_shape(start_time)
-    return event_id // n_y, event_id % n_y, tof
+    return RunEvents(x=event_id // n_y, y=event_id % n_y, tof=tof, n_x=n_x, n_y=n_y,
+                     stride=stride, n_off_detector=n_off_detector)
 
 
-def counts_vs_y(path, lowres=(0, 255), max_events=None, n_tof_bins=200, tof_band=None):
+def _inclusive(name, bounds):
+    """``(low, high)`` of an inclusive range; reversed is a caller's error, never an empty selection."""
+    low, high = bounds
+    if high < low:
+        raise ValueError(f"{name} {tuple(bounds)!r} is reversed: ranges are inclusive [low, high]")
+    return low, high
+
+
+def _in_band(tof, tof_band):
+    """The events inside an inclusive TOF band (all of them when ``tof_band`` is None)."""
+    if tof_band is None:
+        return np.ones(len(tof), dtype=bool)
+    low, high = _inclusive("tof_band", tof_band)
+    return (tof >= low) & (tof <= high)
+
+
+def _edges(edges):
+    """``edges`` as floats. Fewer than two, or not strictly increasing, is a caller's error: numpy bins
+    nothing for one edge, and counts an event on a repeated edge in a zero-width bin."""
+    edges = np.asarray(edges, dtype=float)
+    if edges.ndim != 1 or len(edges) < 2 or np.any(np.diff(edges) <= 0):
+        raise ValueError(f"edges must be at least two strictly increasing TOF values ({edges.size} given)")
+    return edges
+
+
+def xy_image(events, tof_band=None):
+    """Counts per detector pixel, ``image[y, x]``, shape ``(n_y, n_x)``.
+
+    The web report's XY array, cell for cell (``web_report.py:579-583``), with no
+    band. With ``tof_band`` (inclusive, microseconds), only the events inside it.
+    """
+    keep = _in_band(events.tof, tof_band)
+    flat = np.bincount(events.y[keep] * events.n_x + events.x[keep], minlength=events.n_x * events.n_y)
+    return flat.reshape(events.n_y, events.n_x)
+
+
+def tof_edges(events, bin_width=50.0):
+    """TOF bin edges over the events' full span, ``bin_width`` microseconds apart.
+
+    The full span, never the chopper window: a window is an overlay on the
+    image, not a crop of it. 50 us is the web report's bin (``web_report.py:602``).
+    The last edge is at or past the latest event, which :func:`y_tof_image`
+    then counts (its last bin is closed). No events, nothing to bin:
+    :class:`CannotEstimateError`.
+    """
+    if not bin_width > 0:
+        raise ValueError(f"bin_width must be positive, not {bin_width!r}")
+    if len(events.tof) == 0:
+        raise CannotEstimateError("the run has no events, so there is no TOF span to bin")
+    low, high = float(events.tof.min()), float(events.tof.max())
+    edges = low + bin_width * np.arange(max(1, int(np.ceil((high - low) / bin_width))) + 1)
+    if edges[-1] < high:  # floating-point: never leave the latest event outside
+        edges = np.append(edges, edges[-1] + bin_width)
+    return edges
+
+
+def y_tof_image(events, x_range, edges):
+    """Counts per (Y pixel, TOF bin) for the events inside the inclusive ``x_range``.
+
+    Shape ``(n_y, len(edges) - 1)``. An event inside the edges is counted once,
+    including one at exactly the last edge (the last bin is closed). Mantid's
+    histogram drops that event, so this array and ``RefRoi``'s can differ in that
+    one cell (F4).
+    """
+    x_low, x_high = _inclusive("x_range", x_range)
+    edges = _edges(edges)
+    selected = (events.x >= x_low) & (events.x <= x_high)
+    image, _, _ = np.histogram2d(events.y[selected], events.tof[selected],
+                                 bins=[np.arange(events.n_y + 1), edges])
+    return image.astype(np.int64)
+
+
+def profile_y(events, x_range, tof_band=None):
+    """Counts per detector row for the events inside the inclusive ``x_range`` (and ``tof_band``).
+
+    With no band, the Y-TOF image summed over TOF, and, divided by the run's
+    proton charge, :func:`counts_vs_y` (F8).
+    """
+    x_low, x_high = _inclusive("x_range", x_range)
+    keep = (events.x >= x_low) & (events.x <= x_high) & _in_band(events.tof, tof_band)
+    return np.bincount(events.y[keep], minlength=events.n_y)
+
+
+def profile_x(events, y_range=None, tof_band=None):
+    """Counts per detector column, for the events inside ``y_range`` and ``tof_band`` (each optional)."""
+    keep = _in_band(events.tof, tof_band)
+    if y_range is not None:
+        y_low, y_high = _inclusive("y_range", y_range)
+        keep &= (events.y >= y_low) & (events.y <= y_high)
+    return np.bincount(events.x[keep], minlength=events.n_x)
+
+
+def profile_tof(events, edges, x_range=None, y_range=None):
+    """Counts per TOF bin over ``edges``, for the events inside ``x_range`` and ``y_range`` (each optional)."""
+    keep = np.ones(len(events.tof), dtype=bool)
+    if x_range is not None:
+        x_low, x_high = _inclusive("x_range", x_range)
+        keep &= (events.x >= x_low) & (events.x <= x_high)
+    if y_range is not None:
+        y_low, y_high = _inclusive("y_range", y_range)
+        keep &= (events.y >= y_low) & (events.y <= y_high)
+    counts, _ = np.histogram(events.tof[keep], bins=_edges(edges))
+    return counts
+
+
+def counts_vs_y(path, lowres=None, max_events=None, n_tof_bins=200, tof_band=None):
     """Counts per detector row, through the library histogrammer.
+
+    ``lowres`` is the inclusive X pixel range. ``None`` means every X pixel of this
+    run's detector, ``(0, n_x - 1)``, from the instrument database. A literal
+    such as ``(0, 255)`` agrees with the database today, and would not follow it.
 
     Calls :func:`lr_reduction.binary_processing.get_y_tof` rather than
     unpacking event ids here. That function already owns the id packing, the
@@ -184,7 +334,8 @@ def counts_vs_y(path, lowres=(0, 255), max_events=None, n_tof_bins=200, tof_band
 
     ``tof_band`` optionally restricts the sum to ``(tof_min, tof_max)`` in
     microseconds — the caller's way of looking only at the band the chopper
-    actually delivered.
+    actually delivered. The band is applied to the events, before the one
+    ``get_y_tof`` call.
     """
     from lr_reduction import binary_processing
 
@@ -211,6 +362,8 @@ def counts_vs_y(path, lowres=(0, 255), max_events=None, n_tof_bins=200, tof_band
         )
 
     n_x, n_y = detector_shape(start_time)
+    if lowres is None:
+        lowres = (0, n_x - 1)
 
     if len(e_offset) == 0:
         return np.zeros(n_y)
@@ -224,20 +377,16 @@ def counts_vs_y(path, lowres=(0, 255), max_events=None, n_tof_bins=200, tof_band
         raise ValueError(f"empty or inverted TOF band {(lo, hi)!r}")
     tof_array = np.linspace(lo, hi, n_tof_bins)
 
-    _, y_tof, _ = binary_processing.get_y_tof(
-        tof_array, event_id, e_offset, list(lowres), pcharge, n_y=n_y, n_x=n_x
-    )
-
     if tof_band is not None:
         # get_y_tof clips out-of-range events into the edge bins rather than
         # dropping them, so a band has to be applied to the events, not to the
-        # histogram: trimming columns here would keep the clipped strays.
+        # histogram: trimming columns would keep the clipped strays.
         in_band = (e_offset >= lo) & (e_offset <= hi)
-        _, y_tof, _ = binary_processing.get_y_tof(
-            tof_array, event_id[in_band], e_offset[in_band], list(lowres),
-            pcharge, n_y=n_y, n_x=n_x,
-        )
+        event_id, e_offset = event_id[in_band], e_offset[in_band]
 
+    _, y_tof, _ = binary_processing.get_y_tof(
+        tof_array, event_id, e_offset, list(lowres), pcharge, n_y=n_y, n_x=n_x
+    )
     return y_tof.sum(axis=1)
 
 
@@ -321,49 +470,89 @@ def estimate_peak_range(counts, min_contrast=1.5, smooth=3, with_contrast=False)
     return low, high
 
 
-def default_bkg_roi(peak_range, n_y, gap=5, width=10):
-    """A background band beside the peak, on whichever side has room.
+def background_bands(bkg_roi, y_min, y_max):
+    """The two background bands the reducer averages for one angle's ``BkgROI`` entry.
 
-    Prefers the low side, matching the tab's habit, and falls back to the high
-    side. The **fit checks are the protection**: a band is only returned when it
-    lies wholly on the detector, because a negative row or one past the last
-    pixel indexes silently in numpy and yields a background taken from the wrong
-    end of the detector.
+    ``((b0, b1), (b2, b3))``, inclusive: the four bounds ``NR_Reduction._background_roi_sorter``
+    (``nr_reduction_calc.py:827-840``) returns and the reducer's masks use (``:865-866``), computed the
+    same way, values and types. A fractional bound stays as the sorter keeps it, and the reducer's mask
+    then starts at the next row. The bounds are sorted. Exactly two zeros mean "adjacent to the peak": the
+    first two sorted bounds become ``y_min`` and ``y_max`` (the peak's own edges), and the four are sorted
+    again. Mirrored, not shared: extracting the sorter would put this slug on the reduction path, which
+    belongs with the reducer's own fix for pixel 0; T8 pins the two point-wise.
 
-    An earlier draft also clamped the result with ``max(0, ...)`` / ``min(n_y-1,
-    ...)``. Those were **dead code** — each sat inside a branch whose own
-    condition already forbids the out-of-range case, so neither could ever
-    change a value, and a mutation deleting them passed every test. Removed
-    rather than kept as reassurance: an unreachable guard reads as protection
-    and provides none.
+    Every entry on which the reducer would fail is a ``ValueError`` naming the reason. Its sorter returns
+    ``None`` for one, three or four zeros, because pixel 0 is its sentinel. It returns a short entry
+    unchanged, which the reducer then indexes at ``[3]``. A NaN or infinite bound passes through, and the
+    band's centre is then NaN or infinite.
+    """
+    if bkg_roi is None:
+        raise ValueError("no background is set for this angle (its BkgROI entry is None)")
+    if isinstance(bkg_roi, (str, bytes)):
+        raise ValueError(f"a background is four pixel bounds, not the text {bkg_roi!r}")
+    try:
+        bounds = np.asarray(bkg_roi)
+    except ValueError as exc:  # ragged nesting
+        raise ValueError(f"a background is one angle's four pixel bounds, not {bkg_roi!r}") from exc
+    if bounds.ndim != 1:
+        raise ValueError(
+            f"a background is one angle's four bounds, not a {bounds.shape} array (the per-angle "
+            f"BkgROI list?): {bkg_roi!r}"
+        )
+    if len(bounds) != 4:
+        raise ValueError(
+            f"a background needs four bounds, two per band; {bkg_roi!r} has {len(bounds)}, "
+            f"and the reducer reads the fourth"
+        )
+    numeric = np.issubdtype(bounds.dtype, np.integer) or np.issubdtype(bounds.dtype, np.floating)
+    if not numeric or not np.all(np.isfinite(bounds)):
+        raise ValueError(f"a background's four bounds must be finite numbers: {bkg_roi!r}")
+    ordered = np.sort(bounds)
+    zeros = int(np.sum(ordered == 0))
+    if zeros == 2:
+        ordered[0], ordered[1] = y_min, y_max
+        ordered = np.sort(ordered)
+    elif zeros != 0:
+        raise ValueError(
+            f"a background with {zeros} zero bound(s): pixel 0 is the reducer's sentinel for "
+            f"'adjacent to the peak', which takes exactly two, so it returns None for {bkg_roi!r}"
+        )
+    b0, b1, b2, b3 = ordered.tolist()
+    return (b0, b1), (b2, b3)
+
+
+def default_bkg_roi(peak_range, n_y, gap=3, width=5):
+    """A default background in the reducer's form: a band on each side of the peak.
+
+    Four ascending ints ``(b0, b1, b2, b3)``: ``[b0, b1]`` ends ``gap`` rows below
+    the peak and ``[b2, b3]`` starts ``gap`` rows above it, each ``width`` rows
+    wide. That is the entry ``BkgROI`` holds, and ``_background_roi_sorter``
+    returns it unchanged. The defaults, 3 and 5, are #197's, which the
+    scientists reviewed.
+
+    Refused, never clamped. A peak off the detector is refused, because clamping
+    returns a band from the wrong end (``RB_Ymin``/``RB_Ymax`` arrive as unvalidated
+    file input). So is a side with no room: a band may not reach row 0, which is
+    the reducer's sentinel and turns its sorter's answer into ``None``, nor run
+    past the last row.
     """
     peak_low, peak_high = int(peak_range[0]), int(peak_range[1])
-
-    # Each branch below checks only ONE end, so the other end went unchecked and
-    # the function returned bands off the detector: (400, 410) on a 304-row
-    # detector gave (385, 394), and (-50, -40) gave (-34, -25). I had removed
-    # clamps here as "dead code"; they were dead only under an unstated
-    # precondition — that `peak_range` is on the detector — which nothing
-    # checked. Validating and refusing rather than clamping, because clamping
-    # (400, 410) returns a band from the wrong END of the detector, silently,
-    # which is the failure this docstring names. RB_Ymin/RB_Ymax reach the
-    # resolver from layer (c) as unvalidated file input.
+    if gap < 0 or width < 1:
+        raise ValueError(f"gap must be >= 0 and width >= 1, not gap={gap!r}, width={width!r}")
     if not 0 <= peak_low <= peak_high <= n_y - 1:
         raise ValueError(
             f"peak {peak_range} is not on a {n_y}-pixel detector (rows 0-{n_y - 1}); "
             f"refusing rather than clamping, which would return a band from the "
             f"wrong end"
         )
-
-    high_edge = peak_low - gap - 1
-    if high_edge - width + 1 >= 0:
-        return high_edge - width + 1, high_edge
-
-    low_edge = peak_high + gap + 1
-    if low_edge + width - 1 <= n_y - 1:
-        return low_edge, low_edge + width - 1
-
-    raise ValueError(
-        f"no room for a {width}-pixel background with a {gap}-pixel gap beside "
-        f"peak {peak_range} on a {n_y}-pixel detector"
-    )
+    b1 = peak_low - gap - 1
+    b0 = b1 - width + 1
+    b2 = peak_high + gap + 1
+    b3 = b2 + width - 1
+    if b0 < 1 or b3 > n_y - 1:
+        raise ValueError(
+            f"no room for a {width}-pixel background with a {gap}-pixel gap on each side of "
+            f"peak {peak_range} on a {n_y}-pixel detector (a band starts at row 1: row 0 is "
+            f"the reducer's sentinel)"
+        )
+    return b0, b1, b2, b3
