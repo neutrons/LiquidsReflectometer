@@ -470,7 +470,7 @@ def test_the_mutation_battery_refuses_a_dirty_baseline():
     # verifying with pytest instead of with the gate command itself.
     repo_root = Path(__file__).resolve().parents[3]
     spec = importlib.util.spec_from_file_location(
-        "roi_batt", str(repo_root / "plans" / "scripts" / "roi_estimate_mutations.py")
+        "roi_batt", str(repo_root / "scripts" / "test" / "roi_estimate_mutations.py")
     )
     batt = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(batt)

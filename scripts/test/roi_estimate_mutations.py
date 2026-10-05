@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Mutation battery for roi-estimate (T1 slug 1). Run from the repo root:
 
-    pixi run python plans/scripts/roi_estimate_mutations.py
+    pixi run python scripts/test/roi_estimate_mutations.py
 
 Restore safety per the Developer contract: originals held in memory AND a
 mode-600 backup, restore in a ``finally``, sha256 compared after every mutation
