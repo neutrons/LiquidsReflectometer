@@ -495,7 +495,7 @@ class _FileDialogSidebar(QtCore.QObject):
     The static ``QFileDialog`` calls take no sidebar, and the tests' autouse net (``conftest.no_qfiledialog``)
     stubs exactly those calls so that no test can block on a modal dialog. So the dialogs stay static, and this
     filter, installed on the application for the one call, sets the sidebar of the dialog the call builds when it is
-    shown, then removes itself. Measured offscreen on Qt 5.15 (the ledger's ``editor-ipts-inference-probes.py``):
+    shown. Measured offscreen on Qt 5.15 (the ledger's ``editor-ipts-inference-probes.py``):
     the filter sees the static dialog's Show event and the sidebar holds. Qt's own dialog only
     (``DontUseNativeDialog``): a native dialog builds no sidebar.
     """
@@ -509,7 +509,6 @@ class _FileDialogSidebar(QtCore.QObject):
         try:
             if isinstance(watched, QtWidgets.QFileDialog) and event.type() == QtCore.QEvent.Show:
                 watched.setSidebarUrls(self._urls)
-                QtWidgets.QApplication.instance().removeEventFilter(self)
         except Exception:  # noqa: BLE001
             traceback.print_exc()
         return False

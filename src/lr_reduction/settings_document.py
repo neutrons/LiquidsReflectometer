@@ -278,12 +278,11 @@ def load_start_folder(ipts, remembered, root=None):
         return remembered
     root, _ = _facility_layout(root)
     home = os.path.normpath(root / ipts)
-    if remembered:
-        try:
-            if os.path.commonpath([os.path.normpath(remembered), home]) == home:
-                return remembered
-        except ValueError:
-            pass
+    try:
+        if os.path.commonpath([os.path.normpath(remembered), home]) == home:
+            return remembered
+    except ValueError:  # nothing remembered ("" is "."), or a relative folder: not under the IPTS
+        pass
     shared = root / ipts / SETTINGS_FOLDERS[0]
     return str(shared) if os.path.isdir(shared) else remembered
 
@@ -419,8 +418,7 @@ class SettingsDocument:
         value, self._run_lookup = resolve_experiment_id(
             self.get("experiment_id"), self.get("RBnum"), field_value, self.source_path, root, type(self._config)
         )
-        if value != self.get("experiment_id"):
-            self.set("experiment_id", value)
+        self.set("experiment_id", value)
         return value
 
     # -- scalar access -----------------------------------------------------
