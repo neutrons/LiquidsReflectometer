@@ -240,10 +240,14 @@ def _edges(edges):
 
 
 def xy_image(events, tof_band=None):
-    """Counts per detector pixel, ``image[y, x]``, shape ``(n_y, n_x)``.
+    """Counts per detector pixel, ``image[y, x]``, shape ``(n_y, n_x)``: every event held.
 
-    The web report's XY array, cell for cell (``web_report.py:579-583``), with no
-    band. With ``tof_band`` (inclusive, microseconds), only the events inside it.
+    With no band, the web report's XY array (``web_report.py:579-583``) plus the
+    event(s) at the run's minimum and/or maximum TOF, which the report's
+    ``Integration`` drops when its default range excludes them: 1-2 counts in
+    1-2 cells on 45 of the 63 fixture runs, none on the rest (T1, T1b; the
+    Integrator's N-1, v1's "cell for cell" generalised from one agreeing run).
+    With ``tof_band`` (inclusive, microseconds), only the events inside it.
     """
     keep = _in_band(events.tof, tof_band)
     flat = np.bincount(events.y[keep] * events.n_x + events.x[keep], minlength=events.n_x * events.n_y)
@@ -519,6 +523,17 @@ def background_bands(bkg_roi, y_min, y_max):
     return (b0, b1), (b2, b3)
 
 
+def _whole(name, value):
+    """``value`` as an ``int`` when it is a whole number of rows: an int, or an
+    integral float (a JSON ``150.0``). A fraction, a bool or anything else is a
+    ``ValueError``, never truncated: the result promises whole rows."""
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, float, np.integer, np.floating)):
+        raise ValueError(f"{name} must be a whole number of rows, not {value!r}")
+    if isinstance(value, (float, np.floating)) and not float(value).is_integer():
+        raise ValueError(f"{name} must be a whole number of rows, not {value!r}")
+    return int(value)
+
+
 def default_bkg_roi(peak_range, n_y, gap=3, width=5):
     """A default background in the reducer's form: a band on each side of the peak.
 
@@ -532,9 +547,11 @@ def default_bkg_roi(peak_range, n_y, gap=3, width=5):
     because clamping returns a band from the wrong end (``RB_Ymin``/``RB_Ymax`` arrive as unvalidated
     file input). So is a side with no room: a band may not reach row 0, which is
     the reducer's sentinel and turns its sorter's answer into ``None``, nor run
-    past the last row.
+    past the last row. So is a fractional peak edge, gap or width, or a bool
+    (v2): truncating would move the band a row; an integral float is a whole row.
     """
-    peak_low, peak_high = int(peak_range[0]), int(peak_range[1])
+    peak_low, peak_high = _whole("peak_range", peak_range[0]), _whole("peak_range", peak_range[1])
+    gap, width = _whole("gap", gap), _whole("width", width)
     if gap < 0 or width < 1:
         raise ValueError(f"gap must be >= 0 and width >= 1, not gap={gap!r}, width={width!r}")
     if not 0 <= peak_low <= peak_high <= n_y - 1:
