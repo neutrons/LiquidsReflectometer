@@ -5,22 +5,93 @@ from types import SimpleNamespace
 
 import pytest
 from mantid.kernel import amend_config
-from mantid.simpleapi import DeleteWorkspace, mtd
+from mantid.simpleapi import CreateSampleWorkspace, DeleteWorkspace, mtd
 
 from lr_reduction.exceptions import RunNotFoundError
 from lr_reduction.io.run_loader import RunLoader
-from lr_reduction.models.run_data import RunData
+from lr_reduction.utils.sample_logs import SampleLogs
 
 
-def test_load_returns_run_data():
-    assert isinstance(RunLoader().load(12345), RunData)
+@pytest.fixture
+def loaded_workspaces(monkeypatch):
+    """Patch `_load_single_workspace` to register a one-event run 198409 and its rejected
+    events, recording each path it is asked to load."""
+    loaded_paths = []
+    created = []
+
+    def _load_single_workspace(_self, path):
+        loaded_paths.append(path)
+        name, error_events_name = mtd.unique_hidden_name(), mtd.unique_hidden_name()
+        for workspace in (name, error_events_name):
+            CreateSampleWorkspace(
+                WorkspaceType="Event", NumBanks=1, BankPixelWidth=1, NumEvents=1, OutputWorkspace=workspace
+            )
+            SampleLogs(workspace).insert("run_number", "198409")
+            created.append(workspace)
+        return name, error_events_name
+
+    monkeypatch.setattr("lr_reduction.io.run_loader.RunLoader._load_single_workspace", _load_single_workspace)
+    yield loaded_paths
+    for workspace in created:
+        DeleteWorkspace(workspace)
 
 
-def test_load_from_path_returns_run_data(tmp_path):
-    nexus_file = tmp_path / "REF_L_12345.nxs.h5"
-    nexus_file.touch()
+def test_load_from_path_builds_run_data_from_the_loaded_workspaces(loaded_workspaces, tmp_path):
+    path = tmp_path / "REF_L_198409.nxs.h5"
 
-    assert isinstance(RunLoader().load_from_path(nexus_file), RunData)
+    run = RunLoader().load_from_path(path)
+
+    assert loaded_workspaces == [path]
+    assert run.run_numbers == (198409,)
+    assert run.error_events_workspace is not None
+    assert run.source_paths == (path,)
+
+
+def test_load_from_path_accepts_a_str(loaded_workspaces, tmp_path):
+    path = tmp_path / "REF_L_198409.nxs.h5"
+
+    run = RunLoader().load_from_path(str(path))
+
+    assert loaded_workspaces == [path]
+    assert run.source_paths == (path,)
+
+
+def test_load_from_path_without_rejected_events(monkeypatch, tmp_path):
+    name = mtd.unique_hidden_name()
+    CreateSampleWorkspace(WorkspaceType="Event", NumBanks=1, BankPixelWidth=1, NumEvents=1, OutputWorkspace=name)
+    SampleLogs(name).insert("run_number", "198409")
+    monkeypatch.setattr(
+        "lr_reduction.io.run_loader.RunLoader._load_single_workspace",
+        lambda _self, _path: (name, None),
+    )
+    try:
+        run = RunLoader().load_from_path(tmp_path / "REF_L_198409.nxs.h5")
+
+        assert run.error_events_workspace is None
+    finally:
+        DeleteWorkspace(name)
+
+
+def test_load_loads_the_resolved_path(loaded_workspaces, monkeypatch, tmp_path):
+    path = tmp_path / "REF_L_198409.nxs.h5"
+    monkeypatch.setattr("lr_reduction.io.run_loader.RunLoader.resolve_path", lambda _self, _run_number: path)
+
+    run = RunLoader().load(198409)
+
+    assert loaded_workspaces == [path]
+    assert run.source_paths == (path,)
+
+
+def test_load_raises_run_not_found_without_loading(loaded_workspaces, monkeypatch):
+    def _resolve_path(_self, run_number):
+        raise RunNotFoundError(f"No NeXus file found for run {run_number}")
+
+    monkeypatch.setattr("lr_reduction.io.run_loader.RunLoader.resolve_path", _resolve_path)
+
+    with pytest.raises(RunNotFoundError, match="12345"):
+        RunLoader().load(12345)
+
+    assert loaded_workspaces == []
 
 
 def test_resolve_path_returns_the_file_mantid_finds(monkeypatch, tmp_path):
