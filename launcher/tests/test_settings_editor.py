@@ -3075,22 +3075,51 @@ def test_select_roi_cancel_leaves_the_document_untouched(monkeypatch, events):
     tab.close()
 
 
-def test_select_roi_writes_no_file(monkeypatch, events, tmp_path):
-    """E4 (#197's F2: a truncating write to the live autoreduce file): the slot and the dialog open no file for
-    writing. save() would raise, and nothing appears in the working directory."""
-    monkeypatch.chdir(tmp_path)
+@pytest.mark.parametrize("ending", ["cancelled", "accepted"])
+def test_select_roi_writes_no_file(monkeypatch, events, tmp_path, ending):
+    """E4′ (B2; #197's F2, a truncating write to the live autoreduce file): every file the slot can write. The file
+    dialog returns a run in tmp_path/nexus; the dialog is cancelled, or accepted with a new peak edge. In both cases
+    SettingsDocument.save is not called, and no file appears or changes under tmp_path (the working directory and the
+    run's folder among them) except the launcher's QSettings file. In that file exactly one key changes: roi_nexus_dir,
+    to the run's folder, so that the next file dialog opens there."""
+    from launcher.apps import settings_editor
+
+    work, nexus = tmp_path / "cwd", tmp_path / "nexus"
+    work.mkdir()
+    nexus.mkdir()
+    run = nexus / "REF_L_999.nxs.h5"
+    run.write_bytes(b"")
+    monkeypatch.chdir(work)
 
     def no_save(*_a, **_k):
         raise AssertionError("SettingsDocument.save called")
 
     monkeypatch.setattr(SettingsDocument, "save", no_save)
+    monkeypatch.setattr(settings_editor.roi_estimate, "load_event_pixels", lambda _path, **_k: events)
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getOpenFileName", staticmethod(lambda *_a, **_k: (str(run), "")))
+    if ending == "accepted":
+        _replace_exec(monkeypatch, lambda dialog: dialog.peak_spins[0].setValue(131) or QtWidgets.QDialog.Accepted)
+    else:
+        _replace_exec(monkeypatch, lambda _dialog: QtWidgets.QDialog.Rejected)
     tab = SettingsEditorTab(document=_three_peaks())
     tab.angle_table.setCurrentCell(0, 0)
-    monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}", None))
-    _replace_exec(monkeypatch, lambda dialog: dialog.peak_spins[0].setValue(131) or QtWidgets.QDialog.Accepted)
+    tab.settings.sync()
+    settings_file = tab.settings.fileName()
+
+    def files():
+        return {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file() and str(path) != settings_file}
+
+    def keys():
+        return {key: tab.settings.value(key) for key in tab.settings.allKeys()}
+
+    before_files, before_keys = files(), keys()
     QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
-    assert tab.document.get("RB_Ymin")[0] == 131
-    assert list(tmp_path.iterdir()) == []
+    tab.settings.sync()
+    assert files() == before_files
+    after_keys = keys()
+    changed = {key for key in set(before_keys) | set(after_keys) if before_keys.get(key) != after_keys.get(key)}
+    assert changed == {"roi_nexus_dir"} and after_keys["roi_nexus_dir"] == str(nexus), changed
+    assert tab.document.get("RB_Ymin")[0] == (131 if ending == "accepted" else 130)
     tab.close()
 
 
@@ -3204,6 +3233,61 @@ def test_the_run_is_titled_from_its_metadata_and_filtered_at_its_chopper_band(mo
         assert seen["title"].startswith("Si Ir Air (run 221473)") and seen["tof"] == [12000, 31001]
     else:
         assert seen["title"].startswith("REF_L_221473.nxs.h5") and seen["tof"] == seen["span"]
+    tab.close()
+
+
+@pytest.mark.parametrize("button", ["Cancel", "Ok"])
+def test_the_real_modal_dialog_writes_as_its_buttons_are_pressed(monkeypatch, events, button):
+    """E9 (B9, V6′/V7′ through the slot): the modal's real exec_(), with no patch. Once the dialog is up, a timer
+    edits the peak and presses Cancel or Ok. Cancel leaves the document as it was. Ok writes the row's RB_Ymin and
+    nothing else. The dialog is released afterwards (E7).
+    M4 (the result code ignored) cannot red here: Cancel's reject() restores the opening values, so nothing would be
+    written either way. E3 reds it."""
+    from launcher.apps.roi_dialog import ROISelectionDialog
+
+    doc = _three_peaks()
+    tab = SettingsEditorTab(document=doc)
+    tab.angle_table.setCurrentCell(1, 0)
+    monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}", None))
+    before = doc.to_dict()
+    seen, errors = [], []
+
+    def up():
+        return [widget for widget in QtWidgets.QApplication.topLevelWidgets()
+                if isinstance(widget, ROISelectionDialog) and widget.isVisible()]
+
+    def act(tries=50):
+        try:  # an exception out of a timer's slot would abort the run (L3)
+            dialogs = up()
+            if not dialogs:
+                if tries:
+                    QtCore.QTimer.singleShot(100, lambda: act(tries - 1))
+                return
+            seen.append(len(dialogs))
+            dialogs[0].peak_spins[0].setValue(141)
+            QTest.mouseClick(dialogs[0].buttons.button(getattr(QtWidgets.QDialogButtonBox, button)),
+                             QtCore.Qt.LeftButton)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(repr(exc))
+
+    def give_up():  # a modal still up now has failed the test already; close it so the test ends
+        for dialog in up():
+            dialog.reject()
+
+    QtCore.QTimer.singleShot(50, act)
+    QtCore.QTimer.singleShot(8000, give_up)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    assert errors == [] and seen == [1], (errors, seen)
+    after = doc.to_dict()
+    if button == "Cancel":
+        assert after == before
+    else:
+        assert doc.get("RB_Ymin") == [130, 141, 150]
+        assert {k: v for k, v in after.items() if k != "RB_Ymin"} == {k: v for k, v in before.items() if k != "RB_Ymin"}
+    QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+    QtWidgets.QApplication.processEvents()
+    assert not [w for w in QtWidgets.QApplication.topLevelWidgets()
+                if type(w).__name__ == "ROISelectionDialog" and not sip.isdeleted(w)]
     tab.close()
 
 

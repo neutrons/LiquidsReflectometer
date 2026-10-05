@@ -76,6 +76,18 @@ def span_edges(artist, vertical):
     return artist.get_y(), artist.get_y() + artist.get_height()
 
 
+def mathtext(dialog):
+    """Draw, then every label on every axes (the three profiles, the two images and both colorbars) that carries
+    mathtext: major and minor tick labels and the offset text, on both axes of each."""
+    dialog.canvas.draw()
+    texts = []
+    for axes in dialog.figure.axes:
+        for axis in (axes.xaxis, axes.yaxis):
+            texts += [label.get_text() for label in axis.get_ticklabels() + axis.get_ticklabels(minor=True)]
+            texts.append(axis.get_offset_text().get_text())
+    return [text for text in texts if "$" in text]
+
+
 def visible_bands(dialog):
     return [axis for name in ("bkg_low", "bkg_high") for axis, artist in dialog.overlays[name].items()
             if artist.get_visible()]
@@ -221,6 +233,30 @@ def test_dragging_on_the_y_profile_sets_the_chosen_range(mode, span, reported):
     close(dialog)
 
 
+def test_dragging_on_the_x_and_tof_profiles_sets_the_range_and_the_filter():
+    """V4′ (B6, B8): a drag on the X profile sets data_x_range's spins and its overlay on every axes with an X axis, and
+    OK reports it. A drag on the TOF profile sets the view filter, the Y profile and the XY image follow it, and OK
+    reports nothing more. A TOF drag lands within a canvas pixel of its ends (here about 30 us), so the filter is read
+    back from the spins."""
+    events = make_events()
+    dialog = shown(make_dialog(events))
+    drag(dialog, dialog.x_axis, 70, 180)
+    assert [spin.value() for spin in dialog.x_spins] == [70, 180]
+    for axis, vertical in ON["x_range"]:
+        assert span_edges(dialog.overlays["x_range"][axis], vertical) == (70, 180), axis
+    assert dialog.changes() == {"data_x_range": [70, 180]}
+    drag(dialog, dialog.tof_axis, 15000, 30000)
+    band = tuple(spin.value() for spin in dialog.tof_spins)
+    per_pixel = abs(dialog.tof_axis.transData.inverted().transform((1, 0))[0]
+                    - dialog.tof_axis.transData.inverted().transform((0, 0))[0])
+    assert abs(band[0] - 15000) <= 2 * per_pixel and abs(band[1] - 30000) <= 2 * per_pixel, (band, per_pixel)
+    np.testing.assert_array_equal(np.asarray(dialog.xy_axis.images[0].get_array()),
+                                  roi_estimate.xy_image(events, tof_band=band))
+    np.testing.assert_array_equal(dialog.y_line.get_ydata(), roi_estimate.profile_y(events, (70, 180), tof_band=band))
+    assert dialog.changes() == {"data_x_range": [70, 180]}
+    close(dialog)
+
+
 def test_a_drag_past_the_detector_edge_stops_at_the_edge():
     """B6: on a profile zoomed out past the detector, a drag that starts or ends beyond its rows stops at the edge
     row, never at "not set"; a drag wholly off the detector changes nothing and says so."""
@@ -267,40 +303,44 @@ def test_the_reductions_tof_window_is_drawn_when_the_row_has_one():
         close(dialog)
 
 
+def press(dialog, which):
+    """Press the dialog's own Ok or Cancel button, as a user does."""
+    QTest.mouseClick(dialog.buttons.button(getattr(QtWidgets.QDialogButtonBox, which)), QtCore.Qt.LeftButton)
+
+
 def test_cancel_reports_nothing():
-    """V6: edited, then cancelled: the dialog reports no change. Also for a background whose bound is not a whole row,
-    which the spins show rounded."""
-    dialog = make_dialog()
-    type_into(dialog.peak_spins[0], 140)
-    type_into(dialog.x_spins[1], 180)
-    dialog.reject()
-    assert dialog.changes() == {}
-    close(dialog)
-    dialog = make_dialog(BkgROI=[133.5, 149, 0, 0])
-    type_into(dialog.bkg_spins[3], 150)
-    dialog.reject()
-    assert dialog.changes() == {}
-    close(dialog)
+    """V6′: edited, then Cancel pressed: the dialog is rejected and reports no change. Also for a background whose
+    bound is not a whole row, which the spins show rounded."""
+    for edits, background in (((("peak_spins", 0, 140), ("x_spins", 1, 180)), [133, 149, 0, 0]),
+                              ((("bkg_spins", 3, 150),), [133.5, 149, 0, 0])):
+        dialog = make_dialog(BkgROI=background)
+        for spins, index, value in edits:
+            type_into(getattr(dialog, spins)[index], value)
+        press(dialog, "Cancel")
+        assert dialog.result() == QtWidgets.QDialog.Rejected, background
+        assert dialog.changes() == {}, background
+        close(dialog)
 
 
 def test_ok_reports_only_what_changed():
-    """V7 (B9): OK reports only the fields whose values differ from those the dialog opened with. An untouched
-    [a, b, 0, 0] background, or an unset one, is not reported, so the table keeps it byte for byte."""
+    """V7′ (B9): OK, pressed, reports only the fields whose values differ from those the dialog opened with. An
+    untouched [a, b, 0, 0] background, or an unset one, is not reported, so the table keeps it byte for byte."""
     for background in ([133, 149, 0, 0], None):
         dialog = make_dialog(BkgROI=background)
-        dialog.accept()
-        assert dialog.changes() == {}, background
+        press(dialog, "Ok")
+        assert dialog.result() == QtWidgets.QDialog.Accepted and dialog.changes() == {}, background
         close(dialog)
     dialog = make_dialog()
     type_into(dialog.peak_spins[0], 140)
-    dialog.accept()
-    assert dialog.changes() == {"RB_Ymin": 140}
+    press(dialog, "Ok")
+    assert dialog.result() == QtWidgets.QDialog.Accepted and dialog.changes() == {"RB_Ymin": 140}
     close(dialog)
     dialog = make_dialog()
     for spin, value in zip(dialog.bkg_spins, (120, 125, 160, 165)):
         type_into(spin, value)
     type_into(dialog.x_spins[0], 60)
-    dialog.accept()
+    press(dialog, "Ok")
+    assert dialog.result() == QtWidgets.QDialog.Accepted
     assert dialog.changes() == {"BkgROI": [120, 125, 160, 165], "data_x_range": [60, 200]}
     close(dialog)
 
@@ -388,14 +428,20 @@ def test_estimate_near_a_detector_edge_sets_the_peak_and_leaves_the_background(b
 
 
 def test_file_text_and_log_ticks_never_reach_the_math_parser():
-    """V11 (B12, F7, L6): the run title is file text, so it is not parsed as maths; and the log axes and colorbars use
-    a plain formatter, so after a draw no tick or colorbar label carries mathtext ("$")."""
+    """V11′ (B12, F7, L6): the run title is file text, so it is not parsed as maths. No label on the log profiles or the
+    colorbars carries mathtext ("$"): major and minor tick labels and the offset text. That holds after a draw at the
+    opening limits, and again with a profile zoomed inside one decade (what the toolbar's zoom does), where minor
+    labels exist. A sparse run's colorbars span less than a decade, so their minor labels exist too."""
     dialog = make_dialog(title="$\\foo$ run")
     assert dialog.xy_axis.title.get_parse_math() is False
-    dialog.canvas.draw()
-    labels = [label.get_text() for axis in dialog.figure.axes
-              for label in axis.get_xticklabels() + axis.get_yticklabels()]
-    assert labels and not [text for text in labels if "$" in text], [text for text in labels if "$" in text][:5]
+    assert not mathtext(dialog), mathtext(dialog)[:5]
+    dialog.y_axis.set_ylim(20, 80)
+    assert not mathtext(dialog), mathtext(dialog)[:5]
+    close(dialog)
+    sparse = make_events(n=600)
+    dialog = make_dialog(sparse)
+    assert dialog.xy_axis.images[0].get_array().max() < 10  # the colorbar spans less than a decade
+    assert not mathtext(dialog), mathtext(dialog)[:5]
     close(dialog)
 
 
@@ -504,13 +550,29 @@ def test_four_bounds_are_drawn_before_a_peak_is_set():
     close(dialog)
 
 
-@pytest.mark.parametrize("use_bs", [False, 0])
-def test_a_background_the_reducer_does_not_subtract_is_drawn_and_labelled(use_bs):
-    """V14 (B5): with useBS off for the row (False or 0), the bands are drawn and the status line says they are not
-    subtracted."""
+def empty_column_use_bs():
+    """What the dialog is given for a row of a document whose useBS column is [] (the reducer's default, on): the
+    reachable route to None."""
+    from lr_reduction.settings_document import SettingsDocument
+
+    doc = SettingsDocument()
+    doc.add_angle(RB_Ymin=PEAK[0], RB_Ymax=PEAK[1], BkgROI=[133, 149, 0, 0])
+    doc.set("useBS", [])
+    return doc.angle_row(0)["useBS"]
+
+
+@pytest.mark.parametrize("use_bs, subtracted", [(False, False), (0, False), (True, True), (None, True), ("[]", True)],
+                         ids=["False", "0", "True", "None", "an empty column"])
+def test_a_background_the_reducer_does_not_subtract_is_drawn_and_labelled(use_bs, subtracted):
+    """V14, V16 (B5, the types table's useBS row): the bands are drawn in every case. Only with useBS off for the row
+    (False or 0) does the status line say they are not subtracted. None, and the None an empty column gives, are on,
+    as the reducer reads them."""
+    if use_bs == "[]":
+        use_bs = empty_column_use_bs()
+        assert use_bs is None
     dialog = make_dialog(useBS=use_bs)
     assert dialog.overlays["bkg_low"]["y_axis"].get_visible()
-    assert "not subtracted" in dialog.status.text()
+    assert ("not subtracted" in dialog.status.text()) is not subtracted, dialog.status.text()
     close(dialog)
 
 
@@ -548,6 +610,27 @@ def test_a_data_x_range_that_is_not_two_pixels_is_noted_and_written_only_if_chan
     assert dialog.changes() == {}
     type_into(dialog.x_spins[0], 60)
     assert dialog.changes() == {"data_x_range": [60, N_X - 1]}
+    close(dialog)
+
+
+def test_an_unset_peak_draws_no_overlay_until_both_edges_are_set():
+    """V15′ (types table, RB_Ymin/RB_Ymax None): with an edge "not set", no peak overlay is drawn on any plot. It
+    appears on all three once both edges are set, at the spins' edges."""
+    def visible(dialog):
+        return sorted(axis for axis, artist in dialog.overlays["peak"].items() if artist.get_visible())
+
+    dialog = make_dialog(RB_Ymin=None, RB_Ymax=155)
+    assert visible(dialog) == []
+    type_into(dialog.peak_spins[0], 145)
+    assert visible(dialog) == ["xy_axis", "y_axis", "ytof_axis"]
+    for axis, vertical in ON["peak"]:
+        assert span_edges(dialog.overlays["peak"][axis], vertical) == (145, 155), axis
+    close(dialog)
+    dialog = make_dialog(RB_Ymin=None, RB_Ymax=None)
+    type_into(dialog.peak_spins[0], 145)
+    assert visible(dialog) == []
+    type_into(dialog.peak_spins[1], 155)
+    assert visible(dialog) == ["xy_axis", "y_axis", "ytof_axis"]
     close(dialog)
 
 
@@ -650,6 +733,44 @@ def test_an_error_inside_a_slot_is_a_status_line_not_an_abort(monkeypatch, slot)
         QTest.mouseClick(dialog.log_check, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier, indicator)
         assert dialog.log_check.isChecked()
     assert "RuntimeError: injected" in dialog.status.text(), dialog.status.text()
+    close(dialog)
+
+
+def test_the_log_toggle_switches_every_profile():
+    """V17 (B6): the log check box, clicked, switches the three profiles to linear, and clicked again back to log.
+    On log again the plain formatters are applied again, so no label carries mathtext (V11′)."""
+    dialog = shown(make_dialog())
+    on_the_box = QtCore.QPoint(6, dialog.log_check.height() // 2)  # the check box is as wide as its grid cell
+    profiles = (dialog.y_axis, dialog.tof_axis, dialog.x_axis)
+    QTest.mouseClick(dialog.log_check, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier, on_the_box)
+    dialog.canvas.draw()
+    assert [axes.get_yscale() for axes in profiles] == ["linear"] * 3
+    QTest.mouseClick(dialog.log_check, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier, on_the_box)
+    assert [axes.get_yscale() for axes in profiles] == ["log"] * 3
+    assert not mathtext(dialog), mathtext(dialog)[:5]
+    close(dialog)
+
+
+def test_the_profiles_and_the_ytof_image_open_on_their_data():
+    """V18 (B3′; advisories A1 and T1): each axes opens on its data:
+    - the TOF profile and the Y-TOF image across the TOF edges (a span made at (0, 1) once pulled x = 0 into the
+      Y-TOF axes);
+    - the X profile across the detector;
+    - the Y profile around the ROIs, inside the detector.
+    A peak nudge and a filter change leave the TOF and Y-TOF limits where they are."""
+    events = make_events()
+    dialog = make_dialog(events)
+    dialog.canvas.draw()
+    edges = roi_estimate.tof_edges(events)
+    span = (edges[0], edges[-1])
+    assert dialog.tof_axis.get_xlim() == pytest.approx(span) and dialog.ytof_axis.get_xlim() == pytest.approx(span)
+    assert dialog.x_axis.get_xlim() == pytest.approx((0, N_X - 1))
+    low, high = dialog.y_axis.get_xlim()
+    assert 0 <= low <= 133 and 149 <= high <= N_Y - 1, (low, high)
+    type_into(dialog.peak_spins[0], 138)
+    type_into(dialog.tof_spins[0], 20000)
+    dialog.canvas.draw()
+    assert dialog.tof_axis.get_xlim() == pytest.approx(span) and dialog.ytof_axis.get_xlim() == pytest.approx(span)
     close(dialog)
 
 
