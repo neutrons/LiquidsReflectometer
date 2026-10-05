@@ -3236,9 +3236,15 @@ def test_the_run_is_titled_from_its_metadata_and_filtered_at_its_chopper_band(mo
     tab.close()
 
 
+#: QDialog.exec_ as Qt has it. Taken at import, before the autouse no_qmessagebox replaces it for every test with an
+#: instant Accepted, so that E9 alone can run a real modal.
+_REAL_DIALOG_EXEC = QtWidgets.QDialog.exec_
+
+
 @pytest.mark.parametrize("button", ["Cancel", "Ok"])
 def test_the_real_modal_dialog_writes_as_its_buttons_are_pressed(monkeypatch, events, button):
-    """E9 (B9, V6′/V7′ through the slot): the modal's real exec_(), with no patch. Once the dialog is up, a timer
+    """E9 (B9, V6′/V7′ through the slot): the modal's real exec_(), with no_qmessagebox's stand-in taken off for this
+    test alone. Once the dialog is up, a timer
     edits the peak and presses Cancel or Ok. Cancel leaves the document as it was. Ok writes the row's RB_Ymin and
     nothing else. The dialog is released afterwards (E7).
     M4 (the result code ignored) cannot red here: Cancel's reject() restores the opening values, so nothing would be
@@ -3274,6 +3280,9 @@ def test_the_real_modal_dialog_writes_as_its_buttons_are_pressed(monkeypatch, ev
         for dialog in up():
             dialog.reject()
 
+    # The real modal, no_qmessagebox's stand-in off. Through a function, which binds to the instance: the built-in put
+    # back on the class does not ("first argument of unbound method must have type 'QDialog'", measured).
+    monkeypatch.setattr(QtWidgets.QDialog, "exec_", lambda dialog: _REAL_DIALOG_EXEC(dialog))
     QtCore.QTimer.singleShot(50, act)
     QtCore.QTimer.singleShot(8000, give_up)
     QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
