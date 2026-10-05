@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from os import PathLike
 from pathlib import Path
 
 from mantid.simpleapi import CreateSampleWorkspace, mtd
@@ -42,7 +43,7 @@ class RunLoader(RunLoaderInterface):
         # Placeholder implementation; replace with actual data loading logic
         return RunData(workspace=_placeholder_workspace(), run_numbers=(run_number,))
 
-    def load_from_path(self, nexus_file_path: str | Path) -> RunData:
+    def load_from_path(self, nexus_file_path: str | PathLike[str]) -> RunData:
         """Load raw event data directly from a NeXus file path and return it as RunData."""
         logger.info(f"Loading run data from path {nexus_file_path}")
         # Placeholder implementation; replace with actual data loading logic. The run
