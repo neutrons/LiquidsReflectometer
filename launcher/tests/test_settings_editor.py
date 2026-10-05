@@ -2874,3 +2874,209 @@ def test_a_list_left_only_in_a_surplus_row_is_reported_as_the_file_holds_it(tmp_
     tab.save_settings()
     assert json.loads(target.read_text())["ThetaShift"] == []
     tab.close()
+
+
+# --------------------------------------------------------------------------
+# roi-popout-dialog (plan @ triage 4d7a294) — E1-E8: "Select ROI" beside Add/Remove, its slot, the row's run file.
+# The dialog is constructed for real; its exec_ is replaced, so the gesture inside the modal is the test's.
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture
+def events():
+    """A run in memory, through the real RunEvents: a peak at rows 136-146 over x 100-159 (A4: no data submodule)."""
+    import numpy as np
+
+    from lr_reduction.roi_estimate import RunEvents
+
+    rng = np.random.default_rng(0)
+    y = np.r_[rng.integers(136, 147, 20000), rng.integers(0, 304, 5000)]
+    x = np.r_[rng.integers(100, 160, 20000), rng.integers(0, 256, 5000)]
+    return RunEvents(x=x, y=y, tof=rng.uniform(10000.0, 40000.0, len(y)), n_x=256, n_y=304)
+
+
+def _three_peaks(**columns):
+    doc = SettingsDocument()
+    for peak in (130, 140, 150):
+        doc.add_angle(RB_Ymin=peak, RB_Ymax=peak + 6, BkgROI=[peak - 3, peak + 9, 0, 0])
+    for name, value in columns.items():
+        doc.set(name, value)
+    return doc
+
+
+def _replace_exec(monkeypatch, gesture):
+    """The modal's run, replaced: `gesture(dialog)` acts on the real dialog and returns the result code."""
+    from launcher.apps import settings_editor
+
+    monkeypatch.setattr(settings_editor.ROISelectionDialog, "exec_", gesture)
+
+
+def test_select_roi_is_enabled_only_with_a_row_selected():
+    """E1 (B1): "Select ROI" sits after "Remove angle" and is enabled exactly while the Angles table has a current
+    row."""
+    tab = SettingsEditorTab(document=_three_peaks())
+    buttons = tab.add_angle_button.parentWidget().layout()
+    order = [buttons.itemAt(i).widget() for i in range(buttons.count()) if buttons.itemAt(i).widget()]
+    assert order.index(tab.select_roi_button) == order.index(tab.remove_angle_button) + 1
+    assert not tab.select_roi_button.isEnabled()
+    tab.angle_table.setCurrentCell(1, 0)
+    assert tab.select_roi_button.isEnabled()
+    tab.angle_table.setCurrentCell(-1, -1)
+    assert not tab.select_roi_button.isEnabled()
+    tab.close()
+
+
+@pytest.mark.parametrize("short", [False, True], ids=["full columns", "a short RB_Ymin column"])
+def test_select_roi_writes_the_row_it_was_opened_for(monkeypatch, events, short):
+    """E2 (B1, B9; the active-row trap, L1): the row is captured at the click. The selection moving before OK changes
+    nothing: row 1 is written, rows 0 and 2 and every other column are unchanged, the untouched [137, 149, 0, 0]
+    background is not rewritten, and every per-angle column stays one length (set_angle_field)."""
+    doc = _three_peaks(**({"RB_Ymin": [130]} if short else {}))
+    tab = SettingsEditorTab(document=doc)
+    tab.angle_table.setCurrentCell(1, 0)
+    monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}"))
+
+    def accept_after_the_selection_moves(dialog):
+        tab.angle_table.setCurrentCell(2, 0)  # the selection is no longer the target
+        dialog.peak_spins[0].setValue(141)
+        return QtWidgets.QDialog.Accepted
+
+    _replace_exec(monkeypatch, accept_after_the_selection_moves)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    assert doc.get("RB_Ymin") == ([130, 141, None] if short else [130, 141, 150])
+    assert doc.get("RB_Ymax") == [136, 146, 156]
+    assert doc.get("BkgROI")[1] == [137, 149, 0, 0]  # untouched in the dialog, so not rewritten
+    lengths = {len(doc.get(name)) for name in fs.PER_ANGLE_NAMES if isinstance(doc.get(name), list) and doc.get(name)}
+    assert lengths == {3}, lengths
+    tab.close()
+
+
+def test_select_roi_cancel_leaves_the_document_untouched(monkeypatch, events):
+    """E3: edits in the dialog, then Cancel: the document is identical."""
+    doc = _three_peaks()
+    tab = SettingsEditorTab(document=doc)
+    tab.angle_table.setCurrentCell(1, 0)
+    before = doc.to_dict()
+    monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}"))
+
+    def edit_then_cancel(dialog):
+        dialog.peak_spins[0].setValue(141)
+        dialog.x_spins[0].setValue(60)
+        return QtWidgets.QDialog.Rejected
+
+    _replace_exec(monkeypatch, edit_then_cancel)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    assert doc.to_dict() == before
+    tab.close()
+
+
+def test_select_roi_writes_no_file(monkeypatch, events, tmp_path):
+    """E4 (#197's F2: a truncating write to the live autoreduce file): the slot and the dialog open no file for
+    writing. save() would raise, and nothing appears in the working directory."""
+    monkeypatch.chdir(tmp_path)
+
+    def no_save(*_a, **_k):
+        raise AssertionError("SettingsDocument.save called")
+
+    monkeypatch.setattr(SettingsDocument, "save", no_save)
+    tab = SettingsEditorTab(document=_three_peaks())
+    tab.angle_table.setCurrentCell(0, 0)
+    monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}"))
+    _replace_exec(monkeypatch, lambda dialog: dialog.peak_spins[0].setValue(131) or QtWidgets.QDialog.Accepted)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    assert tab.document.get("RB_Ymin")[0] == 131
+    assert list(tmp_path.iterdir()) == []
+    tab.close()
+
+
+def test_an_unreadable_run_is_reported_not_fatal(monkeypatch):
+    """E5 (B2, L3): a run that cannot be read is a line in the panel; no dialog is built, and no modal box."""
+    from launcher.apps import settings_editor
+
+    built = []
+    monkeypatch.setattr(settings_editor, "ROISelectionDialog", lambda *a, **_k: built.append(a))
+    tab = SettingsEditorTab(document=_three_peaks())
+    tab.angle_table.setCurrentCell(0, 0)
+
+    def unreadable(row):
+        raise OSError(f"unable to open REF_L_221472.nxs.h5 for row {row}")
+
+    monkeypatch.setattr(tab, "_events_for_row", unreadable)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    assert "unable to open REF_L_221472.nxs.h5" in tab.report.toPlainText()
+    assert built == []
+    tab.close()
+
+
+@pytest.mark.parametrize("leg", ["from the row", "asked for", "asked for, cancelled"])
+def test_the_run_file_comes_from_the_row_or_is_asked_for(monkeypatch, events, tmp_path, leg):
+    """E6 (B2, F9): with RBnum set and the file present, the row's file is NEXUSpathRB / REF_L_<run>.nxs.h5, the
+    reducer's own name. Without RBnum (authored files hold none), a file dialog asks, starting in the resolved NeXus
+    folder. A cancelled dialog does nothing."""
+    from launcher.apps import settings_editor
+
+    nexus = tmp_path / "nexus"
+    nexus.mkdir()
+    doc = _three_peaks(_NEXUSpathRB_override=str(nexus))
+    if leg == "from the row":
+        doc.set("RBnum", [221472, 221473, 221474])
+        (nexus / "REF_L_221473.nxs.h5").write_bytes(b"")
+    loaded, asked = [], []
+    monkeypatch.setattr(settings_editor.roi_estimate, "load_event_pixels",
+                        lambda path, **_k: loaded.append(str(path)) or events)
+    chosen = "" if leg == "asked for, cancelled" else str(tmp_path / "picked" / "REF_L_999.nxs.h5")
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getOpenFileName",
+                        staticmethod(lambda *a, **k: asked.append(a[2] if len(a) > 2 else k.get("directory")) or (chosen, "")))
+    _replace_exec(monkeypatch, lambda _dialog: QtWidgets.QDialog.Rejected)
+    tab = SettingsEditorTab(document=doc)
+    tab.angle_table.setCurrentCell(1, 0)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    if leg == "from the row":
+        assert loaded == [str(nexus / "REF_L_221473.nxs.h5")] and asked == []
+    elif leg == "asked for":
+        assert asked == [str(nexus)] and loaded == [chosen]
+    else:
+        assert asked == [str(nexus)] and loaded == []
+    tab.close()
+
+
+def test_the_dialog_is_released_not_destroyed(monkeypatch, events):
+    """E7 (B12, L1): after the slot the dialog is released with deleteLater(): gone from the top-level widgets once
+    deferred deletes run. Neither module calls destroy()."""
+    import inspect
+
+    from launcher.apps import roi_dialog, settings_editor
+
+    tab = SettingsEditorTab(document=_three_peaks())
+    tab.angle_table.setCurrentCell(0, 0)
+    monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}"))
+    _replace_exec(monkeypatch, lambda _dialog: QtWidgets.QDialog.Rejected)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+    QtWidgets.QApplication.processEvents()
+    assert not [w for w in QtWidgets.QApplication.topLevelWidgets()
+                if type(w).__name__ == "ROISelectionDialog" and not sip.isdeleted(w)]
+    for module in (roi_dialog, settings_editor):
+        assert ".destroy(" not in inspect.getsource(module), module.__name__
+    tab.close()
+
+
+def test_an_x_range_change_updates_the_scalar_and_its_editor(monkeypatch, events):
+    """E8 (B9): data_x_range is shared by every angle: a change in the dialog sets the scalar (never a per-row copy),
+    its editor shows it, and "Changed from the seed" lists it."""
+    doc = _three_peaks()
+    tab = SettingsEditorTab(document=doc)
+    tab.angle_table.setCurrentCell(2, 0)
+    monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}"))
+
+    def new_x_range(dialog):
+        dialog.x_spins[0].setValue(60)
+        dialog.x_spins[1].setValue(190)
+        return QtWidgets.QDialog.Accepted
+
+    _replace_exec(monkeypatch, new_x_range)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    assert doc.get("data_x_range") == [60, 190]
+    assert "60" in tab.editors["data_x_range"].text() and "190" in tab.editors["data_x_range"].text()
+    assert any(line.startswith("  - data_x_range:") for line in _report_lines(tab))
+    tab.close()
