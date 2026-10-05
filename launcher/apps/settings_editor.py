@@ -30,6 +30,7 @@ path. The choices read as the file spells them (``_in_file_spelling``).
 """
 
 import functools
+import os
 import traceback
 from pathlib import Path
 
@@ -37,7 +38,7 @@ from qtpy import QtCore, QtGui, QtWidgets
 
 from launcher.app_identity import ensure_identity
 from lr_reduction import field_spec as fs
-from lr_reduction.settings_document import SettingsDocument
+from lr_reduction.settings_document import SettingsDocument, normalise_experiment_id
 
 #: Above this, populating the table freezes the GUI thread for seconds and
 #: costs ~1100x the file size in memory. A settings file with more angles than
@@ -64,6 +65,11 @@ _LIST_KEYS = {
     QtCore.Qt.Key_Up, QtCore.Qt.Key_Down, QtCore.Qt.Key_PageUp, QtCore.Qt.Key_PageDown,
     QtCore.Qt.Key_Home, QtCore.Qt.Key_End, QtCore.Qt.Key_F4,
 }
+
+#: The header's path overrides (fs.HEADER_NAMES without the IPTS), and what a path shows when nothing is derived.
+_HEADER_PATHS = tuple(name for name in fs.HEADER_NAMES if name != "experiment_id")
+_NO_IPTS = "set an IPTS or type a path"
+_NOT_A_FOLDER = "the IPTS is not a folder name; type a path"
 
 
 def _later(owner, slot):
@@ -457,6 +463,7 @@ class SettingsEditorTab(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
         layout.addWidget(self._build_toolbar())
+        layout.addWidget(self._build_paths_header())
 
         splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
         splitter.addWidget(self._build_angle_panel())
@@ -489,6 +496,40 @@ class SettingsEditorTab(QtWidgets.QWidget):
 
         row.addStretch(1)
         return bar
+
+    def _build_paths_header(self):
+        """IPTS and the two input paths it roots, above the angles: these fields' only editors (fs.HEADER_NAMES).
+
+        A path override is written only by an explicit edit: typing in its control, or a folder from its Browse
+        button. While it is unset, the control shows the folder the reduction derives from the IPTS as its
+        placeholder (_show_derived_paths), so the derived path is visible but never held: a written override would
+        freeze an absolute path into the file, where an unset one is derived again from the IPTS on load.
+        """
+        box = QtWidgets.QGroupBox("Experiment")
+        self.paths_header = box
+        form = QtWidgets.QFormLayout()
+        box.setLayout(form)
+        field = fs.get("experiment_id")
+        ipts = QtWidgets.QLineEdit()
+        ipts.setToolTip(f"{field.name} — {field.help} A number is stored as IPTS-<number>.")
+        ipts.editingFinished.connect(lambda widget=ipts: self._on_ipts_edited(widget))
+        self.editors[field.name] = ipts
+        form.addRow(field.label, ipts)
+        self.path_browse = {}
+        for name in _HEADER_PATHS:
+            field = fs.get(name)
+            edit = QtWidgets.QLineEdit()
+            edit.setToolTip(f"{field.name} — {field.help} Clear it to use the derived folder again.")
+            edit.editingFinished.connect(lambda name=name, widget=edit: self._on_path_edited(name, widget))
+            browse = QtWidgets.QPushButton("Browse...")
+            browse.clicked.connect(lambda _checked=False, name=name: self._browse_path(name))
+            row = QtWidgets.QHBoxLayout()
+            row.addWidget(edit, 1)
+            row.addWidget(browse)
+            self.editors[name] = edit
+            self.path_browse[name] = browse
+            form.addRow(field.label, row)
+        return box
 
     def _build_angle_panel(self):
         panel = QtWidgets.QGroupBox("Angles")
@@ -545,7 +586,8 @@ class SettingsEditorTab(QtWidgets.QWidget):
         inner.setLayout(column)
 
         for group in fs.GROUPS:
-            scalars = [f for f in fs.fields_in(group) if not f.per_angle]
+            # The header's fields have their editors there, and only there (fs.HEADER_NAMES).
+            scalars = [f for f in fs.fields_in(group) if not f.per_angle and f.name not in fs.HEADER_NAMES]
             if not scalars:
                 continue
             box = QtWidgets.QGroupBox(group)
@@ -791,6 +833,67 @@ class SettingsEditorTab(QtWidgets.QWidget):
             self.report_problem(exc)
 
     @guarded
+    def _on_ipts_edited(self, widget):
+        """An IPTS typed in the header: stored as its directory name (normalise_experiment_id), and both derived
+        paths follow it. A line edit reports editingFinished on every focus-out; with no typing, nothing is
+        written."""
+        if not widget.isModified():
+            return
+        widget.setModified(False)
+        self.document.set("experiment_id", normalise_experiment_id(widget.text()))
+        self._show(fs.get("experiment_id"), widget, self.document.get("experiment_id"))
+        self._show_derived_paths()
+        self.refresh_report()
+
+    @guarded
+    def _on_path_edited(self, name, widget):
+        """A path typed in the header is that override, stripped. Emptied, or only spaces, it is ``None`` again and
+        derived, never ``""``: an override of "" or "   " is ``Path("")`` / ``Path("   ")`` to the reduction, not
+        the folder it derives. No typing, no write."""
+        if not widget.isModified():
+            return
+        widget.setModified(False)
+        self.document.set(name, widget.text().strip() or None)
+        self._show(fs.get(name), widget, self.document.get(name))
+        self.refresh_report()
+
+    @guarded
+    def _browse_path(self, name):
+        """A folder chosen with a header path's Browse button is that override, unless it is the folder the
+        reduction derives now. A cancelled dialog writes nothing.
+
+        The derived folder is never written as an override: written, it would freeze an absolute path into the
+        file, and a file reused for another experiment would then read this one's folders. So choosing the derived
+        folder holds no override. That writes nothing when there is none (the dialog opens there, and Choose
+        without navigating re-chooses what is shown), and returns a held override to derived, as clearing does.
+        Folders are compared with os.path.normpath, never resolve(), which follows symlinks on a facility mount and
+        differs between machines.
+        """
+        editor = self.editors[name]
+        derived = self.document.derived_path(name)
+        start = editor.text() or derived or ""
+        folder = QtWidgets.QFileDialog.getExistingDirectory(self, f"Choose the {fs.get(name).label.lower()}", start)
+        if not folder:
+            return
+        if derived is not None and os.path.normpath(folder) == os.path.normpath(derived):
+            if self.document.get(name) is None:
+                return
+            folder = None
+        self.document.set(name, folder)
+        self._show(fs.get(name), editor, folder)
+        self.refresh_report()
+
+    def _show_derived_paths(self):
+        """Each header path's placeholder: the folder the reduction derives while its override is unset, or why
+        there is none. A placeholder is never the control's text, so a derived path cannot be read back, or
+        saved, as a typed one."""
+        for name in _HEADER_PATHS:
+            derived = self.document.derived_path(name)
+            if derived is None:
+                derived = _NOT_A_FOLDER if self.document.get("experiment_id") else _NO_IPTS
+            self.editors[name].setPlaceholderText(derived)
+
+    @guarded
     def _on_scalar_edited(self, name, widget):
         self.document.set(name, fs.get(name).coerce(widget.text()))
         self.refresh_report()
@@ -959,6 +1062,7 @@ class SettingsEditorTab(QtWidgets.QWidget):
     def refresh_scalars(self):
         for name, editor in self.editors.items():
             self._show(fs.get(name), editor, self.document.get(name))
+        self._show_derived_paths()
 
     def refresh_report(self):
         lines = []
