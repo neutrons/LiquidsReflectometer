@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Mutation battery for roi_estimate (roi-estimate, then roi-popout-data). Run from the repo root:
 
-    pixi run python scripts/test/roi_estimate_mutations.py [--rows 1-25,32]
+    pixi run python scripts/test/roi_estimate_mutations.py [--rows 1-25,32] [--with-slow]
 
 Each row applies one mutation to ``src/lr_reduction/roi_estimate.py``, runs the module's tests, and records
 which tests failed. ``--rows`` runs a subset, so a long battery can be run in chunks under the 600 s harness
-ceiling; every chunk ends with the same baseline run.
+ceiling; every chunk ends with the same baseline run. ``SLOW`` tests (the T1b census, ~45 s a run) are
+deselected unless ``--with-slow``; the rows that need one say so.
 
 What a row's result means:
 
@@ -42,6 +43,10 @@ META = (
     "test_the_mutation_battery_refuses_a_dirty_baseline",
     "test_a_sigterm_during_the_battery_leaves_the_module_restored",
 )
+
+# Too slow to run for every row; deselected unless --with-slow. T1b (the census over every fixture run, ~45 s):
+# row 52 is run with it too (--rows 52 --with-slow), and T1's 179932 leg reds the same mutants in every run.
+SLOW = ("test_xy_image_against_the_web_report_over_every_fixture_run",)
 
 MUTATIONS = [
     # ---- roi-estimate (PR #31): v1 rows 1-10, v2 rows 11-16 ----
@@ -201,6 +206,45 @@ MUTATIONS = [
     (51, "profile_tof ignores y_range",
      '        keep &= (events.y >= y_low) & (events.y <= y_high)\n    counts, _',
      '        pass\n    counts, _'),
+    # ---- roi-popout-data v2: the plan's section 7 additions (M1b, K1m-K7m) ----
+    (52, 'M1b: xy_image drops the extreme-TOF events to "match" the report (run also with --with-slow: T1b)',
+     '    keep = _in_band(events.tof, tof_band)\n    flat',
+     '    keep = _in_band(events.tof, tof_band) & (events.tof > events.tof.min()) & (events.tof < events.tof.max())\n'
+     '    flat'),
+    (53, "K1m: background_bands returns floats for int bounds (== still holds)",
+     '    b0, b1, b2, b3 = ordered.tolist()',
+     '    b0, b1, b2, b3 = ordered.astype(float).tolist()'),
+    (54, "K2m: a called-wrong refusal raises CannotEstimateError (a ValueError subclass)",
+     '        raise ValueError(f"{name} {tuple(bounds)!r} is reversed',
+     '        raise CannotEstimateError(f"{name} {tuple(bounds)!r} is reversed'),
+    (55, "K3m: a file without bank1_events read as a run with no events",
+     '        event_id = np.asarray(f["entry/bank1_events/event_id"][:], dtype=np.int64)\n'
+     '        tof = np.asarray(f["entry/bank1_events/event_time_offset"][:], dtype=float)',
+     '        has = "entry/bank1_events" in f\n'
+     '        event_id = np.asarray(f["entry/bank1_events/event_id"][:] if has else [], dtype=np.int64)\n'
+     '        tof = np.asarray(f["entry/bank1_events/event_time_offset"][:] if has else [], dtype=float)'),
+    (56, "K4m: the None guard deleted (the ndim refusal answers, with the wrong reason)",
+     '    if bkg_roi is None:\n        raise ValueError("no background is set for this angle (its BkgROI entry is None)")\n',
+     ''),
+    (57, "K5m: an equal-bounds range refused (high <= low)",
+     '    if high < low:\n        raise ValueError(f"{name}',
+     '    if high <= low:\n        raise ValueError(f"{name}'),
+    (58, "K7m: gap and width truncated with int() again",
+     '    gap, width = _whole("gap", gap), _whole("width", width)',
+     '    gap, width = int(gap), int(width)'),
+    # ---- frame, v2: each guard of _whole() ----
+    (59, "_whole accepts a bool (an int subclass)",
+     '    if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, float, np.integer, np.floating)):',
+     '    if not isinstance(value, (int, float, np.integer, np.floating)):'),
+    (60, "_whole truncates a fraction",
+     '    if isinstance(value, (float, np.floating)) and not float(value).is_integer():',
+     '    if False:'),
+    (61, "_whole returns an integral float as a float",
+     '        raise ValueError(f"{name} must be a whole number of rows, not {value!r}")\n    return int(value)',
+     '        raise ValueError(f"{name} must be a whole number of rows, not {value!r}")\n    return value'),
+    (62, "the peak edges truncated with int() again",
+     '    peak_low, peak_high = _whole("peak_range", peak_range[0]), _whole("peak_range", peak_range[1])',
+     '    peak_low, peak_high = int(peak_range[0]), int(peak_range[1])'),
 ]
 
 # Table rows that no longer run, with the reason (I5: the table lists MUTATIONS + RETIRED).
@@ -262,10 +306,11 @@ def parse_rows(spec):
     return rows
 
 
-def run_tests():
-    """The module's tests, META deselected: (failed test ids, summary line)."""
+def run_tests(with_slow=False):
+    """The module's tests, META (and SLOW, unless ``with_slow``) deselected: (failed test ids, summary line)."""
     source = open(os.path.join(REPO, T), encoding="utf-8").read()
-    deselect = [arg for name in META if f"def {name}(" in source for arg in ("--deselect", f"{T}::{name}")]
+    skipped = META if with_slow else META + SLOW
+    deselect = [arg for name in skipped if f"def {name}(" in source for arg in ("--deselect", f"{T}::{name}")]
     try:
         proc = subprocess.run(
             [sys.executable, "-m", "pytest", "-q", "-rfE", "--no-header", "-p", "no:cacheprovider",
@@ -292,7 +337,9 @@ def describe(failed):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--rows", help='rows to run, e.g. "1-25" or "9,14,32-36" (default: every row)')
-    wanted = parse_rows(parser.parse_args().rows)
+    parser.add_argument("--with-slow", action="store_true", help="also run the SLOW tests (T1b)")
+    arguments = parser.parse_args()
+    wanted, with_slow = parse_rows(arguments.rows), arguments.with_slow
 
     # Baseline first: never adopt the working tree sight-unseen.
     verify_baseline_matches_head()
@@ -327,7 +374,7 @@ def main():
                 continue
             try:
                 open(MOD, "w", encoding="utf-8").write(orig.replace(old, new))
-                failed, summary = run_tests()
+                failed, summary = run_tests(with_slow)
             finally:
                 open(MOD, "w", encoding="utf-8").write(orig)
                 if sha(MOD) != clean:
@@ -339,7 +386,7 @@ def main():
         print("restored:", "OK" if sha(MOD) == clean else "*** DIRTY ***")
         os.unlink(bak)
 
-    baseline, summary = run_tests()
+    baseline, summary = run_tests(with_slow)
     print(f"baseline (unmutated): {summary}")
     if baseline is None:
         raise SystemExit("ABORT: the baseline run hung, so no row's failures can be read as kills")
@@ -369,10 +416,11 @@ if __name__ == "__main__":
     main()
 
 
-# Measured 2026-10-05 on feature/roi-popout-data at dfe1683, in two chunks: --rows 1-25 (186 s) and
-# --rows 26-51 (194 s). 49 rows ran and all 49 are red; rows 8 and 35 are retired (RETIRED). Each chunk
-# printed "restored: OK" and the baseline "69 passed, 3 deselected" (META); `git status --porcelain` showed
-# only this file, uncommitted at the time.
+# Measured 2026-10-05 on feature/roi-popout-data v2 at 47a4782, in two chunks: --rows 1-30 (263 s) and
+# --rows 31-62 (269 s). 60 rows ran and all 60 are red; rows 8 and 35 are retired (RETIRED). Each chunk printed
+# "restored: OK" and the baseline "74 passed, 4 deselected" (META and SLOW). Row 52 was rerun with --with-slow
+# (60 s, baseline "75 passed, 3 deselected"), so T1b's census is red under it too. `git status --porcelain`
+# showed only this file, uncommitted at the time.
 #
 # | # | mutation | observed (kills: tests red with the mutation, green without) |
 # |---|---|---|
@@ -392,16 +440,16 @@ if __name__ == "__main__":
 # | 14 | D1: drop the on-detector validation of peak_range | test_default_bkg_roi_refuses_a_peak_that_is_not_on_the_detector (x5) -> 5 failed |
 # | 15 | C3: drop the inverted-band refusal | test_counts_vs_y_refuses_an_inverted_band -> 1 failed |
 # | 16 | C1: lambda_to_tof forgets the mm->m conversion | test_the_lambda_range_and_the_tof_band_compose -> 1 failed |
-# | 17 | M1: xy_image counts in id order (x * n_y + y), reshaped (n_y, n_x) without the transpose | test_profiles_are_marginals_of_the_images, test_xy_image_is_what_the_web_report_plots, test_xy_image_puts_the_injected_peak_at_its_row_and_columns -> 3 failed |
+# | 17 | M1: xy_image counts in id order (x * n_y + y), reshaped (n_y, n_x) without the transpose | test_profiles_are_marginals_of_the_images, test_xy_image_is_the_web_reports_array_but_for_the_extreme_tof_events, test_xy_image_puts_the_injected_peak_at_its_row_and_columns -> 3 failed |
 # | 18 | M2: the off-detector filter removed | test_off_detector_ids_are_dropped_and_counted -> 1 failed |
-# | 19 | M3: tof_edges cropped to a window (5th-95th percentile, standing in for the chopper band), not the span | test_profiles_are_marginals_of_the_images, test_tof_edges_hold_the_latest_event_when_rounding_falls_short, test_tof_edges_span_every_event_not_the_chopper_band, test_y_tof_image_counts_only_the_x_range -> 4 failed |
-# | 20 | M4: y_tof_image ignores x_range | test_profiles_are_marginals_of_the_images, test_y_tof_image_counts_only_the_x_range -> 2 failed |
+# | 19 | M3: tof_edges cropped to a window (5th-95th percentile, standing in for the chopper band), not the span | test_a_range_whose_bounds_are_equal_is_one_pixel_or_one_tof, test_profiles_are_marginals_of_the_images, test_tof_edges_hold_the_latest_event_when_rounding_falls_short, test_tof_edges_span_every_event_not_the_chopper_band, test_y_tof_image_counts_only_the_x_range -> 5 failed |
+# | 20 | M4: y_tof_image ignores x_range | test_a_range_whose_bounds_are_equal_is_one_pixel_or_one_tof, test_profiles_are_marginals_of_the_images, test_y_tof_image_counts_only_the_x_range -> 3 failed |
 # | 21 | M5: the last TOF bin made half-open (an event on the last edge dropped) | test_y_tof_image_keeps_the_event_at_the_last_edge -> 1 failed |
-# | 22 | M6: the packing swapped (x = id % n_y, y = id // n_y) | test_load_event_pixels_holds_the_events_and_the_detector_shape, test_profile_y_agrees_with_the_library_histogrammer, test_profiles_are_marginals_of_the_images, test_stride_sampling_is_not_a_time_slice, test_tof_edges_span_every_event_not_the_chopper_band, test_xy_image_is_what_the_web_report_plots, test_xy_image_puts_the_injected_peak_at_its_row_and_columns, test_y_tof_image_counts_only_the_x_range, test_y_tof_image_keeps_the_event_at_the_last_edge -> 9 failed |
-# | 23 | M7: background_bands sorts the entry without putting the peak in place of the two zeros | test_background_bands_are_the_rows_the_reducer_averages (x3) -> 3 failed |
-# | 24 | M8: background_bands' zero-count refusal -> if False | test_background_bands_refuses_what_the_reducer_cannot_use (x3) -> 3 failed |
+# | 22 | M6: the packing swapped (x = id % n_y, y = id // n_y) | test_load_event_pixels_holds_the_events_and_the_detector_shape, test_profile_y_agrees_with_the_library_histogrammer, test_profiles_are_marginals_of_the_images, test_stride_sampling_is_not_a_time_slice, test_tof_edges_span_every_event_not_the_chopper_band, test_xy_image_is_the_web_reports_array_but_for_the_extreme_tof_events, test_xy_image_puts_the_injected_peak_at_its_row_and_columns, test_y_tof_image_counts_only_the_x_range, test_y_tof_image_keeps_the_event_at_the_last_edge -> 9 failed |
+# | 23 | M7: background_bands sorts the entry without putting the peak in place of the two zeros | test_background_bands_are_the_rows_the_reducer_averages (x3), test_background_bands_is_the_sorter_on_an_exhaustive_grid_and_random_entries -> 4 failed |
+# | 24 | M8: background_bands' zero-count refusal -> if False | test_background_bands_is_the_sorter_on_an_exhaustive_grid_and_random_entries, test_background_bands_refuses_what_the_reducer_cannot_use (x4) -> 5 failed |
 # | 25 | M9: default_bkg_roi clamps to the detector instead of refusing | test_default_bkg_roi_never_returns_a_band_off_the_detector, test_default_bkg_roi_refuses_a_peak_that_leaves_no_room, test_default_bkg_roi_survives_the_reducer -> 3 failed |
-# | 26 | M10: default_bkg_roi returns only the low-side band | test_default_bkg_roi_defaults_are_the_reviewed_three_and_five, test_default_bkg_roi_sits_outside_the_peak_with_a_gap, test_default_bkg_roi_survives_the_reducer -> 3 failed |
+# | 26 | M10: default_bkg_roi returns only the low-side band | test_default_bkg_roi_defaults_are_the_reviewed_three_and_five, test_default_bkg_roi_sits_outside_the_peak_with_a_gap, test_default_bkg_roi_survives_the_reducer, test_default_bkg_roi_takes_a_one_row_peak_and_refuses_what_is_not_a_whole_row -> 4 failed |
 # | 27 | M11: stride sampling -> the head slice [:max_events] | test_stride_sampling_is_not_a_time_slice -> 1 failed |
 # | 28 | M12: counts_vs_y's default lowres -> the literal (0, 255) | test_counts_vs_y_default_lowres_follows_the_detector_database -> 1 failed |
 # | 29 | M13: the tof_band selection in counts_vs_y -> if False | test_counts_vs_y_with_a_band_counts_exactly_the_events_inside_it -> 1 failed |
@@ -409,7 +457,7 @@ if __name__ == "__main__":
 # | 31 | M15: tof_edges' no-events refusal removed | test_an_empty_run_gives_zero_images_and_refuses_edges -> 1 failed |
 # | 32 | background_bands accepts a NaN or infinite bound | test_background_bands_refuses_what_the_reducer_cannot_use (x2) -> 2 failed |
 # | 33 | background_bands accepts bounds that are not numbers | test_background_bands_refuses_what_the_reducer_cannot_use -> 1 failed |
-# | 34 | background_bands accepts a nested list (the per-angle BkgROI) | test_background_bands_refuses_what_the_reducer_cannot_use (x2) -> 2 failed |
+# | 34 | background_bands accepts a nested list (the per-angle BkgROI) | test_background_bands_refuses_what_the_reducer_cannot_use (x3) -> 3 failed |
 # | 35 | (retired) background_bands' text refusal -> if False | SURVIVED its first run (unreachable: the ndim refusal catches text); removed in dfe1683 (RETIRED) |
 # | 36 | background_bands lets numpy's error for a ragged entry through | test_background_bands_refuses_what_the_reducer_cannot_use -> 1 failed |
 # | 37 | default_bkg_roi accepts gap < 0 or width < 1 | test_called_wrong_names_what_is_wrong -> 1 failed |
@@ -421,12 +469,23 @@ if __name__ == "__main__":
 # | 43 | tof_edges accepts bin_width <= 0 | test_called_wrong_is_a_value_error_not_an_empty_answer -> 1 failed |
 # | 44 | n_off_detector not counted | test_off_detector_ids_are_dropped_and_counted -> 1 failed |
 # | 45 | the stride not recorded | test_stride_sampling_is_not_a_time_slice -> 1 failed |
-# | 46 | the TOF band selects every event | test_profiles_are_marginals_of_the_images -> 1 failed |
-# | 47 | xy_image drops its band | test_called_wrong_is_a_value_error_not_an_empty_answer, test_profiles_are_marginals_of_the_images -> 2 failed |
-# | 48 | profile_y ignores x_range | test_profile_y_agrees_with_the_library_histogrammer -> 1 failed |
-# | 49 | profile_x ignores y_range | test_profiles_are_marginals_of_the_images -> 1 failed |
-# | 50 | profile_tof ignores x_range | test_profiles_are_marginals_of_the_images -> 1 failed |
-# | 51 | profile_tof ignores y_range | test_profiles_are_marginals_of_the_images -> 1 failed |
+# | 46 | the TOF band selects every event | test_a_range_whose_bounds_are_equal_is_one_pixel_or_one_tof, test_profiles_are_marginals_of_the_images -> 2 failed |
+# | 47 | xy_image drops its band | test_a_range_whose_bounds_are_equal_is_one_pixel_or_one_tof, test_called_wrong_is_a_value_error_not_an_empty_answer, test_profiles_are_marginals_of_the_images -> 3 failed |
+# | 48 | profile_y ignores x_range | test_a_range_whose_bounds_are_equal_is_one_pixel_or_one_tof, test_profile_y_agrees_with_the_library_histogrammer -> 2 failed |
+# | 49 | profile_x ignores y_range | test_a_range_whose_bounds_are_equal_is_one_pixel_or_one_tof, test_profiles_are_marginals_of_the_images -> 2 failed |
+# | 50 | profile_tof ignores x_range | test_a_range_whose_bounds_are_equal_is_one_pixel_or_one_tof, test_profiles_are_marginals_of_the_images -> 2 failed |
+# | 51 | profile_tof ignores y_range | test_a_range_whose_bounds_are_equal_is_one_pixel_or_one_tof, test_profiles_are_marginals_of_the_images -> 2 failed |
+# | 52 | M1b: xy_image drops the extreme-TOF events to "match" the report (run also with --with-slow: T1b) | test_an_empty_run_gives_zero_images_and_refuses_edges, test_off_detector_ids_are_dropped_and_counted, test_profiles_are_marginals_of_the_images, test_xy_image_is_the_web_reports_array_but_for_the_extreme_tof_events -> 4 failed; with --with-slow: test_an_empty_run_gives_zero_images_and_refuses_edges, test_off_detector_ids_are_dropped_and_counted, test_profiles_are_marginals_of_the_images, test_xy_image_against_the_web_report_over_every_fixture_run, test_xy_image_is_the_web_reports_array_but_for_the_extreme_tof_events -> 5 failed |
+# | 53 | K1m: background_bands returns floats for int bounds (== still holds) | test_background_bands_are_the_rows_the_reducer_averages (x4), test_background_bands_is_the_sorter_on_an_exhaustive_grid_and_random_entries -> 5 failed |
+# | 54 | K2m: a called-wrong refusal raises CannotEstimateError (a ValueError subclass) | test_called_wrong_is_a_value_error_not_an_empty_answer, test_called_wrong_names_what_is_wrong -> 2 failed |
+# | 55 | K3m: a file without bank1_events read as a run with no events | test_a_file_without_bank1_events_is_a_key_error_not_an_empty_run -> 1 failed |
+# | 56 | K4m: the None guard deleted (the ndim refusal answers, with the wrong reason) | test_background_bands_refuses_what_the_reducer_cannot_use -> 1 failed |
+# | 57 | K5m: an equal-bounds range refused (high <= low) | test_a_range_whose_bounds_are_equal_is_one_pixel_or_one_tof -> 1 failed |
+# | 58 | K7m: gap and width truncated with int() again | test_default_bkg_roi_takes_a_one_row_peak_and_refuses_what_is_not_a_whole_row -> 1 failed |
+# | 59 | _whole accepts a bool (an int subclass) | test_default_bkg_roi_takes_a_one_row_peak_and_refuses_what_is_not_a_whole_row -> 1 failed |
+# | 60 | _whole truncates a fraction | test_default_bkg_roi_takes_a_one_row_peak_and_refuses_what_is_not_a_whole_row -> 1 failed |
+# | 61 | _whole returns an integral float as a float | test_default_bkg_roi_takes_a_one_row_peak_and_refuses_what_is_not_a_whole_row -> 1 failed |
+# | 62 | the peak edges truncated with int() again | test_default_bkg_roi_takes_a_one_row_peak_and_refuses_what_is_not_a_whole_row -> 1 failed |
 #
 # This battery's earlier runs are in `git log --follow` of this file. Two of them taught something that
 # still holds:
@@ -437,7 +496,8 @@ if __name__ == "__main__":
 #     move the database under the function, and the answer must move.
 #   - Row 8's clamps were dead code, each inside a branch whose own condition forbade the out-of-range
 #     case.
-# - roi-popout-data's first pass (2026-10-05; module at 33ce53b, this file uncommitted): 46 of 51 red.
+# - roi-popout-data v1 (2026-10-05, at dfe1683): 49 rows, all red; v1's first pass (module at 33ce53b) had
+#   been 46 of 51 red.
 #   - Row 14 (D1): B7's no-room refusal also says "detector".
 #   - Rows 33, 34, 36: no test reached the numeric, ndim or ragged-entry guard.
 #   - Row 35: the text refusal was unreachable.

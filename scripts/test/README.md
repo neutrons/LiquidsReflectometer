@@ -12,11 +12,12 @@ Run from the repository root:
 
 ```sh
 pixi run python scripts/test/measure_fit_path_dependence.py   # add --verbose for workflow/Mantid output
-pixi run python scripts/test/roi_estimate_mutations.py --rows 1-25   # then --rows 26-51
+pixi run python scripts/test/roi_estimate_mutations.py --rows 1-30   # then --rows 31-62, and --rows 52 --with-slow
 ```
 
 Both need the test-data submodule at `tests/data/liquidsreflectometer-data`.
-The fit measurement takes a few minutes. The battery takes about three minutes
-per 25 rows, so run it in chunks under a 600 s limit. It refuses to start
+The fit measurement takes a few minutes. The battery takes about four and a half
+minutes per 30 rows, so run it in chunks under a 600 s limit. Its slow census
+test (T1b, ~45 s a run) is left out unless `--with-slow`. It refuses to start
 unless `roi_estimate.py` matches `HEAD`, and it restores the file after every
 row.
