@@ -682,10 +682,19 @@ def test_xy_image_is_what_the_web_report_plots(nexus_dir):
 
 
 def test_xy_image_puts_the_injected_peak_at_its_row_and_columns(nexus):
-    """T2: image[y, x], shape (n_y, n_x); the builder's peak is row 150 at x 100-159."""
+    """T2: image[y, x], shape (n_y, n_x); the builder's peak is centred on y = 150 at x 100-159.
+
+    The builder truncates N(150, 1) to ints, so the peak's centre sits on the 149/150 boundary and the two rows
+    share it: measured, 20647 and 20330 of 72000 counts. Row 150 alone never "dominates", as the plan had it.
+    Asserted instead: rows 148-152 hold most of the counts, their centroid is 149.5 (a one-row shift moves it
+    by 1), and nothing lands outside x 100-159.
+    """
     image = re_mod.xy_image(re_mod.load_event_pixels(nexus))
     assert image.shape == (N_Y, N_X)
-    assert image[150, 100:160].sum() > 0.5 * image.sum()
+    assert image[148:153, 100:160].sum() > 0.75 * image.sum()
+    rows = np.arange(145, 156)
+    profile = image[rows].sum(axis=1)
+    assert abs((profile * rows).sum() / profile.sum() - 149.5) < 0.1
     assert image[:, :100].sum() == 0 and image[:, 160:].sum() == 0
 
 
