@@ -3,8 +3,10 @@ from __future__ import annotations
 from os import PathLike
 from pathlib import Path
 
+from mantid.api import FileFinder
 from mantid.simpleapi import CreateSampleWorkspace, mtd
 
+from lr_reduction.exceptions import RunNotFoundError
 from lr_reduction.io.interfaces import RunLoaderInterface
 from lr_reduction.models.run_data import RunData
 from lr_reduction.types import ID, MantidWorkspaceName
@@ -36,6 +38,26 @@ def _placeholder_workspace() -> MantidWorkspaceName:
 
 class RunLoader(RunLoaderInterface):
     """Loader for single experimental run."""
+
+    def resolve_path(self, run_number: ID) -> Path:
+        """The NeXus file to load for *run_number*.
+
+        Found by Mantid's own facility/archive search, the same search `LoadEventNexus`
+        runs on a bare `REF_L_<n>` token, so the path the loader reads is known before
+        loading.
+
+        Raises
+        ------
+        RunNotFoundError
+            Mantid's search finds no file for *run_number*.
+        """
+        try:
+            found = FileFinder.findRuns(f"REF_L_{run_number}")
+        except RuntimeError as error:
+            raise RunNotFoundError(f"No NeXus file found for run {run_number}: {error}") from error
+        if not found:
+            raise RunNotFoundError(f"No NeXus file found for run {run_number}")
+        return Path(found[0])
 
     def load(self, run_number: ID) -> RunData:
         """Load raw event data for *run_number* and return it as RunData."""
