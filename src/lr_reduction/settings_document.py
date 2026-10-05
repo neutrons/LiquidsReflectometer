@@ -34,8 +34,10 @@ exempted here rather than "fixed".
 """
 
 import copy
+import dataclasses
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 
@@ -57,6 +59,22 @@ MAX_CANDIDATES = 2000
 #: The file types a direct-beam entry names: the reducer loads ``.txt`` and
 #: ``.dat`` direct-beam files. Matched case-insensitively.
 CANDIDATE_SUFFIXES = (".txt", ".dat")
+
+#: The folder the IPTS lookup searches (editor-ipts-inference, I2). ``None``: the folder the reducer joins an
+#: IPTS onto (``NRReductionConfig.base_path`` for no IPTS, ``/SNS/REF_L``), read from the class, never re-spelled.
+#: Tests point it at a fabricated tree.
+IPTS_LOOKUP_ROOT = None
+
+#: At most this many distinct run numbers are looked up per Load (I2, A3). A lookup lists the root once, then
+#: stats one file per IPTS folder per run. Measured by the Integrator on the analysis node (I-42, 2026-10-05): 571
+#: IPTS folders; ~1.35 s for the first lookup on a cold mount, ~13 ms a run after it; a capped Load 0.04-0.33 s.
+MAX_RUN_LOOKUPS = 20
+
+#: Where an IPTS keeps its settings files (F7: 101 of 104 real files): the Load and Save dialogs' sidebar (I5).
+SETTINGS_FOLDERS = ("shared", "shared/reduced", "shared/autoreduce")
+
+#: An IPTS folder's name, as ``normalise_experiment_id`` writes it.
+_IPTS_NAME = re.compile(r"IPTS-(\d+)")
 
 #: Returned by ``SettingsDocument._compact_reading`` for a list the reducer reads
 #: as it is held. ``None`` cannot mark that: it is what a derived λ reads.
@@ -92,8 +110,196 @@ def _held_as_bool(value):
     return value if boolean is None else boolean
 
 
+# -- the IPTS a Load holds (editor-ipts-inference) ----------------------------
+
+
+def _empty_ipts(value):
+    """No IPTS: ``""``, ``None`` (a file's ``null`` or missing key) or only spaces. One definition, for the
+    resolution, I4 and the notes (v2)."""
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
+def _clean_ipts(value):
+    """``value`` if it is an IPTS ``validate()`` accepts, else ``""``."""
+    if not isinstance(value, str) or _empty_ipts(value):
+        return ""
+    return "" if fs.get("experiment_id").check(value) else value
+
+
+def _facility_layout(root=None, config_class=NRReductionConfig):
+    """``(root, nexus)``: the folder the lookup searches, and where an IPTS keeps its NeXus files inside it.
+
+    Both come from the config class's own properties for an empty IPTS (``base_path``, ``NEXUSpathRB``), so the
+    lookup searches exactly where the reducer would read (CPKT derived-identifiers). ``root``, else
+    ``IPTS_LOOKUP_ROOT``, replaces the first.
+    """
+    probe = config_class()
+    probe.experiment_id = ""
+    probe._NEXUSpathRB_override = None
+    base = Path(probe.base_path)
+    nexus = Path(probe.NEXUSpathRB).relative_to(base)
+    if root is None:
+        root = base if IPTS_LOOKUP_ROOT is None else IPTS_LOOKUP_ROOT
+    return Path(root), nexus
+
+
+def _ipts_folders(root):
+    """The ``IPTS-<n>`` folder names under ``root`` in IPTS-number order, or ``None`` when it cannot be listed."""
+    try:
+        with os.scandir(root) as entries:
+            names = [entry.name for entry in entries if _IPTS_NAME.fullmatch(entry.name)]
+    except OSError:
+        return None
+    return sorted(names, key=lambda name: int(_IPTS_NAME.fullmatch(name).group(1)))
+
+
+def _run_ipts(run, folders, root, nexus):
+    """The folders among ``folders`` whose NeXus folder holds ``run``'s file, under the name the reducer opens
+    (``REF_L_<run>.nxs.h5``, ``nr_reduction_calc.py:325``). ``os.path.isfile`` reads a failed stat as no file."""
+    name = f"REF_L_{run}.nxs.h5"
+    return tuple(folder for folder in folders if os.path.isfile(root / folder / nexus / name))
+
+
+def ipts_of_run(run, root=None):
+    """The IPTS folders holding ``run``'s NeXus file, in IPTS-number order (I2).
+
+    One for a run where it belongs; ``()`` for none; more than one for a copied file, which the caller names rather
+    than choosing silently. A root that cannot be listed (not mounted, a stale handle) is ``()``, never an exception:
+    the caller is a Qt slot (``candidates()``'s precedent).
+    """
+    root, nexus = _facility_layout(root)
+    folders = _ipts_folders(root)
+    return () if folders is None else _run_ipts(run, folders, root, nexus)
+
+
+@dataclasses.dataclass(frozen=True)
+class RunLookup:
+    """Where one Load found its runs' NeXus files (I2). ``notes()`` reads it; nothing repeats it per refresh.
+
+    ``found`` maps each distinct run looked up, in the order the file names them, to the IPTS folders holding it.
+    ``skipped`` holds the distinct runs past ``MAX_RUN_LOOKUPS``, not looked up. ``available`` is false when the
+    root could not be listed, so no run could be looked up.
+    """
+
+    root: str
+    available: bool
+    found: dict
+    skipped: tuple = ()
+
+
+def _distinct_runs(runs):
+    """The run numbers a lookup names, once each, in the file's order. Only ints (``RBnum`` is ``list[int]``):
+    an unset entry or anything else is skipped, for ``validate()`` to report, and never reaches a path."""
+    if not isinstance(runs, (list, tuple)):
+        return []
+    return list(dict.fromkeys(run for run in runs if isinstance(run, int) and not isinstance(run, bool)))
+
+
+def lookup_runs(runs, root=None, cap=None, config_class=NRReductionConfig):
+    """Look up where each distinct run's NeXus file is, at most ``cap`` runs (``MAX_RUN_LOOKUPS``, read when
+    called): one listing of the root, then one ``_run_ipts`` per run. A :class:`RunLookup`."""
+    cap = MAX_RUN_LOOKUPS if cap is None else cap
+    root, nexus = _facility_layout(root, config_class)
+    distinct = _distinct_runs(runs)
+    folders = _ipts_folders(root)
+    if folders is None:
+        return RunLookup(str(root), False, {}, tuple(distinct[cap:]))
+    found = {run: _run_ipts(run, folders, root, nexus) for run in distinct[:cap]}
+    return RunLookup(str(root), True, found, tuple(distinct[cap:]))
+
+
+def _ipts_of_folder(path, root):
+    """The IPTS folder ``path`` lies in under ``root`` (2c), or ``""``. Compared as normalised paths, never
+    resolved: a facility mount's symlinks differ between machines."""
+    if not path:
+        return ""
+    try:
+        relative = os.path.relpath(os.path.normpath(os.fspath(path)), os.path.normpath(os.fspath(root)))
+    except ValueError:
+        return ""
+    parts = Path(relative).parts
+    if len(parts) >= 2 and _IPTS_NAME.fullmatch(parts[0]):
+        return parts[0]
+    return ""
+
+
+def resolve_experiment_id(file_value, runs, field_value, source_path, root=None, config_class=NRReductionConfig):
+    """The IPTS a Load holds, in the human's order (I1), and the lookup used: ``(value, lookup)``.
+
+    1. The file's own ``experiment_id``, whenever it has one, is held: never overridden. One ``validate()`` reports
+       is held as loaded and nothing is looked up (A2; ``editor-load-fidelity`` B8: the editor never rewrites a
+       value the file holds). For a clean one the runs are still looked up, so ``notes()`` can say they resolve
+       elsewhere (I3).
+    2. Otherwise, if the file names runs: the IPTS of the first run that resolves (2a, "choose the 1st IPTS that
+       resolves"; a run under two IPTSs gives the first in IPTS-number order).
+    3. Otherwise a clean IPTS the header held before the Load (2b).
+    4. Otherwise, for a file that names no runs (2c, "contains no angles"): the IPTS folder it was loaded from,
+       under the root.
+    5. Otherwise the file's value as it is (2d), which ``validate()`` reports when runs are named (I4).
+
+    ``lookup`` is ``None`` when none ran: no runs, or a reported IPTS. A second source, the NeXus file's own
+    ``entry/experiment_identifier`` (F6, A4), is not needed: the folder a run is found in is its IPTS.
+    """
+    root, _ = _facility_layout(root, config_class)
+    distinct = _distinct_runs(runs)
+    if not _empty_ipts(file_value):
+        if fs.get("experiment_id").check(file_value):
+            return file_value, None
+        return file_value, (lookup_runs(distinct, root, config_class=config_class) if distinct else None)
+    lookup = lookup_runs(distinct, root, config_class=config_class) if distinct else None
+    if lookup is not None:
+        for run in distinct:
+            hits = lookup.found.get(run)
+            if hits:
+                return hits[0], lookup
+    held = _clean_ipts(field_value)
+    if held:
+        return held, lookup
+    if not distinct:
+        folder = _ipts_of_folder(source_path, root)
+        if folder:
+            return folder, lookup
+    return file_value, lookup
+
+
+def settings_folders(ipts, root=None):
+    """The folders of ``ipts`` where settings files live (``SETTINGS_FOLDERS``), those that exist, in that order;
+    none without a clean IPTS. The Load and Save dialogs' sidebar (I5)."""
+    ipts = _clean_ipts(ipts)
+    if not ipts:
+        return []
+    root, _ = _facility_layout(root)
+    return [str(root / ipts / relative) for relative in SETTINGS_FOLDERS if os.path.isdir(root / ipts / relative)]
+
+
+def load_start_folder(ipts, remembered, root=None):
+    """Where the Load and Save dialogs open (I5, A5).
+
+    With a clean IPTS whose ``shared`` folder exists: that folder, unless the remembered folder is already under
+    the IPTS, where the user last was in this experiment. Otherwise the remembered folder, as before. "Under" is a
+    path prefix of normalised paths, never a string prefix: ``IPTS-361190`` is not under ``IPTS-36119``.
+    """
+    remembered = remembered or ""  # QSettings gives None for a value it cannot read (the security advisory F4)
+    ipts = _clean_ipts(ipts)
+    if not ipts:
+        return remembered
+    root, _ = _facility_layout(root)
+    home = os.path.normpath(root / ipts)
+    try:
+        if os.path.commonpath([os.path.normpath(remembered), home]) == home:
+            return remembered
+    except ValueError:  # nothing remembered ("" is "."), or a relative folder: not under the IPTS
+        pass
+    shared = root / ipts / SETTINGS_FOLDERS[0]
+    return str(shared) if os.path.isdir(shared) else remembered
+
+
 class SettingsDocument:
     """One editable reduction configuration."""
+
+    #: The file ``from_file`` read this document from, absolute and not resolved; ``None`` for any other document.
+    #: An attribute, never a config key: ``save()`` does not write it. The IPTS resolution reads it (2c).
+    source_path = None
 
     def __init__(self, config=None):
         self._config = config if config is not None else NRReductionConfig()
@@ -103,6 +309,8 @@ class SettingsDocument:
         # {field name: row} of the λ edits set_angle_field refused, which
         # validate() reports while they still apply. Not part of the settings.
         self._refused = {}
+        # The Load's run lookup (resolve_ipts), which notes() reads against the IPTS held now.
+        self._run_lookup = None
 
     # -- construction ------------------------------------------------------
 
@@ -204,7 +412,21 @@ class SettingsDocument:
         values = loaded.get("config")
         if values is None:
             raise ValueError(f"No reduction settings found in {path}")
-        return cls.from_dict(values)
+        document = cls.from_dict(values)
+        document.source_path = os.path.abspath(os.fspath(path))
+        return document
+
+    def resolve_ipts(self, field_value="", root=None):
+        """Hold the IPTS a Load resolves to (``resolve_experiment_id``), given the IPTS the header held before.
+
+        The lookup is kept for ``notes()``. An inferred IPTS is the one difference from the file: "Changed from
+        the seed" shows it, and a Save writes it. Returns the IPTS held.
+        """
+        value, self._run_lookup = resolve_experiment_id(
+            self.get("experiment_id"), self.get("RBnum"), field_value, self.source_path, root, type(self._config)
+        )
+        self.set("experiment_id", value)
+        return value
 
     # -- scalar access -----------------------------------------------------
 
@@ -530,6 +752,21 @@ class SettingsDocument:
         in an optional list, where a half-specified field is genuinely broken.
         """
         messages = []
+        # I4 (editor-ipts-inference): runs named with no IPTS and no NeXus override read every run from the
+        # folder an empty IPTS gives, which never holds one. Unreducible, so a problem; first, it blocks the rest.
+        runs = self.get("RBnum")
+        named = [run for run in runs if run is not None] if isinstance(runs, list) else []
+        if _empty_ipts(self.get("experiment_id")) and named and self.get("_NEXUSpathRB_override") is None:
+            # The folder an empty IPTS gives, read from the class on a copy: None makes base_path raise, and
+            # spaces name a folder of spaces (v2: one definition of empty).
+            empty = copy.copy(self._config)
+            empty.experiment_id = ""
+            many = len(named) != 1
+            messages.append(
+                f"{fs.get('experiment_id').label} (experiment_id) is empty and {len(named)} run "
+                f"number{'s are' if many else ' is'} set: the reduction would look for REF_L_{named[0]}.nxs.h5 "
+                f"under {empty.NEXUSpathRB} and not find it — enter the IPTS, or choose a NeXus path"
+            )
         # Lengths are measured against the reduction's count, not the table's
         # rows: a list longer than that is surplus (notes()), and only a list
         # shorter than it is a problem (nr_reduction_calc.py:61-81).
@@ -667,6 +904,59 @@ class SettingsDocument:
                     f"{file_spelling(field, field.reducer_default)} at every angle — leave it, or choose "
                     f"a value to write it explicitly"
                 )
+        lines.extend(self._ipts_notes())
+        return lines
+
+    def _ipts_notes(self):
+        """What the Load's run lookup says, read against the IPTS held now and the runs still named.
+
+        So the notes follow an IPTS typed after the Load (I6) and an angle removed, with no new lookup. Runs that
+        resolve under another IPTS than the one held (I3; 2a's other runs); a run under more than one IPTS; runs
+        no IPTS holds, whose files the reduction would not find; a lookup that could not run when the file named
+        no IPTS; a capped lookup. Information, not problems.
+        """
+        lookup = self._run_lookup
+        if lookup is None:
+            return []
+        runs = _distinct_runs(self.get("RBnum"))
+        if not lookup.available:
+            if runs and _empty_ipts(self._seed.get("experiment_id")):
+                return [f"The IPTS could not be looked up from the run numbers: {lookup.root} is not available here"]
+            return []
+        found = [(run, lookup.found[run]) for run in runs if run in lookup.found]
+        lines = []
+        held = _clean_ipts(self.get("experiment_id"))
+
+        def spell(ipts):  # as the file holds an IPTS: K1's one renderer (the plan's §2)
+            return file_spelling(fs.get("experiment_id"), ipts)
+        if held:
+            elsewhere = {}
+            for run, hits in found:
+                if len(hits) == 1 and hits[0] != held:
+                    elsewhere.setdefault(hits[0], []).append(run)
+            for ipts, named in elsewhere.items():
+                many = len(named) > 1
+                lines.append(
+                    f"The run number{'s' if many else ''} {', '.join(map(str, named))} "
+                    f"resolve{'' if many else 's'} under {spell(ipts)}, not {spell(held)}; reduced as it stands, "
+                    f"this file looks for {'them' if many else 'it'} in {self._config.NEXUSpathRB}"
+                )
+        lines.extend(
+            f"The run number {run} has a NeXus file under more than one IPTS: {', '.join(map(spell, hits))}"
+            for run, hits in found
+            if len(hits) > 1
+        )
+        missing = [run for run, hits in found if not hits]
+        if missing:
+            lines.append(
+                f"No IPTS in {lookup.root} holds the run number{'s' if len(missing) > 1 else ''} "
+                f"{', '.join(map(str, missing))}"
+            )
+        if any(run in runs for run in lookup.skipped):
+            lines.append(
+                f"Only the first {len(lookup.found)} of {len(lookup.found) + len(lookup.skipped)} distinct run "
+                f"numbers were looked up for their IPTS"
+            )
         return lines
 
     @staticmethod
