@@ -37,15 +37,10 @@ from qtpy.QtWidgets import (
 from lr_reduction import roi_estimate
 
 try:
+    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+    from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
     from matplotlib.figure import Figure
     from matplotlib.widgets import SpanSelector
-
-    try:
-        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-        from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
-    except ImportError:  # matplotlib < 3.5
-        from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-        from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 except ImportError:  # the editor works without the ROI plots; its button says why it is unavailable
     Figure = None
 
@@ -57,21 +52,14 @@ def _move_span(patch, low, high, vertical=True):
     """
     Move a shaded region, whose other extent is in axes coordinates.
 
-    ``axvspan`` returns a rectangle from matplotlib 3.9 on and a polygon
-    before, and the two do not take the same coordinates. A vertical span
-    (``axvspan``) covers ``low``-``high`` along the data x axis; a horizontal
-    one (``axhspan``, the bands drawn on the images, whose Y is vertical) along
-    the data y axis.
+    A vertical span (``axvspan``) covers ``low``-``high`` along the data x axis; a horizontal one (``axhspan``, the
+    bands drawn on the images, whose Y is vertical) along the data y axis. Both are rectangles from matplotlib 3.9 on,
+    and ``pyproject.toml`` requires 3.9.4, so #197's branch for the polygons of earlier releases is not carried.
     """
     if vertical:
-        if hasattr(patch, "set_bounds"):  # a rectangle
-            patch.set_bounds(low, 0, high - low, 1)
-        else:  # a polygon
-            patch.set_xy([[low, 0], [low, 1], [high, 1], [high, 0], [low, 0]])
-    elif hasattr(patch, "set_bounds"):
-        patch.set_bounds(0, low, 1, high - low)
+        patch.set_bounds(low, 0, high - low, 1)
     else:
-        patch.set_xy([[0, low], [1, low], [1, high], [0, high], [0, low]])
+        patch.set_bounds(0, low, 1, high - low)
 
 
 def _guarded(method):
@@ -274,7 +262,7 @@ class ROISelectionDialog(QDialog):
         low, high = int(np.floor(self.tof_edges[0])), int(np.ceil(self.tof_edges[-1]))
         self.tof_spins = []
         for value in opening["tof"]:
-            spin = self._make_spin(min(max(value, low), high), high, unset=False, minimum=low)
+            spin = self._make_spin(value, high, unset=False, minimum=low)  # Qt holds a band past the span at its edge
             spin.setSingleStep(100)
             spin.setToolTip("Only the events of this TOF range make the Y and X profiles and the XY image; "
                             "never written (the reduction's TOF window is edited in the table)")
@@ -352,8 +340,7 @@ class ROISelectionDialog(QDialog):
             self._updating = False
         self._values_changed()
 
-    @_guarded
-    def _background_edited(self, *_value):
+    def _background_edited(self, *_value):  # not guarded: its one call, _values_changed, is
         if not self._updating:
             self._bkg_edited = True
             self._values_changed()
@@ -420,7 +407,7 @@ class ROISelectionDialog(QDialog):
 
     @staticmethod
     def _norm(array):
-        return LogNorm(vmin=1, vmax=max(2.0, float(np.max(array)) if array.size else 2.0))
+        return LogNorm(vmin=1, vmax=max(2.0, float(np.max(array))))  # an image without counts keeps a scale
 
     def _build_profiles(self):
         self.y_axis.set_xlabel("y pixel (reflectivity direction)")
@@ -552,7 +539,7 @@ class ROISelectionDialog(QDialog):
 
         for axis, line in ((self.y_axis, self.y_line), (self.tof_axis, self.tof_line), (self.x_axis, self.x_line)):
             axis.relim()
-            if axis.get_yscale() == "linear" or np.any(line.get_ydata() > 0):  # a log axis has no scale for no counts
+            if np.any(line.get_ydata() > 0):  # no counts: nothing to fit, and a log axis would warn
                 axis.autoscale_view(scalex=False)
         self.canvas.draw_idle()
 

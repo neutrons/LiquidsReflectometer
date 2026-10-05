@@ -1148,16 +1148,14 @@ class SettingsEditorTab(QtWidgets.QWidget):
         loaded = self._events_for_row(row)
         if loaded is None:  # the file dialog was cancelled
             return
-        events, title, *more = loaded
-        values = self._roi_values(row)
-        dialog = ROISelectionDialog(events, values, title=title, tof_band=more[0] if more else None, parent=self)
+        events, title, band = loaded
+        dialog = ROISelectionDialog(events, self._roi_values(row), title=title, tof_band=band, parent=self)
         try:
             if dialog.exec_() != QtWidgets.QDialog.Accepted:
                 return
             changes = dialog.changes()
         finally:
-            dialog.close()
-            dialog.deleteLater()  # released, never destroy(): Qt frees it when control returns to the loop
+            dialog.deleteLater()  # released, never destroy() (E7): exec_ has hidden it, and Qt frees it in the loop
         if row >= self.document.n_angles:
             raise IndexError(f"angle {row + 1} no longer exists, so nothing was written")
         for name in ("RB_Ymin", "RB_Ymax", "BkgROI"):
