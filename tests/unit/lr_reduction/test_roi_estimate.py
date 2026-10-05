@@ -402,7 +402,9 @@ def test_a_non_finite_profile_is_refused_even_if_it_reaches_the_estimator():
 
 
 @pytest.mark.parametrize(
-    "peak", [(400, 410), (-50, -40), (300, 320), (-5, 5)], ids=["past-end", "negative", "straddles-end", "straddles-zero"]
+    "peak",
+    [(400, 410), (-50, -40), (300, 320), (-5, 5), (200, 100)],
+    ids=["past-end", "negative", "straddles-end", "straddles-zero", "reversed"],
 )
 def test_default_bkg_roi_refuses_a_peak_that_is_not_on_the_detector(peak):
     """D1: each branch checks only ONE end, so the other end went unchecked.
@@ -416,8 +418,13 @@ def test_default_bkg_roi_refuses_a_peak_that_is_not_on_the_detector(peak):
     Refusing rather than clamping, deliberately: clamping `(400, 410)` yields a
     band from the wrong end of the detector, silently. `RB_Ymin`/`RB_Ymax` reach
     the resolver from layer (c) as unvalidated file input, so this is reachable.
+
+    roi-popout-data: B7's two-sided band refuses every off-detector peak above through its no-room check as
+    well, whose message also says "detector", so deleting D1 left this test green (battery row 14 SURVIVED).
+    The test now matches D1's own words, and adds the case only D1 refuses: a reversed peak, for which the
+    no-room check returns (192, 196, 104, 108).
     """
-    with pytest.raises(ValueError, match="detector"):
+    with pytest.raises(ValueError, match="not an ascending range"):
         re_mod.default_bkg_roi(peak, n_y=N_Y, gap=5, width=10)
 
 
@@ -802,7 +809,8 @@ def test_tof_edges_hold_the_latest_event_when_rounding_falls_short(tmp_path):
 
 _ACCEPTED = [[133, 149, 0, 0], [120, 130, 150, 160], [160, 150, 130, 120], [0, 0, 10, 300], [133.5, 149.5, 0, 0]]
 _REFUSED = [[0, 10, 150, 160], [0, 0, 0, 0], [0, 140, 150, 160], [121, 130], [133, 149, 0], [], None, "120, 130",
-            [float("nan"), 149, 0, 0], [133, float("inf"), 0, 0], [[133, 149, 0, 0], [120, 130, 150, 160]]]
+            [float("nan"), 149, 0, 0], [133, float("inf"), 0, 0], [[133, 149, 0, 0], [120, 130, 150, 160]],
+            ["120", "130", "150", "160"], [[120, 130, 150, 160]] * 4, [[133, 149], [0, 0, 0]]]
 
 
 @pytest.mark.parametrize("bkg", _ACCEPTED)
@@ -822,7 +830,13 @@ def test_background_bands_refuses_what_the_reducer_cannot_use(bkg):
     """T8 (F6): one, three or four zeros (pixel 0 is the reducer's sentinel), a length other than four, no
     entry, not numbers: ValueError naming the background, never None or two bounds. So is a bound that is not
     finite, which the sorter passes through: a NaN band selects no rows and its centre is NaN, and an infinite
-    one's centre is infinite. So is the per-angle list of entries in place of one angle's entry."""
+    one's centre is infinite. So is the per-angle list of entries in place of one angle's entry.
+
+    Three cases each reach one guard that nothing else catches (battery rows 33, 34, 36 SURVIVED without them):
+    - four numbers as text: no numeric check means np.isfinite raises TypeError;
+    - a four-angle list without zeros: shape (4, 4) passes the length and zero checks, and without the ndim
+      check four lists come back as "bounds";
+    - a ragged entry: numpy's own ValueError does not name the background."""
     with pytest.raises(ValueError, match="background"):
         re_mod.background_bands(bkg, 136, 146)
 
