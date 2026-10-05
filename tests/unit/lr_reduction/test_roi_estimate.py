@@ -305,7 +305,8 @@ def test_the_module_imports_without_any_gui_package():
     import textwrap
 
     # roi-popout-data I8 (F12): asserted on sys.modules in a fresh interpreter, as test_settings_document.py
-    # does, not through a find_module finder: Python 3.12 dropped that hook, and the guard would pass vacuously.
+    # does, not through a find_module finder. Python 3.12 dropped that hook, so there the guard would pass
+    # vacuously (inferred from the language's removal notice; not run: this environment is Python 3.11).
     program = textwrap.dedent(
         """
         import sys
