@@ -7,6 +7,7 @@ in order to know what the fixture actually asserts. It also lets each test vary
 one thing — notably the PRESENCE of a log, which amendment 21 requires.
 """
 
+import glob
 import os
 from pathlib import Path
 
@@ -39,6 +40,7 @@ def _write_nexus(
     proton_charge=1.0e12,
     start_time="2025-03-04T11:22:33-05:00",
     events=None,
+    with_events=True,
 ):
     """Write a minimal REF_L-shaped NeXus file.
 
@@ -76,9 +78,10 @@ def _write_nexus(
         # to `get_y_tof` as `pcharge` — not the DASlogs time series beside it.
         entry.create_dataset("proton_charge", data=np.array([proton_charge]))
 
-        events = entry.create_group("bank1_events")
-        events.create_dataset("event_id", data=event_id)
-        events.create_dataset("event_time_offset", data=tof)
+        if with_events:  # roi-popout-data v2, K3: a file without the group
+            events = entry.create_group("bank1_events")
+            events.create_dataset("event_id", data=event_id)
+            events.create_dataset("event_time_offset", data=tof)
 
         logs = entry.create_group("DASlogs")
 
@@ -310,14 +313,21 @@ def test_the_module_imports_without_any_gui_package():
     program = textwrap.dedent(
         """
         import sys
-        import lr_reduction.roi_estimate  # noqa: F401
+        import lr_reduction.roi_estimate
         bindings = ("qtpy", "PyQt5", "PyQt6", "PySide2", "PySide6")
+        print(lr_reduction.roi_estimate.__file__)
         print(sorted(m for m in sys.modules if m.split(".")[0] in bindings))
         """
     )
-    proc = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=120)
+    # roi-popout-data v2, K6 (A1): the child imports this checkout's module, not whichever lr_reduction the
+    # environment's editable install points at (from another checkout that would test another tree).
+    source = os.path.dirname(os.path.dirname(os.path.abspath(re_mod.__file__)))
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(filter(None, [source, os.environ.get("PYTHONPATH")]))}
+    proc = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=120, env=env)
     assert proc.returncode == 0, proc.stderr
-    assert proc.stdout.strip().splitlines()[-1] == "[]", proc.stdout
+    imported, bindings = proc.stdout.strip().splitlines()[-2:]
+    assert os.path.realpath(imported) == os.path.realpath(re_mod.__file__), imported
+    assert bindings == "[]", proc.stdout
 
 
 def test_the_geometry_comes_from_the_instrument_database_not_a_literal(monkeypatch):
@@ -677,16 +687,63 @@ def test_the_event_geometry_follows_the_instrument_database(nexus, monkeypatch):
 # -- B2: the XY image --------------------------------------------------------
 
 
-def test_xy_image_is_what_the_web_report_plots(nexus_dir):
-    """T1 (F4): equal, cell for cell, to the web report's XY array (web_report.py:579-583)."""
+def _report_xy(path, n_x, n_y):
+    """The web report's XY array for a run (web_report.py:579-583): Integration of LoadEventNexus."""
     from mantid.simpleapi import Integration, LoadEventNexus
 
-    path = os.path.join(nexus_dir, "REF_L_201288.nxs.h5")
-    events = re_mod.load_event_pixels(path)
     workspace = LoadEventNexus(Filename=path, OutputWorkspace="xy_cross_check")
     signal = Integration(InputWorkspace=workspace, OutputWorkspace="xy_cross_check_sum").extractY()
-    expected = np.reshape(signal, (events.n_x, events.n_y)).T
-    assert np.array_equal(re_mod.xy_image(events), expected)
+    return np.reshape(signal, (n_x, n_y)).T
+
+
+def _extreme_tof_pixels(events):
+    """``{(y, x): count}`` of the events at the run's minimum and maximum TOF."""
+    pixels = {}
+    at = (events.tof == events.tof.min()) | (events.tof == events.tof.max())
+    for y, x in zip(events.y[at], events.x[at]):
+        pixels[(int(y), int(x))] = pixels.get((int(y), int(x)), 0) + 1
+    return pixels
+
+
+def _differing(image, report):
+    """``{(y, x): image - report}`` where the two differ."""
+    difference = image - report
+    return {(int(y), int(x)): int(difference[y, x]) for y, x in zip(*np.nonzero(difference))}
+
+
+def test_xy_image_is_the_web_reports_array_but_for_the_extreme_tof_events(nexus_dir):
+    """T1 (F4, corrected at v2: N-1). The report's array is the event image less the event(s) at the run's minimum
+    and/or maximum TOF, which Mantid's Integration drops when its default range excludes them. 201288 agrees
+    everywhere; 179932 differs at exactly its two extreme events' pixels, (y, x) = (72, 14) and (191, 217), by one
+    count each (the Integrator's measurement, reproduced)."""
+    agree = os.path.join(nexus_dir, "REF_L_201288.nxs.h5")
+    events = re_mod.load_event_pixels(agree)
+    assert _differing(re_mod.xy_image(events), _report_xy(agree, events.n_x, events.n_y)) == {}
+
+    differ = os.path.join(nexus_dir, "REF_L_179932.nxs.h5")
+    events = re_mod.load_event_pixels(differ)
+    image, report = re_mod.xy_image(events), _report_xy(differ, events.n_x, events.n_y)
+    extreme = _extreme_tof_pixels(events)
+    assert _differing(image, report) == extreme == {(72, 14): 1, (191, 217): 1}
+    assert image.sum() - report.sum() == sum(extreme.values())
+
+
+def test_xy_image_against_the_web_report_over_every_fixture_run(nexus_dir):
+    """T1b (v2, the census v1 lacked; F4's population claim, not one sample). Over every REF_L run in the fixture
+    data, xy_image minus the report's array is non-negative, non-zero only at the extreme-TOF events' pixels, and
+    at most their count there. Measured at v2: 63 runs, 18 equal, 45 differing, no exception, ~45 s."""
+    pytest.importorskip("mantid.simpleapi", reason="the report's array is Mantid's Integration; no Mantid here")
+    paths = sorted(glob.glob(os.path.join(nexus_dir, "REF_L_*.nxs.h5")))
+    assert len(paths) >= 60, "precondition: the fixture data is present"
+    differing_runs = 0
+    for path in paths:
+        events = re_mod.load_event_pixels(path)
+        image = re_mod.xy_image(events)
+        differing = _differing(image, _report_xy(path, events.n_x, events.n_y))
+        extreme = _extreme_tof_pixels(events)
+        assert all(0 < count <= extreme.get(pixel, 0) for pixel, count in differing.items()), (path, differing)
+        differing_runs += bool(differing)
+    assert differing_runs > 0, "precondition: some run differs, or the census proves nothing about the drop"
 
 
 def test_xy_image_puts_the_injected_peak_at_its_row_and_columns(nexus):
@@ -809,9 +866,15 @@ def test_tof_edges_hold_the_latest_event_when_rounding_falls_short(tmp_path):
 # -- B6: the reducer's background bands --------------------------------------
 
 _ACCEPTED = [[133, 149, 0, 0], [120, 130, 150, 160], [160, 150, 130, 120], [0, 0, 10, 300], [133.5, 149.5, 0, 0]]
-_REFUSED = [[0, 10, 150, 160], [0, 0, 0, 0], [0, 140, 150, 160], [121, 130], [133, 149, 0], [], None, "120, 130",
-            [float("nan"), 149, 0, 0], [133, float("inf"), 0, 0], [[133, 149, 0, 0], [120, 130, 150, 160]],
-            ["120", "130", "150", "160"], [[120, 130, 150, 160]] * 4, [[133, 149], [0, 0, 0]]]
+_REFUSED = [  # (entry, the words of its own refusal) -- v2, K4: each reason matched, not only "background"
+    ([0, 10, 150, 160], "sentinel"), ([0, 0, 0, 0], "sentinel"), ([0, 140, 150, 160], "sentinel"),
+    ([0, 0, 0, 150], "sentinel"),
+    ([121, 130], "needs four bounds"), ([133, 149, 0], "needs four bounds"), ([], "needs four bounds"),
+    (None, "no background is set"), ("120, 130", "flat list"),
+    ([float("nan"), 149, 0, 0], "finite numbers"), ([133, float("inf"), 0, 0], "finite numbers"),
+    ([[133, 149, 0, 0], [120, 130, 150, 160]], "flat list"), (["120", "130", "150", "160"], "finite numbers"),
+    ([[120, 130, 150, 160]] * 4, "flat list"), ([[133, 149], [0, 0, 0]], "one angle's four pixel bounds, not"),
+]
 
 
 @pytest.mark.parametrize("bkg", _ACCEPTED)
@@ -824,10 +887,48 @@ def test_background_bands_are_the_rows_the_reducer_averages(bkg):
     expected = NR_Reduction._background_roi_sorter(None, bkg, 136, 146).tolist()
     (b0, b1), (b2, b3) = re_mod.background_bands(bkg, 136, 146)
     assert [b0, b1, b2, b3] == expected
+    # v2, K1: "values and types" -- 136 == 136.0, so == alone passes a float for an int.
+    assert [type(v) for v in (b0, b1, b2, b3)] == [type(v) for v in expected]
 
 
-@pytest.mark.parametrize("bkg", _REFUSED)
-def test_background_bands_refuses_what_the_reducer_cannot_use(bkg):
+def _against_the_sorter(bkg, y_min, y_max):
+    """None when background_bands agrees with the sorter on ``bkg`` (values and types; a refusal exactly where the
+    sorter returns no four bounds), else a description of the disagreement."""
+    from lr_reduction.nr_reduction_calc import NR_Reduction
+
+    sorted_ = NR_Reduction._background_roi_sorter(None, list(bkg), y_min, y_max)
+    try:
+        got = [v for band in re_mod.background_bands(list(bkg), y_min, y_max) for v in band]
+    except ValueError as exc:
+        if type(exc) is not ValueError:
+            return f"{bkg}: {type(exc).__name__}, not ValueError"
+        return None if sorted_ is None or len(sorted_) != 4 else f"{bkg}: refused, the sorter gives {sorted_}"
+    if sorted_ is None or len(sorted_) != 4:
+        return f"{bkg}: {got}, the sorter gives {sorted_}"
+    want = sorted_.tolist()
+    return None if got == want and [type(v) for v in got] == [type(v) for v in want] else f"{bkg}: {got} != {want}"
+
+
+def test_background_bands_is_the_sorter_on_an_exhaustive_grid_and_random_entries():
+    """v2, K1 (after the numerical reviewer's grid): every four-bound entry from 0..7 (4096, every zero count, peak
+    3-4), and 2000 seeded entries on the detector with zeros mixed in. Python ints come back for int entries, and
+    a refusal where the sorter returns None."""
+    import itertools
+
+    misses = [m for bkg in itertools.product(range(8), repeat=4) if (m := _against_the_sorter(bkg, 3, 4))]
+    rng = np.random.default_rng(2026)
+    for _ in range(2000):
+        bkg = [int(v) for v in rng.integers(0, N_Y, 4)]
+        for i in rng.choice(4, size=int(rng.integers(0, 3)), replace=False):
+            bkg[i] = 0
+        low = int(rng.integers(1, N_Y - 20))
+        if (m := _against_the_sorter(bkg, low, low + int(rng.integers(0, 15)))):
+            misses.append(m)
+    assert misses == [], misses[:5]
+
+
+@pytest.mark.parametrize("bkg, reason", _REFUSED)
+def test_background_bands_refuses_what_the_reducer_cannot_use(bkg, reason):
     """T8 (F6): one, three or four zeros (pixel 0 is the reducer's sentinel), a length other than four, no
     entry, not numbers: ValueError naming the background, never None or two bounds. So is a bound that is not
     finite, which the sorter passes through: a NaN band selects no rows and its centre is NaN, and an infinite
@@ -837,9 +938,13 @@ def test_background_bands_refuses_what_the_reducer_cannot_use(bkg):
     - four numbers as text: no numeric check means np.isfinite raises TypeError;
     - a four-angle list without zeros: shape (4, 4) passes the length and zero checks, and without the ndim
       check four lists come back as "bounds";
-    - a ragged entry: numpy's own ValueError does not name the background."""
-    with pytest.raises(ValueError, match="background"):
+    - a ragged entry: numpy's own ValueError does not name the background.
+
+    v2: each refusal is matched by its own reason (K4: a deleted None guard let the ndim refusal answer with the
+    wrong one), and is exactly ValueError (K2: CannotEstimateError subclasses it)."""
+    with pytest.raises(ValueError, match="background") as refused:
         re_mod.background_bands(bkg, 136, 146)
+    assert refused.type is ValueError and reason in str(refused.value), refused.value
 
 
 # -- B7: a default background the reducer accepts ----------------------------
@@ -867,6 +972,21 @@ def test_default_bkg_roi_survives_the_reducer():
 def test_default_bkg_roi_defaults_are_the_reviewed_three_and_five():
     """A3: gap 3 and width 5 either side, #197's values that the scientists reviewed."""
     assert re_mod.default_bkg_roi((140, 160), n_y=N_Y) == (132, 136, 164, 168)
+
+
+def test_default_bkg_roi_takes_a_one_row_peak_and_refuses_what_is_not_a_whole_row():
+    """v2, K7 (A4, the numerical advisory). A one-row peak is legitimate: four ints around it. A fractional peak
+    edge, gap or width, or a bool, is refused rather than truncated: the result promises whole rows. An integral
+    float (a JSON 150.0) is a whole row."""
+    assert re_mod.default_bkg_roi((150, 150), n_y=N_Y) == (142, 146, 154, 158)
+    bounds = re_mod.default_bkg_roi((150.0, 160.0), n_y=N_Y)
+    assert bounds == (142, 146, 164, 168) and all(type(b) is int for b in bounds)
+    for kwargs in ({"peak_range": (150.5, 160)}, {"peak_range": (150, 160.5)}, {"gap": 2.5}, {"width": 4.5},
+                   {"gap": True}, {"width": True}, {"peak_range": (True, 160)}):
+        call = {"peak_range": (150, 160), "n_y": N_Y, **kwargs}
+        with pytest.raises(ValueError, match="whole") as refused:
+            re_mod.default_bkg_roi(**call)
+        assert refused.type is ValueError, kwargs
 
 
 # -- B9, T10-T12: refusals, sparse and empty runs, sampling -------------------
@@ -899,9 +1019,16 @@ def test_an_empty_run_gives_zero_images_and_refuses_edges(tmp_path):
     path = _events_file(tmp_path, np.array([], dtype=np.int64), np.array([], dtype=float))
     events = re_mod.load_event_pixels(path)
     assert len(events.tof) == 0
-    assert re_mod.xy_image(events).shape == (N_Y, N_X) and re_mod.xy_image(events).sum() == 0
-    assert re_mod.profile_y(events, (0, N_X - 1)).shape == (N_Y,) and re_mod.profile_x(events).shape == (N_X,)
-    assert re_mod.y_tof_image(events, (0, N_X - 1), np.array([0.0, 50.0])).shape == (N_Y, 1)
+    # v2, A5: all-zero values, not only shapes, and profile_tof as well.
+    zeros = {
+        "xy_image": (re_mod.xy_image(events), (N_Y, N_X)),
+        "profile_y": (re_mod.profile_y(events, (0, N_X - 1)), (N_Y,)),
+        "profile_x": (re_mod.profile_x(events), (N_X,)),
+        "y_tof_image": (re_mod.y_tof_image(events, (0, N_X - 1), np.array([0.0, 50.0])), (N_Y, 1)),
+        "profile_tof": (re_mod.profile_tof(events, np.array([0.0, 50.0, 100.0])), (2,)),
+    }
+    for name, (array, shape) in zeros.items():
+        assert array.shape == shape and not array.any(), name
     with pytest.raises(re_mod.CannotEstimateError):
         re_mod.tof_edges(events)
 
@@ -916,8 +1043,11 @@ def test_called_wrong_is_a_value_error_not_an_empty_answer(nexus):
                  lambda: re_mod.y_tof_image(events, (160, 100), re_mod.tof_edges(events)),
                  lambda: re_mod.tof_edges(events, bin_width=0),
                  lambda: re_mod.load_event_pixels(nexus, max_events=0)):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as refused:
             call()
+        # v2, K2: exactly ValueError. CannotEstimateError ("looked, nothing to offer") subclasses it, so
+        # pytest.raises(ValueError) alone passes a called-wrong site that raises the other.
+        assert refused.type is ValueError, refused.value
 
 
 def test_called_wrong_names_what_is_wrong(nexus):
@@ -934,5 +1064,32 @@ def test_called_wrong_names_what_is_wrong(nexus):
                         (lambda: re_mod.profile_tof(events, edges, y_range=(200, 100)), "reversed"),
                         (lambda: re_mod.default_bkg_roi((140, 160), n_y=N_Y, gap=-1), "gap"),
                         (lambda: re_mod.default_bkg_roi((140, 160), n_y=N_Y, width=0), "width")):
-        with pytest.raises(ValueError, match=match):
+        with pytest.raises(ValueError, match=match) as refused:
             call()
+        assert refused.type is ValueError, refused.value  # v2, K2
+
+
+# -- roi-popout-data v2: K3, K5 ------------------------------------------------
+
+
+def test_a_file_without_bank1_events_is_a_key_error_not_an_empty_run(tmp_path):
+    """v2, K3 (the plan's types table): a file without the event group is h5py's KeyError, uncaught. It is not
+    read as a run with no events, which would draw empty images for a file that is not a run at all."""
+    path = _write_nexus(tmp_path / "no_events.nxs.h5", with_events=False)
+    with pytest.raises(KeyError):
+        re_mod.load_event_pixels(path)
+
+
+def test_a_range_whose_bounds_are_equal_is_one_pixel_or_one_tof(nexus):
+    """v2, K5: low == high is a legal inclusive range, one pixel (or one TOF value), for every range kind; only
+    high < low is refused. Each selection counts exactly the events at that pixel or TOF."""
+    events = re_mod.load_event_pixels(nexus)
+    edges = re_mod.tof_edges(events)
+    t = float(events.tof[0])
+    at_x, at_y, at_t = events.x == 120, events.y == 150, events.tof == t
+    assert at_x.any() and at_y.any() and at_t.any(), "precondition: events at the chosen pixel and TOF"
+    assert re_mod.profile_y(events, (120, 120)).sum() == at_x.sum()
+    assert re_mod.profile_x(events, y_range=(150, 150)).sum() == at_y.sum()
+    assert re_mod.xy_image(events, tof_band=(t, t)).sum() == at_t.sum()
+    assert re_mod.y_tof_image(events, (120, 120), edges).sum() == at_x.sum()
+    assert re_mod.profile_tof(events, edges, x_range=(120, 120), y_range=(150, 150)).sum() == (at_x & at_y).sum()
