@@ -198,3 +198,39 @@ def test_load_single_workspace_deletes_the_events_when_rejected_events_fail(nexu
         RunLoader()._load_single_workspace(Path(nexus_dir) / "REF_L_198409.nxs.h5")
 
     assert _ads_names() == before
+
+
+def _assert_loaded_run_198409(run, path, before):
+    """The RunData of run 198409 loaded from *path*, adding only its two workspaces to the ADS."""
+    assert run.run_numbers == (198409,)
+    assert isinstance(run.run_numbers[0], int)
+    assert run.source_paths == (path,)
+    assert _ads_names() - before == {run.workspace, run.error_events_workspace}
+    assert mtd[run.workspace].getNumberEvents() > 0
+    assert mtd[run.error_events_workspace].getNumberEvents() > 0
+
+
+@pytest.mark.datarepo
+def test_load_reads_a_run_from_the_data_repository_by_number(nexus_dir):
+    before = _ads_names()
+
+    with amend_config(data_dir=nexus_dir):
+        run = RunLoader().load(198409)
+    try:
+        _assert_loaded_run_198409(run, Path(nexus_dir) / "REF_L_198409.nxs.h5", before)
+    finally:
+        DeleteWorkspace(run.workspace)
+        DeleteWorkspace(run.error_events_workspace)
+
+
+@pytest.mark.datarepo
+def test_load_from_path_reads_a_run_from_the_data_repository(nexus_dir):
+    path = Path(nexus_dir) / "REF_L_198409.nxs.h5"
+    before = _ads_names()
+
+    run = RunLoader().load_from_path(path)
+    try:
+        _assert_loaded_run_198409(run, path, before)
+    finally:
+        DeleteWorkspace(run.workspace)
+        DeleteWorkspace(run.error_events_workspace)
