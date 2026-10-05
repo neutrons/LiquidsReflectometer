@@ -498,17 +498,27 @@ class _FileDialogSidebar(QtCore.QObject):
     shown. Measured offscreen on Qt 5.15 (the ledger's ``editor-ipts-inference-probes.py``):
     the filter sees the static dialog's Show event and the sidebar holds. Qt's own dialog only
     (``DontUseNativeDialog``): a native dialog builds no sidebar.
+
+    When the dialog hides, it gets its own sidebar back. Qt saves a dialog's sidebar ("shortcuts") to the user's
+    QtProject.conf when the dialog is destroyed, and every later Qt 5 file dialog of the user's starts from it:
+    left in place, the IPTS's folders would replace the user's own sidebar in every Qt application.
     """
 
     def __init__(self, folders):
         super().__init__()
         self._urls = [QtCore.QUrl.fromLocalFile(folder) for folder in folders]
+        self._own = None
 
     def eventFilter(self, watched, event):  # noqa: N802 -- Qt's name
         # Never raise here: an exception out of a PyQt virtual reaches qFatal() and aborts the launcher.
         try:
-            if isinstance(watched, QtWidgets.QFileDialog) and event.type() == QtCore.QEvent.Show:
-                watched.setSidebarUrls(self._urls)
+            if isinstance(watched, QtWidgets.QFileDialog):
+                if event.type() == QtCore.QEvent.Show:
+                    self._own = watched.sidebarUrls()
+                    watched.setSidebarUrls(self._urls)
+                elif event.type() == QtCore.QEvent.Hide and self._own is not None:
+                    watched.setSidebarUrls(self._own)
+                    self._own = None
         except Exception:  # noqa: BLE001
             traceback.print_exc()
         return False

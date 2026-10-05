@@ -3071,13 +3071,17 @@ def test_the_ipts_sidebar_is_not_saved_over_the_users_own(tmp_path, monkeypatch,
     QtProject.conf when the dialog is destroyed, and every later Qt 5 file dialog of the user's starts from it. The
     IPTS's folders are this dialog's alone: the user's own sidebar is what Qt saves, before and after."""
     _facility(tmp_path, monkeypatch, {}, folders=_SIDEBAR)
-    mine = QtCore.QUrl.fromLocalFile(str(tmp_path / "my" / "own")).toString()
-    QtCore.QSettings(QtCore.QSettings.UserScope, "QtProject").setValue("FileDialog/shortcuts", [mine])
+    (tmp_path / "my" / "own").mkdir(parents=True)
+    users = QtWidgets.QFileDialog(None, "", "", "")
+    users.setSidebarUrls([QtCore.QUrl.fromLocalFile(str(tmp_path / "my" / "own"))])
+    sip.delete(users)  # the user's sidebar, saved by Qt in its own format (a list PyQt writes is a @Variant)
+    mine = [QtCore.QUrl.fromLocalFile(str(tmp_path / "my" / "own")).toString()]
+    assert _saved_sidebar() == mine
     tab = SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "IPTS-36119"}))
     seen = _capture_dialog(monkeypatch, method)
     getattr(tab, slot)()
     assert len(seen["sidebar"]) == 3
-    assert _saved_sidebar() == [mine]
+    assert _saved_sidebar() == mine
     tab.close()
 
 
