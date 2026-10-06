@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from os import PathLike
+from pathlib import Path
 
 from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.run_data import RunData
@@ -26,7 +26,7 @@ class RunLoaderInterface(Loader):
         """Load raw event data for *run_number* and return it as RunData."""
 
     @abstractmethod
-    def load_from_path(self, nexus_file_path: str | PathLike[str]) -> RunData:
+    def load_from_path(self, nexus_file_path: str | Path) -> RunData:
         """Load raw event data directly from a NeXus file path and return it as RunData."""
 
 

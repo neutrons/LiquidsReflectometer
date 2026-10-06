@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from os import PathLike
 from pathlib import Path
 from secrets import token_hex
 
@@ -23,8 +22,8 @@ _ERROR_EVENTS_ENTRY = "bank_error_events"
 class RunLoader(RunLoaderInterface):
     """Loader for single experimental run."""
 
-    def resolve_path(self, run_number: ID) -> Path:
-        """The NeXus file to load for *run_number*.
+    def get_filepath_for_run(self, run_number: ID) -> Path:
+        """Return the path to the NeXus file to load for *run_number*.
 
         Found by Mantid's own facility/archive search, the same search `LoadEventNexus`
         runs on a bare `REF_L_<n>` token, so the path the loader reads is known before
@@ -68,8 +67,8 @@ class RunLoader(RunLoaderInterface):
         LoadEventNexus(Filename=str(path), OutputWorkspace=name)
         try:
             LoadErrorEventsNexus(Filename=str(path), OutputWorkspace=error_events_name)
-        except BaseException as error:
-            if isinstance(error, RuntimeError) and f"{_ERROR_EVENTS_ENTRY} does not exist" in str(error):
+        except RuntimeError as error:
+            if f"{_ERROR_EVENTS_ENTRY} does not exist" in str(error):
                 logger.info(f"{path} records no rejected events")
                 return name, None
             DeleteWorkspace(name)
@@ -85,9 +84,9 @@ class RunLoader(RunLoaderInterface):
             Mantid's search finds no file for *run_number*.
         """
         logger.info(f"Loading run data for run number {run_number}")
-        return self.load_from_path(self.resolve_path(run_number))
+        return self.load_from_path(self.get_filepath_for_run(run_number))
 
-    def load_from_path(self, nexus_file_path: str | PathLike[str]) -> RunData:
+    def load_from_path(self, nexus_file_path: str | Path) -> RunData:
         """Load raw event data directly from a NeXus file path and return it as RunData.
 
         The run number is read from the loaded workspace's `run_number` log.

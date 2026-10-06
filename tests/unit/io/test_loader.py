@@ -74,7 +74,7 @@ def test_load_from_path_without_rejected_events(monkeypatch, tmp_path):
 
 def test_load_loads_the_resolved_path(loaded_workspaces, monkeypatch, tmp_path):
     path = tmp_path / "REF_L_198409.nxs.h5"
-    monkeypatch.setattr("lr_reduction.io.run_loader.RunLoader.resolve_path", lambda _self, _run_number: path)
+    monkeypatch.setattr("lr_reduction.io.run_loader.RunLoader.get_filepath_for_run", lambda _self, _run_number: path)
 
     run = RunLoader().load(198409)
 
@@ -83,10 +83,10 @@ def test_load_loads_the_resolved_path(loaded_workspaces, monkeypatch, tmp_path):
 
 
 def test_load_raises_run_not_found_without_loading(loaded_workspaces, monkeypatch):
-    def _resolve_path(_self, run_number):
+    def _get_filepath_for_run(_self, run_number):
         raise RunNotFoundError(f"No NeXus file found for run {run_number}")
 
-    monkeypatch.setattr("lr_reduction.io.run_loader.RunLoader.resolve_path", _resolve_path)
+    monkeypatch.setattr("lr_reduction.io.run_loader.RunLoader.get_filepath_for_run", _get_filepath_for_run)
 
     with pytest.raises(RunNotFoundError, match="12345"):
         RunLoader().load(12345)
@@ -94,7 +94,7 @@ def test_load_raises_run_not_found_without_loading(loaded_workspaces, monkeypatc
     assert loaded_workspaces == []
 
 
-def test_resolve_path_returns_the_file_mantid_finds(monkeypatch, tmp_path):
+def test_get_filepath_for_run_returns_the_file_mantid_finds(monkeypatch, tmp_path):
     found = tmp_path / "REF_L_12345.nxs.h5"
     searched = []
 
@@ -104,24 +104,24 @@ def test_resolve_path_returns_the_file_mantid_finds(monkeypatch, tmp_path):
 
     monkeypatch.setattr("lr_reduction.io.run_loader.FileFinder", SimpleNamespace(findRuns=_find_runs))
 
-    assert RunLoader().resolve_path(12345) == found
+    assert RunLoader().get_filepath_for_run(12345) == found
     assert searched == ["REF_L_12345"]
 
 
-def test_resolve_path_raises_run_not_found_when_mantid_finds_nothing(monkeypatch):
+def test_get_filepath_for_run_raises_run_not_found_when_mantid_finds_nothing(monkeypatch):
     def _find_runs(hint):
         raise RuntimeError(f"Unable to find file: search object '{hint}'")
 
     monkeypatch.setattr("lr_reduction.io.run_loader.FileFinder", SimpleNamespace(findRuns=_find_runs))
 
     with pytest.raises(RunNotFoundError, match="12345"):
-        RunLoader().resolve_path(12345)
+        RunLoader().get_filepath_for_run(12345)
 
 
 @pytest.mark.datarepo
-def test_resolve_path_finds_a_run_in_the_data_repository(nexus_dir):
+def test_get_filepath_for_run_finds_a_run_in_the_data_repository(nexus_dir):
     with amend_config(data_dir=nexus_dir):
-        path = RunLoader().resolve_path(198409)
+        path = RunLoader().get_filepath_for_run(198409)
 
     assert path == Path(nexus_dir) / "REF_L_198409.nxs.h5"
 
