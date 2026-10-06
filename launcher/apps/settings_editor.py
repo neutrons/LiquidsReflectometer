@@ -1142,7 +1142,8 @@ class SettingsEditorTab(QtWidgets.QWidget):
         short column only as far as the row (review 1568397; E2's short leg); data_x_range, shared by every angle,
         with ``set`` (E8). The dialog writes nothing. The slot writes no settings file and no data file: the one thing
         it records is the folder a chosen run came from, in the launcher's QSettings (``roi_nexus_dir``), so that the
-        next file dialog opens there (B2; E4 watches every file and key).
+        next file dialog opens there (B2). E4 and E9 watch that: ``SettingsDocument.save``, the panel, the working
+        directory, the run's folder and the QSettings store.
         """
         row = self.angle_table.currentRow()
         if row < 0:

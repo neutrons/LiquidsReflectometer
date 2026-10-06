@@ -74,7 +74,8 @@ def _move_span(patch, low, high, vertical=True):
 def _guarded(method):
     """A slot that raises reports into the status line instead of leaving the slot: an exception out of a PyQt slot
     reaches qFatal() and aborts the launcher (L3; ``test_an_error_inside_a_slot_is_a_status_line_not_an_abort``, and
-    the battery's M5 aborts the run). Typing a value passes through intermediate ones, and none may be fatal."""
+    the battery's G-guard-values, G-guard-estimate and G-guard-log rows abort the run). Typing a value passes through
+    intermediate ones, and none may be fatal."""
 
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
