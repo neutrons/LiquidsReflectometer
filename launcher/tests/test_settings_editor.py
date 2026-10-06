@@ -3077,11 +3077,14 @@ def test_select_roi_cancel_leaves_the_document_untouched(monkeypatch, events):
 
 @pytest.mark.parametrize("ending", ["cancelled", "accepted"])
 def test_select_roi_writes_no_file(monkeypatch, events, tmp_path, ending):
-    """E4′ (B2; #197's F2, a truncating write to the live autoreduce file): every file the slot can write. The file
-    dialog returns a run in tmp_path/nexus; the dialog is cancelled, or accepted with a new peak edge. In both cases
-    SettingsDocument.save is not called, and no file appears or changes under tmp_path (the working directory and the
-    run's folder among them) except the launcher's QSettings file. In that file exactly one key changes: roi_nexus_dir,
-    to the run's folder, so that the next file dialog opens there."""
+    """E4″ (B2; #197's F2, a truncating write to the live autoreduce file): every file the slot can write. The file
+    dialog returns a run in tmp_path/nexus; the dialog is cancelled, or accepted with a new peak edge. In both cases:
+    - SettingsDocument.save is not called. Its stand-in records calls rather than raising: a raise inside the @guarded
+      slot becomes a panel message and the test would pass (I-48, B-1);
+    - the panel reports no problem;
+    - no file appears or changes under tmp_path (the working directory and the run's folder among them) except the
+      launcher's QSettings file, where exactly one key changes: roi_nexus_dir, to the run's folder, so that the next
+      file dialog opens there."""
     from launcher.apps import settings_editor
 
     work, nexus = tmp_path / "cwd", tmp_path / "nexus"
@@ -3091,10 +3094,8 @@ def test_select_roi_writes_no_file(monkeypatch, events, tmp_path, ending):
     run.write_bytes(b"")
     monkeypatch.chdir(work)
 
-    def no_save(*_a, **_k):
-        raise AssertionError("SettingsDocument.save called")
-
-    monkeypatch.setattr(SettingsDocument, "save", no_save)
+    saved = []
+    monkeypatch.setattr(SettingsDocument, "save", lambda _document, *a, **k: saved.append((a, k)))
     monkeypatch.setattr(settings_editor.roi_estimate, "load_event_pixels", lambda _path, **_k: events)
     monkeypatch.setattr(QtWidgets.QFileDialog, "getOpenFileName", staticmethod(lambda *_a, **_k: (str(run), "")))
     if ending == "accepted":
@@ -3115,6 +3116,7 @@ def test_select_roi_writes_no_file(monkeypatch, events, tmp_path, ending):
     before_files, before_keys = files(), keys()
     QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
     tab.settings.sync()
+    assert saved == [] and "Could not complete" not in tab.report.toPlainText(), (saved, tab.report.toPlainText())
     assert files() == before_files
     after_keys = keys()
     changed = {key for key in set(before_keys) | set(after_keys) if before_keys.get(key) != after_keys.get(key)}
@@ -3242,15 +3244,21 @@ _REAL_DIALOG_EXEC = QtWidgets.QDialog.exec_
 
 
 @pytest.mark.parametrize("button", ["Cancel", "Ok"])
-def test_the_real_modal_dialog_writes_as_its_buttons_are_pressed(monkeypatch, events, button):
-    """E9 (B9, V6′/V7′ through the slot): the modal's real exec_(), with no_qmessagebox's stand-in taken off for this
-    test alone. Once the dialog is up, a timer
-    edits the peak and presses Cancel or Ok. Cancel leaves the document as it was. Ok writes the row's RB_Ymin and
-    nothing else. The dialog is released afterwards (E7).
+def test_the_real_modal_dialog_writes_as_its_buttons_are_pressed(monkeypatch, events, tmp_path, button):
+    """E9′ (B9, V6′/V7′ through the slot): the modal's real exec_(), with no_qmessagebox's stand-in taken off for this
+    test alone. Once the dialog is up, a timer edits the peak and presses Cancel or Ok.
+    - Cancel leaves the document as it was. Ok writes the row's RB_Ymin and nothing else.
+    - Either way the panel reports no problem, and no file appears or changes in the working directory or anywhere
+      under tmp_path but the launcher's QSettings file. Saving the document is the bug E4 exists for (I-48, B-1).
+    - The dialog is released afterwards (E7). The timers are objects, stopped when the test ends, so that none fires
+      into a later test (I-48, A-1).
     M4 (the result code ignored) cannot red here: Cancel's reject() restores the opening values, so nothing would be
     written either way. E3 reds it."""
     from launcher.apps.roi_dialog import ROISelectionDialog
 
+    work = tmp_path / "cwd"
+    work.mkdir()
+    monkeypatch.chdir(work)
     doc = _three_peaks()
     tab = SettingsEditorTab(document=doc)
     tab.angle_table.setCurrentCell(1, 0)
@@ -3262,31 +3270,48 @@ def test_the_real_modal_dialog_writes_as_its_buttons_are_pressed(monkeypatch, ev
         return [widget for widget in QtWidgets.QApplication.topLevelWidgets()
                 if isinstance(widget, ROISelectionDialog) and widget.isVisible()]
 
-    def act(tries=50):
+    poll, give_up = QtCore.QTimer(), QtCore.QTimer()
+
+    def act():
         try:  # an exception out of a timer's slot would abort the run (L3)
             dialogs = up()
             if not dialogs:
-                if tries:
-                    QtCore.QTimer.singleShot(100, lambda: act(tries - 1))
-                return
+                return  # the modal is not up yet; the poll fires again
+            poll.stop()
             seen.append(len(dialogs))
             dialogs[0].peak_spins[0].setValue(141)
             QTest.mouseClick(dialogs[0].buttons.button(getattr(QtWidgets.QDialogButtonBox, button)),
                              QtCore.Qt.LeftButton)
         except Exception as exc:  # noqa: BLE001
+            poll.stop()
             errors.append(repr(exc))
 
-    def give_up():  # a modal still up now has failed the test already; close it so the test ends
+    def close_what_is_up():  # a modal still up now has failed the test already; close it so the test ends
         for dialog in up():
             dialog.reject()
 
+    poll.timeout.connect(act)
+    give_up.setSingleShot(True)
+    give_up.timeout.connect(close_what_is_up)
+    settings_file = tab.settings.fileName()
+
+    def files():
+        return {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file() and str(path) != settings_file}
+
+    before_files = files()
     # The real modal, no_qmessagebox's stand-in off. Through a function, which binds to the instance: the built-in put
     # back on the class does not ("first argument of unbound method must have type 'QDialog'", measured).
     monkeypatch.setattr(QtWidgets.QDialog, "exec_", lambda dialog: _REAL_DIALOG_EXEC(dialog))
-    QtCore.QTimer.singleShot(50, act)
-    QtCore.QTimer.singleShot(8000, give_up)
-    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    poll.start(50)
+    give_up.start(8000)
+    try:
+        QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    finally:
+        poll.stop()
+        give_up.stop()
     assert errors == [] and seen == [1], (errors, seen)
+    assert "Could not complete" not in tab.report.toPlainText(), tab.report.toPlainText()
+    assert files() == before_files
     after = doc.to_dict()
     if button == "Cancel":
         assert after == before

@@ -113,8 +113,9 @@ def test_the_dialog_draws_two_images_and_three_profiles():
 
 
 def test_the_images_are_the_data_layers_arrays():
-    """V2 (B3, L1): each image's array is the data layer's, unmodified: get_array() is the data, whatever the display
-    does. origin is "lower", and the extent puts each pixel's centre on its index."""
+    """V2′ (B3, L1): each image's array is the data layer's, unmodified: get_array() is the data, whatever the display
+    does. origin is "lower", the extent puts each pixel's centre on its index, and the aspect is left to the data
+    ("auto", after open and after a draw): forced to "equal", the Y-TOF image is a one-pixel sliver (I-48, B-2)."""
     events = make_events()
     band = (15000.0, 30000.0)
     dialog = make_dialog(events, tof_band=band)
@@ -125,6 +126,10 @@ def test_the_images_are_the_data_layers_arrays():
     ytof = dialog.ytof_axis.images[0]
     np.testing.assert_array_equal(np.asarray(ytof.get_array()), roi_estimate.y_tof_image(events, (50, 200), edges))
     assert ytof.origin == "lower" and list(ytof.get_extent()) == [edges[0], edges[-1], -0.5, N_Y - 0.5]
+    for drawn in (False, True):
+        if drawn:
+            dialog.canvas.draw()
+        assert [axes.get_aspect() for axes in (dialog.xy_axis, dialog.ytof_axis)] == ["auto", "auto"], drawn
     close(dialog)
 
 
