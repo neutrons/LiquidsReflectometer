@@ -10,6 +10,7 @@ import inspect
 
 import numpy as np
 import pytest
+from matplotlib.colors import LogNorm
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtTest import QTest
 
@@ -113,9 +114,14 @@ def test_the_dialog_draws_two_images_and_three_profiles():
 
 
 def test_the_images_are_the_data_layers_arrays():
-    """V2′ (B3, L1): each image's array is the data layer's, unmodified: get_array() is the data, whatever the display
-    does. origin is "lower", the extent puts each pixel's centre on its index, and the aspect is left to the data
-    ("auto", after open and after a draw): forced to "equal", the Y-TOF image is a one-pixel sliver (I-48, B-2)."""
+    """V2″ (B3, L1, B12): each image's array is the data layer's, unmodified: get_array() is the data, whatever the
+    display does.
+    - origin is "lower", and the extent puts each pixel's centre on its index.
+    - The aspect is left to the data ("auto", after open and after a draw): forced to "equal", the Y-TOF image is a
+      one-pixel sliver (I-48, B-2).
+    - The colour scale is logarithmic (a LogNorm on each image).
+    - Each image has its own colorbar, beside it: seven axes in all, the XY colorbar between the two images and the
+      Y-TOF colorbar right of its own (I-50, B-2 and B-3). Without the colorbars, V11′'s colorbar leg reads nothing."""
     events = make_events()
     band = (15000.0, 30000.0)
     dialog = make_dialog(events, tof_band=band)
@@ -130,6 +136,13 @@ def test_the_images_are_the_data_layers_arrays():
         if drawn:
             dialog.canvas.draw()
         assert [axes.get_aspect() for axes in (dialog.xy_axis, dialog.ytof_axis)] == ["auto", "auto"], drawn
+        assert all(isinstance(image.norm, LogNorm) for image in (xy, ytof)), drawn
+    assert len(dialog.figure.axes) == 7
+    bars = [image.colorbar for image in (xy, ytof)]
+    assert all(bar is not None and bar.ax in dialog.figure.axes for bar in bars)
+    xy_box, ytof_box = dialog.xy_axis.get_position(), dialog.ytof_axis.get_position()
+    assert xy_box.x1 <= bars[0].ax.get_position().x0 <= ytof_box.x0, "the XY colorbar sits between the two images"
+    assert ytof_box.x1 <= bars[1].ax.get_position().x0, "the Y-TOF colorbar sits right of its own image"
     close(dialog)
 
 
@@ -259,6 +272,8 @@ def test_dragging_on_the_x_and_tof_profiles_sets_the_range_and_the_filter():
                                   roi_estimate.xy_image(events, tof_band=band))
     np.testing.assert_array_equal(dialog.y_line.get_ydata(), roi_estimate.profile_y(events, (70, 180), tof_band=band))
     assert dialog.changes() == {"data_x_range": [70, 180]}
+    dialog.canvas.draw()
+    assert [axes.get_aspect() for axes in (dialog.xy_axis, dialog.ytof_axis)] == ["auto", "auto"]  # A-ii: after a drag too
     close(dialog)
 
 
@@ -518,7 +533,8 @@ def test_a_nudge_moves_artists_and_rebuilds_nothing():
 
 
 @pytest.mark.parametrize("background, reason", [
-    ([0, 10, 150, 160], "sentinel"), ([121, 130], "four bounds"), ("120, 130", "flat list"), (None, "not set")])
+    ([0, 10, 150, 160], "sentinel"), ([121, 130], "four bounds"), ("120, 130", "flat list"), (None, "not set"),
+    ([], "four bounds"), ([120, 125, 160], "four bounds"), ([0, 0, 0, 160], "sentinel"), ([0, 0, 0, 0], "sentinel")])
 def test_an_unusable_background_is_shown_as_not_set_with_its_reason(background, reason):
     """V14 (B5): an entry the reducer cannot use, or none at all, is "not set" in the status line with the reason. No
     bands are drawn and no values are invented: the spins say "not set". The dialog does not write the row's own

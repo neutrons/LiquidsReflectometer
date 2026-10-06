@@ -3084,14 +3084,17 @@ def test_select_roi_writes_no_file(monkeypatch, events, tmp_path, ending):
     - the panel reports no problem;
     - no file appears or changes under tmp_path (the working directory and the run's folder among them) except the
       launcher's QSettings file, where exactly one key changes: roi_nexus_dir, to the run's folder, so that the next
-      file dialog opens there."""
+      file dialog opens there. The run holds bytes and each file is compared by size, mtime and content, so a
+      truncation shows (I-50, B-5);
+    - the document is as it was, RBnum included, but for the accepted leg's one edit (I-50, B-1).
+    Posted events run before the asserts, so a deferred save is seen too (I-50, A-i)."""
     from launcher.apps import settings_editor
 
     work, nexus = tmp_path / "cwd", tmp_path / "nexus"
     work.mkdir()
     nexus.mkdir()
     run = nexus / "REF_L_999.nxs.h5"
-    run.write_bytes(b"")
+    run.write_bytes(b"\x89HDF")
     monkeypatch.chdir(work)
 
     saved = []
@@ -3102,26 +3105,34 @@ def test_select_roi_writes_no_file(monkeypatch, events, tmp_path, ending):
         _replace_exec(monkeypatch, lambda dialog: dialog.peak_spins[0].setValue(131) or QtWidgets.QDialog.Accepted)
     else:
         _replace_exec(monkeypatch, lambda _dialog: QtWidgets.QDialog.Rejected)
-    tab = SettingsEditorTab(document=_three_peaks())
+    doc = _three_peaks()
+    tab = SettingsEditorTab(document=doc)
     tab.angle_table.setCurrentCell(0, 0)
     tab.settings.sync()
     settings_file = tab.settings.fileName()
 
     def files():
-        return {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file() and str(path) != settings_file}
+        return {path: (path.stat().st_size, path.stat().st_mtime_ns, path.read_bytes())
+                for path in tmp_path.rglob("*") if path.is_file() and str(path) != settings_file}
 
     def keys():
         return {key: tab.settings.value(key) for key in tab.settings.allKeys()}
 
-    before_files, before_keys = files(), keys()
+    before_doc, before_files, before_keys = doc.to_dict(), files(), keys()
     QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    QTest.qWait(20)  # a save posted to the event loop runs before the asserts (A-i)
     tab.settings.sync()
     assert saved == [] and "Could not complete" not in tab.report.toPlainText(), (saved, tab.report.toPlainText())
+    after_doc = doc.to_dict()
+    if ending == "accepted":
+        assert doc.get("RB_Ymin") == [131, 140, 150]
+        after_doc.pop("RB_Ymin")
+        before_doc.pop("RB_Ymin")
+    assert after_doc == before_doc
     assert files() == before_files
     after_keys = keys()
     changed = {key for key in set(before_keys) | set(after_keys) if before_keys.get(key) != after_keys.get(key)}
     assert changed == {"roi_nexus_dir"} and after_keys["roi_nexus_dir"] == str(nexus), changed
-    assert tab.document.get("RB_Ymin")[0] == (131 if ending == "accepted" else 130)
     tab.close()
 
 
@@ -3151,7 +3162,8 @@ def test_the_run_file_comes_from_the_row_or_is_asked_for(monkeypatch, events, tm
     reducer's own name, read MAX_ROI_EVENTS at most (the failure matrix's long run). Otherwise (no RBnum, as in authored
     files; a short or malformed RBnum; the file missing) a file dialog asks. It starts in the resolved NeXus folder, or
     where the last file was chosen when there is none (an experiment_id of None) or it is missing; the chosen file's
-    folder is remembered for next time. A cancelled dialog does nothing and reports nothing."""
+    folder is remembered for next time. A cancelled dialog does nothing and reports nothing. In every leg the
+    document is as it was: the lookup never writes RBnum (I-50, B-1)."""
     from launcher.apps import settings_editor
 
     nexus, remembered = tmp_path / "nexus", tmp_path / "remembered"
@@ -3176,8 +3188,9 @@ def test_the_run_file_comes_from_the_row_or_is_asked_for(monkeypatch, events, tm
     tab = SettingsEditorTab(document=doc)
     tab.settings.setValue("roi_nexus_dir", str(remembered))
     tab.angle_table.setCurrentCell(1, 0)
-    report = tab.report.toPlainText()
+    report, before = tab.report.toPlainText(), doc.to_dict()
     QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    assert doc.to_dict() == before  # the lookup writes nothing into the document, RBnum included (I-50, B-1)
     at_most = {"max_events": settings_editor.MAX_ROI_EVENTS}
     if leg == "from the row":
         assert loaded == [(str(nexus / "REF_L_221473.nxs.h5"), at_most)] and asked == []
@@ -3296,7 +3309,8 @@ def test_the_real_modal_dialog_writes_as_its_buttons_are_pressed(monkeypatch, ev
     settings_file = tab.settings.fileName()
 
     def files():
-        return {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file() and str(path) != settings_file}
+        return {path: (path.stat().st_size, path.stat().st_mtime_ns, path.read_bytes())
+                for path in tmp_path.rglob("*") if path.is_file() and str(path) != settings_file}
 
     before_files = files()
     # The real modal, no_qmessagebox's stand-in off. Through a function, which binds to the instance: the built-in put
@@ -3309,6 +3323,7 @@ def test_the_real_modal_dialog_writes_as_its_buttons_are_pressed(monkeypatch, ev
     finally:
         poll.stop()
         give_up.stop()
+    QTest.qWait(20)  # a save posted to the event loop runs before the asserts (A-i)
     assert errors == [] and seen == [1], (errors, seen)
     assert "Could not complete" not in tab.report.toPlainText(), tab.report.toPlainText()
     assert files() == before_files
@@ -3347,20 +3362,24 @@ def test_the_dialog_is_released_not_destroyed(monkeypatch, events):
 
 
 def test_an_x_range_change_updates_the_scalar_and_its_editor(monkeypatch, events):
-    """E8 (B9): data_x_range is shared by every angle: a change in the dialog sets the scalar (never a per-row copy),
-    its editor shows it, and "Changed from the seed" lists it."""
+    """E8 (B9): data_x_range is shared by every angle. The dialog labels it "all angles" (I-50, B-4). A change in the
+    dialog sets the scalar (never a per-row copy), its editor shows it, and "Changed from the seed" lists it."""
     doc = _three_peaks()
     tab = SettingsEditorTab(document=doc)
     tab.angle_table.setCurrentCell(2, 0)
     monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}", None))
 
+    labels = []
+
     def new_x_range(dialog):
+        labels.extend(label.text() for label in dialog.findChildren(QtWidgets.QLabel) if "data_x_range" in label.text())
         dialog.x_spins[0].setValue(60)
         dialog.x_spins[1].setValue(190)
         return QtWidgets.QDialog.Accepted
 
     _replace_exec(monkeypatch, new_x_range)
     QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    assert len(labels) == 1 and "all angles" in labels[0], labels
     assert doc.get("data_x_range") == [60, 190]
     assert "60" in tab.editors["data_x_range"].text() and "190" in tab.editors["data_x_range"].text()
     assert any(line.startswith("  - data_x_range:") for line in _report_lines(tab))
