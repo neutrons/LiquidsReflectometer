@@ -32,7 +32,6 @@ jobs:
         with:
           fetch-depth: 0 # Fetch all history for accurate versioning
           fetch-tags: true # Fetch tags to ensure versioning works correctly
-          submodules: recursive
 
       - name: Set up Pixi
         uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
@@ -40,20 +39,26 @@ jobs:
           manifest-path: pyproject.toml
 
       - name: Configure Git credentials for code.ornl.gov
+        # Dependabot has no access to the data repository token
+        if: github.actor != 'dependabot[bot]'
         env:
           TOKEN: ${{ secrets.DATA_READ_TOKEN }}
         run: |
           git config --global url."https://gitlab-ci-token:${TOKEN}@code.ornl.gov/".insteadOf "https://code.ornl.gov/"
 
       - name: Download test data
+        if: github.actor != 'dependabot[bot]'
         run: |
           git submodule update --init
           git submodule foreach --recursive git lfs pull
           echo "data repo size: $(du -sh tests/data/liquidsreflectometer-data)"
 
       - name: Test with coverage
+        env:
+          # Dependabot runs without the test data, so skip the tests that need it
+          PYTEST_MARKERS: ${{ github.actor == 'dependabot[bot]' && 'not datarepo' || '' }}
         run: |
-          pixi run test-reduction
+          pixi run test-reduction -m "$PYTEST_MARKERS"
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0

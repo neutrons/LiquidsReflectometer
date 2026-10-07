@@ -5,6 +5,13 @@ from pathlib import Path
 import pytest
 
 
+def pytest_collection_modifyitems(items):
+    r"""Mark every test that uses the data repository as ``datarepo``"""
+    for item in items:
+        if {"datarepo_dir", "nexus_dir"} & set(item.fixturenames):
+            item.add_marker(pytest.mark.datarepo)
+
+
 @pytest.fixture(scope="session")
 def datarepo_dir() -> str:
     r"""Absolute path to the event nexus files"""
