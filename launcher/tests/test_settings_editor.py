@@ -13,7 +13,9 @@ fires that signal for the gesture the user actually makes, which is the
 campaign's signature defect class (S2-v2's double-toggle).
 """
 
+import copy
 import json
+import os
 
 import pytest
 from qtpy import QtCore, QtGui, QtWidgets, sip
@@ -27,6 +29,17 @@ from lr_reduction.nr_reduction_config import NRReductionConfig
 from lr_reduction.settings_document import SettingsDocument
 
 pytestmark = pytest.mark.usefixtures("isolated_qapp", "no_qmessagebox")
+
+
+@pytest.fixture(autouse=True)
+def _no_facility_lookup(tmp_path_factory, monkeypatch):
+    """editor-ipts-inference: every Load in this module looks its runs up under an empty folder, never the facility
+    tree. /SNS is mounted on the analysis nodes and not here, and no test may depend on which. A test that wants
+    runs to resolve fabricates a tree and points the lookup at it (_facility)."""
+    from lr_reduction import settings_document
+
+    monkeypatch.setattr(settings_document, "IPTS_LOOKUP_ROOT", str(tmp_path_factory.mktemp("no-facility")),
+                        raising=False)
 
 
 def test_tab_constructs():
@@ -493,7 +506,10 @@ def test_a_loaded_background_switch_reads_true_or_false(tmp_path, monkeypatch):
 def test_a_reducer_written_file_reports_no_problems(tmp_path, monkeypatch):
     tab = SettingsEditorTab()
     _load(tab, _reducer_written_settings(tmp_path), monkeypatch)
-    assert tab.report.toPlainText() == "No problems found."
+    # editor-notes-and-report-spelling K2: the lists the reducer fills that the file leaves [] (tof_min, tof_max,
+    # ThetaShift, ScaleFactor) are notes, never problems.
+    text = tab.report.toPlainText()
+    assert text.startswith("No problems found.") and "Problems:" not in text, text
 
 
 @pytest.mark.parametrize("name", ["LambdaMinUse", "LambdaMaxUse"])
@@ -542,7 +558,8 @@ def test_toggling_a_loaded_switch_saves_ones_and_zeros(tmp_path, monkeypatch):
     tab = SettingsEditorTab()
     _load(tab, _reducer_written_settings(tmp_path), monkeypatch)
     tab.angle_table.item(1, fs.PER_ANGLE_NAMES.index("useBS")).setText("false")
-    assert "useBS: [True, True, False] -> [True, False, False]" in tab.report.toPlainText()
+    # editor-notes-and-report-spelling K3: the report spells the list as the file does (it was repr).
+    assert "useBS: [1, 1, 0] -> [1, 0, 0]" in tab.report.toPlainText()
 
     target = tmp_path / "saved.json"
     monkeypatch.setattr(
@@ -604,9 +621,11 @@ def test_a_hand_written_integer_useGravity_is_reported_and_saved_as_written(tmp_
 
 
 def _surplus_settings(directory):
-    """Three angles by RBnum, useBS four long — IPTS-36119's reduce_settings.json shape."""
+    """Three angles by RBnum, useBS four long — IPTS-36119's reduce_settings.json shape. With its IPTS, as the real
+    file has it (editor-ipts-inference: runs with no IPTS are I4's problem, which these tests are not about)."""
     path = directory / "reduce_settings.json"
     path.write_text(json.dumps({
+        "experiment_id": "IPTS-36119",
         "RBnum": [201282, 201283, 201284],
         "DBname": ["db_a.dat", "db_b.dat", "db_c.dat"],
         "RB_Ymin": [140, 141, 142],
@@ -2757,3 +2776,940 @@ def test_collapsing_and_expanding_leaves_each_editor_showing_the_documents_value
     assert _shown_value(tab.editors[field]) == shown
     assert tab.document.get(field) == loaded and tab.document.changed_vs_seed() == {}
     tab.close()
+
+
+# --------------------------------------------------------------------------
+# editor-notes-and-report-spelling (plan @ triage 0e333ca) — V1-V3. The human's file from a from-scratch
+# session (PR #38, 2026-10-04: three angles, every list the reducer fills left []), committed as a fixture.
+# --------------------------------------------------------------------------
+
+_FROM_SCRATCH = os.path.join(os.path.dirname(__file__), "data", "REFL_229197_settings-try1-start-from-scratch.json")
+_REDUCER_FILLED = ("useBS", "method_per_run", "ThetaShift", "ScaleFactor", "tof_min", "tof_max")
+
+
+def _report_lines(tab):
+    return tab.report.toPlainText().splitlines()
+
+
+def test_the_from_scratch_file_reads_no_problems_and_notes_each_list_the_reducer_fills(tmp_path, monkeypatch):
+    """V1/K1/K2: every list the reducer fills is [] in the human's file. That is useBS and method_per_run, as
+    they reported, and ThetaShift, ScaleFactor, tof_min and tof_max too. Each gets its note, under "Notes:", and
+    the panel still reads "No problems found." (The plan's V1 names two notes; the file holds six such lists,
+    and K1 notes each.)
+
+    editor-ipts-inference: the file names no IPTS. Its runs resolve under IPTS-36119 in a fabricated tree, so
+    the Load takes that IPTS (2a) and the file reduces. Where no IPTS holds them, the empty IPTS is a problem
+    (I4): test_an_empty_ipts_with_runs_is_a_problem_until_one_is_typed."""
+    _facility(tmp_path, monkeypatch, {"IPTS-36119": [229197, 229198, 229199]})
+    tab = SettingsEditorTab()
+    _load(tab, _FROM_SCRATCH, monkeypatch)
+    text = tab.report.toPlainText()
+    assert text.startswith("No problems found.") and "Problems:" not in text
+    notes = text.split("Notes:", 1)[1]
+    for name in _REDUCER_FILLED:
+        assert f"({name}) is not set; the reduction will use" in notes, name
+    tab.close()
+
+
+def test_one_choice_reports_each_list_as_the_file_then_holds_it(tmp_path, monkeypatch):
+    """V2/K3: re-choosing the implied value is the identity: no "Changed" line, and the note stays. A different
+    value prints the list in the file's spelling (1/0, quoted strings), and the saved file holds exactly that.
+    One list of each kind the reducer fills: a boolean, a choice, a number."""
+    tab = _shown_tab(SettingsEditorTab())
+    _load(tab, _FROM_SCRATCH, monkeypatch)
+    editor = _open_cell_editor(tab, 0, "useBS")
+    assert editor.currentText() == "true"
+    QTest.keyClick(editor.view(), QtCore.Qt.Key_Down)
+    QTest.keyClick(editor.view(), QtCore.Qt.Key_Up)  # a deliberate move, back to the shown value
+    QTest.keyClick(editor.view(), QtCore.Qt.Key_Return)
+    _settle()
+    assert tab.document.changed_vs_seed() == {}
+    assert "Changed from the seed:" not in _report_lines(tab)
+    assert any("(useBS) is not set" in line for line in _report_lines(tab))
+
+    _choose(_open_cell_editor(tab, 0, "useBS"), "false")
+    _choose(_open_cell_editor(tab, 0, "method_per_run"), "constantQ")
+    tab.angle_table.item(0, fs.PER_ANGLE_NAMES.index("ThetaShift")).setText("0.5")
+    _settle()
+    printed = {
+        "useBS": "[] -> [0, 1, 1]",
+        "method_per_run": '[] -> ["constantQ", "meanTheta", "meanTheta"]',
+        "ThetaShift": "[] -> [0.5, 0, 0]",
+    }
+    lines = _report_lines(tab)
+    for name, change in printed.items():
+        assert f"  - {name}: {change}" in lines, (name, lines)
+
+    target = tmp_path / "saved.json"
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), "")))
+    tab.save_settings()
+    saved = json.loads(target.read_text())
+    for name, change in printed.items():
+        assert json.dumps(saved[name]) == change.split(" -> ", 1)[1], name
+    tab.close()
+
+
+def test_a_scalar_change_is_reported_in_the_files_spelling():
+    """V3/K3: a boolean scalar as JSON writes it (false -> true, not False -> True); a string choice quoted."""
+    tab = SettingsEditorTab(SettingsDocument.from_dict({**_THREE_ANGLES, "useGravity": False}))
+    tab.editors["useGravity"].click()
+    tab.editors["useCalcTheta"].setCurrentText("trust sample angle")
+    tab.refresh_report()
+    lines = _report_lines(tab)
+    assert "  - useGravity: false -> true" in lines, lines
+    assert '  - useCalcTheta: false -> "sample_angle"' in lines, lines
+    tab.close()
+
+
+def test_the_report_spells_values_through_the_one_helper():
+    """K4 (the plan's one-definition check): refresh_report spells a changed value only through
+    settings_document.file_spelling, and the tab defines no renderer of its own."""
+    import inspect
+
+    from launcher.apps import settings_editor
+
+    source = inspect.getsource(SettingsEditorTab.refresh_report)
+    assert "file_spelling(" in source
+    assert "!r}" not in source and "repr(" not in source and "json.dumps" not in source
+    assert "def file_spelling" not in inspect.getsource(settings_editor)
+
+
+def test_a_list_left_only_in_a_surplus_row_is_reported_as_the_file_holds_it(tmp_path, monkeypatch):
+    """Added when frame row F6 (the report's current value spelled without the reduction's count) survived the
+    battery. ThetaShift is set at the three angles, then unset at each, with a value left only in the surplus row
+    (useBS has four entries, as real files do). The reducer never reads that row, so save() writes [], and the
+    report prints [] too, not the held [null, null, null, 0.01]."""
+    tab = SettingsEditorTab(SettingsDocument.from_dict(
+        {**_THREE_ANGLES, "useBS": [1, 1, 1, 1], "ThetaShift": [0.5, 0, 0]}))
+    doc = tab.document
+    doc.set_angle_field(3, "ThetaShift", 0.01)
+    for angle in range(3):
+        doc.set_angle_field(angle, "ThetaShift", None)
+    tab.refresh_report()
+    assert repr(doc.get("ThetaShift")) == "[None, None, None, 0.01]"
+    assert "  - ThetaShift: [0.5, 0, 0] -> []" in _report_lines(tab), _report_lines(tab)
+    target = tmp_path / "saved.json"
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), "")))
+    tab.save_settings()
+    assert json.loads(target.read_text())["ThetaShift"] == []
+    tab.close()
+
+
+# --------------------------------------------------------------------------
+# roi-popout-dialog (plan @ triage 4d7a294) — E1-E8: "Select ROI" beside Add/Remove, its slot, the row's run file.
+# The dialog is constructed for real; its exec_ is replaced, so the gesture inside the modal is the test's.
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture
+def events():
+    """A run in memory, through the real RunEvents: a peak at rows 136-146 over x 100-159 (A4: no data submodule)."""
+    import numpy as np
+
+    from lr_reduction.roi_estimate import RunEvents
+
+    rng = np.random.default_rng(0)
+    y = np.r_[rng.integers(136, 147, 20000), rng.integers(0, 304, 5000)]
+    x = np.r_[rng.integers(100, 160, 20000), rng.integers(0, 256, 5000)]
+    return RunEvents(x=x, y=y, tof=rng.uniform(10000.0, 40000.0, len(y)), n_x=256, n_y=304)
+
+
+def _three_peaks(**columns):
+    doc = SettingsDocument()
+    for peak in (130, 140, 150):
+        doc.add_angle(RB_Ymin=peak, RB_Ymax=peak + 6, BkgROI=[peak - 3, peak + 9, 0, 0])
+    for name, value in columns.items():
+        doc.set(name, value)
+    return doc
+
+
+def _replace_exec(monkeypatch, gesture):
+    """The modal's run, replaced: `gesture(dialog)` acts on the real dialog and returns the result code."""
+    from launcher.apps import settings_editor
+
+    monkeypatch.setattr(settings_editor.ROISelectionDialog, "exec_", gesture)
+
+
+#: What the panel says when a slot fails (report_problem); absent after a Select ROI that went right.
+_PROBLEM = "Could not complete"
+
+
+def _files_under(root, skip=None):
+    """Every file under `root` but `skip`, by size, mtime and content, so that an added, removed, truncated or
+    rewritten file shows (E4″, E9′)."""
+    return {path: (path.stat().st_size, path.stat().st_mtime_ns, path.read_bytes())
+            for path in root.rglob("*") if path.is_file() and str(path) != skip}
+
+
+def _run_posted_events():
+    """Let what the slot posted to the event loop run before the disk is read: a deferred save (I-50, A-i)."""
+    QTest.qWait(0)
+
+
+def _document_state(doc):
+    """The document's values, deep-copied. to_dict() hands back the document's own lists, so a snapshot taken with it
+    changes with an in-place write and could never show one (I-56, A-1)."""
+    return copy.deepcopy(doc.to_dict())
+
+
+def _nexus_builder():
+    """The data layer's own NeXus test builder (_write_nexus in tests/unit/lr_reduction/test_roi_estimate.py): one
+    builder, one definition of the file. Its module is found from this file's path, not from sys.path, and is loaded
+    under a name of its own (I-56, A-4)."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "tests" / "unit" / "lr_reduction" / "test_roi_estimate.py"
+    spec = importlib.util.spec_from_file_location("roi_estimate_tests_for_the_builder", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module._write_nexus
+
+
+def test_select_roi_is_enabled_only_with_a_row_selected():
+    """E1 (B1): "Select ROI" sits after "Remove angle" and is enabled exactly while the Angles table has a current
+    row."""
+    tab = SettingsEditorTab(document=_three_peaks())
+    def widgets(layout):
+        for index in range(layout.count()):
+            item = layout.itemAt(index)
+            if item.widget():
+                yield item.widget()
+            elif item.layout():
+                yield from widgets(item.layout())
+
+    order = list(widgets(tab.add_angle_button.parentWidget().layout()))
+    assert order.index(tab.select_roi_button) == order.index(tab.remove_angle_button) + 1
+    assert not tab.select_roi_button.isEnabled()
+    tab.angle_table.setCurrentCell(1, 0)
+    assert tab.select_roi_button.isEnabled()
+    tab.angle_table.setCurrentCell(-1, -1)
+    assert not tab.select_roi_button.isEnabled()
+    tab.close()
+
+
+def test_select_roi_without_matplotlibs_qt_backend_is_disabled_and_says_why(monkeypatch):
+    """E1 (failure matrix, pathological): with matplotlib's Qt backend missing (roi_dialog.Figure is None), the button
+    stays disabled whatever the selection, and its tooltip says why."""
+    from launcher.apps import roi_dialog
+
+    monkeypatch.setattr(roi_dialog, "Figure", None)
+    tab = SettingsEditorTab(document=_three_peaks())
+    tab.angle_table.setCurrentCell(1, 0)
+    assert not tab.select_roi_button.isEnabled()
+    assert "matplotlib" in tab.select_roi_button.toolTip()
+    tab.close()
+
+
+def test_select_roi_without_a_current_row_asks_for_nothing(monkeypatch):
+    """B1: the slot acts on the row current at the gesture. With none (the button is then disabled, so here the slot
+    is called directly) it reads no file, asks for none and builds no dialog: never row -1, the last row."""
+    from launcher.apps import settings_editor
+
+    tab = SettingsEditorTab(document=_three_peaks())
+    tab.angle_table.setCurrentCell(-1, -1)
+    calls = []
+    monkeypatch.setattr(tab, "_events_for_row", lambda row: calls.append(row))
+    monkeypatch.setattr(settings_editor, "ROISelectionDialog", lambda *_a, **_k: calls.append("dialog"))
+    tab.select_roi()
+    assert calls == []
+    tab.close()
+
+
+@pytest.mark.parametrize("short", [False, True], ids=["full columns", "a short RB_Ymin column"])
+def test_select_roi_writes_the_row_it_was_opened_for(monkeypatch, events, short):
+    """E2 (B1, B9; the active-row trap, L1): the row is captured at the click. The selection moving before OK changes
+    nothing: row 1 is written, rows 0 and 2 and every other column are unchanged, and the untouched [137, 149, 0, 0]
+    background is not rewritten. A short column is written through set_angle_field, which pads it only to the
+    edited row, never to the row count (review 1568397): [130] becomes [130, 141], and the reduction's count stays
+    3. The plan's F6 ("pads ... to n_angles") predates that rule."""
+    doc = _three_peaks(**({"RB_Ymin": [130]} if short else {}))
+    tab = SettingsEditorTab(document=doc)
+    tab.angle_table.setCurrentCell(1, 0)
+    monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}", None))
+
+    def accept_after_the_selection_moves(dialog):
+        tab.angle_table.setCurrentCell(2, 0)  # the selection is no longer the target
+        dialog.peak_spins[0].setValue(141)
+        return QtWidgets.QDialog.Accepted
+
+    _replace_exec(monkeypatch, accept_after_the_selection_moves)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    assert doc.get("RB_Ymin") == ([130, 141] if short else [130, 141, 150])
+    assert doc.get("RB_Ymax") == [136, 146, 156]
+    assert doc.get("BkgROI")[1] == [137, 149, 0, 0]  # untouched in the dialog, so not rewritten
+    assert doc.reduction_angles == 3
+    lengths = {name: len(doc.get(name)) for name in fs.PER_ANGLE_NAMES
+               if name != "RB_Ymin" and isinstance(doc.get(name), list) and doc.get(name)}
+    assert set(lengths.values()) == {3}, lengths
+    assert _column_text(tab, "RB_Ymin")[1] == "141"  # the table shows what was written
+    tab.close()
+
+
+def test_the_dialog_opens_with_the_rows_own_values(monkeypatch, events):
+    """E9 (B1, B4, B5): the dialog shows the row it was opened for: that row's peak, its background as the reducer
+    averages it, its TOF window and its useBS, and the shared data_x_range."""
+    doc = _three_peaks(data_x_range=[60, 190], tof_min=[11000.0, 12000.0, 13000.0],
+                       tof_max=[30000.0, 31000.0, 32000.0], useBS=[True, False, True])
+    tab = SettingsEditorTab(document=doc)
+    tab.angle_table.setCurrentCell(1, 0)
+    monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}", None))
+    seen = {}
+
+    def look(dialog):
+        seen["peak"] = [spin.value() for spin in dialog.peak_spins]
+        seen["bkg"] = [spin.value() for spin in dialog.bkg_spins]
+        seen["x"] = [spin.value() for spin in dialog.x_spins]
+        window = dialog.overlays["tof_window"]["tof_axis"]
+        seen["window"] = (window.get_x(), window.get_x() + window.get_width()) if window.get_visible() else None
+        seen["status"] = dialog.status.text()
+        return QtWidgets.QDialog.Rejected
+
+    _replace_exec(monkeypatch, look)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    assert seen["peak"] == [140, 146] and seen["bkg"] == [137, 140, 146, 149] and seen["x"] == [60, 190]
+    assert seen["window"] == pytest.approx((12000.0, 31000.0))
+    assert "not subtracted" in seen["status"], seen["status"]
+    tab.close()
+
+
+def test_a_row_removed_before_ok_is_reported_and_nothing_is_written(monkeypatch, events):
+    """Failure matrix (pathological): the row is gone when OK returns. The panel says so, and the document is exactly as
+    it stood once the row had gone: nothing is written, and no row comes back by padding."""
+    doc = _three_peaks()
+    tab = SettingsEditorTab(document=doc)
+    tab.angle_table.setCurrentCell(2, 0)
+    monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}", None))
+
+    gone = {}
+
+    def remove_then_accept(dialog):
+        doc.remove_angle(2)
+        gone.update(_document_state(doc))  # the document as it stands once the row has gone
+        dialog.peak_spins[0].setValue(151)
+        return QtWidgets.QDialog.Accepted
+
+    _replace_exec(monkeypatch, remove_then_accept)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    assert "angle 3 no longer exists" in tab.report.toPlainText()
+    assert doc.to_dict() == gone  # the one check that guards every write (I-54, A-3)
+    tab.close()
+
+
+def test_select_roi_cancel_leaves_the_document_untouched(monkeypatch, events):
+    """E3: edits in the dialog, then Cancel: the document is identical."""
+    doc = _three_peaks()
+    tab = SettingsEditorTab(document=doc)
+    tab.angle_table.setCurrentCell(1, 0)
+    before = _document_state(doc)
+    monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}", None))
+
+    def edit_then_cancel(dialog):
+        dialog.peak_spins[0].setValue(141)
+        dialog.x_spins[0].setValue(60)
+        return QtWidgets.QDialog.Rejected
+
+    _replace_exec(monkeypatch, edit_then_cancel)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    assert doc.to_dict() == before
+    tab.close()
+
+
+@pytest.mark.parametrize("ending", ["cancelled", "accepted"])
+def test_select_roi_writes_no_file(monkeypatch, events, tmp_path, ending):
+    """E4″ (B2; #197's F2, a truncating write to the live autoreduce file): what the slot writes under tmp_path, which
+    holds the working directory and the run's folder. The file dialog returns a run in tmp_path/nexus; the dialog is
+    cancelled, or accepted with a new peak edge. In both cases:
+    - SettingsDocument.save is not called. Its stand-in records calls rather than raising: a raise inside the @guarded
+      slot becomes a panel message and the test would pass (I-48, B-1);
+    - the panel reports no problem;
+    - no file appears or changes under tmp_path (the working directory and the run's folder among them) except the
+      launcher's QSettings file, where exactly one key changes: roi_nexus_dir, to the run's folder, so that the next
+      file dialog opens there. The run holds bytes and each file is compared by size, mtime and content, so a
+      truncation shows (I-50, B-5);
+    - the document is as it was, RBnum included, but for the accepted leg's one edit (I-50, B-1).
+    Posted events run before the asserts, so a deferred save is seen too (I-50, A-i)."""
+    from launcher.apps import settings_editor
+
+    work, nexus = tmp_path / "cwd", tmp_path / "nexus"
+    work.mkdir()
+    nexus.mkdir()
+    run = nexus / "REF_L_999.nxs.h5"
+    run.write_bytes(b"\x89HDF")
+    monkeypatch.chdir(work)
+
+    saved = []
+    monkeypatch.setattr(SettingsDocument, "save", lambda _document, *a, **k: saved.append((a, k)))
+    monkeypatch.setattr(settings_editor.roi_estimate, "load_event_pixels", lambda _path, **_k: events)
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getOpenFileName", staticmethod(lambda *_a, **_k: (str(run), "")))
+    if ending == "accepted":
+        _replace_exec(monkeypatch, lambda dialog: dialog.peak_spins[0].setValue(131) or QtWidgets.QDialog.Accepted)
+    else:
+        _replace_exec(monkeypatch, lambda _dialog: QtWidgets.QDialog.Rejected)
+    doc = _three_peaks()
+    tab = SettingsEditorTab(document=doc)
+    tab.angle_table.setCurrentCell(0, 0)
+    tab.settings.sync()
+    settings_file = tab.settings.fileName()
+
+    def files():
+        return _files_under(tmp_path, settings_file)
+
+    def keys():
+        return {key: tab.settings.value(key) for key in tab.settings.allKeys()}
+
+    before_doc, before_files, before_keys = _document_state(doc), files(), keys()
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    _run_posted_events()
+    tab.settings.sync()
+    assert saved == [] and _PROBLEM not in tab.report.toPlainText(), (saved, tab.report.toPlainText())
+    after_doc = doc.to_dict()
+    if ending == "accepted":
+        assert doc.get("RB_Ymin") == [131, 140, 150]
+        after_doc.pop("RB_Ymin")
+        before_doc.pop("RB_Ymin")
+    assert after_doc == before_doc
+    assert files() == before_files
+    after_keys = keys()
+    changed = {key for key in set(before_keys) | set(after_keys) if before_keys.get(key) != after_keys.get(key)}
+    assert changed == {"roi_nexus_dir"} and after_keys["roi_nexus_dir"] == str(nexus), changed
+    tab.close()
+
+
+def test_an_unreadable_run_is_reported_not_fatal(monkeypatch):
+    """E5 (B2, L3): a run that cannot be read is a line in the panel; no dialog is built, and no modal box."""
+    from launcher.apps import settings_editor
+
+    built = []
+    monkeypatch.setattr(settings_editor, "ROISelectionDialog", lambda *a, **_k: built.append(a))
+    tab = SettingsEditorTab(document=_three_peaks())
+    tab.angle_table.setCurrentCell(0, 0)
+
+    def unreadable(row):
+        raise OSError(f"unable to open REF_L_221472.nxs.h5 for row {row}")
+
+    monkeypatch.setattr(tab, "_events_for_row", unreadable)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    assert "unable to open REF_L_221472.nxs.h5" in tab.report.toPlainText()
+    assert built == []
+    tab.close()
+
+
+@pytest.mark.parametrize("leg", ["from the row", "asked for", "asked for, cancelled", "the row's file missing",
+                                 "a short RBnum", "RBnum not a list", "no NeXus folder", "the NeXus folder missing"])
+def test_the_run_file_comes_from_the_row_or_is_asked_for(monkeypatch, events, tmp_path, leg):
+    """E6 (B2, F9): with RBnum set and the file present, the row's file is NEXUSpathRB / REF_L_<run>.nxs.h5, the
+    reducer's own name, read MAX_ROI_EVENTS at most (the failure matrix's long run). Otherwise (no RBnum, as in authored
+    files; a short or malformed RBnum; the file missing) a file dialog asks. It starts in the resolved NeXus folder, or
+    where the last file was chosen when there is none (an experiment_id of None) or it is missing; the chosen file's
+    folder is remembered for next time. A cancelled dialog does nothing and reports nothing. In every leg the
+    document is as it was: the lookup never writes RBnum (I-50, B-1)."""
+    from launcher.apps import settings_editor
+
+    nexus, remembered = tmp_path / "nexus", tmp_path / "remembered"
+    nexus.mkdir()
+    for name in ("REF_L_221473.nxs.h5", "REF_L_None.nxs.h5"):  # an unset RBnum is never spelled into a name
+        (nexus / name).write_bytes(b"")
+    columns = {"_NEXUSpathRB_override": str(nexus if leg != "the NeXus folder missing" else tmp_path / "missing")}
+    if leg == "no NeXus folder":
+        columns = {"experiment_id": None}
+    columns["RBnum"] = {"from the row": [221472, 221473, 221474], "the row's file missing": [221472, 221475, 221474],
+                        "a short RBnum": [221472], "RBnum not a list": 221473}.get(leg, [])
+    doc = _three_peaks(**columns)
+    if leg == "no NeXus folder":  # held as a file's null holds it: the path properties raise, so /SNS is never asked
+        assert doc.get("experiment_id") is None
+    loaded, asked = [], []
+    monkeypatch.setattr(settings_editor.roi_estimate, "load_event_pixels",
+                        lambda path, **kwargs: loaded.append((str(path), kwargs)) or events)
+    chosen = "" if leg == "asked for, cancelled" else str(tmp_path / "picked" / "REF_L_999.nxs.h5")
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getOpenFileName",
+                        staticmethod(lambda *a, **k: asked.append(a[2] if len(a) > 2 else k.get("directory")) or (chosen, "")))
+    _replace_exec(monkeypatch, lambda _dialog: QtWidgets.QDialog.Rejected)
+    tab = SettingsEditorTab(document=doc)
+    tab.settings.setValue("roi_nexus_dir", str(remembered))
+    tab.angle_table.setCurrentCell(1, 0)
+    report, before = tab.report.toPlainText(), _document_state(doc)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    assert doc.to_dict() == before  # the lookup writes nothing into the document, RBnum included (I-50, B-1)
+    at_most = {"max_events": settings_editor.MAX_ROI_EVENTS}
+    if leg == "from the row":
+        assert loaded == [(str(nexus / "REF_L_221473.nxs.h5"), at_most)] and asked == []
+        tab.close()
+        return
+    assert asked == [str(remembered if leg in ("no NeXus folder", "the NeXus folder missing") else nexus)]
+    if leg == "asked for, cancelled":
+        assert loaded == [] and tab.report.toPlainText() == report
+    else:
+        assert loaded == [(chosen, at_most)]
+        assert tab.settings.value("roi_nexus_dir") == str(tmp_path / "picked")
+    tab.close()
+
+
+@pytest.mark.parametrize("leg", ["from its metadata", "without metadata or a chopper log"])
+def test_the_run_is_titled_from_its_metadata_and_filtered_at_its_chopper_band(monkeypatch, events, tmp_path, leg):
+    """E10 (B2, B8): the dialog's title is the run's own (its title and run number from the metadata, else the file's
+    name), and the view filter starts at the run's chopper band when it has a chopper log, else at the whole span.
+    The metadata leg reads a real run with a chopper log, written by the data layer's own builder (_write_nexus), through
+    the real read_nexus_metadata, chopper_lambda_range and lambda_to_tof. The filter must open on the band the data layer
+    composes from that run's file and start time: stand-ins that ignored their arguments let a swapped call pass (I-54,
+    B-1). The run starts in the 15.282 m geometry epoch (2024-08-26 to 2025-01-01), so its start time changes the
+    band, and the band's fractions tell the spins' floor (low) and ceil (high) from round: a run in an epoch with
+    today's distance let a literal date pass for its start time (I-56, B-1). An unreadable metadata block and a missing
+    chopper log are states, not failures."""
+    import math
+
+    from launcher.apps import settings_editor
+
+    nexus = tmp_path / "nexus"
+    nexus.mkdir()
+    path = nexus / "REF_L_221473.nxs.h5"
+    doc = _three_peaks(_NEXUSpathRB_override=str(nexus), RBnum=[221472, 221473, 221474])
+
+    def unreadable(path):
+        raise OSError(f"unable to open {path}")
+
+    def no_chopper(path):
+        raise KeyError("no chopper log")
+
+    if leg == "from its metadata":
+        _nexus_builder()(path, title="Si Ir Air", run_number=221473, chopper_lam=4.6,
+                         start_time="2024-10-01T12:00:00-04:00")
+        start = settings_editor.roi_estimate.read_nexus_metadata(path)["start_time"]
+        lam_range = settings_editor.roi_estimate.chopper_lambda_range(path)
+        band = settings_editor.roi_estimate.lambda_to_tof(lam_range, start)
+        # Where the run sits is part of the test (L14): another epoch's date gives another band, and the band's
+        # fractions round otherwise than floor and ceil. If either guard fails, the run no longer tells them apart.
+        assert band != settings_editor.roi_estimate.lambda_to_tof(lam_range, "2026-10-07"), band
+        assert [math.floor(band[0]), math.ceil(band[1])] != [round(band[0]), round(band[1])], band
+    else:
+        path.write_bytes(b"")
+        monkeypatch.setattr(settings_editor.roi_estimate, "load_event_pixels", lambda _path, **_k: events)
+        monkeypatch.setattr(settings_editor.roi_estimate, "read_nexus_metadata", unreadable)
+        monkeypatch.setattr(settings_editor.roi_estimate, "chopper_lambda_range", no_chopper)
+    seen = {}
+
+    def look(dialog):
+        seen["title"] = dialog.windowTitle()
+        seen["tof"] = [spin.value() for spin in dialog.tof_spins]
+        seen["span"] = [spin.minimum() for spin in dialog.tof_spins[:1]] + [spin.maximum() for spin in dialog.tof_spins[1:]]
+        return QtWidgets.QDialog.Rejected
+
+    _replace_exec(monkeypatch, look)
+    tab = SettingsEditorTab(document=doc)
+    tab.angle_table.setCurrentCell(1, 0)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    if leg == "from its metadata":
+        expected = [math.floor(band[0]), math.ceil(band[1])]
+        low, high = seen["span"]
+        assert low < expected[0] and expected[1] < high, (expected, seen["span"])  # inside: the full span would show
+        assert seen["title"].startswith("Si Ir Air (run 221473)") and seen["tof"] == expected, (seen, expected)
+    else:
+        assert seen["title"].startswith("REF_L_221473.nxs.h5") and seen["tof"] == seen["span"]
+    tab.close()
+
+
+#: QDialog.exec_ as Qt has it. Taken at import, before the autouse no_qmessagebox replaces it for every test with an
+#: instant Accepted, so that E9 alone can run a real modal.
+_REAL_DIALOG_EXEC = QtWidgets.QDialog.exec_
+
+
+@pytest.mark.parametrize("button", ["Cancel", "Ok"])
+def test_the_real_modal_dialog_writes_as_its_buttons_are_pressed(monkeypatch, events, tmp_path, button):
+    """E9′ (B9, V6′/V7′ through the slot): the modal's real exec_(), with no_qmessagebox's stand-in taken off for this
+    test alone. Once the dialog is up, a timer edits the peak and presses Cancel or Ok.
+    - Cancel leaves the document as it was. Ok writes the row's RB_Ymin and nothing else.
+    - Either way the panel reports no problem, and no file appears or changes in the working directory or anywhere
+      under tmp_path but the launcher's QSettings file. Saving the document is the bug E4 exists for (I-48, B-1).
+    - The dialog is released afterwards (E7). The timers are objects, stopped when the test ends, so that none fires
+      into a later test (I-48, A-1).
+    M4 (the result code ignored) cannot red here: Cancel's reject() restores the opening values, so nothing would be
+    written either way. E3 reds it."""
+    from launcher.apps.roi_dialog import ROISelectionDialog
+
+    work = tmp_path / "cwd"
+    work.mkdir()
+    monkeypatch.chdir(work)
+    doc = _three_peaks()
+    tab = SettingsEditorTab(document=doc)
+    tab.angle_table.setCurrentCell(1, 0)
+    monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}", None))
+    before = _document_state(doc)
+    seen, errors = [], []
+
+    def up():
+        return [widget for widget in QtWidgets.QApplication.topLevelWidgets()
+                if isinstance(widget, ROISelectionDialog) and widget.isVisible()]
+
+    poll, give_up = QtCore.QTimer(), QtCore.QTimer()
+
+    def act():
+        try:  # an exception out of a timer's slot would abort the run (L3)
+            dialogs = up()
+            if not dialogs:
+                return  # the modal is not up yet; the poll fires again
+            poll.stop()
+            seen.append(len(dialogs))
+            dialogs[0].peak_spins[0].setValue(141)
+            QTest.mouseClick(dialogs[0].buttons.button(getattr(QtWidgets.QDialogButtonBox, button)),
+                             QtCore.Qt.LeftButton)
+        except Exception as exc:  # noqa: BLE001
+            poll.stop()
+            errors.append(repr(exc))
+
+    def close_what_is_up():  # a modal still up now has failed the test already; close it so the test ends
+        for dialog in up():
+            dialog.reject()
+
+    poll.timeout.connect(act)
+    give_up.setSingleShot(True)
+    give_up.timeout.connect(close_what_is_up)
+    settings_file = tab.settings.fileName()
+
+    def files():
+        return _files_under(tmp_path, settings_file)
+
+    before_files = files()
+    # The real modal, no_qmessagebox's stand-in off. Through a function, which binds to the instance: the built-in put
+    # back on the class does not ("first argument of unbound method must have type 'QDialog'", measured).
+    monkeypatch.setattr(QtWidgets.QDialog, "exec_", lambda dialog: _REAL_DIALOG_EXEC(dialog))
+    poll.start(50)
+    give_up.start(8000)
+    try:
+        QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    finally:
+        poll.stop()
+        give_up.stop()
+    _run_posted_events()
+    assert errors == [] and seen == [1], (errors, seen)
+    assert _PROBLEM not in tab.report.toPlainText(), tab.report.toPlainText()
+    assert files() == before_files
+    after = doc.to_dict()
+    if button == "Cancel":
+        assert after == before
+    else:
+        assert doc.get("RB_Ymin") == [130, 141, 150]
+        assert {k: v for k, v in after.items() if k != "RB_Ymin"} == {k: v for k, v in before.items() if k != "RB_Ymin"}
+    QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+    QtWidgets.QApplication.processEvents()
+    assert not [w for w in QtWidgets.QApplication.topLevelWidgets()
+                if type(w).__name__ == "ROISelectionDialog" and not sip.isdeleted(w)]
+    tab.close()
+
+
+def test_the_dialog_is_released_not_destroyed(monkeypatch, events):
+    """E7 (B12, L1): after the slot the dialog is released with deleteLater(): gone from the top-level widgets once
+    deferred deletes run. Neither module calls destroy()."""
+    import inspect
+
+    from launcher.apps import roi_dialog, settings_editor
+
+    tab = SettingsEditorTab(document=_three_peaks())
+    tab.angle_table.setCurrentCell(0, 0)
+    monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}", None))
+    _replace_exec(monkeypatch, lambda _dialog: QtWidgets.QDialog.Rejected)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+    QtWidgets.QApplication.processEvents()
+    assert not [w for w in QtWidgets.QApplication.topLevelWidgets()
+                if type(w).__name__ == "ROISelectionDialog" and not sip.isdeleted(w)]
+    for module in (roi_dialog, settings_editor):
+        assert ".destroy(" not in inspect.getsource(module), module.__name__
+    tab.close()
+
+
+def test_an_x_range_change_updates_the_scalar_and_its_editor(monkeypatch, events):
+    """E8 (B9): data_x_range is shared by every angle. The dialog labels it "all angles" (I-50, B-4). A change in the
+    dialog sets the scalar (never a per-row copy), its editor shows it, and "Changed from the seed" lists it."""
+    doc = _three_peaks()
+    tab = SettingsEditorTab(document=doc)
+    tab.angle_table.setCurrentCell(2, 0)
+    monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}", None))
+
+    labels = []
+
+    def new_x_range(dialog):
+        labels.extend(label.text() for label in dialog.findChildren(QtWidgets.QLabel) if "data_x_range" in label.text())
+        dialog.x_spins[0].setValue(60)
+        dialog.x_spins[1].setValue(190)
+        return QtWidgets.QDialog.Accepted
+
+    _replace_exec(monkeypatch, new_x_range)
+    QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
+    assert len(labels) == 1 and "all angles" in labels[0], labels
+    assert doc.get("data_x_range") == [60, 190]
+    assert "60" in tab.editors["data_x_range"].text() and "190" in tab.editors["data_x_range"].text()
+    assert any(line.startswith("  - data_x_range:") for line in _report_lines(tab))
+    tab.close()
+
+
+# --------------------------------------------------------------------------
+# editor-ipts-inference (plan @ triage 2650210) — V1-V6. Every lookup goes to a fabricated tree (_facility) or to
+# the empty folder _no_facility_lookup gives each test: never /SNS.
+# --------------------------------------------------------------------------
+
+
+def _facility(tmp_path, monkeypatch, layout, folders=()):
+    """A fabricated facility tree under tmp_path/SNS: ``{IPTS: [runs]}`` as <IPTS>/nexus/REF_L_<run>.nxs.h5, plus
+    `folders` (relative paths) made empty. The IPTS lookup is pointed at it."""
+    from lr_reduction import settings_document
+
+    root = tmp_path / "SNS"
+    for ipts, runs in layout.items():
+        folder = root / ipts / "nexus"
+        folder.mkdir(parents=True, exist_ok=True)
+        for run in runs:
+            (folder / f"REF_L_{run}.nxs.h5").touch()
+    for relative in folders:
+        (root / relative).mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(settings_document, "IPTS_LOOKUP_ROOT", str(root), raising=False)
+    return root
+
+
+def _sections(tab):
+    """The panel's text split into its Problems, Notes and Changed sections (each "" when absent)."""
+    text = tab.report.toPlainText()
+    head, _, changed = text.partition("Changed from the seed:")
+    problems, _, notes = head.partition("Notes:")
+    return problems, notes, changed
+
+
+_I4 = "IPTS (experiment_id) is empty and 3 run numbers are set"
+
+
+def test_the_from_scratch_file_takes_the_ipts_its_runs_resolve_under(tmp_path, monkeypatch):
+    """V1 (2a): the human's from-scratch file (experiment_id "", runs 229197-229199), with the runs under IPTS-36119
+    in a fabricated tree. The header shows IPTS-36119 and both derived folders. "Changed from the seed" shows the
+    IPTS, which the file does not hold until it is saved, and a Save writes it."""
+    _facility(tmp_path, monkeypatch, {"IPTS-36119": [229197, 229198, 229199]})
+    tab = _shown_tab(SettingsEditorTab())
+    _load(tab, _FROM_SCRATCH, monkeypatch)
+    assert tab.editors["experiment_id"].text() == "IPTS-36119"
+    for name in _PATH_FIELDS:
+        assert tab.editors[name].text() == ""
+        assert tab.editors[name].placeholderText() == f"/SNS/REF_L/IPTS-36119/{_PATH_TAIL[name]}"
+    problems, _notes, changed = _sections(tab)
+    assert '  - experiment_id: "" -> "IPTS-36119"' in changed.splitlines()
+    assert problems.startswith("No problems found.")
+    target = tmp_path / "saved.json"
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), "")))
+    tab.save_settings()
+    assert json.loads(target.read_text())["experiment_id"] == "IPTS-36119"
+    tab.close()
+
+
+def test_a_load_without_runs_keeps_the_fields_ipts_or_takes_the_files_folder(tmp_path, monkeypatch):
+    """V2 (2b, 2c): the header held IPTS-1 and the file names neither an IPTS nor runs: IPTS-1 is kept, and shown
+    as a change. With the header empty, a file loaded from under <root>/IPTS-7/ takes IPTS-7."""
+    root = _facility(tmp_path, monkeypatch, {})
+    tab = SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "IPTS-1"}))
+    _load(tab, _settings_file(tmp_path / "home", {"Sname": "x"}), monkeypatch)
+    assert tab.document.get("experiment_id") == "IPTS-1" and tab.editors["experiment_id"].text() == "IPTS-1"
+    assert '  - experiment_id: "" -> "IPTS-1"' in _sections(tab)[2].splitlines()
+    tab.close()
+    tab = SettingsEditorTab()
+    _load(tab, _settings_file(root / "IPTS-7" / "shared", {"Sname": "y"}), monkeypatch)
+    assert tab.document.get("experiment_id") == "IPTS-7" and tab.editors["experiment_id"].text() == "IPTS-7"
+    tab.close()
+
+
+def test_a_load_takes_the_runs_ipts_over_the_one_the_header_held(tmp_path, monkeypatch):
+    """V2 (v2, B-1: the collision, through load_settings). A previous file left IPTS-1 in the header; the human's
+    from-scratch file names runs under IPTS-36119: the header shows IPTS-36119, as a change, with no problem."""
+    _facility(tmp_path, monkeypatch, {"IPTS-36119": [229197, 229198, 229199], "IPTS-1": []})
+    tab = SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "IPTS-1"}))
+    _load(tab, _FROM_SCRATCH, monkeypatch)
+    assert tab.document.get("experiment_id") == "IPTS-36119" and tab.editors["experiment_id"].text() == "IPTS-36119"
+    problems, _notes, changed = _sections(tab)
+    assert '  - experiment_id: "" -> "IPTS-36119"' in changed.splitlines()
+    assert problems.startswith("No problems found.")
+    tab.close()
+
+
+def test_an_injected_document_is_not_resolved(tmp_path, monkeypatch):
+    """V2 (v2, design A3): resolution runs at load_settings only. A document given to the tab, or adopted again,
+    is shown as it holds: no facility lookup at construction, and nothing inferred over a cleared field (I6)."""
+    from lr_reduction import settings_document
+
+    _facility(tmp_path, monkeypatch, {"IPTS-36119": [229197]})
+    calls = []
+    real = settings_document.lookup_runs
+    monkeypatch.setattr(settings_document, "lookup_runs", lambda *a, **k: calls.append(a) or real(*a, **k))
+    tab = SettingsEditorTab(SettingsDocument.from_dict({"RBnum": [229197]}))
+    tab.set_document(tab.document)
+    assert calls == [] and tab.document.get("experiment_id") == ""
+    tab.close()
+
+
+def test_an_empty_ipts_with_runs_is_a_problem_until_one_is_typed(monkeypatch):
+    """V3 (I4): the from-scratch file, its runs under no IPTS (this module's empty lookup folder). The panel's
+    Problems name the empty IPTS, and a note says the runs resolved nowhere. Typing an IPTS clears the problem,
+    and clearing the field brings it back."""
+    tab = _shown_tab(SettingsEditorTab())
+    _load(tab, _FROM_SCRATCH, monkeypatch)
+    problems, notes, _changed = _sections(tab)
+    assert any(line.startswith(f"  - {_I4}") for line in problems.splitlines()), problems
+    assert any("holds the run numbers 229197, 229198, 229199" in line for line in notes.splitlines()), notes
+    _type_into(tab.editors["experiment_id"], "36119")
+    assert _I4 not in tab.report.toPlainText()
+    _type_into(tab.editors["experiment_id"], "")
+    assert tab.document.get("experiment_id") == ""
+    assert any(line.startswith(f"  - {_I4}") for line in _sections(tab)[0].splitlines())
+    tab.close()
+
+
+def test_typing_an_ipts_runs_no_lookup_and_stands(tmp_path, monkeypatch):
+    """V4 (I6): the Load inferred IPTS-36119. A typed IPTS is the user's: no lookup runs on it, and it stands
+    through later refreshes."""
+    from lr_reduction import settings_document
+
+    _facility(tmp_path, monkeypatch, {"IPTS-36119": [229197, 229198, 229199]})
+    tab = _shown_tab(SettingsEditorTab())
+    _load(tab, _FROM_SCRATCH, monkeypatch)
+    assert tab.document.get("experiment_id") == "IPTS-36119"
+    calls = []
+    monkeypatch.setattr(settings_document, "_run_ipts", lambda *a, **_k: calls.append(a) or (), raising=False)
+    monkeypatch.setattr(settings_document, "lookup_runs", lambda *a, **_k: calls.append(a), raising=False)
+    _type_into(tab.editors["experiment_id"], "9")
+    tab.refresh_scalars()
+    tab.refresh_report()
+    assert calls == []
+    assert tab.document.get("experiment_id") == "IPTS-9" and tab.editors["experiment_id"].text() == "IPTS-9"
+    tab.close()
+
+
+def _capture_dialog(monkeypatch, method, answer=""):
+    """Stand in for QFileDialog.<method> as the static call behaves: build a QFileDialog with the folder and
+    options it is given and show it. Record the folder, the options and the sidebar the shown dialog has, then
+    answer `answer`."""
+    seen = {}
+
+    def fake(parent=None, caption="", directory="", filters="", selected="", options=None):
+        dialog = QtWidgets.QFileDialog(parent, caption, directory, filters)
+        if options is not None:
+            dialog.setOptions(options)
+        dialog.show()
+        _settle()
+        seen.update(directory=directory, options=options,
+                    sidebar=[url.toLocalFile() for url in dialog.sidebarUrls()])
+        dialog.close()
+        _settle()
+        sip.delete(dialog)  # as in the static call: destroyed before it returns, and Qt saves its state then
+        return answer, ""
+
+    monkeypatch.setattr(QtWidgets.QFileDialog, method, staticmethod(fake))
+    return seen
+
+
+_SIDEBAR = ("IPTS-36119/shared", "IPTS-36119/shared/reduced", "IPTS-36119/shared/autoreduce")
+
+
+def _saved_sidebar():
+    """The sidebar Qt saved for every later file dialog of this user: QtProject.conf's FileDialog/shortcuts
+    (redirected per test by isolated_qapp)."""
+    value = QtCore.QSettings(QtCore.QSettings.UserScope, "QtProject").value("FileDialog/shortcuts") or []
+    return [value] if isinstance(value, str) else list(value)
+
+
+@pytest.mark.parametrize("method, slot", [("getOpenFileName", "load_settings"), ("getSaveFileName", "save_settings")])
+def test_the_file_dialogs_open_where_the_ipts_keeps_its_settings(tmp_path, monkeypatch, method, slot):
+    """V5 (I5, A5): with IPTS-36119 in the header and a remembered folder elsewhere, Load and Save open in
+    <root>/IPTS-36119/shared. The sidebar offers the IPTS's three settings folders, set on Qt's own dialog
+    (DontUseNativeDialog: a native dialog builds no sidebar). A remembered folder under the IPTS wins; with no
+    IPTS, the remembered folder, as before."""
+    root = _facility(tmp_path, monkeypatch, {}, folders=_SIDEBAR)
+    default = QtWidgets.QFileDialog(None, "", "", "")
+    default.setOptions(QtWidgets.QFileDialog.DontUseNativeDialog)
+    qt_sidebar = [url.toLocalFile() for url in default.sidebarUrls()]
+    sip.delete(default)
+    tab = SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "IPTS-36119"}))
+    tab.settings.setValue("settings_editor_dir", "/home/u")
+    seen = _capture_dialog(monkeypatch, method)
+    getattr(tab, slot)()
+    assert seen["directory"] == str(root / "IPTS-36119" / "shared")
+    assert seen["sidebar"] == [str(root / relative) for relative in _SIDEBAR]
+    assert seen["options"] is not None and seen["options"] & QtWidgets.QFileDialog.DontUseNativeDialog
+    remembered = str(root / "IPTS-36119" / "shared" / "reduced")
+    tab.settings.setValue("settings_editor_dir", remembered)
+    getattr(tab, slot)()
+    assert seen["directory"] == remembered
+    tab.close()
+    tab = SettingsEditorTab()
+    tab.settings.setValue("settings_editor_dir", "/home/u")
+    getattr(tab, slot)()
+    assert seen["directory"] == "/home/u"
+    assert seen["sidebar"] == qt_sidebar and qt_sidebar, "no IPTS: Qt's own sidebar, untouched (frame row F33)"
+    tab.close()
+
+
+@pytest.mark.parametrize("method, slot", [("getOpenFileName", "load_settings"), ("getSaveFileName", "save_settings")])
+def test_the_ipts_sidebar_is_not_saved_over_the_users_own(tmp_path, monkeypatch, method, slot):
+    """I5, found while measuring the sidebar: Qt saves a file dialog's sidebar ("shortcuts") to the user's
+    QtProject.conf when the dialog is destroyed, and every later Qt 5 file dialog of the user's starts from it. The
+    IPTS's folders are this dialog's alone: the user's own sidebar is what Qt saves, before and after."""
+    _facility(tmp_path, monkeypatch, {}, folders=_SIDEBAR)
+    (tmp_path / "my" / "own").mkdir(parents=True)
+    users = QtWidgets.QFileDialog(None, "", "", "")
+    users.setSidebarUrls([QtCore.QUrl.fromLocalFile(str(tmp_path / "my" / "own"))])
+    sip.delete(users)  # the user's sidebar, saved by Qt in its own format (a list PyQt writes is a @Variant)
+    mine = [QtCore.QUrl.fromLocalFile(str(tmp_path / "my" / "own")).toString()]
+    assert _saved_sidebar() == mine
+    tab = SettingsEditorTab(SettingsDocument.from_dict({"experiment_id": "IPTS-36119"}))
+    seen = _capture_dialog(monkeypatch, method)
+    getattr(tab, slot)()
+    assert len(seen["sidebar"]) == 3
+    assert _saved_sidebar() == mine
+    tab.close()
+
+
+def test_the_sidebar_filter_acts_on_a_file_dialog_shown_and_hidden_and_nothing_else(capfd):
+    """F31, F32: the filter gives a QFileDialog the IPTS's folders when it is shown, and its own sidebar back when it
+    hides. On no other event (through the application, that mutant re-entered the filter until the process
+    aborted) and on no other widget (where it would raise, which the filter catches and prints)."""
+    from launcher.apps.settings_editor import _FileDialogSidebar
+
+    sidebar = _FileDialogSidebar(["/data/a", "/data/b"])
+    dialog = QtWidgets.QFileDialog(None, "", "", "")
+    dialog.setOptions(QtWidgets.QFileDialog.DontUseNativeDialog)
+    own = dialog.sidebarUrls()
+    assert sidebar.eventFilter(dialog, QtCore.QEvent(QtCore.QEvent.Resize)) is False
+    assert dialog.sidebarUrls() == own
+    assert sidebar.eventFilter(dialog, QtGui.QShowEvent()) is False
+    assert [url.toLocalFile() for url in dialog.sidebarUrls()] == ["/data/a", "/data/b"]
+    assert sidebar.eventFilter(dialog, QtGui.QHideEvent()) is False
+    assert dialog.sidebarUrls() == own
+    widget = QtWidgets.QWidget()
+    assert sidebar.eventFilter(widget, QtGui.QShowEvent()) is False
+    assert "Traceback" not in capfd.readouterr().err
+    sip.delete(widget)
+    sip.delete(dialog)
+
+
+def test_load_and_save_remember_the_chosen_files_folder(tmp_path, monkeypatch):
+    """V5 (v2, B-2): after a Load and after a Save, the remembered folder (settings_editor_dir) is the chosen file's
+    folder: read back, not preset. Lost, I5's "a remembered folder under the IPTS wins" could never arise."""
+    loaded = _settings_file(tmp_path / "loaded-from", {"Sname": "x"})
+    tab = SettingsEditorTab()
+    tab.settings.setValue("settings_editor_dir", "/home/u")
+    _load(tab, loaded, monkeypatch)
+    assert tab.settings.value("settings_editor_dir") == str(loaded.parent)
+    target = tmp_path / "saved-to" / "out.json"
+    target.parent.mkdir()
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: (str(target), "")))
+    tab.save_settings()
+    assert target.exists() and tab.settings.value("settings_editor_dir") == str(target.parent)
+    tab.close()
+
+
+def test_the_ipts_notes_sit_under_notes_not_problems(tmp_path, monkeypatch):
+    """V6: the file-wins note (I3) and the disagreeing-runs note (2a) are information: under "Notes:", never under
+    "Problems:"."""
+    _facility(tmp_path, monkeypatch, {"IPTS-38016": [229197], "IPTS-36119": [229198, 229199]})
+    with open(_FROM_SCRATCH) as handle:
+        scratch = json.load(handle)
+    for values, note in (({**scratch, "experiment_id": "IPTS-36119"}, '229197 resolves under "IPTS-38016"'),
+                         (scratch, '229198, 229199 resolve under "IPTS-36119"')):
+        tab = SettingsEditorTab()
+        _load(tab, _settings_file(tmp_path / "home", values), monkeypatch)
+        problems, notes, _changed = _sections(tab)
+        assert note in notes and note not in problems, (problems, notes)
+        tab.close()
