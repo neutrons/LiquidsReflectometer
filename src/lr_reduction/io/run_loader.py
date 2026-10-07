@@ -64,7 +64,9 @@ class RunLoader(RunLoaderInterface):
         # TODO: we will probably revisit this unique naming scheme.
         name = f"{path.name.split('.', 1)[0]}__{token_hex(4)}"
         error_events_name = f"{name}_errors"
-        LoadEventNexus(Filename=str(path), OutputWorkspace=name)
+        # NumberOfBins=1: the default (500) gives every spectrum 501 shared X edges, which the
+        # first algorithm to touch X (ScaleX, ConvertUnits) un-shares.
+        LoadEventNexus(Filename=str(path), OutputWorkspace=name, NumberOfBins=1)
         try:
             LoadErrorEventsNexus(Filename=str(path), OutputWorkspace=error_events_name)
         except RuntimeError as error:

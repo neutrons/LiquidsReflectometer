@@ -150,6 +150,7 @@ def test_load_single_workspace_loads_events_and_rejected_events(nexus_dir):
         assert _ads_names() - before == {name, error_events_name}
         assert mtd[name].getNumberEvents() > 0
         assert mtd[error_events_name].getNumberEvents() > 0
+        assert mtd[name].blocksize() == 1
     finally:
         DeleteWorkspace(name)
         DeleteWorkspace(error_events_name)
