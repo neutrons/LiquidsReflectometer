@@ -1,6 +1,7 @@
 import os
 
 import mantid.simpleapi as mtd_api
+import pytest
 
 from lr_reduction import template
 from lr_reduction.dead_time_correction import SingleReadoutDeadTimeCorrection
@@ -10,6 +11,7 @@ mtd_api.config["default.facility"] = "SNS"
 mtd_api.config["default.instrument"] = "REF_L"
 
 
+@pytest.mark.datarepo
 def test_deadtime(nexus_dir):
     """
     Test the time-resolved reduction that uses a measured reference.
@@ -30,6 +32,7 @@ def test_deadtime(nexus_dir):
         assert c < 1.001
 
 
+@pytest.mark.datarepo
 def test_deadtime_paralyzable(nexus_dir):
     """
     Test the time-resolved reduction that uses a measured reference.
@@ -51,6 +54,7 @@ def test_deadtime_paralyzable(nexus_dir):
         assert c < 1.001
 
 
+@pytest.mark.datarepo
 def test_deadtime_threshold(nexus_dir):
     """
     Test using the threshold. Here the threshold is set to 0,
@@ -80,6 +84,7 @@ def test_deadtime_threshold(nexus_dir):
         assert c <= 1.0003
 
 
+@pytest.mark.datarepo
 def test_full_reduction(nexus_dir, template_dir):
     """
     Test dead time from the reduction workflow

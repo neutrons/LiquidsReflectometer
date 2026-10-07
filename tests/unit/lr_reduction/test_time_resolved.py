@@ -3,12 +3,14 @@ import os
 
 # third-party imports
 import numpy as np
+import pytest
 
 # lr_reduction imports
 from lr_reduction import time_resolved
 from lr_reduction.utils import amend_config
 
 
+@pytest.mark.datarepo
 def test_reduce_workflow(nexus_dir):
     """
     Test the time-resolved reduction that uses a measured reference.
@@ -47,6 +49,7 @@ def test_reduce_workflow(nexus_dir):
     time_resolved.plot_slices(reduced, "Test", 300, os.path.join(output_dir, "reduced.png"), show=False)
 
 
+@pytest.mark.datarepo
 def test_reduce_template_workflow(nexus_dir):
     """
     Test the time-resolved reduction that uses a template.

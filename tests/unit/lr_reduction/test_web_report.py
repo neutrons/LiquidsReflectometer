@@ -69,28 +69,33 @@ def meta_data(workspace_sc, workspace_db, template_data):
     return meta_data
 
 
+@pytest.mark.datarepo
 def test_generate_report_section_reduction_parameters(workspace_sc, template_data, meta_data):
     report = generate_report_section_reduction_parameters(workspace_sc, template_data, meta_data)
     assert len(report) == 942
 
 
+@pytest.mark.datarepo
 def test_generate_report_plots_reflected_beam(workspace_sc, template_data):
     html_plots = generate_report_plots(workspace_sc, template_data, DataType.REFLECTED_BEAM)
     assert len(html_plots) == 5
     assert None not in html_plots
 
 
+@pytest.mark.datarepo
 def test_generate_report_plots_direct_beam(workspace_db, template_data):
     html_plots = generate_report_plots(workspace_db, template_data, DataType.DIRECT_BEAM)
     assert len(html_plots) == 5
     assert None not in html_plots
 
 
+@pytest.mark.datarepo
 def test_generate_report_section_run_meta_data(workspace_sc):
     html_meta_data = generate_report_section_run_meta_data(workspace_sc)
     assert len(html_meta_data) == 132
 
 
+@pytest.mark.datarepo
 def test_generate_report_sections(workspace_sc, template_data, meta_data):
     report_sections = generate_report_sections(workspace_sc, template_data, meta_data)
     assert report_sections.run_meta_data is not None
@@ -98,6 +103,7 @@ def test_generate_report_sections(workspace_sc, template_data, meta_data):
     assert report_sections.plots is not None
 
 
+@pytest.mark.datarepo
 def test_generate_report_section_direct_beam(workspace_db, template_data):
     report_sections = generate_report_sections(workspace_db, template_data)
     assert report_sections.run_meta_data is not None
@@ -105,6 +111,7 @@ def test_generate_report_section_direct_beam(workspace_db, template_data):
     assert report_sections.plots is not None
 
 
+@pytest.mark.datarepo
 def test_assemble_report(workspace_sc, template_data, meta_data):
     report_sections = generate_report_sections(workspace_sc, template_data, meta_data)
     report = assemble_report(None, report_sections)
