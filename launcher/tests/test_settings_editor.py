@@ -13,6 +13,7 @@ fires that signal for the gesture the user actually makes, which is the
 campaign's signature defect class (S2-v2's double-toggle).
 """
 
+import copy
 import json
 import os
 
@@ -2945,9 +2946,16 @@ def _run_posted_events():
     QTest.qWait(0)
 
 
+def _document_state(doc):
+    """The document's values, deep-copied. to_dict() hands back the document's own lists, so a snapshot taken with it
+    changes with an in-place write and could never show one (I-56, A-1)."""
+    return copy.deepcopy(doc.to_dict())
+
+
 def _nexus_builder():
-    """The data layer's own NeXus test builder (_write_nexus in tests/unit/lr_reduction/test_roi_estimate.py), loaded by
-    path: launcher/tests is not a package beside it, and a second builder would be a second definition of the file."""
+    """The data layer's own NeXus test builder (_write_nexus in tests/unit/lr_reduction/test_roi_estimate.py): one
+    builder, one definition of the file. Its module is found from this file's path, not from sys.path, and is loaded
+    under a name of its own (I-56, A-4)."""
     import importlib.util
     from pathlib import Path
 
@@ -3077,7 +3085,7 @@ def test_a_row_removed_before_ok_is_reported_and_nothing_is_written(monkeypatch,
 
     def remove_then_accept(dialog):
         doc.remove_angle(2)
-        gone.update(doc.to_dict())  # the document as it stands once the row has gone
+        gone.update(_document_state(doc))  # the document as it stands once the row has gone
         dialog.peak_spins[0].setValue(151)
         return QtWidgets.QDialog.Accepted
 
@@ -3093,7 +3101,7 @@ def test_select_roi_cancel_leaves_the_document_untouched(monkeypatch, events):
     doc = _three_peaks()
     tab = SettingsEditorTab(document=doc)
     tab.angle_table.setCurrentCell(1, 0)
-    before = doc.to_dict()
+    before = _document_state(doc)
     monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}", None))
 
     def edit_then_cancel(dialog):
@@ -3150,7 +3158,7 @@ def test_select_roi_writes_no_file(monkeypatch, events, tmp_path, ending):
     def keys():
         return {key: tab.settings.value(key) for key in tab.settings.allKeys()}
 
-    before_doc, before_files, before_keys = doc.to_dict(), files(), keys()
+    before_doc, before_files, before_keys = _document_state(doc), files(), keys()
     QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
     _run_posted_events()
     tab.settings.sync()
@@ -3220,7 +3228,7 @@ def test_the_run_file_comes_from_the_row_or_is_asked_for(monkeypatch, events, tm
     tab = SettingsEditorTab(document=doc)
     tab.settings.setValue("roi_nexus_dir", str(remembered))
     tab.angle_table.setCurrentCell(1, 0)
-    report, before = tab.report.toPlainText(), doc.to_dict()
+    report, before = tab.report.toPlainText(), _document_state(doc)
     QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
     assert doc.to_dict() == before  # the lookup writes nothing into the document, RBnum included (I-50, B-1)
     at_most = {"max_events": settings_editor.MAX_ROI_EVENTS}
@@ -3244,7 +3252,10 @@ def test_the_run_is_titled_from_its_metadata_and_filtered_at_its_chopper_band(mo
     The metadata leg reads a real run with a chopper log, written by the data layer's own builder (_write_nexus), through
     the real read_nexus_metadata, chopper_lambda_range and lambda_to_tof. The filter must open on the band the data layer
     composes from that run's file and start time: stand-ins that ignored their arguments let a swapped call pass (I-54,
-    B-1). An unreadable metadata block and a missing chopper log are states, not failures."""
+    B-1). The run starts in the 15.282 m geometry epoch (2024-08-26 to 2025-01-01), so its start time changes the
+    band, and the band's fractions tell the spins' floor (low) and ceil (high) from round: a run in an epoch with
+    today's distance let a literal date pass for its start time (I-56, B-1). An unreadable metadata block and a missing
+    chopper log are states, not failures."""
     import math
 
     from launcher.apps import settings_editor
@@ -3261,9 +3272,15 @@ def test_the_run_is_titled_from_its_metadata_and_filtered_at_its_chopper_band(mo
         raise KeyError("no chopper log")
 
     if leg == "from its metadata":
-        _nexus_builder()(path, title="Si Ir Air", run_number=221473, chopper_lam=4.6)
+        _nexus_builder()(path, title="Si Ir Air", run_number=221473, chopper_lam=4.6,
+                         start_time="2024-10-01T12:00:00-04:00")
         start = settings_editor.roi_estimate.read_nexus_metadata(path)["start_time"]
-        band = settings_editor.roi_estimate.lambda_to_tof(settings_editor.roi_estimate.chopper_lambda_range(path), start)
+        lam_range = settings_editor.roi_estimate.chopper_lambda_range(path)
+        band = settings_editor.roi_estimate.lambda_to_tof(lam_range, start)
+        # Where the run sits is part of the test (L14): another epoch's date gives another band, and the band's
+        # fractions round otherwise than floor and ceil. If either guard fails, the run no longer tells them apart.
+        assert band != settings_editor.roi_estimate.lambda_to_tof(lam_range, "2026-10-07"), band
+        assert [math.floor(band[0]), math.ceil(band[1])] != [round(band[0]), round(band[1])], band
     else:
         path.write_bytes(b"")
         monkeypatch.setattr(settings_editor.roi_estimate, "load_event_pixels", lambda _path, **_k: events)
@@ -3316,7 +3333,7 @@ def test_the_real_modal_dialog_writes_as_its_buttons_are_pressed(monkeypatch, ev
     tab = SettingsEditorTab(document=doc)
     tab.angle_table.setCurrentCell(1, 0)
     monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}", None))
-    before = doc.to_dict()
+    before = _document_state(doc)
     seen, errors = [], []
 
     def up():
