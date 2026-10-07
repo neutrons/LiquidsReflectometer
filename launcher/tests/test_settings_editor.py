@@ -2929,6 +2929,35 @@ def _replace_exec(monkeypatch, gesture):
     monkeypatch.setattr(settings_editor.ROISelectionDialog, "exec_", gesture)
 
 
+#: What the panel says when a slot fails (report_problem); absent after a Select ROI that went right.
+_PROBLEM = "Could not complete"
+
+
+def _files_under(root, skip=None):
+    """Every file under `root` but `skip`, by size, mtime and content, so that an added, removed, truncated or
+    rewritten file shows (E4″, E9′)."""
+    return {path: (path.stat().st_size, path.stat().st_mtime_ns, path.read_bytes())
+            for path in root.rglob("*") if path.is_file() and str(path) != skip}
+
+
+def _run_posted_events():
+    """Let what the slot posted to the event loop run before the disk is read: a deferred save (I-50, A-i)."""
+    QTest.qWait(0)
+
+
+def _nexus_builder():
+    """The data layer's own NeXus test builder (_write_nexus in tests/unit/lr_reduction/test_roi_estimate.py), loaded by
+    path: launcher/tests is not a package beside it, and a second builder would be a second definition of the file."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "tests" / "unit" / "lr_reduction" / "test_roi_estimate.py"
+    spec = importlib.util.spec_from_file_location("roi_estimate_tests_for_the_builder", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module._write_nexus
+
+
 def test_select_roi_is_enabled_only_with_a_row_selected():
     """E1 (B1): "Select ROI" sits after "Remove angle" and is enabled exactly while the Angles table has a current
     row."""
@@ -3037,22 +3066,25 @@ def test_the_dialog_opens_with_the_rows_own_values(monkeypatch, events):
 
 
 def test_a_row_removed_before_ok_is_reported_and_nothing_is_written(monkeypatch, events):
-    """Failure matrix (pathological): the row is gone when OK returns. The panel says so, nothing is written, and no
-    row comes back by padding."""
+    """Failure matrix (pathological): the row is gone when OK returns. The panel says so, and the document is exactly as
+    it stood once the row had gone: nothing is written, and no row comes back by padding."""
     doc = _three_peaks()
     tab = SettingsEditorTab(document=doc)
     tab.angle_table.setCurrentCell(2, 0)
     monkeypatch.setattr(tab, "_events_for_row", lambda row: (events, f"row {row}", None))
 
+    gone = {}
+
     def remove_then_accept(dialog):
         doc.remove_angle(2)
+        gone.update(doc.to_dict())  # the document as it stands once the row has gone
         dialog.peak_spins[0].setValue(151)
         return QtWidgets.QDialog.Accepted
 
     _replace_exec(monkeypatch, remove_then_accept)
     QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
     assert "angle 3 no longer exists" in tab.report.toPlainText()
-    assert doc.n_angles == 2 and doc.get("RB_Ymin") == [130, 140]
+    assert doc.to_dict() == gone  # the one check that guards every write (I-54, A-3)
     tab.close()
 
 
@@ -3077,8 +3109,9 @@ def test_select_roi_cancel_leaves_the_document_untouched(monkeypatch, events):
 
 @pytest.mark.parametrize("ending", ["cancelled", "accepted"])
 def test_select_roi_writes_no_file(monkeypatch, events, tmp_path, ending):
-    """E4″ (B2; #197's F2, a truncating write to the live autoreduce file): every file the slot can write. The file
-    dialog returns a run in tmp_path/nexus; the dialog is cancelled, or accepted with a new peak edge. In both cases:
+    """E4″ (B2; #197's F2, a truncating write to the live autoreduce file): what the slot writes under tmp_path, which
+    holds the working directory and the run's folder. The file dialog returns a run in tmp_path/nexus; the dialog is
+    cancelled, or accepted with a new peak edge. In both cases:
     - SettingsDocument.save is not called. Its stand-in records calls rather than raising: a raise inside the @guarded
       slot becomes a panel message and the test would pass (I-48, B-1);
     - the panel reports no problem;
@@ -3112,17 +3145,16 @@ def test_select_roi_writes_no_file(monkeypatch, events, tmp_path, ending):
     settings_file = tab.settings.fileName()
 
     def files():
-        return {path: (path.stat().st_size, path.stat().st_mtime_ns, path.read_bytes())
-                for path in tmp_path.rglob("*") if path.is_file() and str(path) != settings_file}
+        return _files_under(tmp_path, settings_file)
 
     def keys():
         return {key: tab.settings.value(key) for key in tab.settings.allKeys()}
 
     before_doc, before_files, before_keys = doc.to_dict(), files(), keys()
     QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
-    QTest.qWait(20)  # a save posted to the event loop runs before the asserts (A-i)
+    _run_posted_events()
     tab.settings.sync()
-    assert saved == [] and "Could not complete" not in tab.report.toPlainText(), (saved, tab.report.toPlainText())
+    assert saved == [] and _PROBLEM not in tab.report.toPlainText(), (saved, tab.report.toPlainText())
     after_doc = doc.to_dict()
     if ending == "accepted":
         assert doc.get("RB_Ymin") == [131, 140, 150]
@@ -3209,14 +3241,18 @@ def test_the_run_file_comes_from_the_row_or_is_asked_for(monkeypatch, events, tm
 def test_the_run_is_titled_from_its_metadata_and_filtered_at_its_chopper_band(monkeypatch, events, tmp_path, leg):
     """E10 (B2, B8): the dialog's title is the run's own (its title and run number from the metadata, else the file's
     name), and the view filter starts at the run's chopper band when it has a chopper log, else at the whole span.
-    An unreadable metadata block and a missing chopper log are states, not failures."""
+    The metadata leg reads a real run with a chopper log, written by the data layer's own builder (_write_nexus), through
+    the real read_nexus_metadata, chopper_lambda_range and lambda_to_tof. The filter must open on the band the data layer
+    composes from that run's file and start time: stand-ins that ignored their arguments let a swapped call pass (I-54,
+    B-1). An unreadable metadata block and a missing chopper log are states, not failures."""
+    import math
+
     from launcher.apps import settings_editor
 
     nexus = tmp_path / "nexus"
     nexus.mkdir()
-    (nexus / "REF_L_221473.nxs.h5").write_bytes(b"")
+    path = nexus / "REF_L_221473.nxs.h5"
     doc = _three_peaks(_NEXUSpathRB_override=str(nexus), RBnum=[221472, 221473, 221474])
-    monkeypatch.setattr(settings_editor.roi_estimate, "load_event_pixels", lambda _path, **_k: events)
 
     def unreadable(path):
         raise OSError(f"unable to open {path}")
@@ -3225,11 +3261,12 @@ def test_the_run_is_titled_from_its_metadata_and_filtered_at_its_chopper_band(mo
         raise KeyError("no chopper log")
 
     if leg == "from its metadata":
-        monkeypatch.setattr(settings_editor.roi_estimate, "read_nexus_metadata",
-                            lambda _path: {"title": "Si Ir Air", "run_number": 221473, "start_time": "2025-03-01"})
-        monkeypatch.setattr(settings_editor.roi_estimate, "chopper_lambda_range", lambda _path: (2.5, 9.5))
-        monkeypatch.setattr(settings_editor.roi_estimate, "lambda_to_tof", lambda _band, _start: (12000.4, 31000.6))
+        _nexus_builder()(path, title="Si Ir Air", run_number=221473, chopper_lam=4.6)
+        start = settings_editor.roi_estimate.read_nexus_metadata(path)["start_time"]
+        band = settings_editor.roi_estimate.lambda_to_tof(settings_editor.roi_estimate.chopper_lambda_range(path), start)
     else:
+        path.write_bytes(b"")
+        monkeypatch.setattr(settings_editor.roi_estimate, "load_event_pixels", lambda _path, **_k: events)
         monkeypatch.setattr(settings_editor.roi_estimate, "read_nexus_metadata", unreadable)
         monkeypatch.setattr(settings_editor.roi_estimate, "chopper_lambda_range", no_chopper)
     seen = {}
@@ -3245,7 +3282,10 @@ def test_the_run_is_titled_from_its_metadata_and_filtered_at_its_chopper_band(mo
     tab.angle_table.setCurrentCell(1, 0)
     QTest.mouseClick(tab.select_roi_button, QtCore.Qt.LeftButton)
     if leg == "from its metadata":
-        assert seen["title"].startswith("Si Ir Air (run 221473)") and seen["tof"] == [12000, 31001]
+        expected = [math.floor(band[0]), math.ceil(band[1])]
+        low, high = seen["span"]
+        assert low < expected[0] and expected[1] < high, (expected, seen["span"])  # inside: the full span would show
+        assert seen["title"].startswith("Si Ir Air (run 221473)") and seen["tof"] == expected, (seen, expected)
     else:
         assert seen["title"].startswith("REF_L_221473.nxs.h5") and seen["tof"] == seen["span"]
     tab.close()
@@ -3309,8 +3349,7 @@ def test_the_real_modal_dialog_writes_as_its_buttons_are_pressed(monkeypatch, ev
     settings_file = tab.settings.fileName()
 
     def files():
-        return {path: (path.stat().st_size, path.stat().st_mtime_ns, path.read_bytes())
-                for path in tmp_path.rglob("*") if path.is_file() and str(path) != settings_file}
+        return _files_under(tmp_path, settings_file)
 
     before_files = files()
     # The real modal, no_qmessagebox's stand-in off. Through a function, which binds to the instance: the built-in put
@@ -3323,9 +3362,9 @@ def test_the_real_modal_dialog_writes_as_its_buttons_are_pressed(monkeypatch, ev
     finally:
         poll.stop()
         give_up.stop()
-    QTest.qWait(20)  # a save posted to the event loop runs before the asserts (A-i)
+    _run_posted_events()
     assert errors == [] and seen == [1], (errors, seen)
-    assert "Could not complete" not in tab.report.toPlainText(), tab.report.toPlainText()
+    assert _PROBLEM not in tab.report.toPlainText(), tab.report.toPlainText()
     assert files() == before_files
     after = doc.to_dict()
     if button == "Cancel":

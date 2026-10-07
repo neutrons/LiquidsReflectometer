@@ -260,6 +260,7 @@ def test_dragging_on_the_x_and_tof_profiles_sets_the_range_and_the_filter():
     dialog = shown(make_dialog(events))
     drag(dialog, dialog.x_axis, 70, 180)
     assert [spin.value() for spin in dialog.x_spins] == [70, 180]
+    assert all(isinstance(axes.images[0].norm, LogNorm) for axes in (dialog.xy_axis, dialog.ytof_axis))  # I-54 A-1
     for axis, vertical in ON["x_range"]:
         assert span_edges(dialog.overlays["x_range"][axis], vertical) == (70, 180), axis
     assert dialog.changes() == {"data_x_range": [70, 180]}
@@ -274,6 +275,7 @@ def test_dragging_on_the_x_and_tof_profiles_sets_the_range_and_the_filter():
     assert dialog.changes() == {"data_x_range": [70, 180]}
     dialog.canvas.draw()
     assert [axes.get_aspect() for axes in (dialog.xy_axis, dialog.ytof_axis)] == ["auto", "auto"]  # A-ii: after a drag too
+    assert all(isinstance(axes.images[0].norm, LogNorm) for axes in (dialog.xy_axis, dialog.ytof_axis))  # I-54 A-1
     close(dialog)
 
 
