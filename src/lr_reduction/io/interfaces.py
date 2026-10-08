@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.run_data import RunData
+from lr_reduction.types import ID
 
 
 class Loader(ABC):
@@ -14,17 +16,17 @@ class RunLoaderInterface(Loader):
     """
     Abstract loader for a single experimental run.
 
-    Accepts a run number and returns a RunData instance containing
-    neutron event data. Concrete implementations are responsible for
-    locating and reading data.
+    Accepts a run number or a NeXus file path and returns a RunData instance containing
+    neutron event data. Concrete implementations are responsible for locating and reading
+    data.
     """
 
     @abstractmethod
-    def load(self, run_number: int) -> RunData:
+    def load(self, run_number: ID) -> RunData:
         """Load raw event data for *run_number* and return it as RunData."""
 
     @abstractmethod
-    def load_from_path(self, nexus_file_path: str) -> RunData:
+    def load_from_path(self, nexus_file_path: str | Path) -> RunData:
         """Load raw event data directly from a NeXus file path and return it as RunData."""
 
 

@@ -21,6 +21,10 @@ from lr_reduction.exceptions.run_data import (
     IncompleteRunDataError,
     RunDataError,
 )
+from lr_reduction.exceptions.run_loader import (
+    LoaderError,
+    RunNotFoundError,
+)
 from lr_reduction.exceptions.sample_logs import (
     AmbiguousLogError,
     LogNotFoundError,
@@ -42,6 +46,7 @@ __all__ = [
     "ConfigValidationError",
     "IncompleteDataError",
     "IncompleteRunDataError",
+    "LoaderError",
     "LogNotFoundError",
     "LogTypeError",
     "LogUnitError",
@@ -52,6 +57,7 @@ __all__ = [
     "ParseError",
     "ResultError",
     "RunDataError",
+    "RunNotFoundError",
     "SampleLogsError",
     "UnsupportedFormatError",
     "WorkspaceError",
