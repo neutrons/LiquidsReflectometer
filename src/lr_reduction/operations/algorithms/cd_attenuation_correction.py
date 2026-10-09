@@ -22,7 +22,10 @@ class CdAttenuationCorrection(PythonAlgorithm):
         return 1
 
     def summary(self):
-        return "Attenuation correction for Cadmium foils along the beam path"
+        return (
+            "Apply transmission correction for cadmium attenuators along the beam path. "
+            "The total Cd thickness is determined from the Atten log."
+        )
 
     def PyInit(self):  # noqa: N802
         self.declareProperty(
@@ -30,7 +33,12 @@ class CdAttenuationCorrection(PythonAlgorithm):
             "Direct-beam event workspace in wavelength, carrying an ``Atten`` log of per-stage flags",
         )
         self.declareProperty(
-            "FlipAtten", False, doc="If True, the ``Atten`` log was recorded with inverted polarity (0 = in beam)"
+            "FlipAtten",
+            False,
+            doc=(
+                "If True, swap the 0/1 flags in the ``Atten`` log before use: it was recorded with "
+                "inverted polarity, so 0 means the attenuator stage is in the beam"
+            ),
         )
         self.declareProperty(
             IEventWorkspaceProperty("OutputWorkspace", "", Direction.Output), "Corrected event workspace"
