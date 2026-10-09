@@ -7,6 +7,14 @@ lr_reduction.operations.algorithms
    :local:
    :depth: 1
 
+lr_reduction.operations.algorithms.cd_attenuation_correction
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. automodule:: lr_reduction.operations.algorithms.cd_attenuation_correction
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 lr_reduction.operations.algorithms.dead_time_correction
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
