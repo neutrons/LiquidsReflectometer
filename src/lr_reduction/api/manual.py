@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 
 from lr_reduction.api._shared import get_direct_beam_config, get_direct_beams
-from lr_reduction.api._single_run import SingleRunReduction, reduce_one
+from lr_reduction.api._single_run import SingleRunReduction, compose_direct_beam, reduce_with_direct_beam
 from lr_reduction.api.interfaces import Entrypoint
 from lr_reduction.exceptions import LrValidationError
 from lr_reduction.io import ConfigLoader, RunLoader
@@ -14,8 +14,9 @@ from lr_reduction.io.orso import write_orso
 from lr_reduction.io.report import html_report
 from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
+from lr_reduction.models.run_data import RunData
 from lr_reduction.operations import CombineResultsOperation
-from lr_reduction.types import ID, SingleReductionInput
+from lr_reduction.types import ID, CompositeDirectBeam, SingleReductionInput
 
 
 class ManualSingleRun(SingleRunReduction):
@@ -73,14 +74,19 @@ class ManualRunSequence(Entrypoint[list[SingleReductionInput], CombinedReduction
         return self._config_loader.load(str(self.configuration))
 
     def load_data(self, config: ReductionConfig) -> list[SingleReductionInput]:
+        # Runs referencing the same composite direct beam share one load of its runs.
+        direct_beams_by_name: dict[str, list[RunData]] = {}
         run_data = []
         for run_number in self.run_numbers:
             run = self._run_loader.load(run_number)
-            db_config = get_direct_beam_config(run.sequence_number, config)
+            db_name = config.runs[run.sequence_number].direct_beam
+            db_config = config.direct_beams[db_name]
+            if db_name not in direct_beams_by_name:
+                direct_beams_by_name[db_name] = get_direct_beams(self._run_loader, db_config)
             run_data.append(
                 SingleReductionInput(
                     run_data=run,
-                    direct_beams=[self._run_loader.load(db) for db in db_config.direct_beam_run_numbers],
+                    direct_beams=direct_beams_by_name[db_name],
                     direct_beam_config=db_config,
                 )
             )
@@ -89,10 +95,15 @@ class ManualRunSequence(Entrypoint[list[SingleReductionInput], CombinedReduction
     # TODO: figure out how to address override sequence numbers
     def call_operations(self, data: list[SingleReductionInput], config: ReductionConfig) -> CombinedReductionResult:
         """Perform the run-sequence reduction operations."""
-        # for each run, compose the direct beam and reduce the run
+        # Each composite direct beam is composed once and reused by every run referencing it.
+        composed_by_name: dict[str, CompositeDirectBeam] = {}
         reduced_runs = []
         for run in data:
-            reduced_run = reduce_one(run, config, run.run_data.sequence_number)
+            sequence_number = run.run_data.sequence_number
+            db_name = config.runs[sequence_number].direct_beam
+            if db_name not in composed_by_name:
+                composed_by_name[db_name] = compose_direct_beam(run)
+            reduced_run = reduce_with_direct_beam(run.run_data, config, composed_by_name[db_name], sequence_number)
             reduced_runs.append(reduced_run)
         # combine the reduced runs into a single result
         combine_op = CombineResultsOperation(reduced_runs, config)

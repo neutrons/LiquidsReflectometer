@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 def get_direct_beam_config(sequence_number: ID, config: ReductionConfig) -> DirectBeamConfig:
     """Get the direct beam configuration for a given run, according to the configuration.
 
-    `DirectBeamConfig.direct_beam_run_numbers` gives the run numbers to load; the object itself is
+    `DirectBeamConfig.run_numbers` gives the run numbers to load; the object itself is
     what `DirectBeamCompositionOperation` needs, so callers can carry a single resolved
     value through `load_data` -> `call_operations` instead of re-deriving it from `config`.
     """
@@ -32,7 +32,7 @@ def get_direct_beam_config(sequence_number: ID, config: ReductionConfig) -> Dire
 
 def get_direct_beams(run_loader: RunLoader, db_config: DirectBeamConfig) -> list[RunData]:
     """Load the direct beam runs for a given run, according to the configuration."""
-    return [run_loader.load(run_number) for run_number in db_config.direct_beam_run_numbers]
+    return [run_loader.load(run_number) for run_number in db_config.run_numbers]
 
 
 def locate_standard_configuration(run_number: ID) -> Path:

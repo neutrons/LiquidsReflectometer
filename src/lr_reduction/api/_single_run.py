@@ -14,17 +14,28 @@ from lr_reduction.exceptions import LrReductionError
 from lr_reduction.io import ConfigLoader
 from lr_reduction.io.orso import write_orso
 from lr_reduction.models import ReductionConfig, ReductionResult
+from lr_reduction.models.run_data import RunData
 from lr_reduction.operations import DirectBeamCompositionOperation, SingleRunReductionOperation
-from lr_reduction.types import ID, SingleReductionInput
+from lr_reduction.types import ID, CompositeDirectBeam, SingleReductionInput
+
+
+def compose_direct_beam(data: SingleReductionInput) -> CompositeDirectBeam:
+    """Compose the run's direct beam runs into its composite direct beam."""
+    db_op = DirectBeamCompositionOperation(data=data.direct_beams, config=data.direct_beam_config)
+    return db_op.execute()
+
+
+def reduce_with_direct_beam(
+    run_data: RunData, config: ReductionConfig, comp_db: CompositeDirectBeam, sequence_number: ID
+) -> ReductionResult:
+    """Reduce a single run against an already-composed direct beam."""
+    op = SingleRunReductionOperation(run_data, config, comp_db, sequence_number)
+    return op.execute()
 
 
 def reduce_one(data: SingleReductionInput, config: ReductionConfig, sequence_number: ID) -> ReductionResult:
     """Perform a single-run reduction."""
-    db_op = DirectBeamCompositionOperation(data=data.direct_beams, config=data.direct_beam_config)
-    comp_db = db_op.execute()
-    op = SingleRunReductionOperation(data.run_data, config, comp_db, sequence_number)
-    result = op.execute()
-    return result
+    return reduce_with_direct_beam(data.run_data, config, compose_direct_beam(data), sequence_number)
 
 
 class SingleRunReduction(Entrypoint[SingleReductionInput, ReductionResult]):
