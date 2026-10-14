@@ -65,7 +65,7 @@ class ExtractDetectorROI(PythonAlgorithm):
             range_validator.add(IntArrayBoundedValidator(lower=0))
             range_validator.add(IntArrayOrderedPairsValidator())
             self.declareProperty(
-                IntArrayProperty(name, [0, 0], range_validator, direction=Direction.Input),
+                IntArrayProperty(name, [], range_validator, direction=Direction.Input),
                 f"Inclusive [min, max] range of {name[0].lower()} pixels to keep",
             )
 
