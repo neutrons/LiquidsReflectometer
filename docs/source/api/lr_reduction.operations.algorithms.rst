@@ -7,10 +7,10 @@ lr_reduction.operations.algorithms
    :local:
    :depth: 1
 
-lr_reduction.operations.algorithms.dead_time_correction
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+lr_reduction.operations.algorithms.cd_attenuation_correction
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-.. automodule:: lr_reduction.operations.algorithms.dead_time_correction
+.. automodule:: lr_reduction.operations.algorithms.cd_attenuation_correction
    :members:
    :undoc-members:
    :show-inheritance:
@@ -19,6 +19,22 @@ lr_reduction.operations.algorithms.convert_tof_to_wavelength
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 .. automodule:: lr_reduction.operations.algorithms.convert_tof_to_wavelength
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+lr_reduction.operations.algorithms.dead_time_correction
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. automodule:: lr_reduction.operations.algorithms.dead_time_correction
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+lr_reduction.operations.algorithms.roi_extraction
+++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. automodule:: lr_reduction.operations.algorithms.roi_extraction
    :members:
    :undoc-members:
    :show-inheritance:
