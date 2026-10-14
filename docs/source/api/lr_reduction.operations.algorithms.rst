@@ -30,3 +30,11 @@ lr_reduction.operations.algorithms.roi_extraction
    :members:
    :undoc-members:
    :show-inheritance:
+
+lr_reduction.operations.algorithms.apply_dead_time_correction
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. automodule:: lr_reduction.operations.algorithms.apply_dead_time_correction
+   :members:
+   :undoc-members:
+   :show-inheritance:
