@@ -22,3 +22,11 @@ lr_reduction.operations.algorithms.calculate_dead_time_corrections
    :members:
    :undoc-members:
    :show-inheritance:
+
+lr_reduction.operations.algorithms.roi_extraction
+++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. automodule:: lr_reduction.operations.algorithms.roi_extraction
+   :members:
+   :undoc-members:
+   :show-inheritance:
