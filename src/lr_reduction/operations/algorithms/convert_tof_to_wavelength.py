@@ -2,7 +2,7 @@
 Emission-time-corrected conversion of an event workspace from time of flight to wavelength.
 
 Requirements §2.1.3 (moderator emission-time TOF correction) and §2.1.4 (TOF -> wavelength),
-folded into one step as specified in ``design/toftowavelength.pdf``.
+folded into one step.
 """
 
 import math
