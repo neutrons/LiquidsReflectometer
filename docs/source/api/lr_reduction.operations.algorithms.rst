@@ -14,3 +14,11 @@ lr_reduction.operations.algorithms.dead_time_correction
    :members:
    :undoc-members:
    :show-inheritance:
+
+lr_reduction.operations.algorithms.convert_tof_to_wavelength
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. automodule:: lr_reduction.operations.algorithms.convert_tof_to_wavelength
+   :members:
+   :undoc-members:
+   :show-inheritance:

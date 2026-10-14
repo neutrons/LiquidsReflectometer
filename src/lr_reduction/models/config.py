@@ -10,6 +10,7 @@ Composite direct beams live in their own named key space and are referenced by n
 
 from __future__ import annotations
 
+import math
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -131,12 +132,24 @@ class EmissionTimeConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
     apply: bool = Field(True, description="Enable emission-time correction")
-    coefficients: list[float] | None = Field(None)
+    coefficients: list[float] | None = Field(
+        None,
+        description=(
+            "Linear emission-time model `[t0, t1]` in microseconds and microseconds per Angstrom. "
+            "When omitted, the coefficients are read from the reflected run's chopper logs"
+        ),
+    )
 
     @model_validator(mode="after")
-    def _coefficients_non_empty(self) -> EmissionTimeConfig:
-        if self.coefficients is not None and not self.coefficients:
-            raise ValueError("`coefficients` must not be empty when provided")
+    def _coefficients_are_t0_t1(self) -> EmissionTimeConfig:
+        # The model t_emit(lambda) = t0 + t1 * lambda has exactly two coefficients; any other
+        # length cannot be mapped onto it, and a non-finite value would poison every event.
+        if self.coefficients is None:
+            return self
+        if len(self.coefficients) != 2:
+            raise ValueError(f"`coefficients` must be exactly [t0, t1], got {len(self.coefficients)} value(s)")
+        if not all(math.isfinite(value) for value in self.coefficients):
+            raise ValueError(f"`coefficients` must be finite numbers, got {self.coefficients}")
         return self
 
 

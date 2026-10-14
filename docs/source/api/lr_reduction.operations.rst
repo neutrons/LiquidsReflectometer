@@ -34,6 +34,14 @@ lr_reduction.operations.direct_beam
    :undoc-members:
    :show-inheritance:
 
+lr_reduction.operations.emission_time
++++++++++++++++++++++++++++++++++++++++
+
+.. automodule:: lr_reduction.operations.emission_time
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 lr_reduction.operations.interfaces
 ++++++++++++++++++++++++++++++++++++
 
