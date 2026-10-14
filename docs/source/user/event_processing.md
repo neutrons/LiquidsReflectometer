@@ -69,6 +69,35 @@ between the moderator and the detector.
 The $t_{off}$, $A$, and $L$ parameters are process variables that are stored in the
 data file and can be changed in the data acquisition system.
 
+#### In the new reduction workflow
+
+The new workflow models the emission delay as linear in wavelength,
+$t_{emit}(\lambda) = t_0 + t_1 \lambda$, and folds it into the conversion to wavelength.
+Each event's wavelength is the exact solution
+
+$$
+\lambda = \frac{h \, (t - t_0)}{m_n L + h \, t_1}
+$$
+
+where $t$ is the recorded time of flight and $L$ is the full flight path of the pixel that
+recorded the event, taken from the workspace's instrument (including any instrument-settings
+override). This is done by the `ConvertTofToWavelength` algorithm, which takes an event
+workspace in TOF and the two coefficients `T0` (µs) and `T1` (µs/Å), and returns a new event
+workspace in wavelength. It records the applied values in the sample logs `lr_emission_t0` and
+`lr_emission_t1`. With both coefficients zero it is a plain TOF → wavelength conversion.
+
+The coefficients are chosen from the `corrections.emission_time` configuration block:
+
+- `apply: false` turns the correction off (`t0 = t1 = 0`).
+- `coefficients: [t0, t1]` gives the coefficients explicitly. These take precedence over the logs.
+- Otherwise they are read from the reflected run's chopper logs: `BL4B:Chop:Skf2:ChopperOffset`
+  ($t_0$) and `BL4B:Chop:Skf2:ChopperMultiplier` ($t_1$) when `BL4B:Chop:Skf2:ChopperModerator`
+  is 1, and zero when it is 0. If the run has none of these logs, the reduction stops with an
+  error asking for one of the two settings above.
+
+The direct beams that a reflected run is divided by use the same coefficients as the reflected
+run, so that the correction cancels consistently in the ratio.
+
 ### Gravity correction
 
 The reflected angle of each neutron is corrected for the effect of gravity according to

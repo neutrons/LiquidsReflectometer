@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from lr_reduction.models.config import PixelRange, QBinning, ReductionConfig, apply_overrides
+from lr_reduction.models.config import EmissionTimeConfig, PixelRange, QBinning, ReductionConfig, apply_overrides
 
 
 def _minimal_config(**overrides):
@@ -55,6 +55,22 @@ def test_pixel_range_rejects_inverted_bounds():
 def test_q_binning_rejects_non_increasing_range():
     with pytest.raises(ValidationError, match="q_max .* must exceed q_min"):
         QBinning(q_min=0.5, q_max=0.1)
+
+
+def test_emission_time_coefficients_accept_t0_t1():
+    assert EmissionTimeConfig(coefficients=[10.0, -2.5]).coefficients == [10.0, -2.5]
+
+
+@pytest.mark.parametrize("coefficients", [[], [1.0], [1.0, 2.0, 3.0]])
+def test_emission_time_coefficients_must_be_exactly_two(coefficients):
+    with pytest.raises(ValidationError, match=r"exactly \[t0, t1\]"):
+        EmissionTimeConfig(coefficients=coefficients)
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf")])
+def test_emission_time_coefficients_must_be_finite(bad):
+    with pytest.raises(ValidationError, match="finite"):
+        EmissionTimeConfig(coefficients=[1.0, bad])
 
 
 def test_for_run_extracts_single_run_and_referenced_direct_beam():
