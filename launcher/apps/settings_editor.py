@@ -29,6 +29,7 @@ choice is written into the item, so ``_on_cell_changed`` remains the one write
 path. The choices read as the file spells them (``_in_file_spelling``).
 """
 
+import contextlib
 import functools
 import os
 import traceback
@@ -38,7 +39,13 @@ from qtpy import QtCore, QtGui, QtWidgets
 
 from launcher.app_identity import ensure_identity
 from lr_reduction import field_spec as fs
-from lr_reduction.settings_document import SettingsDocument, file_spelling, normalise_experiment_id
+from lr_reduction.settings_document import (
+    SettingsDocument,
+    file_spelling,
+    load_start_folder,
+    normalise_experiment_id,
+    settings_folders,
+)
 
 #: Above this, populating the table freezes the GUI thread for seconds and
 #: costs ~1100x the file size in memory. A settings file with more angles than
@@ -480,6 +487,56 @@ class _CandidatesDelegate(_DropDownDelegate):
         # (a row the list made current on its own, applied when it closed).
         if editor.property(_CHOSEN) or editor.lineEdit().isModified():
             model.setData(index, editor.currentText(), QtCore.Qt.EditRole)
+
+
+class _FileDialogSidebar(QtCore.QObject):
+    """Gives the next file dialog shown the IPTS's settings folders as its sidebar (editor-ipts-inference, I5).
+
+    The static ``QFileDialog`` calls take no sidebar, and the tests' autouse net (``conftest.no_qfiledialog``)
+    stubs exactly those calls so that no test can block on a modal dialog. So the dialogs stay static, and this
+    filter, installed on the application for the one call, sets the sidebar of the dialog the call builds when it is
+    shown. Measured offscreen on Qt 5.15 (the ledger's ``editor-ipts-inference-probes.py``):
+    the filter sees the static dialog's Show event and the sidebar holds. Qt's own dialog only
+    (``DontUseNativeDialog``): a native dialog builds no sidebar.
+
+    When the dialog hides, it gets its own sidebar back. Qt saves a dialog's sidebar ("shortcuts") to the user's
+    QtProject.conf when the dialog is destroyed, and every later Qt 5 file dialog of the user's starts from it:
+    left in place, the IPTS's folders would replace the user's own sidebar in every Qt application.
+    """
+
+    def __init__(self, folders):
+        super().__init__()
+        self._urls = [QtCore.QUrl.fromLocalFile(folder) for folder in folders]
+        self._own = None
+
+    def eventFilter(self, watched, event):  # noqa: N802 -- Qt's name
+        # Never raise here: an exception out of a PyQt virtual reaches qFatal() and aborts the launcher.
+        try:
+            if isinstance(watched, QtWidgets.QFileDialog):
+                if event.type() == QtCore.QEvent.Show:
+                    self._own = watched.sidebarUrls()
+                    watched.setSidebarUrls(self._urls)
+                elif event.type() == QtCore.QEvent.Hide and self._own is not None:
+                    watched.setSidebarUrls(self._own)
+                    self._own = None
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
+        return False
+
+
+@contextlib.contextmanager
+def _file_dialog_sidebar(folders):
+    """For one static file-dialog call: the dialog it shows gets ``folders`` as its sidebar (none: unchanged)."""
+    application = QtWidgets.QApplication.instance()
+    if not folders or application is None:
+        yield
+        return
+    sidebar = _FileDialogSidebar(folders)
+    application.installEventFilter(sidebar)
+    try:
+        yield
+    finally:
+        application.removeEventFilter(sidebar)
 
 
 def guarded(method):
@@ -1060,6 +1117,8 @@ class SettingsEditorTab(QtWidgets.QWidget):
 
         The single entry point a resolution layer uses: replacing the document
         without the three refreshes leaves the view showing the previous one.
+        A document adopted here is shown as it holds: its IPTS is resolved by a
+        Load only (``load_settings``; editor-ipts-inference v2, design A3).
         """
         self.document = document
         self.refresh_angles()
@@ -1182,14 +1241,25 @@ class SettingsEditorTab(QtWidgets.QWidget):
 
     # -- files -------------------------------------------------------------
 
+    def _settings_dialog_folders(self):
+        """Where the Load and Save dialogs open, and their sidebar (I5, A5): the IPTS's shared folder and its
+        settings folders, unless the remembered folder is already under that IPTS (``load_start_folder``)."""
+        ipts = self.document.get("experiment_id")
+        remembered = self.settings.value("settings_editor_dir", "")
+        return load_start_folder(ipts, remembered), settings_folders(ipts)
+
     @guarded
     def load_settings(self):
-        path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self,
-            "Load reduction settings",
-            self.settings.value("settings_editor_dir", ""),
-            "Settings (*.json *.dat);;All files (*)",
-        )
+        start, sidebar = self._settings_dialog_folders()
+        with _file_dialog_sidebar(sidebar):
+            path, _ = QtWidgets.QFileDialog.getOpenFileName(
+                self,
+                "Load reduction settings",
+                start,
+                "Settings (*.json *.dat);;All files (*)",
+                "",
+                QtWidgets.QFileDialog.DontUseNativeDialog,
+            )
         if not path:
             return
         # The refreshes are INSIDE the try. They were outside it, and the catch
@@ -1197,7 +1267,13 @@ class SettingsEditorTab(QtWidgets.QWidget):
         # a sequence ({"tof_min": 5}) raised TypeError out of the slot and
         # aborted the launcher.
         try:
-            self.set_document(SettingsDocument.from_file(path))
+            document = SettingsDocument.from_file(path)
+            # The Load's IPTS (editor-ipts-inference, I1), with the IPTS the header holds now as the field's: the
+            # file's own; else its runs'; else the header's; else the folder a file without runs came from. Here
+            # only (v2, A3): a document injected or adopted again is not resolved, so nothing infers over an IPTS
+            # the user cleared or typed (I6).
+            document.resolve_ipts(normalise_experiment_id(self.editors["experiment_id"].text()))
+            self.set_document(document)
         except Exception as exc:  # noqa: BLE001
             QtWidgets.QMessageBox.warning(self, "Could not load settings", str(exc))
             self.report_problem(exc)
@@ -1206,12 +1282,16 @@ class SettingsEditorTab(QtWidgets.QWidget):
 
     @guarded
     def save_settings(self):
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self,
-            "Save reduction settings",
-            self.settings.value("settings_editor_dir", ""),
-            "Settings (*.json);;All files (*)",
-        )
+        start, sidebar = self._settings_dialog_folders()
+        with _file_dialog_sidebar(sidebar):
+            path, _ = QtWidgets.QFileDialog.getSaveFileName(
+                self,
+                "Save reduction settings",
+                start,
+                "Settings (*.json);;All files (*)",
+                "",
+                QtWidgets.QFileDialog.DontUseNativeDialog,
+            )
         if not path:
             return
         # load_from_file dispatches on the suffix, so a name saved without a
