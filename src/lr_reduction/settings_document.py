@@ -637,11 +637,14 @@ class SettingsDocument:
           indexes ``[i]`` with ``i < len(RBnum)`` (``nr_reduction_calc.py:61``)
           and never reads the extra entries. One line per field, never per
           entry; Remove angle on a surplus row drops them.
-        * A boolean default list unset at every angle the reduction uses
-          (``useBS`` — pinned by a test on the derivation): it is written ``[]``, which the reducer
-          fills with 1, on, for every angle (``:102-103``). Shown only when
-          angle-defining entries exist, because otherwise there is no reduction
-          to describe.
+        * A list the reducer fills or broadcasts (``default_if_empty``,
+          ``broadcast_ok``) unset at every angle the reduction uses: it is written
+          ``[]``, and the reducer then uses its default at every angle
+          (``nr_reduction_calc.py:76-80, 99-110``). The words come from the
+          ``Field`` (its label and ``reducer_default``, spelled as the file holds
+          it), for every such list, not only the boolean one; they are
+          information, not a problem to clear. Shown only when angle-defining
+          entries exist, because otherwise there is no reduction to describe.
         """
         count = self.reduction_angles
         defining = self._defining_length()
@@ -657,11 +660,12 @@ class SettingsDocument:
                     f"{'entry' if extra == 1 else 'entries'} beyond the {count} angles the "
                     f"reduction uses; it ignores them, and removing the surplus angle drops them"
                 )
-            if (field.default_if_empty and field.element_type == "bool" and defining
+            if ((field.default_if_empty or field.broadcast_ok) and defining
                     and all(entry is None for entry in value[:count])):
                 lines.append(
-                    f"{field.label} ({field.name}) is unset, so the reduction uses its default: "
-                    f"on (1) at every angle (nr_reduction_calc.py:102-103)"
+                    f"{field.label} ({field.name}) is not set; the reduction will use "
+                    f"{file_spelling(field, field.reducer_default)} at every angle — leave it, or choose "
+                    f"a value to write it explicitly"
                 )
         return lines
 
@@ -720,19 +724,29 @@ class SettingsDocument:
           stays ``None`` (``null``) and anything else is written as held.
 
         ``values`` is the fresh mapping ``make_json_safe`` built, never the
-        document's own state.
+        document's own state. The rules are per field (``_file_value``), which
+        ``file_spelling`` shares, so the change report says what the file holds.
         """
         for field in fs.FIELD_SPEC:
-            if not (field.default_if_empty or field.broadcast_ok):
-                continue
-            entries = values.get(field.name)
-            if isinstance(entries, list) and entries and all(entry is None for entry in entries[:count]):
-                values[field.name] = []
-        for name in fs.INT_ENCODED_NAMES:
-            entries = values.get(name)
-            if isinstance(entries, list):
-                values[name] = [int(entry) if isinstance(entry, bool) else entry for entry in entries]
+            if field.name in values:
+                values[field.name] = SettingsDocument._file_value(field, values[field.name], count)
         return values
+
+    @staticmethod
+    def _file_value(field, value, count=None):
+        """One field's JSON-safe value as the file holds it: ``_encode_for_file``'s rules.
+
+        A list the reducer fills or broadcasts that is unset below ``count``
+        (the whole list when ``None``) is ``[]``; an ``int_encoded`` list has its
+        booleans as ``1``/``0``; anything else is the value as held.
+        """
+        if not isinstance(value, list):
+            return value
+        if (field.default_if_empty or field.broadcast_ok) and value and all(entry is None for entry in value[:count]):
+            return []
+        if field.int_encoded:
+            return [int(entry) if isinstance(entry, bool) else entry for entry in value]
+        return value
 
     def save(self, path):
         """Write the full document as a JSON settings file, atomically.
@@ -806,3 +820,17 @@ class SettingsDocument:
             for key in current
             if key in self._seed and current[key] != self._seed[key]
         }
+
+
+def file_spelling(field, value, count=None):
+    """A field's value as the settings file spells it: the JSON text ``save()`` writes for that key.
+
+    The file's rules (``SettingsDocument._file_value``), then JSON. An int-encoded boolean list
+    reads ``[1, 0, 1]``. A list the reducer fills or broadcasts that is unset below ``count`` (the
+    whole list when ``None``) reads ``[]``. A string is double-quoted and ``None`` is ``null``.
+    ``field`` may be ``None`` for a key no ``Field`` declares, which is then written as held. The
+    change report and the notes spell values with this one function, so they say what the file
+    holds; the Angles-table cell keeps the scientists' ``true``/``false``.
+    """
+    safe = make_json_safe(value)
+    return json.dumps(safe if field is None else SettingsDocument._file_value(field, safe, count))

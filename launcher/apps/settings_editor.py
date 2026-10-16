@@ -38,7 +38,7 @@ from qtpy import QtCore, QtGui, QtWidgets
 
 from launcher.app_identity import ensure_identity
 from lr_reduction import field_spec as fs
-from lr_reduction.settings_document import SettingsDocument, normalise_experiment_id
+from lr_reduction.settings_document import SettingsDocument, file_spelling, normalise_experiment_id
 
 #: Above this, populating the table freezes the GUI thread for seconds and
 #: costs ~1100x the file size in memory. A settings file with more angles than
@@ -1166,13 +1166,18 @@ class SettingsEditorTab(QtWidgets.QWidget):
             lines.append("Notes:")
             lines.extend(f"  - {note}" for note in notes)
 
+        # A changed value is spelled as the file holds it (file_spelling, the rules save() applies): one
+        # value, one spelling between this report and the saved file. The Angles-table cell keeps the
+        # scientists' true/false (_cell_text).
         changed = self.document.changed_vs_seed()
         if changed:
             lines.append("")
             lines.append("Changed from the seed:")
+            count = self.document.reduction_angles
             for name in sorted(changed):
                 before, after = changed[name]
-                lines.append(f"  - {name}: {before!r} -> {after!r}")
+                field = fs.BY_NAME.get(name)
+                lines.append(f"  - {name}: {file_spelling(field, before)} -> {file_spelling(field, after, count)}")
         self.report.setPlainText("\n".join(lines))
 
     # -- files -------------------------------------------------------------
