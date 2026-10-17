@@ -135,6 +135,9 @@ def lambda_to_tof(lam_range, start_time):
     time-indexed instrument database rather than a literal — the distance has
     three entries in `settings.json` and has genuinely changed.
 
+    m_n/h in SI is about 2.527701e6 s/m²
+    Å to m is 1e-10, s to µs is 1e6, and their product is 1e-4
+
     tof[us] = (m_n / h) * L[m] * lam[A] * 1e-4
     """
     settings = nr_tools.read_settings(start_time)
