@@ -146,15 +146,16 @@ class Direct_Beam:
 
             # Find the DB pixel
             ypix = np.linspace(self.n_y-1, 0, self.n_y)
-            mask = (ypix >= self.y_ROI[0]+10) & (ypix < self.y_ROI[1]+10)
+            mask = (ypix >= self.y_ROI[0]-10) & (ypix < self.y_ROI[1]+10)
             y_db = ypix[mask]
             i_db = np.sum(y_tof_corr[mask,:], axis=1)
             par, fit, bkg = tools.fit_peak(y_db, i_db, peaktype="supergauss", bkgtype="linear")
             db_pixel.append(par[1])
 
-            y_crop = y_tof_corr[self.y_ROI[0]:self.y_ROI[1], :]
+            roi_mask = (ypix >= self.y_ROI[0]) & (ypix < self.y_ROI[1])
+            y_crop = y_tof_corr[roi_mask, :]
             I = np.sum(y_crop, axis=0)
-            E = np.sum(error_array_corr[self.y_ROI[0]:self.y_ROI[1], :], axis=0)
+            E = np.sum(error_array_corr[roi_mask, :], axis=0)
 
             # TODO: can this be outside the loop, but need the time.
             if mu_file is None:
