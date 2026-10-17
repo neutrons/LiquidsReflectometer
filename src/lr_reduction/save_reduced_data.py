@@ -6,6 +6,10 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 import lr_reduction.nr_tools as tools
 
+# Header format 2: "Run Title", "Angles" and "NR_runs" are lists indexed by sequence position
+# (seq_num - 1), with null where no run was reduced. Files without the line predate it.
+HEADER_FORMAT = 2
+
 
 def save_results(results, config_header, log_values, sname = None, full=True, eight_column=False, sequence=None):
     """
@@ -81,6 +85,7 @@ def _build_header(config_header, log_values, full=True, eight_column=False, sequ
             f"Scaling factors = {scale_factor_header}\n"
             f"Lambda Range = {sorted_config.LambdaMinUse}\u212B to {sorted_config.LambdaMaxUse}\u212B\n"
             f"Angles: {angle_header}\n"
+            f"Header format: {HEADER_FORMAT} (Run Title, Angles and NR_runs are indexed by sequence position)\n"
             f"{'---' * 20}\n"
             f"Config: {config_json}\n"
             f"{'---' * 20}\n"
@@ -99,6 +104,7 @@ def _build_header(config_header, log_values, full=True, eight_column=False, sequ
             f"Scaling factors = {scale_factor_header}\n"
             f"Lambda Range = {sorted_config.LambdaMinUse}\u212B to {sorted_config.LambdaMaxUse}\u212B\n"
             f"Angles: {angle_header}\n"
+            f"Header format: {HEADER_FORMAT} (Run Title, Angles and NR_runs are indexed by sequence position)\n"
             f"{'---' * 20}\n"
             f"Config: {config_json}\n"
             f"{'---' * 20}\n"
