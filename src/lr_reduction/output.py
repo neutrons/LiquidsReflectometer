@@ -285,13 +285,20 @@ def read_file(file_path):
         The path to the file to be read
     """
     _meta = dict()
+    has_data = False
     with open(file_path, "r") as fd:
         for l in fd:
             if l.startswith("# Meta:"):
                 _meta = json.loads(l[len("# Meta:") : -1])
+            # A data row as np.loadtxt sees one: something is left once the comment and the blanks are gone.
+            has_data = has_data or bool(l.split("#", 1)[0].strip())
     try:
-        _q, _r, _dr, _dq = np.loadtxt(file_path).T
-    except:
+        # Without a data row np.loadtxt warns ("input contained no data"), so the file is not handed to it:
+        # unpacking nothing raises the same ValueError its empty result did. ndmin=1 reads a single number as
+        # one value rather than a 0-d array, whose unpack raises TypeError; no other shape changes.
+        _q, _r, _dr, _dq = np.loadtxt(file_path, ndmin=1).T if has_data else ()
+    except ValueError:
+        # No data row, a single number, a value that is not a number, or not four columns (nor four values).
         print("Could not read file. It may have no points")
         _q = _r = _dr = _dq = []
     return _q, _r, _dr, _dq, _meta

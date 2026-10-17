@@ -18,6 +18,7 @@ import textwrap
 import pytest
 
 from lr_reduction import field_spec as fs
+from lr_reduction import settings_document as sd
 from lr_reduction.new_reduction_from_file import json_to_config, save_config_json
 from lr_reduction.nr_reduction_config import NRReductionConfig
 from lr_reduction.save_reduced_data import make_json_safe
@@ -1323,6 +1324,9 @@ def test_a_saved_useBS_entry_is_read_as_the_source_entry(tmp_path, value):
 # --------------------------------------------------------------------------
 
 _THREE_ANGLES = {
+    # editor-ipts-inference: a file that reduces names its IPTS. Runs with none are I4's problem, which is not
+    # what any test of this shape is about.
+    "experiment_id": "IPTS-00000",
     "RBnum": [201282, 201283, 201284],
     "DBname": ["db_a.dat", "db_b.dat", "db_c.dat"],
     "RB_Ymin": [140, 141, 142],
@@ -1496,24 +1500,20 @@ def test_an_all_null_default_list_loads_as_unset_and_saves_empty(tmp_path):
 def test_removing_the_surplus_angle_clears_the_note_and_trims_only_useBS():
     doc = _surplus_document()
     doc.remove_angle(3)
-    assert doc.notes() == []
+    # editor-notes-and-report-spelling K1: the other lists the reducer fills are [] here, and keep their notes
+    assert not any("extra" in line for line in doc.notes()), doc.notes()
     assert doc.get("useBS") == [True, True, True]
     assert doc.get("DBname") == _THREE_ANGLES["DBname"]
 
 
 def test_an_unset_background_switch_is_noted_as_the_reductions_default():
     """Plan A2: an all-unset useBS is written [], which the reducer fills with 1 (on) for
-    every angle (nr_reduction_calc.py:102-103), so the panel says so."""
+    every angle (nr_reduction_calc.py:102-103), so the panel says so. U4
+    (editor-notes-and-report-spelling): in K1's words, the default as the file spells it."""
     doc = SettingsDocument.from_dict({**_THREE_ANGLES, "useBS": []})
     notes = [line for line in doc.notes() if "(useBS)" in line]
     assert len(notes) == 1
-    assert re.search(r"\bon\b", notes[0]), notes[0]
-
-
-def test_the_boolean_default_lists_are_exactly_useBS():
-    """A pin on the derivation the A2 note uses: its "on" is the reducer's fill for useBS
-    (nr_reduction_calc.py:103). Before adding another, read that field's default fill."""
-    assert {f.name for f in fs.FIELD_SPEC if f.default_if_empty and f.element_type == "bool"} == {"useBS"}
+    assert "will use 1 at every angle" in notes[0], notes[0]
 
 
 def test_a_per_angle_value_that_is_not_a_list_is_kept_out_of_the_counts():
@@ -1678,7 +1678,7 @@ def test_an_unset_background_switch_with_a_surplus_value_is_still_noted_as_the_d
     for angle in range(3):
         doc.set_angle_field(angle, "useBS", None)
     assert repr(doc.get("useBS")) == "[None, None, None, False]"
-    assert any("(useBS)" in line and re.search(r"\bon\b", line) for line in doc.notes())
+    assert any("(useBS)" in line and "will use 1 at every angle" in line for line in doc.notes())
     assert json.loads(doc.save(tmp_path / "out.json").read_text())["useBS"] == []
 
 
@@ -1839,7 +1839,9 @@ def test_an_edit_of_a_compact_list_keeps_what_the_reducer_reads_at_every_other_a
             assert f"({name})" in note and f"{index + 1 - m} extra" in note
         else:
             assert new == set()
-        assert gone == ({line for line in notes_before if "(useBS)" in line} if name == "useBS" else set())
+        # editor-notes-and-report-spelling K1: every list the reducer fills has its default note while unset, not
+        # only useBS, so the edit takes away that list's own note, whichever list it is.
+        assert gone == {line for line in notes_before if f"({name}) is not set" in line}
     if index < m:
         read_as = value_written.lower() if isinstance(value_written, str) else value_written
         assert reading[name][index] == repr(read_as)
@@ -2175,3 +2177,887 @@ def test_a_list_unset_at_every_angle_implies_the_reductions_default():
     tests above held only [] and one broadcast entry, never unset entries."""
     doc = SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": [None, None, None]})
     assert [doc.implied_entry(k, "method_per_run") for k in range(3)] == ["meanTheta"] * 3
+
+
+# --------------------------------------------------------------------------
+# editor-defaults-and-theta — a new file starts at gaussian / 1.0 (the library keeps rectangular / 0.8); the
+# theta enumeration is held canonical when the reducer accepts the value, and kept as loaded when it does not
+# --------------------------------------------------------------------------
+
+
+def test_a_document_the_editor_creates_starts_at_gaussian_and_1():
+    """U1, D1: the starting values are part of the seed, so nothing shows as changed in a new file."""
+    doc = SettingsDocument.for_new_file()
+    assert doc.get("DetResFn") == "gaussian"
+    assert doc.get("DetSigma") == 1.0 and type(doc.get("DetSigma")) is float
+    assert doc.changed_vs_seed() == {}
+
+
+def test_the_library_and_a_bare_document_keep_rectangular_and_0_8():
+    """U2, D2: only a document the editor creates starts at the new values."""
+    config = NRReductionConfig()
+    assert (config.DetResFn, config.DetSigma) == ("rectangular", 0.8)
+    assert (fs.get("DetResFn").default, fs.get("DetSigma").default) == ("rectangular", 0.8)
+    doc = SettingsDocument()
+    assert (doc.get("DetResFn"), doc.get("DetSigma")) == ("rectangular", 0.8)
+
+
+def test_a_loaded_file_without_the_resolution_keys_holds_what_its_reduction_uses(tmp_path):
+    """U3, D2, A2: a file that omits them is reduced with the library's rectangular / 0.8 (json_to_config starts
+    from NRReductionConfig()), so that is what the editor shows, not the new file's starting values."""
+    seed = tmp_path / "s.json"
+    seed.write_text(json.dumps({"Sname": "old"}))
+    doc = SettingsDocument.from_file(seed)
+    assert (doc.get("DetResFn"), doc.get("DetSigma")) == ("rectangular", 0.8)
+
+
+def test_the_fields_with_a_starting_value_are_exactly_the_resolution_pair():
+    """U4: declared on the Field and derived into EDITOR_START_NAMES; every other field starts at its default."""
+    assert {name: fs.get(name).starting_value() for name in fs.EDITOR_START_NAMES} == {
+        "DetResFn": "gaussian", "DetSigma": 1.0,
+    }
+    assert all(f.starting_value() == f.default for f in fs.FIELD_SPEC if f.name not in fs.EDITOR_START_NAMES)
+
+
+_ABSENT = object()
+
+# (id, the value in the file, the value held after load, reported?) — plan §3's table, one row per spelling.
+_THETA_LOADS = [
+    ("absent", _ABSENT, False, False),
+    ("false", False, False, False),
+    ("null", None, False, False),
+    ("zero", 0, False, False),
+    ("empty", "", False, False),
+    ("true", True, "detector_angle", False),
+    ("detector_angle", "detector_angle", "detector_angle", False),
+    ("Detector_Angle", "Detector_Angle", "detector_angle", False),
+    ("DETECTOR_ANGLE", "DETECTOR_ANGLE", "detector_angle", False),
+    ("sample_angle", "sample_angle", "sample_angle", False),
+    ("Sample_Angle", "Sample_Angle", "sample_angle", False),
+    ("SAMPLE_ANGLE", "SAMPLE_ANGLE", "sample_angle", False),
+    ("string-true", "true", "true", True),
+    ("string-TRUE", "TRUE", "TRUE", True),
+    ("string-yes", "yes", "yes", True),
+    ("one", 1, 1, True),
+    ("string-True", "True", "True", True),
+    ("detector", "detector", "detector", True),
+    ("sample", "sample", "sample", True),
+    ("a-list", ["detector_angle"], ["detector_angle"], True),
+]
+
+
+def _theta_document(tmp_path, loaded):
+    seed = tmp_path / "seed.json"
+    seed.write_text(json.dumps({} if loaded is _ABSENT else {"useCalcTheta": loaded}))
+    return SettingsDocument.from_file(seed)
+
+
+@pytest.mark.parametrize("loaded, held, reported", [pytest.param(*row[1:], id=row[0]) for row in _THETA_LOADS])
+def test_loading_holds_a_theta_value_the_reducer_accepts_canonically_and_keeps_the_rest(tmp_path, loaded, held,
+                                                                                        reported):
+    """U5, D5, D6. What the reducer accepts is held as the value it acts on: True and any case of a name as the
+    lower-case name, any falsy value as False. What it rejects (it raises on "true") is kept exactly as loaded
+    and reported with the three forms it accepts. Either way nothing shows as changed, and a save writes what
+    is held."""
+    doc = _theta_document(tmp_path, loaded)
+    value = doc.get("useCalcTheta")
+    assert value == held and type(value) is type(held)
+    lines = [message for message in doc.validate() if "useCalcTheta" in message]
+    assert bool(lines) is reported, lines
+    if reported:
+        assert all(form in lines[0] for form in ("False", "True", "trust sample angle")), lines[0]
+    assert doc.changed_vs_seed() == {}
+    saved = json.loads(doc.save(tmp_path / "out.json").read_text())["useCalcTheta"]
+    assert saved == held and type(saved) is type(held)
+
+
+@pytest.mark.parametrize("loaded", [pytest.param(row[1], id=row[0]) for row in _THETA_LOADS
+                                    if row[1] is not _ABSENT])
+def test_the_reduction_reads_the_saved_theta_value_as_it_read_the_loaded_one(tmp_path, loaded):
+    """U7, D7: the reducer's own normalisation (NR_Reduction._validate_config, nr_reduction_calc.py:90-97) does
+    the same with the saved value as with the loaded one, for every spelling. It reads both as the same name,
+    or both as off, or rejects both: a canonicalisation it does not perform itself ("sample" -> "sample_angle")
+    would turn a file it rejects into one it reduces. Off is compared by truthiness, which is all its readers
+    test (:92, :543, :574; :550 compares a name), so no reader sees which falsy value it was."""
+
+    def outcome(value):
+        reduction = _bare_reduction(RBnum=[1], DBname=["db.dat"], RB_Ymin=[1], RB_Ymax=[2], useCalcTheta=value)
+        try:
+            reduction._validate_config()
+        except (ValueError, AttributeError) as exc:  # AttributeError: .lower() on a non-string
+            return ("rejected", type(exc).__name__)
+        return ("reads", reduction.config.useCalcTheta or False)
+
+    doc = _theta_document(tmp_path, loaded)
+    saved = json.loads(doc.save(tmp_path / "out.json").read_text())["useCalcTheta"]
+    assert outcome(saved) == outcome(loaded)
+
+
+def test_the_readers_of_use_calc_theta_are_the_ones_d7_cleared():
+    """U7's pin, D7. Holding a falsy value as False and True as "detector_angle" is safe only while no reader of
+    useCalcTheta tells them apart. These are its mentions in the library at dispatch (reader, writer or carrier,
+    each read): nr_reduction_calc (the rule and three reads), web_report (prints it), new_reduction_from_template
+    (copies it into a template), nr_reduction_config (the default) and the example scripts (writers). A new mention
+    changes this count: read it, and remove the canonicalisation it can see from D5, before updating the count."""
+    library = pathlib.Path(fs.__file__).parent
+    declarations = {"field_spec.py", "settings_document.py", "reduction_domains.py"}
+    mentions = {
+        path.name: count
+        for path in sorted(library.glob("*.py"))
+        if path.name not in declarations and (count := path.read_text().count("useCalcTheta"))
+    }
+    assert mentions == {
+        "EBW_nr_reduction_test.py": 2,
+        "example_nr_from_template.py": 2,
+        "example_nr_reduction.py": 5,
+        "new_reduction_from_template.py": 3,
+        "new_reduction_template_reader.py": 1,
+        "nr_reduction_calc.py": 11,
+        "nr_reduction_config.py": 1,
+        "web_report.py": 1,
+    }
+
+
+def test_every_theta_choice_has_one_label_and_every_label_maps_back():
+    """U6, D3, D4: one mapping, declared on the Field, read in both directions; False is an entry of its own."""
+    field = fs.get("useCalcTheta")
+    assert field.label == "Apply theta calculation"
+    assert [label for _, label in field.choice_labels] == ["False", "True", "trust sample angle"]
+    assert {stored for stored, _ in field.choice_labels} == {False, *fs.CALC_THETA_CHOICES}
+    for stored, label in field.choice_labels:
+        assert field.label_for(stored) == label
+        back = field.value_for(label)
+        assert back == stored and type(back) is type(stored)
+    assert field.label_for(True) == "True" and field.label_for("Sample_Angle") == "trust sample angle"
+    assert field.label_for(None) == "False" and field.label_for("true") is None
+
+
+def test_a_stored_choice_without_a_label_fails_the_check_run_at_import():
+    """§5, pathological: a choice added to CALC_THETA_CHOICES without a label fails at import (the check runs
+    on every field there), never an unlabelled entry. Two choices with one label fail too."""
+    import dataclasses
+
+    field = fs.get("useCalcTheta")
+    fs._check_choice_labels(field)
+    with pytest.raises(ValueError, match="useCalcTheta"):
+        fs._check_choice_labels(dataclasses.replace(field, allowed=(*field.allowed, "fitted_angle")))
+    with pytest.raises(ValueError, match="share a label"):
+        fs._check_choice_labels(dataclasses.replace(
+            field, choice_labels=((False, "False"), ("detector_angle", "True"), ("sample_angle", "True"))))
+
+
+# --------------------------------------------------------------------------
+# editor-paths-header — the derived paths are what the reduction would use, answered by its own properties; an IPTS
+# typed as a number is stored as the directory name
+# --------------------------------------------------------------------------
+
+
+def test_derived_path_is_what_the_reduction_would_use_if_the_override_were_unset():
+    """U1: answered by NRReductionConfig's own properties with the override disregarded, whether one is held or
+    not, and without touching the document. No IPTS, or one validate() reports, gives None: the header then says
+    so rather than presenting /SNS/REF_L/nexus or a traversed path as the reduction's."""
+    from lr_reduction.settings_document import SettingsDocument as Document
+
+    doc = Document.from_dict({"experiment_id": "IPTS-36119", "_DBpath_override": "/elsewhere/db"})
+    before = repr(doc.to_dict())
+    assert doc.derived_path("_NEXUSpathRB_override") == "/SNS/REF_L/IPTS-36119/nexus"
+    assert doc.derived_path("_DBpath_override") == "/SNS/REF_L/IPTS-36119/shared/transmission"
+    assert repr(doc.to_dict()) == before
+    for unset in ("", None, "../x", "/abs"):
+        assert Document.from_dict({"experiment_id": unset}).derived_path("_DBpath_override") is None, unset
+
+
+def test_derived_path_follows_the_config_class_not_a_copy_of_its_rule():
+    """U1, the leg the "re-implements /SNS/REF_L/..." mutation needs: a config whose base_path differs gives that
+    base, so the helper reads the class's properties (CPKT derived-identifiers)."""
+
+    class Elsewhere(NRReductionConfig):
+        @property
+        def base_path(self):
+            return pathlib.Path("/elsewhere") / self.experiment_id
+
+    config = Elsewhere()
+    config.experiment_id = "IPTS-1"
+    assert SettingsDocument(config).derived_path("_NEXUSpathRB_override") == "/elsewhere/IPTS-1/nexus"
+
+
+@pytest.mark.parametrize("typed, stored", [
+    ("36119", "IPTS-36119"), (" 36119 ", "IPTS-36119"), ("ipts-36119", "IPTS-36119"), ("IPTS-36119", "IPTS-36119"),
+    ("", ""), ("proposal_x", "proposal_x"),
+])
+def test_an_ipts_typed_as_a_number_is_stored_as_the_directory_name(typed, stored):
+    """U2, P5: a bare number and a lower-case ipts- are the directory name IPTS-<n> (file_batch.py's convention);
+    anything else is stored as typed and left to validate(); an empty entry is "", never None (F7)."""
+    from lr_reduction.settings_document import normalise_experiment_id
+
+    value = normalise_experiment_id(typed)
+    assert value == stored and type(value) is str
+
+
+# --------------------------------------------------------------------------
+# editor-sections — the list's sections in the scientists' order, declared, and checked at import
+# --------------------------------------------------------------------------
+
+_SECTIONS = ("Runs and angles", "Processing", "Q-space", "Wavelength and TOF", "Dead time", "Detector resolution",
+             "Peak fitting", "Output naming and paths", "Instrument geometry", "Runtime record")
+
+
+def _list_groups(fields):
+    return {f.group for f in fields if not f.per_angle and f.name not in fs.HEADER_NAMES}
+
+
+def test_the_sections_are_declared_in_the_scientists_order():
+    """U1, S1 (item 7): an explicit declaration, not the order the groups first appear in FIELD_SPEC."""
+    assert fs.SECTION_ORDER == _SECTIONS
+
+
+def test_the_declared_sections_are_exactly_the_groups_with_a_list_field():
+    """U2, S5: each group a list field uses is declared once, and nothing else is. The check that enforces it at
+    import fails, naming the group, on a field with a new group, on an order missing a group, and on a group
+    listed twice. It is run on copies, not by editing the module."""
+    import dataclasses
+
+    assert _list_groups(fs.FIELD_SPEC) == set(fs.SECTION_ORDER)
+    fs._check_section_order(fs.FIELD_SPEC, fs.SECTION_ORDER)
+    stray = dataclasses.replace(fs.get("tof_bin"), name="new_field", group="Brand new")
+    with pytest.raises(ValueError, match="Brand new"):
+        fs._check_section_order((*fs.FIELD_SPEC, stray), fs.SECTION_ORDER)
+    with pytest.raises(ValueError, match="Dead time"):
+        fs._check_section_order(fs.FIELD_SPEC, tuple(g for g in fs.SECTION_ORDER if g != "Dead time"))
+    with pytest.raises(ValueError, match="twice"):
+        fs._check_section_order(fs.FIELD_SPEC, (*fs.SECTION_ORDER, "Q-space"))
+
+
+def test_the_per_angle_names_and_their_order_are_unchanged():
+    """U3, S5's pin: the Angles table's columns and other code index this tuple; the regrouping leaves it alone."""
+    assert fs.PER_ANGLE_NAMES == ("method_per_run", "DBname", "RBnum", "RB_Ymin", "RB_Ymax", "BkgROI", "useBS",
+                                  "tof_min", "tof_max", "LambdaMin", "LambdaMax", "ThetaShift", "ScaleFactor")
+
+
+def test_the_merged_section_holds_what_the_header_left_of_naming_and_paths():
+    """U4, S2: Sname, subname, the three suffixes and the two output paths; the IPTS and the input paths are the
+    header's."""
+    merged = [f.name for f in fs.fields_in("Output naming and paths")
+              if not f.per_angle and f.name not in fs.HEADER_NAMES]
+    assert merged == ["Sname", "subname", "DTCsubname", "BINsubname", "errBINsubname",
+                      "_Spath_override", "_BINpath_override"]
+
+
+def test_groups_are_the_declared_sections_then_the_groups_with_no_list_field():
+    """U5: GROUPS derives from the declaration; the per-angle-only groups (no list field, no section) follow."""
+    assert fs.GROUPS == (*_SECTIONS, "Background", "Theta and scaling")
+
+
+def test_the_import_itself_rejects_a_group_the_order_does_not_declare():
+    """U2 (v2, B-1): the wiring, not the function. An edited copy of the module's source, with a field in a group
+    SECTION_ORDER does not declare, fails while it is imported, with a ValueError naming the group. Calling
+    _check_section_order directly (v1's U2) could not see the module-level call removed."""
+    import importlib.util
+
+    source = pathlib.Path(fs.__file__).read_text()
+    anchor = "\n)\n\n\nBY_NAME = {f.name: f for f in FIELD_SPEC}"
+    assert source.count(anchor) == 1
+    edited = source.replace(
+        anchor, '\n    Field("new_field", "New field", "Brand new group", "float", 0.0, "A field of its own."),' + anchor)
+    module = importlib.util.module_from_spec(importlib.util.spec_from_loader("field_spec_edited_copy", loader=None))
+    with pytest.raises(ValueError, match="Brand new group"):
+        exec(compile(edited, fs.__file__, "exec"), module.__dict__)  # noqa: S102 — this module's own source
+
+
+# --------------------------------------------------------------------------
+# editor-notes-and-report-spelling (plan @ triage 0e333ca) — K1-K4. Every list the reducer fills or
+# broadcasts, unset at every angle the reduction uses, gets the same note, in words that do not read
+# as a problem. One helper, file_spelling, spells a value the way save() writes it, for the notes and
+# for the change report. U1-U4 here, V1-V3 in launcher/tests/test_settings_editor.py.
+# The old pin test_the_boolean_default_lists_are_exactly_useBS guarded the A2 note's hard-coded "on";
+# K1 takes the words from Field.reducer_default, so the pin on the six fields and U2 replace it.
+# --------------------------------------------------------------------------
+
+# What the reducer uses at an angle such a list does not give, as the file spells it
+# (nr_reduction_calc.py:42-43, :76-80, :99-110), written here independently of field_spec.
+_FILLED_DEFAULT_SPELLING = {
+    "useBS": "1",
+    "method_per_run": '"meanTheta"',
+    "tof_min": "0",
+    "tof_max": "100000",
+    "ThetaShift": "0",
+    "ScaleFactor": "1",
+}
+
+
+def _default_note(name):
+    field = fs.BY_NAME[name]
+    return (f"{field.label} ({name}) is not set; the reduction will use {_FILLED_DEFAULT_SPELLING[name]} at "
+            f"every angle — leave it, or choose a value to write it explicitly")
+
+
+def test_the_lists_the_reducer_fills_are_the_six_the_notes_cover():
+    """U1's domain, pinned (F1): the lists the reducer fills or broadcasts when empty."""
+    assert {f.name for f in fs.FIELD_SPEC if f.default_if_empty or f.broadcast_ok} == set(_FILLED_DEFAULT_SPELLING)
+
+
+@pytest.mark.parametrize("unset", [[], [None, None, None]], ids=["empty", "all-None"])
+@pytest.mark.parametrize("name", sorted(_FILLED_DEFAULT_SPELLING))
+def test_a_reducer_filled_list_unset_at_every_angle_gets_one_note_in_the_reducers_words(name, unset):
+    """U1/K1: one note per such list, whatever its element type, with the default as the file spells it."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, name: unset})
+    assert [line for line in doc.notes() if f"({name})" in line] == [_default_note(name)]
+
+
+@pytest.mark.parametrize("name, held", [
+    ("useBS", [True, None, None]),
+    ("useBS", [True, False, True]),
+    ("method_per_run", ["constantQ"]),
+    ("method_per_run", ["constantQ", None, None]),
+    ("ThetaShift", [0.5, 0, 0]),
+    ("tof_max", [None, 90000, None]),
+])
+def test_a_reducer_filled_list_set_at_some_angle_gets_no_default_note(name, held):
+    """U1: set at some angle is not unset: partly set is validate()'s to report (as today), and a single
+    method_per_run entry is broadcast."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, name: held})
+    assert not any(f"({name}) is not set" in line for line in doc.notes())
+
+
+def test_a_list_the_reducer_does_not_fill_gets_no_default_note():
+    """U1: an unset list the reducer does not fill (the peak window) is no default of the reducer's."""
+    doc = SettingsDocument.from_dict({**_THREE_ANGLES, "RB_Ymin": [None, None, None]})
+    assert not any("(RB_Ymin) is not set" in line for line in doc.notes())
+
+
+def test_no_default_note_without_angles_to_describe():
+    """U1: with no angle-defining entries there is no reduction to describe (as today)."""
+    assert not any("is not set" in line for line in SettingsDocument.from_dict({}).notes())
+
+
+def test_the_default_notes_are_notes_and_never_problems():
+    """K2: a file whose only remarks are these notes reads no problems; one note per unset list."""
+    doc = SettingsDocument.from_dict(dict(_THREE_ANGLES))
+    assert doc.validate() == []
+    assert sorted(line for line in doc.notes() if "is not set" in line) == sorted(
+        _default_note(name) for name in _FILLED_DEFAULT_SPELLING)
+
+
+def test_every_reducer_filled_list_declares_what_the_reducer_fills():
+    """U2: the notes' words come from the Field, so every such field declares reducer_default (a pin)."""
+    assert [f.name for f in fs.FIELD_SPEC
+            if (f.default_if_empty or f.broadcast_ok) and f.reducer_default is None] == []
+
+
+def test_the_notes_carry_no_python_spelling_and_no_source_reference():
+    """U2: words for the scientists: no None/True/False, and no `.py:` line reference."""
+    for line in SettingsDocument.from_dict(dict(_THREE_ANGLES)).notes():
+        assert not re.search(r"\b(None|True|False)\b|\.py:", line), line
+
+
+def test_file_spelling_spells_each_kind_of_value_as_the_file_does():
+    """U3/K3: the int-encoded booleans as 1/0, an all-unset reducer-filled list as [], a scalar boolean
+    and None as JSON writes them, strings quoted."""
+    from lr_reduction.settings_document import file_spelling
+
+    assert file_spelling(fs.BY_NAME["useBS"], [True, False, True], 3) == "[1, 0, 1]"
+    assert file_spelling(fs.BY_NAME["ThetaShift"], [None, None, None], 3) == "[]"
+    assert file_spelling(fs.BY_NAME["ThetaShift"], [0.5, 0, 0], 3) == "[0.5, 0, 0]"
+    assert file_spelling(fs.BY_NAME["method_per_run"], ["constantQ"], 3) == '["constantQ"]'
+    assert file_spelling(fs.BY_NAME["useGravity"], False) == "false"
+    assert file_spelling(fs.BY_NAME["useCalcTheta"], "detector_angle") == '"detector_angle"'
+    assert file_spelling(fs.BY_NAME["LambdaMin"], None) == "null"
+
+
+def test_file_spelling_agrees_with_what_save_writes_key_by_key(tmp_path):
+    """U3/K4: one helper, beside the file encoding: for every field, the spelling equals the JSON of the
+    value save() wrote for that key."""
+    from lr_reduction.settings_document import file_spelling
+
+    doc = SettingsDocument.from_dict({
+        **_THREE_ANGLES,
+        "useBS": [True, False, True],
+        "tof_min": [1.5, 2, 3],
+        "method_per_run": ["constantQ", "meanTheta", "constantQ"],
+        "ThetaShift": [None, None, None],
+        "useGravity": False,
+        "useCalcTheta": "detector_angle",
+        "LambdaMin": None,
+    })
+    saved = json.loads(doc.save(tmp_path / "out.json").read_text())
+    for field in fs.FIELD_SPEC:
+        if field.name in saved:
+            assert file_spelling(field, doc.get(field.name), doc.reduction_angles) == json.dumps(saved[field.name]), field.name
+
+
+# --------------------------------------------------------------------------
+# editor-ipts-inference (plan @ triage 2650210) — U1-U6. The facility tree is fabricated under tmp_path: every
+# lookup here is given its root, so no test reads /SNS (F6: it is not mounted on every machine).
+# --------------------------------------------------------------------------
+
+
+def _nexus_tree(root, layout):
+    """``{IPTS: [runs]}`` as ``<root>/<IPTS>/nexus/REF_L_<run>.nxs.h5``: the folder and name the reducer opens (F1)."""
+    for ipts, runs in layout.items():
+        folder = pathlib.Path(root) / ipts / "nexus"
+        folder.mkdir(parents=True, exist_ok=True)
+        for run in runs:
+            (folder / f"REF_L_{run}.nxs.h5").touch()
+    return pathlib.Path(root)
+
+
+def _settings_at(path, values):
+    """A settings file at `path` (folders made), holding `values` over a fresh config."""
+    path = pathlib.Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    config = NRReductionConfig()
+    for name, value in values.items():
+        setattr(config, name, value)
+    save_config_json(path, config)
+    return path
+
+
+def _ipts_notes(doc):
+    """The notes this slug adds: the ones that speak of an IPTS or a run's place, not K1's list defaults."""
+    return [line for line in doc.notes() if "IPTS" in line or "run number" in line]
+
+
+def test_ipts_of_run_is_the_folder_whose_nexus_holds_the_run(tmp_path):
+    """U1 (F1, F6): the IPTS of a run is the directory whose nexus folder holds REF_L_<run>.nxs.h5. No hit is (), a
+    run in two IPTS folders (a copied NeXus) is both, in IPTS-number order, and a folder that is not named
+    IPTS-<n> is not an IPTS."""
+    root = _nexus_tree(tmp_path, {"IPTS-36119": [229197, 229198], "IPTS-38016": [229199], "IPTS-2": [5],
+                                  "IPTS-10": [5], "IPTS-old": [229199], "notes": [229197]})
+    (tmp_path / "IPTS-99" / "shared").mkdir(parents=True)
+    assert sd.ipts_of_run(229197, root=root) == ("IPTS-36119",)
+    assert sd.ipts_of_run(229199, root=root) == ("IPTS-38016",)
+    assert sd.ipts_of_run(123, root=root) == ()
+    assert sd.ipts_of_run(5, root=root) == ("IPTS-2", "IPTS-10")
+
+
+def test_ipts_of_run_reads_an_unreadable_root_as_no_hit(tmp_path):
+    """U1: a root that cannot be listed (not mounted, a stale handle) is no hit, never an exception out of a Qt
+    slot (candidates()'s precedent)."""
+    assert sd.ipts_of_run(229197, root=tmp_path / "not-mounted") == ()
+    afile = tmp_path / "a-file"
+    afile.write_text("")
+    assert sd.ipts_of_run(229197, root=afile) == ()
+
+
+def test_the_lookup_root_defaults_to_the_reducers_own_base(monkeypatch):
+    """U1, frame: with no root given and no override, the lookup searches the folder the reducer joins an IPTS
+    onto (NRReductionConfig.base_path for an empty IPTS: /SNS/REF_L), not a second spelling of it."""
+    monkeypatch.setattr(sd, "IPTS_LOOKUP_ROOT", None, raising=False)
+    seen = []
+
+    def spy(path):
+        seen.append(os.fspath(path))
+        raise OSError("the test stops here: nothing under the facility root is read")
+
+    monkeypatch.setattr(sd.os, "scandir", spy)
+    assert sd.ipts_of_run(229197) == ()
+    assert seen == [os.fspath(NRReductionConfig().base_path)]
+
+
+_FILE_RUNS = [229197, 229198, 229199]
+
+
+def _resolved(tmp_path, root, file_value, runs, field_value="", path=None):
+    """Load a file holding `file_value` and `runs` from `path` (a folder outside the root by default) and resolve
+    its IPTS with the header field holding `field_value`."""
+    values = {"experiment_id": file_value, "RBnum": list(runs)}
+    if runs:
+        n = len(runs)
+        values.update(DBname=[f"db_{i}.dat" for i in range(n)], RB_Ymin=[140] * n, RB_Ymax=[150] * n,
+                      BkgROI=[[120, 130]] * n)
+    doc = SettingsDocument.from_file(_settings_at(path or tmp_path / "home" / "u" / "x.json", values))
+    doc.resolve_ipts(field_value, root=root)
+    return doc
+
+
+def _three(doc, value, changed, notes, problem):
+    """U2's three columns (v2: every row asserts all three). The IPTS held, which the header shows; "Changed from
+    the seed"; and the panel's lines: this slug's notes, and whether validate() reports the empty IPTS (I4)."""
+    assert doc.get("experiment_id") == value
+    assert doc.changed_vs_seed() == changed
+    assert _ipts_notes(doc) == notes
+    assert any("(experiment_id) is empty" in line for line in doc.validate()) is problem
+
+
+_ELSEWHERE = ('The run numbers 229197, 229198, 229199 resolve under "IPTS-38016", not "IPTS-36119"; reduced as it '
+              'stands, this file looks for them in /SNS/REF_L/IPTS-36119/nexus')
+
+
+def _nowhere(root, runs="229197, 229198, 229199"):
+    return f"No IPTS in {root} holds the run numbers {runs}"
+
+
+def test_a_file_whose_runs_are_under_its_ipts_keeps_it_and_says_nothing(tmp_path):
+    """U2, row 1: the file's own clean IPTS, its runs under it: held, nothing changed, no note, no problem."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-36119": _FILE_RUNS})
+    _three(_resolved(tmp_path, root, "IPTS-36119", _FILE_RUNS), "IPTS-36119", {}, [], False)
+
+
+def test_the_files_ipts_wins_over_runs_that_resolve_elsewhere_with_a_note(tmp_path):
+    """U2, row 2 (I3): the file's IPTS is never overridden. The runs resolve under another IPTS, and a note says
+    so, naming the runs, both IPTSs (spelled as the file holds them: file_spelling, §2) and the folder a reduction
+    of this file reads."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-38016": _FILE_RUNS, "IPTS-36119": []})
+    doc = _resolved(tmp_path, root, "IPTS-36119", _FILE_RUNS)
+    _three(doc, "IPTS-36119", {}, [_ELSEWHERE], False)
+    assert doc.validate() == []
+
+
+def test_an_empty_ipts_follows_runs_that_all_resolve_under_one(tmp_path):
+    """U2, row 3 (2a): the file names no IPTS and every run resolves under IPTS-36119: that IPTS is held, and
+    "Changed from the seed" shows it, since the file does not hold it until it is saved."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-36119": _FILE_RUNS})
+    doc = _resolved(tmp_path, root, "", _FILE_RUNS)
+    _three(doc, "IPTS-36119", {"experiment_id": ("", "IPTS-36119")}, [], False)
+    assert doc.validate() == []
+
+
+def test_runs_that_resolve_beat_the_ipts_the_field_held(tmp_path):
+    """U2, the collision row (v2, B-1: the order, asserted). The header held IPTS-1 from a previous file, and the
+    loaded file's runs resolve under IPTS-36119: the runs' IPTS (2a before 2b). The human's own flow: keeping
+    IPTS-1 would send the reduction to a folder without these runs' files."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-36119": _FILE_RUNS, "IPTS-1": []})
+    doc = _resolved(tmp_path, root, "", _FILE_RUNS, field_value="IPTS-1")
+    _three(doc, "IPTS-36119", {"experiment_id": ("", "IPTS-36119")}, [], False)
+
+
+def test_runs_in_two_ipts_take_the_first_runs_with_a_note_naming_the_others(tmp_path):
+    """U2, row 4 (2a, the human: "choose the 1st IPTS that resolves"): the first run's IPTS, and a note names the
+    runs that resolve elsewhere."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-38016": [229197], "IPTS-36119": [229198, 229199]})
+    _three(_resolved(tmp_path, root, "", _FILE_RUNS), "IPTS-38016", {"experiment_id": ("", "IPTS-38016")},
+           ['The run numbers 229198, 229199 resolve under "IPTS-36119", not "IPTS-38016"; reduced as it stands, '
+            'this file looks for them in /SNS/REF_L/IPTS-38016/nexus'], False)
+
+
+def test_runs_that_resolve_nowhere_fall_back_to_the_field_with_a_note(tmp_path):
+    """U2, row 5 (2b): no run resolves, so the IPTS the header held before the Load is kept, and a note says the
+    runs resolved nowhere."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-1": []})
+    _three(_resolved(tmp_path, root, "", _FILE_RUNS, field_value="IPTS-1"), "IPTS-1",
+           {"experiment_id": ("", "IPTS-1")}, [_nowhere(root)], False)
+
+
+def test_no_runs_keep_the_fields_ipts(tmp_path):
+    """U2, row 6 (2b): no angles, so no runs to resolve: the header's IPTS holds, shown as a change."""
+    _three(_resolved(tmp_path, _nexus_tree(tmp_path / "SNS", {}), "", [], field_value="IPTS-1"), "IPTS-1",
+           {"experiment_id": ("", "IPTS-1")}, [], False)
+
+
+def test_no_runs_and_no_field_take_the_ipts_of_the_folder_the_file_came_from(tmp_path):
+    """U2, row 7 (2c): no angles, an empty field, and the file loaded from under <root>/IPTS-7/: IPTS-7."""
+    root = _nexus_tree(tmp_path / "SNS", {})
+    _three(_resolved(tmp_path, root, "", [], path=root / "IPTS-7" / "shared" / "x.json"), "IPTS-7",
+           {"experiment_id": ("", "IPTS-7")}, [], False)
+
+
+def test_no_runs_no_field_and_a_file_from_elsewhere_stay_empty_without_a_problem(tmp_path):
+    """U2, row 8 (2d): nothing to infer from: "" kept, nothing changed, no note, no problem (no runs)."""
+    doc = _resolved(tmp_path, _nexus_tree(tmp_path / "SNS", {}), "", [])
+    _three(doc, "", {}, [], False)
+    assert doc.validate() == []
+
+
+def test_runs_that_resolve_nowhere_with_no_field_stay_empty_with_a_problem_and_a_note(tmp_path):
+    """U2, row 9 (2d, "and say so"): "" kept; the note says the runs resolved nowhere, and validate() reports the
+    empty IPTS (I4). The file's own folder is not consulted: it has runs (2c is for files without angles)."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-1": []})
+    _three(_resolved(tmp_path, root, "", _FILE_RUNS, path=root / "IPTS-7" / "shared" / "x.json"), "", {},
+           [_nowhere(root)], True)
+
+
+@pytest.mark.parametrize("held", [None, "   "], ids=["null", "spaces"])
+def test_a_null_or_blank_ipts_is_empty_too(tmp_path, held):
+    """U2 (v2: one definition of empty). A file holding null (10 of 104 real files hold null or no key) or only
+    spaces is empty. Its runs resolving nowhere, it is held as loaded, nothing changes, the note says so, and I4
+    reports it, never silently. Runs that resolve replace it (2a), shown as a change."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-1": []})
+    _three(_resolved(tmp_path, root, held, _FILE_RUNS), held, {}, [_nowhere(root)], True)
+    resolving = _nexus_tree(tmp_path / "SNS2", {"IPTS-36119": _FILE_RUNS})
+    _three(_resolved(tmp_path, resolving, held, _FILE_RUNS), "IPTS-36119",
+           {"experiment_id": (held, "IPTS-36119")}, [], False)
+
+
+def test_a_reported_ipts_is_held_as_loaded_and_nothing_is_looked_up(tmp_path, monkeypatch):
+    """U2, row 10 (A2, editor-load-fidelity B8): a file whose IPTS validate() reports keeps it as loaded; no
+    lookup runs (its runs would resolve) and today's problem stands."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-36119": _FILE_RUNS})
+    calls = []
+    monkeypatch.setattr(sd, "ipts_of_run", lambda *a, **_k: calls.append(a) or ())
+    monkeypatch.setattr(sd, "lookup_runs", lambda *a, **_k: calls.append(a) or None)
+    doc = _resolved(tmp_path, root, "../x", _FILE_RUNS)
+    _three(doc, "../x", {}, [], False)
+    assert calls == [] and any("'../x' contains a path separator" in line for line in doc.validate())
+
+
+def test_a_dat_seed_resolves_like_a_json_file(tmp_path):
+    """U2, row 11: a reduced .dat's # Config: header with an empty IPTS and runs under IPTS-36119 resolves as the
+    .json does (2a), and records its path."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-36119": _FILE_RUNS})
+    config = NRReductionConfig()
+    config.RBnum = list(_FILE_RUNS)
+    path = tmp_path / "home" / "run.dat"
+    path.parent.mkdir(parents=True)
+    path.write_text(f"# Config: {json.dumps(make_json_safe(config.__dict__))}\n0.01 1.0 0.1 0.001\n")
+    doc = SettingsDocument.from_file(path)
+    assert doc.source_path == os.path.abspath(path)
+    doc.resolve_ipts("", root=root)
+    _three(doc, "IPTS-36119", {"experiment_id": ("", "IPTS-36119")}, [], False)
+
+
+def test_an_injected_document_without_runs_or_field_stays_empty(tmp_path):
+    """U2, row 12: no file, so no folder to infer from; no runs, an empty field: "" and nothing to say."""
+    doc = SettingsDocument.from_dict({"Sname": "x"})
+    doc.resolve_ipts("", root=_nexus_tree(tmp_path, {}))
+    _three(doc, "", {}, [], False)
+
+
+def test_the_field_beats_the_files_folder(tmp_path):
+    """U2, the order (3) before (4): no runs, the field held IPTS-1, the file came from under IPTS-7: IPTS-1."""
+    root = _nexus_tree(tmp_path / "SNS", {})
+    _three(_resolved(tmp_path, root, "", [], field_value="IPTS-1", path=root / "IPTS-7" / "shared" / "x.json"),
+           "IPTS-1", {"experiment_id": ("", "IPTS-1")}, [], False)
+
+
+@pytest.mark.parametrize("field", ["../x", "   "], ids=["reported", "spaces"])
+def test_a_field_that_is_not_a_clean_ipts_is_not_carried_into_the_next_file(tmp_path, field):
+    """U2, (3) takes a clean IPTS only: a field holding "../x" (which validate() reports) or only spaces (empty) is
+    not inherited."""
+    _three(_resolved(tmp_path, _nexus_tree(tmp_path / "SNS", {}), "", [], field_value=field), "", {}, [], False)
+
+
+def test_a_run_under_two_ipts_is_named_with_both(tmp_path):
+    """U2, the pathological copied NeXus: the run is under two IPTS folders. The first in IPTS-number order is
+    used, and a note names both (never silent)."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-10": [229197], "IPTS-2": [229197]})
+    _three(_resolved(tmp_path, root, "", [229197]), "IPTS-2", {"experiment_id": ("", "IPTS-2")},
+           ['The run number 229197 has a NeXus file under more than one IPTS: "IPTS-2", "IPTS-10"'], False)
+
+
+def test_a_run_that_resolves_nowhere_is_named_beside_ones_that_do(tmp_path):
+    """U2, a partial lookup: two runs resolve under IPTS-36119 and one nowhere. IPTS-36119 is held, and the run no
+    IPTS holds is named: the reduction would not find its file."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-36119": [229197, 229198]})
+    _three(_resolved(tmp_path, root, "", _FILE_RUNS), "IPTS-36119", {"experiment_id": ("", "IPTS-36119")},
+           [f"No IPTS in {root} holds the run number 229199"], False)
+
+
+def test_a_lookup_that_cannot_run_says_so_when_the_file_named_no_ipts(tmp_path):
+    """U2, /SNS not mounted (a laptop): the runs cannot be looked up. The fallbacks apply, and a note says why no
+    IPTS came from the runs. A file with its own IPTS says nothing: there was nothing to infer."""
+    missing = tmp_path / "not-mounted"
+    _three(_resolved(tmp_path, missing, "", _FILE_RUNS, field_value="IPTS-1"), "IPTS-1",
+           {"experiment_id": ("", "IPTS-1")},
+           [f"The IPTS could not be looked up from the run numbers: {missing} is not available here"], False)
+    _three(_resolved(tmp_path, missing, "IPTS-36119", _FILE_RUNS), "IPTS-36119", {}, [], False)
+
+
+def test_the_notes_follow_the_ipts_typed_after_the_load(tmp_path):
+    """U2, I6 with the notes: typing the IPTS the other runs resolve under re-reads the same lookup against it
+    (no new lookup) and the note now names the runs under the first IPTS; removing a run's angle drops it."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-38016": [229197], "IPTS-36119": [229198, 229199]})
+    doc = _resolved(tmp_path, root, "", _FILE_RUNS)
+    doc.set("experiment_id", "IPTS-36119")
+    assert _ipts_notes(doc) == [
+        'The run number 229197 resolves under "IPTS-38016", not "IPTS-36119"; reduced as it stands, '
+        "this file looks for it in /SNS/REF_L/IPTS-36119/nexus"]
+    doc.remove_angle(0)
+    assert _ipts_notes(doc) == []
+
+
+def test_validate_reports_an_empty_ipts_when_runs_are_named():
+    """U3 (I4): "" with runs and no NeXus override is a problem naming the first run and the folder the reduction
+    would search; with no runs, or with an override, or with an IPTS, there is nothing to report."""
+    doc = SettingsDocument.from_dict({"RBnum": list(_FILE_RUNS)})
+    i4 = ("IPTS (experiment_id) is empty and 3 run numbers are set: the reduction would look for "
+          "REF_L_229197.nxs.h5 under /SNS/REF_L/nexus and not find it — enter the IPTS, or choose a NeXus path")
+    assert i4 in doc.validate()
+    one = SettingsDocument.from_dict({"RBnum": [229199]})
+    assert ("IPTS (experiment_id) is empty and 1 run number is set: the reduction would look for "
+            "REF_L_229199.nxs.h5 under /SNS/REF_L/nexus and not find it — enter the IPTS, or choose a NeXus path"
+            ) in one.validate()
+    for empty in (None, "   "):  # v2: one definition of empty
+        assert i4 in SettingsDocument.from_dict({"RBnum": list(_FILE_RUNS), "experiment_id": empty}).validate(), empty
+    for quiet in ({}, {"RBnum": []}, {"RBnum": [None, None]},
+                  {"RBnum": list(_FILE_RUNS), "_NEXUSpathRB_override": "/data/nexus"},
+                  {"RBnum": list(_FILE_RUNS), "experiment_id": "IPTS-1"}):
+        assert not [line for line in SettingsDocument.from_dict(quiet).validate() if "experiment_id) is empty" in line], quiet
+
+
+def test_from_file_records_where_the_document_came_from(tmp_path):
+    """U4: from_file records the absolute path it read (an attribute, never a config key: save() must not write
+    it); a document built any other way records none."""
+    path = _settings_at(tmp_path / "a" / "x.json", {"experiment_id": "IPTS-1"})
+    doc = SettingsDocument.from_file(path)
+    assert doc.source_path == os.path.abspath(path)
+    assert "source_path" not in doc.to_dict()
+    assert SettingsDocument.from_dict({}).source_path is None
+    assert SettingsDocument.for_new_file().source_path is None
+    assert SettingsDocument().source_path is None
+
+
+@pytest.mark.parametrize("ipts, remembered, expected", [
+    ("IPTS-36119", "/home/u", "{root}/IPTS-36119/shared"),
+    ("IPTS-36119", "{root}/IPTS-36119/shared/reduced", "{root}/IPTS-36119/shared/reduced"),
+    ("IPTS-36119", "{root}/IPTS-361190/shared", "{root}/IPTS-36119/shared"),
+    ("IPTS-36119", "", "{root}/IPTS-36119/shared"),
+    ("", "/home/u", "/home/u"),
+    ("../x", "/home/u", "/home/u"),
+    ("IPTS-404", "/home/u", "/home/u"),
+], ids=["ipts-remembered-elsewhere", "remembered-under-the-ipts", "a-prefix-is-not-under", "nothing-remembered",
+        "no-ipts", "a-reported-ipts", "no-shared-folder"])
+def test_load_start_folder(tmp_path, ipts, remembered, expected):
+    """U5 (I5): with a clean IPTS the dialog starts in its shared folder, unless the remembered folder is already
+    under that IPTS (a path prefix, not a string prefix); without one, or without the folder, where it was."""
+    root = tmp_path / "SNS"
+    for sub in ("IPTS-36119/shared/reduced", "IPTS-361190/shared"):
+        (root / sub).mkdir(parents=True)
+    fill = {"root": str(root)}
+    assert sd.load_start_folder(ipts, remembered.format(**fill), root=root) == expected.format(**fill)
+
+
+def test_load_start_folder_reads_a_missing_remembered_folder_as_none(tmp_path):
+    """U5 (v2, the security advisory F4): QSettings gives None for a stored value it cannot read. With an IPTS the
+    dialog still opens in its shared folder; without one it gets "" (Qt's default folder), never None."""
+    root = tmp_path / "SNS"
+    (root / "IPTS-1" / "shared").mkdir(parents=True)
+    assert sd.load_start_folder("IPTS-1", None, root=root) == str(root / "IPTS-1" / "shared")
+    assert sd.load_start_folder("", None, root=root) == ""
+    assert sd.load_start_folder("IPTS-404", None, root=root) == ""
+
+
+def test_settings_folders_are_the_ipts_folders_that_exist(tmp_path):
+    """U5 (I5, F7): the sidebar offers <IPTS>/shared, shared/reduced and shared/autoreduce, those that exist, in
+    that order; none without a clean IPTS."""
+    root = tmp_path / "SNS"
+    (root / "IPTS-1" / "shared" / "autoreduce").mkdir(parents=True)
+    assert sd.settings_folders("IPTS-1", root=root) == [str(root / "IPTS-1" / "shared"),
+                                                        str(root / "IPTS-1" / "shared" / "autoreduce")]
+    (root / "IPTS-1" / "shared" / "reduced").mkdir()
+    assert sd.settings_folders("IPTS-1", root=root)[1] == str(root / "IPTS-1" / "shared" / "reduced")
+    assert sd.settings_folders("", root=root) == [] and sd.settings_folders("../x", root=root) == []
+    assert sd.settings_folders("IPTS-404", root=root) == []
+
+
+def test_the_lookup_is_bounded(tmp_path, monkeypatch):
+    """U6 (A3): a file naming more distinct runs than MAX_RUN_LOOKUPS looks up only that many, once each, and a
+    note says the lookup was capped; within the cap, each distinct run is looked up once."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-1": range(1000, 1030)})
+    calls = []
+    real = sd._run_ipts
+
+    def counting(run, *args, **kwargs):
+        calls.append(run)
+        return real(run, *args, **kwargs)
+
+    monkeypatch.setattr(sd, "_run_ipts", counting)
+    runs = list(range(1000, 1000 + sd.MAX_RUN_LOOKUPS + 5)) * 2
+    doc = _resolved(tmp_path, root, "", runs)
+    assert calls == list(range(1000, 1000 + sd.MAX_RUN_LOOKUPS))
+    assert doc.get("experiment_id") == "IPTS-1"
+    assert (f"Only the first {sd.MAX_RUN_LOOKUPS} of {sd.MAX_RUN_LOOKUPS + 5} distinct run numbers were looked up "
+            f"for their IPTS") in _ipts_notes(doc)
+    calls.clear()
+    _resolved(tmp_path, root, "", [1000, 1001, 1000])
+    assert calls == [1000, 1001]
+
+
+# -- the battery's survivors (frame rows F2, F3, F7, F11, F12, F17, F21, F22 SURVIVED the first run) --------
+
+
+def test_the_lookup_and_the_empty_ipts_problem_follow_the_config_class(tmp_path, monkeypatch):
+    """F2, F3, F21: with no root given, the lookup searches the folder the document's own config class joins an IPTS
+    onto, in the NeXus folder that class names, and I4 names the folder that class would read. A config whose base
+    and NeXus folder are not /SNS/REF_L and nexus is what tells a re-spelled literal apart (equal values cannot)."""
+    monkeypatch.setattr(sd, "IPTS_LOOKUP_ROOT", None)
+
+    class Site(NRReductionConfig):
+        @property
+        def base_path(self):
+            return tmp_path / "site" / self.experiment_id
+
+        @property
+        def NEXUSpathRB(self):  # noqa: N802 -- the config's own name
+            if self._NEXUSpathRB_override is not None:
+                return pathlib.Path(self._NEXUSpathRB_override)
+            return self.base_path / "raw"
+
+    (tmp_path / "site" / "IPTS-1" / "raw").mkdir(parents=True)
+    (tmp_path / "site" / "IPTS-1" / "raw" / "REF_L_229197.nxs.h5").touch()
+    config = Site()
+    config.RBnum = [229197]
+    doc = SettingsDocument(config)
+    assert (f"IPTS (experiment_id) is empty and 1 run number is set: the reduction would look for REF_L_229197.nxs.h5 "
+            f"under {tmp_path / 'site' / 'raw'} and not find it — enter the IPTS, or choose a NeXus path"
+            ) in doc.validate()
+    assert doc.resolve_ipts("") == "IPTS-1"
+
+
+def test_only_int_runs_reach_the_lookup(tmp_path, monkeypatch):
+    """F7: RBnum is list[int]. An unset entry, text (here a path) or a bool never reaches the lookup's file name."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-1": [229197]})
+    calls = []
+    real = sd._run_ipts
+    monkeypatch.setattr(sd, "_run_ipts", lambda run, *args, **kwargs: calls.append(run) or real(run, *args, **kwargs))
+    doc = SettingsDocument.from_dict({"RBnum": [None, "../../x", True, 229197]})
+    assert doc.resolve_ipts("", root=root) == "IPTS-1"
+    assert calls == [229197]
+
+
+def test_a_null_ipts_with_nothing_to_infer_stays_as_the_file_holds_it(tmp_path):
+    """F11: 2d leaves the file's value as it is, a null included (the human's d: "no harm in leaving it that
+    way"). Nothing changes from the seed."""
+    path = tmp_path / "home" / "x.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({"experiment_id": None, "Sname": "x"}))
+    doc = SettingsDocument.from_file(path)
+    doc.resolve_ipts("", root=_nexus_tree(tmp_path / "SNS", {}))
+    assert doc.get("experiment_id") is None and doc.changed_vs_seed() == {}
+
+
+def test_only_a_file_inside_an_ipts_folder_is_in_that_ipts(tmp_path):
+    """F12: 2c takes the IPTS folder a file is inside. Something named IPTS-7 directly under the root, and the root
+    itself, are inside no IPTS."""
+    root = tmp_path / "SNS"
+    assert sd._ipts_of_folder(root / "IPTS-7" / "shared" / "x.json", root) == "IPTS-7"
+    assert sd._ipts_of_folder(root / "IPTS-7", root) == ""
+    assert sd._ipts_of_folder(root, root) == ""
+
+
+def test_a_run_under_two_ipts_is_named_once_whichever_is_held(tmp_path):
+    """F17: a run under two IPTSs is named once, as ambiguous, also when the IPTS held is not the first of them (the
+    file holds IPTS-10; the run is under IPTS-2 and IPTS-10). It is not "elsewhere" too."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-10": [229197], "IPTS-2": [229197]})
+    doc = _resolved(tmp_path, root, "IPTS-10", [229197])
+    assert _ipts_notes(doc) == ['The run number 229197 has a NeXus file under more than one IPTS: "IPTS-2", "IPTS-10"']
+
+
+def test_the_elsewhere_note_names_the_folder_a_nexus_override_reads(tmp_path):
+    """F22: with a NeXus override set, a reduction of this file reads the override's folder, and the note names
+    that folder, not the IPTS's."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-38016": _FILE_RUNS, "IPTS-36119": []})
+    path = _settings_at(tmp_path / "home" / "x.json", {"experiment_id": "IPTS-36119", "RBnum": list(_FILE_RUNS),
+                                                         "_NEXUSpathRB_override": "/data/nexus"})
+    doc = SettingsDocument.from_file(path)
+    doc.resolve_ipts("", root=root)
+    assert _ipts_notes(doc) == [
+        'The run numbers 229197, 229198, 229199 resolve under "IPTS-38016", not "IPTS-36119"; reduced as it stands, '
+        "this file looks for them in /data/nexus"]
+
+
+
+def test_the_cap_is_read_when_the_lookup_runs(tmp_path, monkeypatch):
+    """v2, the design advisory A4: lookup_runs reads MAX_RUN_LOOKUPS when it is called. A default bound at
+    definition would ignore a changed constant."""
+    root = _nexus_tree(tmp_path / "SNS", {"IPTS-1": [1000, 1001, 1002]})
+    monkeypatch.setattr(sd, "MAX_RUN_LOOKUPS", 2)
+    lookup = sd.lookup_runs([1000, 1001, 1002], root=root)
+    assert list(lookup.found) == [1000, 1001] and lookup.skipped == (1002,)
+
+
+def test_a_null_ipts_that_cannot_be_looked_up_says_so(tmp_path):
+    """v2, one definition of empty, in the cannot-look-up note: a file holding null names no IPTS either, so a
+    lookup that cannot run says why none came from the runs."""
+    missing = tmp_path / "not-mounted"
+    _three(_resolved(tmp_path, missing, None, _FILE_RUNS), None, {},
+           [f"The IPTS could not be looked up from the run numbers: {missing} is not available here"], True)

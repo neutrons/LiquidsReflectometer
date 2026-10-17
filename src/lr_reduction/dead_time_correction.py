@@ -10,6 +10,31 @@ from mantid.kernel import Direction, FloatArrayLengthValidator, FloatArrayProper
 from mantid.simpleapi import Rebin, SumSpectra, logger
 
 
+def paralyzable_correction(rate, dead_time, tof_step):
+    """
+    Paralyzable dead-time correction of each TOF bin: the true rate over the measured one.
+
+    Where there are no events (a zero rate) the correction is 1. The equation would give 0/0 there,
+    so the division is not done in those bins rather than done and overwritten.
+
+    Parameters
+    ----------
+    rate : numpy.ndarray
+        Measured counts per pulse in each TOF bin
+    dead_time : float
+        Dead time, in microseconds
+    tof_step : float
+        Width of the TOF bins, in microseconds
+
+    Returns
+    -------
+    numpy.ndarray
+        Correction of each TOF bin
+    """
+    true_rate = -scipy.special.lambertw(-rate * dead_time / tof_step).real / dead_time
+    return np.divide(true_rate, rate / tof_step, out=np.ones_like(true_rate), where=rate != 0)
+
+
 class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
     def category(self):
         return "Reflectometry\\SNS"
@@ -94,11 +119,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
 
         # Compute the dead time correction for each TOF bin
         if paralyzing:
-            true_rate = -scipy.special.lambertw(-rate * dead_time / tof_step).real / dead_time
-            corr = true_rate / (rate / tof_step)
-            # If we have no events, set the correction to 1 otherwise we will get a nan
-            # from the equation above.
-            corr[rate == 0] = 1
+            corr = paralyzable_correction(rate, dead_time, tof_step)
         else:
             corr = 1 / (1 - rate * dead_time / tof_step)
 

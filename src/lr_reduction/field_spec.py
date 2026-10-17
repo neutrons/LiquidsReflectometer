@@ -72,9 +72,13 @@ __all__ = [
     "CALC_THETA_CHOICES", "DET_RES_CHOICES", "METHOD_CHOICES", "PEAK_TYPE_CHOICES",
     "Field", "FIELD_SPEC", "BY_NAME", "PER_ANGLE_NAMES", "OPTIONAL_LIST_NAMES",
     "RUNTIME_OWNED_NAMES", "INT_ENCODED_NAMES", "DEFAULT_IF_EMPTY_NAMES", "ANGLE_DEFINING_NAMES",
-    "GROUPS", "TYPES",
+    "EDITOR_START_NAMES", "HEADER_NAMES", "SECTION_ORDER", "GROUPS", "TYPES",
     "as_boolean", "get", "fields_in",
 ]
+
+
+#: ``Field.editor_start`` when a new file starts at the library's default.
+_SAME_AS_DEFAULT = object()
 
 
 @dataclass(frozen=True)
@@ -136,6 +140,21 @@ class Field:
         ``nr_reduction_calc.py:402`` joins the two). The editor offers that
         folder's files as the column's choices
         (``SettingsDocument.candidates``). ``None`` for every other field.
+    editor_start
+        The value a settings file the editor creates from nothing starts at, where
+        that differs from ``default``: the instrument's current operation
+        (``DetResFn`` ``gaussian``, ``DetSigma`` ``1.0``; the scientists' item 3).
+        Only that: ``NRReductionConfig`` keeps ``default``, and a loaded file that
+        omits the field still holds ``default``, which is what reducing it uses
+        (``json_to_config`` starts from a fresh config). Read through
+        ``starting_value()``; listed in ``EDITOR_START_NAMES``.
+    choice_labels
+        For a choice the editor offers in words other than its stored values:
+        ``(stored value, entry text)`` pairs, in the order the editor lists them.
+        ``useCalcTheta`` is the case (item 4): ``False`` / ``True`` / ``trust
+        sample angle`` store ``False`` / ``"detector_angle"`` / ``"sample_angle"``.
+        One mapping, read both ways (``label_for``, ``value_for``); asserted at
+        import to label every value the field holds canonically, exactly once.
     """
 
     name: str
@@ -159,6 +178,8 @@ class Field:
     value_notes: Tuple[Tuple[str, str], ...] = ()
     reducer_default: Any = None
     candidates_folder: Optional[str] = None
+    editor_start: Any = _SAME_AS_DEFAULT
+    choice_labels: Tuple[Tuple[Any, str], ...] = ()
 
     # -- type vocabulary ------------------------------------------------
 
@@ -188,6 +209,46 @@ class Field:
         if isinstance(self.default, list):
             return [list(e) if isinstance(e, list) else e for e in self.default]
         return self.default
+
+    def starting_value(self):
+        """The value a settings file the editor creates starts at: ``editor_start``, else the default (a copy)."""
+        if self.editor_start is _SAME_AS_DEFAULT:
+            return self.default_value()
+        return self.editor_start
+
+    # -- stored value <-> what the reducer reads <-> entry text --------------
+
+    def canonical_choice(self, value):
+        """For a tri-state choice, the stored value the reducer acts on when it accepts `value`; else `value`.
+
+        The reducer reads ``useCalcTheta`` (``nr_reduction_calc.py:92-97``) as off when it is falsy, maps a
+        legacy ``True`` to ``detector_angle``, and lower-cases a name before matching it. So a falsy value is
+        ``False``, ``True`` is the first choice, and a name in any case is its declared spelling. A value the
+        reducer rejects (it raises on ``"true"``) comes back unchanged, to be shown and reported as itself.
+        Every other field's value comes back unchanged.
+        """
+        if not (self.falsy_means_off and self.allowed):
+            return value
+        if not value:
+            return False
+        if value is True:
+            return self.allowed[0]
+        return self.canonical(value)
+
+    def label_for(self, value):
+        """The entry text for `value` as the reducer reads it (``canonical_choice``), or ``None`` if none."""
+        stored = self.canonical_choice(value)
+        for choice, text in self.choice_labels:
+            if type(choice) is type(stored) and choice == stored:
+                return text
+        return None
+
+    def value_for(self, text):
+        """The stored value an entry text stands for. Raises ``KeyError`` for a text the field does not offer."""
+        for choice, label in self.choice_labels:
+            if label == text:
+                return choice
+        raise KeyError(f"{self.name} offers no entry {text!r}")
 
     # -- text -> value ---------------------------------------------------
 
@@ -281,10 +342,7 @@ class Field:
                 for noted, reason in self.value_notes:
                     if str(value).lower() == noted.lower():
                         return f"{self.label} ({self.name}){where}: {value!r} — {reason}"
-                return (
-                    f"{self.label} ({self.name}){where}: {value!r} is not one of "
-                    f"{', '.join(str(a) for a in self.allowed)}"
-                )
+                return f"{self.label} ({self.name}){where}: {value!r} is not one of {self._accepted_forms()}"
             return ""
         expected = self.element_type
         problem = _type_problem(value, expected, ints=self.int_encoded)
@@ -312,6 +370,16 @@ class Field:
         if self.maximum is not None and value > self.maximum:
             return f"{self.label} ({self.name}){where}: {value} is above {self.maximum}"
         return ""
+
+
+    def _accepted_forms(self):
+        """The forms a problem line names: the entry texts where there are labels (with the stored value
+        where it differs), else the declared choices."""
+        if not self.choice_labels:
+            return ", ".join(str(a) for a in self.allowed)
+        return ", ".join(
+            text if str(choice) == text else f"{text} ({choice})" for choice, text in self.choice_labels
+        )
 
 
 #: Every type string a Field may declare. Asserted below, so a typo like
@@ -444,8 +512,8 @@ def _path_problem(value):
     return ""
 
 RUNS = "Runs and angles"
-PATHS = "Paths"
-NAMING = "Output naming"
+# One section for what the header (HEADER_NAMES) leaves of the output naming and the paths (item 7 (viii)).
+OUTPUT = "Output naming and paths"
 PROCESSING = "Processing"
 BACKGROUND = "Background"
 QSPACE = "Q-space"
@@ -505,32 +573,32 @@ FIELD_SPEC = (
           per_angle=True, default_if_empty=True, reducer_default=1),
 
     # ---- scalars ---------------------------------------------------------
-    Field("Sname", "Output name", NAMING, "str", "reduction_output",
+    Field("Sname", "Output name", OUTPUT, "str", "reduction_output",
           "Base name for the reduced output files.", no_separators=True),
     # A directory NAME, not a path: it is joined verbatim onto /SNS/REF_L, so
     # an absolute value replaces the base entirely and a '..' walks out of it.
-    Field("experiment_id", "IPTS", NAMING, "str", "",
+    Field("experiment_id", "IPTS", OUTPUT, "str", "",
           "IPTS identifier. Also the root of every default path.",
           no_separators=True),
-    Field("subname", "Output subtitle", NAMING, "str", None,
+    Field("subname", "Output subtitle", OUTPUT, "str", None,
           "Optional subtitle appended to saved file names.", no_separators=True),
-    Field("DTCsubname", "Dead-time-corrected suffix", NAMING, "str", "_DTC",
+    Field("DTCsubname", "Dead-time-corrected suffix", OUTPUT, "str", "_DTC",
           "Suffix for dead-time-corrected outputs.", no_separators=True),
-    Field("BINsubname", "Binned suffix", NAMING, "str", "_DTC",
+    Field("BINsubname", "Binned suffix", OUTPUT, "str", "_DTC",
           "Suffix for binned outputs.", no_separators=True),
-    Field("errBINsubname", "Binned-error suffix", NAMING, "str", "_err_DTC",
+    Field("errBINsubname", "Binned-error suffix", OUTPUT, "str", "_err_DTC",
           "Suffix for binned uncertainty outputs.", no_separators=True),
     Field("data_x_range", "Detector X range", RUNS, "list[int]", [50, 200],
           "Detector pixel range integrated over in X. Two values, not per angle."),
 
-    Field("_Spath_override", "Output path", PATHS, "path", None,
+    Field("_Spath_override", "Output path", OUTPUT, "path", None,
           "Where reduced data is written. Unset uses <IPTS>/shared/reduced."),
-    Field("_NEXUSpathRB_override", "NeXus path", PATHS, "path", None,
+    Field("_NEXUSpathRB_override", "NeXus path", OUTPUT, "path", None,
           "Where run NeXus files are read from. Unset uses <IPTS>/nexus."),
-    Field("_DBpath_override", "Direct-beam path", PATHS, "path", None,
+    Field("_DBpath_override", "Direct-beam path", OUTPUT, "path", None,
           "Where direct-beam files are read from. Unset uses "
           "<IPTS>/shared/transmission."),
-    Field("_BINpath_override", "Binned-output path", PATHS, "path", None,
+    Field("_BINpath_override", "Binned-output path", OUTPUT, "path", None,
           "Where binned output is written. Unset uses <IPTS>/shared/reduced."),
 
     Field("Normalize", "Normalize to critical edge", PROCESSING, "bool", False,
@@ -542,10 +610,17 @@ FIELD_SPEC = (
     # the former (nr_reduction_calc, NRReduction.__init__). Declaring it bool
     # rendered a checkbox that could not express 'sample_angle' at all and
     # silently downgraded a loaded one on any toggle.
-    Field("useCalcTheta", "Theta source", PROCESSING, "str", False,
-          "Where theta comes from: the detector angle, or the fitted sample "
-          "angle. Leave blank to keep the THS/THI log values.",
-          allowed=CALC_THETA_CHOICES, falsy_means_off=True),
+    #
+    # Offered as False / True / trust sample angle (the scientists' item 4), which
+    # store False / "detector_angle" / "sample_angle": the reducer's own reading
+    # of a legacy True is detector_angle.
+    Field("useCalcTheta", "Apply theta calculation", PROCESSING, "str", False,
+          "Whether theta is calculated from the fitted peak position. False: not "
+          "calculated; the THS/THI log values are used. True: calculated trusting "
+          "the detector angle (TTHD). Trust sample angle: calculated trusting the "
+          "sample angle.",
+          allowed=CALC_THETA_CHOICES, falsy_means_off=True,
+          choice_labels=((False, "False"), ("detector_angle", "True"), ("sample_angle", "trust sample angle"))),
     Field("plotON", "Show plots", PROCESSING, "bool", True,
           "Display plots during reduction. Turn off for batch processing."),
     Field("plotQ4", "Plot as R*Q^4", PROCESSING, "bool", False,
@@ -602,11 +677,13 @@ FIELD_SPEC = (
           "TOF bin width used when computing the dead-time correction.",
           minimum=0.0),
 
+    # A new file starts at gaussian / 1.0, the instrument's current operation
+    # (item 3); the library and a file that omits them keep rectangular / 0.8.
     Field("DetResFn", "Resolution function", RESOLUTION, "str", "rectangular",
           "Shape of the detector resolution function.", allowed=DET_RES_CHOICES,
-          value_notes=DET_RES_NOTES, case_sensitive=True),
+          value_notes=DET_RES_NOTES, case_sensitive=True, editor_start="gaussian"),
     Field("DetSigma", "Resolution sigma", RESOLUTION, "float", 0.8,
-          "Width of the detector resolution function.", minimum=0.0),
+          "Width of the detector resolution function.", minimum=0.0, editor_start=1.0),
 
     Field("peak_pad", "Peak fit padding (pixels)", PEAK, "int", 1,
           "Extra pixels included outside the background range when fitting the "
@@ -662,8 +739,64 @@ ANGLE_DEFINING_NAMES = tuple(
     if f.per_angle and not (f.default_if_empty or f.broadcast_ok or f.optional_list)
 )
 
-#: Groups in the order the editor should present them.
-GROUPS = tuple(dict.fromkeys(f.group for f in FIELD_SPEC))
+#: Fields a settings file the editor creates starts at a value other than the
+#: default (``Field.editor_start``); ``SettingsDocument.for_new_file`` applies them.
+EDITOR_START_NAMES = tuple(f.name for f in FIELD_SPEC if f.editor_start is not _SAME_AS_DEFAULT)
+
+def _check_choice_labels(field):
+    """Raise ``ValueError`` unless ``field.choice_labels`` labels every value the field holds canonically
+    (``False`` too, for a tri-state choice), each once, with no two labels the same.
+
+    Run on every field at import, so a stored choice added to a domain without a label fails there rather
+    than reaching the editor as an unlabelled entry. A raise, not an ``assert``: ``python -O`` strips asserts.
+    """
+    stored = [choice for choice, _ in field.choice_labels]
+    texts = [text for _, text in field.choice_labels]
+    held = {False, *field.allowed} if field.falsy_means_off else set(field.allowed)
+    if set(stored) != held or len(stored) != len(set(stored)):
+        raise ValueError(f"{field.name}: choice_labels label {stored}, but the field holds {sorted(held, key=str)}")
+    if len(texts) != len(set(texts)):
+        raise ValueError(f"{field.name}: two choices share a label in {texts}")
+
+
+for _field in FIELD_SPEC:
+    if _field.choice_labels:
+        _check_choice_labels(_field)
+
+#: The fields the settings editor shows in its header, above the angles, instead of in its list: the IPTS and
+#: the two input paths it roots (the scientists' item 6). The overrides' derived paths are shown, never written.
+HEADER_NAMES = ("experiment_id", "_NEXUSpathRB_override", "_DBpath_override")
+for _name in HEADER_NAMES:
+    BY_NAME[_name]  # an unknown name raises KeyError at import
+
+#: The sections of the editor's list, in the order the scientists asked for (item 7): how often each is
+#: opened and changed, not where its fields happen to sit in FIELD_SPEC. Every group with a field in the list
+#: (not per-angle, not in the header) is here exactly once; _check_section_order enforces it at import.
+SECTION_ORDER = (RUNS, PROCESSING, QSPACE, WAVELENGTH, DEADTIME, RESOLUTION, PEAK, OUTPUT, GEOMETRY, RUNTIME)
+
+
+def _check_section_order(fields, order):
+    """Raise ``ValueError`` unless `order` names each group that has a field in the editor's list exactly once,
+    and nothing else.
+
+    Run at import, so a field added later with a group of its own fails here, naming the group, instead of
+    leaving its field out of every section. A raise, not an ``assert``: ``python -O`` strips asserts.
+    """
+    if len(order) != len(set(order)):
+        raise ValueError(f"SECTION_ORDER lists a group twice: {order}")
+    listed = {f.group for f in fields if not f.per_angle and f.name not in HEADER_NAMES}
+    missing, extra = sorted(listed - set(order)), sorted(set(order) - listed)
+    if missing or extra:
+        raise ValueError(
+            f"SECTION_ORDER does not match the groups of the editor's list: missing {missing}, not a section {extra}"
+        )
+
+
+_check_section_order(FIELD_SPEC, SECTION_ORDER)
+
+#: Every group: the sections in their declared order, then the groups with no field in the list (per-angle only:
+#: their fields are columns of the Angles table).
+GROUPS = SECTION_ORDER + tuple(g for g in dict.fromkeys(f.group for f in FIELD_SPEC) if g not in SECTION_ORDER)
 
 
 def get(name):

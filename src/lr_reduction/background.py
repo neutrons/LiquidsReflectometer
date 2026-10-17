@@ -44,6 +44,32 @@ def find_ranges_without_overlap(r1, r2):
     return []  # no range without r2
 
 
+def background_fit_weights(counts, errors, charge):
+    """
+    Weights for the linear fit of one Q or TOF bin across the background pixels.
+
+    Here we have counts normalized by proton charge, so if we want to assign an error of 1 on the counts,
+    it should be 1/charge: a pixel with no counts is weighted `charge`, and the others 1/error. A pixel with
+    no counts has no error either, so the division is not done there rather than done as 1/0 and overwritten.
+    A zero error with counts is still divided, and still warns: an infinite weight would reach the fit.
+
+    Parameters
+    ----------
+    counts : numpy.ndarray
+        Background counts of each pixel, normalized by proton charge
+    errors : numpy.ndarray
+        Errors on those counts
+    charge : float
+        Proton charge
+
+    Returns
+    -------
+    numpy.ndarray
+        Weight of each pixel
+    """
+    return np.divide(1, errors, out=np.full_like(errors, charge), where=counts != 0)
+
+
 def functional_background(
     ws,
     event_reflectivity,
@@ -141,10 +167,7 @@ def functional_background(
         linear = LinearModel()
         pars = linear.make_params(slope=0, intercept=_estimate)
 
-        weights = 1 / _d_bck[:, i]
-        # Here we have counts normalized by proton charge, so if we want to
-        # assign an error of 1 on the counts, it should be 1/charge.
-        weights[_bck[:, i] == 0] = charge
+        weights = background_fit_weights(_bck[:, i], _d_bck[:, i], charge)
 
         fit = linear.fit(_bck[:, i], pars, method="leastsq", x=pixels, weights=weights)
 

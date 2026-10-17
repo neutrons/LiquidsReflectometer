@@ -29,20 +29,35 @@ choice is written into the item, so ``_on_cell_changed`` remains the one write
 path. The choices read as the file spells them (``_in_file_spelling``).
 """
 
+import contextlib
 import functools
+import os
 import traceback
 from pathlib import Path
 
 from qtpy import QtCore, QtGui, QtWidgets
 
 from launcher.app_identity import ensure_identity
+from launcher.apps import roi_dialog
+from launcher.apps.roi_dialog import ROISelectionDialog
 from lr_reduction import field_spec as fs
-from lr_reduction.settings_document import SettingsDocument
+from lr_reduction import roi_estimate
+from lr_reduction.settings_document import (
+    SettingsDocument,
+    file_spelling,
+    load_start_folder,
+    normalise_experiment_id,
+    settings_folders,
+)
 
 #: Above this, populating the table freezes the GUI thread for seconds and
 #: costs ~1100x the file size in memory. A settings file with more angles than
 #: this is a mistake, not a workload.
 MAX_TABLE_ROWS = 500
+
+#: Events the ROI pop-out reads from a run (roi-popout-data's stride sampling over the whole run, never its first
+#: N): a choice of pixel ranges needs a sample, and a long run then opens quickly. #197's value (A7).
+MAX_ROI_EVENTS = 2_000_000
 
 
 #: Editor property set when the user chooses an item in a table drop-down.
@@ -64,6 +79,75 @@ _LIST_KEYS = {
     QtCore.Qt.Key_Up, QtCore.Qt.Key_Down, QtCore.Qt.Key_PageUp, QtCore.Qt.Key_PageDown,
     QtCore.Qt.Key_Home, QtCore.Qt.Key_End, QtCore.Qt.Key_F4,
 }
+
+def section_state_key(name):
+    """The QSettings key a list section's state is stored under: the section's declared name, never its position."""
+    return f"settings_editor/sections/{name}"
+
+
+def _stored_expanded(value):
+    """A stored section state, read by its meaning. A new process reads the strings "true"/"false" back from INI
+    (measured, Qt 5.15), and bool("false") is True. Anything else, or nothing stored, is expanded."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.strip().lower() in ("true", "false"):
+        return value.strip().lower() == "true"
+    return True
+
+
+class _SectionHeading(QtWidgets.QToolButton):
+    """A list section's heading: a checkable button, checked while the section is expanded. A click or Space toggles
+    it, as any button does; Return and Enter do too, for a heading reached with Tab."""
+
+    def keyPressEvent(self, event):
+        modifiers = event.modifiers() & ~QtCore.Qt.KeypadModifier
+        if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter) and modifiers == QtCore.Qt.NoModifier:
+            self.click()
+            return
+        super().keyPressEvent(event)
+
+
+class _Section(QtWidgets.QWidget):
+    """One section of the editor's list: a heading that collapses and expands the fields under it.
+
+    Collapsed, the fields are hidden: they take no space, and Tab passes from the heading to the next section's.
+    Nothing else changes. They are still the tab's editors, so a Load refreshes them, and their values are still in
+    the document, in validate() and in a save.
+    """
+
+    def __init__(self, title, expanded, parent=None):
+        super().__init__(parent)
+        self.heading = _SectionHeading()
+        self.heading.setText(title)
+        self.heading.setCheckable(True)
+        self.heading.setChecked(expanded)
+        self.heading.setAutoRaise(True)
+        self.heading.setFocusPolicy(QtCore.Qt.StrongFocus)
+        self.heading.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+        self.heading.setToolTip("Collapse or expand this section. The state is remembered for you.")
+        font = self.heading.font()
+        font.setBold(True)
+        self.heading.setFont(font)
+        self.body = QtWidgets.QWidget()
+        self.form = QtWidgets.QFormLayout()
+        self.body.setLayout(self.form)
+        layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.heading)
+        layout.addWidget(self.body)
+        self.setLayout(layout)
+        self.heading.toggled.connect(self._show_body)
+        self._show_body(expanded)
+
+    def _show_body(self, expanded):
+        self.heading.setArrowType(QtCore.Qt.DownArrow if expanded else QtCore.Qt.RightArrow)
+        self.body.setVisible(expanded)
+
+
+#: The header's path overrides (fs.HEADER_NAMES without the IPTS), and what a path shows when nothing is derived.
+_HEADER_PATHS = tuple(name for name in fs.HEADER_NAMES if name != "experiment_id")
+_NO_IPTS = "set an IPTS or type a path"
+_NOT_A_FOLDER = "the IPTS is not a folder name; type a path"
 
 
 def _later(owner, slot):
@@ -412,6 +496,56 @@ class _CandidatesDelegate(_DropDownDelegate):
             model.setData(index, editor.currentText(), QtCore.Qt.EditRole)
 
 
+class _FileDialogSidebar(QtCore.QObject):
+    """Gives the next file dialog shown the IPTS's settings folders as its sidebar (editor-ipts-inference, I5).
+
+    The static ``QFileDialog`` calls take no sidebar, and the tests' autouse net (``conftest.no_qfiledialog``)
+    stubs exactly those calls so that no test can block on a modal dialog. So the dialogs stay static, and this
+    filter, installed on the application for the one call, sets the sidebar of the dialog the call builds when it is
+    shown. Measured offscreen on Qt 5.15 (the ledger's ``editor-ipts-inference-probes.py``):
+    the filter sees the static dialog's Show event and the sidebar holds. Qt's own dialog only
+    (``DontUseNativeDialog``): a native dialog builds no sidebar.
+
+    When the dialog hides, it gets its own sidebar back. Qt saves a dialog's sidebar ("shortcuts") to the user's
+    QtProject.conf when the dialog is destroyed, and every later Qt 5 file dialog of the user's starts from it:
+    left in place, the IPTS's folders would replace the user's own sidebar in every Qt application.
+    """
+
+    def __init__(self, folders):
+        super().__init__()
+        self._urls = [QtCore.QUrl.fromLocalFile(folder) for folder in folders]
+        self._own = None
+
+    def eventFilter(self, watched, event):  # noqa: N802 -- Qt's name
+        # Never raise here: an exception out of a PyQt virtual reaches qFatal() and aborts the launcher.
+        try:
+            if isinstance(watched, QtWidgets.QFileDialog):
+                if event.type() == QtCore.QEvent.Show:
+                    self._own = watched.sidebarUrls()
+                    watched.setSidebarUrls(self._urls)
+                elif event.type() == QtCore.QEvent.Hide and self._own is not None:
+                    watched.setSidebarUrls(self._own)
+                    self._own = None
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
+        return False
+
+
+@contextlib.contextmanager
+def _file_dialog_sidebar(folders):
+    """For one static file-dialog call: the dialog it shows gets ``folders`` as its sidebar (none: unchanged)."""
+    application = QtWidgets.QApplication.instance()
+    if not folders or application is None:
+        yield
+        return
+    sidebar = _FileDialogSidebar(folders)
+    application.installEventFilter(sidebar)
+    try:
+        yield
+    finally:
+        application.removeEventFilter(sidebar)
+
+
 def guarded(method):
     """Report an exception into the panel instead of letting it leave the slot.
 
@@ -443,7 +577,9 @@ class SettingsEditorTab(QtWidgets.QWidget):
         ensure_identity()
         super().__init__(parent)
 
-        self.document = document if document is not None else SettingsDocument()
+        # A tab opened with no document is a new file: it starts at the instrument's current operation
+        # (SettingsDocument.for_new_file). A document given to the tab is shown as it holds.
+        self.document = document if document is not None else SettingsDocument.for_new_file()
         self.settings = QtCore.QSettings()
         self.editors = {}
         # Guards the table's cellChanged signal while the view writes into it,
@@ -455,6 +591,7 @@ class SettingsEditorTab(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
         layout.addWidget(self._build_toolbar())
+        layout.addWidget(self._build_paths_header())
 
         splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
         splitter.addWidget(self._build_angle_panel())
@@ -487,6 +624,40 @@ class SettingsEditorTab(QtWidgets.QWidget):
 
         row.addStretch(1)
         return bar
+
+    def _build_paths_header(self):
+        """IPTS and the two input paths it roots, above the angles: these fields' only editors (fs.HEADER_NAMES).
+
+        A path override is written only by an explicit edit: typing in its control, or a folder from its Browse
+        button. While it is unset, the control shows the folder the reduction derives from the IPTS as its
+        placeholder (_show_derived_paths), so the derived path is visible but never held: a written override would
+        freeze an absolute path into the file, where an unset one is derived again from the IPTS on load.
+        """
+        box = QtWidgets.QGroupBox("Experiment")
+        self.paths_header = box
+        form = QtWidgets.QFormLayout()
+        box.setLayout(form)
+        field = fs.get("experiment_id")
+        ipts = QtWidgets.QLineEdit()
+        ipts.setToolTip(f"{field.name} — {field.help} A number is stored as IPTS-<number>.")
+        ipts.editingFinished.connect(lambda widget=ipts: self._on_ipts_edited(widget))
+        self.editors[field.name] = ipts
+        form.addRow(field.label, ipts)
+        self.path_browse = {}
+        for name in _HEADER_PATHS:
+            field = fs.get(name)
+            edit = QtWidgets.QLineEdit()
+            edit.setToolTip(f"{field.name} — {field.help} Clear it to use the derived folder again.")
+            edit.editingFinished.connect(lambda name=name, widget=edit: self._on_path_edited(name, widget))
+            browse = QtWidgets.QPushButton("Browse...")
+            browse.clicked.connect(lambda _checked=False, name=name: self._browse_path(name))
+            row = QtWidgets.QHBoxLayout()
+            row.addWidget(edit, 1)
+            row.addWidget(browse)
+            self.editors[name] = edit
+            self.path_browse[name] = browse
+            form.addRow(field.label, row)
+        return box
 
     def _build_angle_panel(self):
         panel = QtWidgets.QGroupBox("Angles")
@@ -529,9 +700,25 @@ class SettingsEditorTab(QtWidgets.QWidget):
         self.remove_angle_button = QtWidgets.QPushButton("Remove angle")
         self.remove_angle_button.clicked.connect(lambda _checked=False: self.remove_selected_angle())
         buttons.addWidget(self.remove_angle_button)
+
+        # roi-popout-dialog (B1): the selected row's run on its detector images and profiles, its ROIs adjustable.
+        self.select_roi_button = QtWidgets.QPushButton("Select ROI")
+        self.select_roi_button.clicked.connect(lambda _checked=False: self.select_roi())
+        buttons.addWidget(self.select_roi_button)
+        self.angle_table.currentCellChanged.connect(lambda *_cells: self._update_select_roi_button())
+        self._update_select_roi_button()
         buttons.addStretch(1)
         box.addLayout(buttons)
         return panel
+
+    def _update_select_roi_button(self):
+        """B1: enabled exactly while the Angles table has a current row, and the ROI plots can be drawn."""
+        if roi_dialog.Figure is None:
+            self.select_roi_button.setEnabled(False)
+            self.select_roi_button.setToolTip("Unavailable: matplotlib's Qt backend could not be imported")
+            return
+        self.select_roi_button.setToolTip("Show the selected angle's run on the detector and adjust its ROIs")
+        self.select_roi_button.setEnabled(self.angle_table.currentRow() >= 0)
 
     def _build_scalar_panel(self):
         scroll = QtWidgets.QScrollArea()
@@ -542,19 +729,23 @@ class SettingsEditorTab(QtWidgets.QWidget):
         column = QtWidgets.QVBoxLayout()
         inner.setLayout(column)
 
-        for group in fs.GROUPS:
-            scalars = [f for f in fs.fields_in(group) if not f.per_angle]
+        # One collapsible section per declared group, in the scientists' order (fs.SECTION_ORDER), each opened as
+        # this user left it. Keyed by the section's name, so a reordering cannot hand one section another's state.
+        self.sections = {}
+        for group in fs.SECTION_ORDER:
+            # The header's fields have their editors there, and only there (fs.HEADER_NAMES).
+            scalars = [f for f in fs.fields_in(group) if not f.per_angle and f.name not in fs.HEADER_NAMES]
             if not scalars:
                 continue
-            box = QtWidgets.QGroupBox(group)
-            grid = QtWidgets.QFormLayout()
-            box.setLayout(grid)
+            section = _Section(group, _stored_expanded(self.settings.value(section_state_key(group))))
+            section.heading.toggled.connect(lambda expanded, group=group: self._on_section_toggled(group, expanded))
             for field in scalars:
                 editor = self._build_editor(field)
                 editor.setToolTip(f"{field.name} — {field.help}")
                 self.editors[field.name] = editor
-                grid.addRow(field.label, editor)
-            column.addWidget(box)
+                section.form.addRow(field.label, editor)
+            self.sections[group] = section
+            column.addWidget(section)
 
         column.addStretch(1)
         scroll.setWidget(inner)
@@ -582,19 +773,20 @@ class SettingsEditorTab(QtWidgets.QWidget):
 
         if field.allowed:
             editor = NoWheelComboBox()
-            # A blank first entry for the tri-state fields, where a falsy value
-            # means "off" and is the class default.
-            if field.falsy_means_off:
-                editor.addItem("")
-            editor.addItems([str(a) for a in field.allowed])
+            if field.choice_labels:
+                # Entries in words (Field.choice_labels): each item carries the value it stores.
+                for choice, text in field.choice_labels:
+                    editor.addItem(text, choice)
+            else:
+                # A blank first entry for the tri-state fields, where a falsy value
+                # means "off" and is the class default.
+                if field.falsy_means_off:
+                    editor.addItem("")
+                editor.addItems([str(a) for a in field.allowed])
             # A choice in its list is the last thing it does: the focus goes to the panel, so a later arrow
             # key or wheel changes nothing (C10).
             editor.activated.connect(lambda _index: self.scalar_panel.setFocus(QtCore.Qt.OtherFocusReason))
-            editor.currentTextChanged.connect(
-                lambda text, name=field.name: self._set_scalar(
-                    name, fs.get(name).coerce(text) if text else False
-                )
-            )
+            editor.currentIndexChanged.connect(lambda _index, name=field.name, editor=editor: self._on_choice(name, editor))
             self._show(field, editor, value)
             return editor
 
@@ -649,6 +841,28 @@ class SettingsEditorTab(QtWidgets.QWidget):
         finally:
             editor.blockSignals(was)
 
+    def _on_choice(self, name, editor):
+        """Store a choice made in a scalar combo, then show the document's value again once the signal has returned.
+
+        The second step drops a raw entry the choice replaced (D3′, ``_show_in_combo``). It waits for the signal to
+        return because removing items inside the combo's own signal changes the model under the handler, the known
+        Qt trap. The write follows ``currentIndexChanged``: the position is what tells two entries with the same
+        text apart (the string "True" beside the entry True). Qt 5.15 emits ``currentTextChanged`` on every index
+        change of a non-editable combo as well (measured), so the two agree there. The position is the one that does
+        not depend on that. Re-choosing the entry shown changes no position, so it writes nothing (C9′).
+        """
+        field = fs.get(name)
+        self._set_scalar(name, self._chosen_value(field, editor, editor.currentText()))
+        _later(editor, lambda: self._show(field, editor, self.document.get(name)))
+
+    @staticmethod
+    def _chosen_value(field, editor, text):
+        """What a choice in an enumerated combo stores: the item's value where the entries are words
+        (``Field.choice_labels``), else the text coerced to the field's type, "" being off."""
+        if field.choice_labels:
+            return editor.currentData()
+        return field.coerce(text) if text else False
+
     @staticmethod
     def _show_in_combo(editor, field, value):
         """Display `value`, even when it is not one of the offered choices.
@@ -658,14 +872,51 @@ class SettingsEditorTab(QtWidgets.QWidget):
         one — and saving would then write the substituted value back. Adding the
         stray value as an entry keeps what is shown equal to what is held;
         validate() is what reports it as a problem.
+
+        Where the entries are words, a value the reducer accepts shows its word
+        (``Field.label_for``: ``True`` and any case of a name included), and any
+        other value is an entry of its own.
+
+        A raw entry lives exactly as long as the value it shows is held (D3′). Each
+        refresh removes the raw entries and adds back one only for the value held
+        now, so a Load, a new document, or a choice that replaced a raw value leaves
+        the offered entries plus at most one raw entry: nothing in the list writes a
+        value no loaded file holds. One rule for every scalar combo, labelled or not.
+        Whether a value has an offered entry is decided by type and value
+        (``_offered_index``), never by its text: the string ``"True"`` is not the
+        entry ``True``.
         """
+        at = SettingsEditorTab._offered_index(field, value)
+        offered = SettingsEditorTab._offered_count(field)
+        while editor.count() > offered:
+            editor.removeItem(editor.count() - 1)
+        if at is None:
+            editor.addItem(str(value), value)
+            at = editor.count() - 1
+        editor.setCurrentIndex(at)
+
+    @staticmethod
+    def _offered_count(field):
+        """The entries a scalar combo offers before any raw one: its words, or its choices after a blank first entry
+        where falsy means off."""
+        if field.choice_labels:
+            return len(field.choice_labels)
+        return len(field.allowed) + (1 if field.falsy_means_off else 0)
+
+    @staticmethod
+    def _offered_index(field, value):
+        """The position of the offered entry that shows `value`: ``-1`` for none (an unset plain choice), ``None``
+        when `value` needs a raw entry of its own. Matched by type and value."""
+        if field.choice_labels:
+            label = field.label_for(value)
+            return None if label is None else [text for _, text in field.choice_labels].index(label)
         if value is None or value is False or value == "":
-            editor.setCurrentIndex(0 if field.falsy_means_off else -1)
-            return
-        text = str(value)
-        if editor.findText(text) < 0:
-            editor.addItem(text)
-        editor.setCurrentText(text)
+            return 0 if field.falsy_means_off else -1
+        blank = 1 if field.falsy_means_off else 0
+        for position, choice in enumerate(field.allowed):
+            if type(choice) is type(value) and choice == value:
+                return blank + position
+        return None
 
     @staticmethod
     def _as_text(value):
@@ -727,6 +978,78 @@ class SettingsEditorTab(QtWidgets.QWidget):
             self.refresh_report()
         except Exception as exc:  # noqa: BLE001
             self.report_problem(exc)
+
+    @guarded
+    def _on_section_toggled(self, name, expanded):
+        """Remember a section's state for this user, under the section's name. The section has already shown or
+        hidden its fields. A store that cannot be written costs only the memory of the state for the next session,
+        so the failure is printed and the slot returns normally. Written as "true"/"false", the text a new process
+        reads back from INI either way."""
+        try:
+            self.settings.setValue(section_state_key(name), "true" if expanded else "false")
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
+
+    @guarded
+    def _on_ipts_edited(self, widget):
+        """An IPTS typed in the header: stored as its directory name (normalise_experiment_id), and both derived
+        paths follow it. A line edit reports editingFinished on every focus-out; with no typing, nothing is
+        written."""
+        if not widget.isModified():
+            return
+        widget.setModified(False)
+        self.document.set("experiment_id", normalise_experiment_id(widget.text()))
+        self._show(fs.get("experiment_id"), widget, self.document.get("experiment_id"))
+        self._show_derived_paths()
+        self.refresh_report()
+
+    @guarded
+    def _on_path_edited(self, name, widget):
+        """A path typed in the header is that override, stripped. Emptied, or only spaces, it is ``None`` again and
+        derived, never ``""``: an override of "" or "   " is ``Path("")`` / ``Path("   ")`` to the reduction, not
+        the folder it derives. No typing, no write."""
+        if not widget.isModified():
+            return
+        widget.setModified(False)
+        self.document.set(name, widget.text().strip() or None)
+        self._show(fs.get(name), widget, self.document.get(name))
+        self.refresh_report()
+
+    @guarded
+    def _browse_path(self, name):
+        """A folder chosen with a header path's Browse button is that override, unless it is the folder the
+        reduction derives now. A cancelled dialog writes nothing.
+
+        The derived folder is never written as an override: written, it would freeze an absolute path into the
+        file, and a file reused for another experiment would then read this one's folders. So choosing the derived
+        folder holds no override. That writes nothing when there is none (the dialog opens there, and Choose
+        without navigating re-chooses what is shown), and returns a held override to derived, as clearing does.
+        Folders are compared with os.path.normpath, never resolve(), which follows symlinks on a facility mount and
+        differs between machines.
+        """
+        editor = self.editors[name]
+        derived = self.document.derived_path(name)
+        start = editor.text() or derived or ""
+        folder = QtWidgets.QFileDialog.getExistingDirectory(self, f"Choose the {fs.get(name).label.lower()}", start)
+        if not folder:
+            return
+        if derived is not None and os.path.normpath(folder) == os.path.normpath(derived):
+            if self.document.get(name) is None:
+                return
+            folder = None
+        self.document.set(name, folder)
+        self._show(fs.get(name), editor, folder)
+        self.refresh_report()
+
+    def _show_derived_paths(self):
+        """Each header path's placeholder: the folder the reduction derives while its override is unset, or why
+        there is none. A placeholder is never the control's text, so a derived path cannot be read back, or
+        saved, as a typed one."""
+        for name in _HEADER_PATHS:
+            derived = self.document.derived_path(name)
+            if derived is None:
+                derived = _NOT_A_FOLDER if self.document.get("experiment_id") else _NO_IPTS
+            self.editors[name].setPlaceholderText(derived)
 
     @guarded
     def _on_scalar_edited(self, name, widget):
@@ -809,6 +1132,93 @@ class SettingsEditorTab(QtWidgets.QWidget):
         self.refresh_angles()
         self.refresh_report()
 
+    @guarded
+    def select_roi(self):
+        """B1, B2, B9: the ROI pop-out for the selected row, and what it reports written to that row.
+
+        The row is read once, at the gesture, and passed on: nothing later consults the selection, so the row the
+        dialog was opened for is the row written (the active-row trap; E2). Only the fields the dialog reports
+        changed are written, through the document: RB_Ymin, RB_Ymax and BkgROI with ``set_angle_field``, which pads a
+        short column only as far as the row (review 1568397; E2's short leg); data_x_range, shared by every angle,
+        with ``set`` (E8). The dialog writes nothing. The slot writes no settings file and no data file: the one thing
+        it records is the folder a chosen run came from, in the launcher's QSettings (``roi_nexus_dir``), so that the
+        next file dialog opens there (B2). E4 watches ``SettingsDocument.save``, the panel, the document, the working
+        directory, the run's folder (each file by size, mtime and content) and the QSettings store; E9 the panel, the
+        document and the working directory.
+        """
+        row = self.angle_table.currentRow()
+        if row < 0:
+            return
+        loaded = self._events_for_row(row)
+        if loaded is None:  # the file dialog was cancelled
+            return
+        events, title, band = loaded
+        dialog = ROISelectionDialog(events, self._roi_values(row), title=title, tof_band=band, parent=self)
+        try:
+            if dialog.exec_() != QtWidgets.QDialog.Accepted:
+                return
+            changes = dialog.changes()
+        finally:
+            dialog.deleteLater()  # released, never destroy() (E7): exec_ has hidden it, and Qt frees it in the loop
+        if row >= self.document.n_angles:
+            raise IndexError(f"angle {row + 1} no longer exists, so nothing was written")
+        for name in ("RB_Ymin", "RB_Ymax", "BkgROI"):
+            if name in changes:
+                self.document.set_angle_field(row, name, changes[name])
+        if "data_x_range" in changes:
+            self.document.set("data_x_range", changes["data_x_range"])
+        self.refresh_angles()
+        self.refresh_scalars()
+        self.refresh_report()
+
+    def _roi_values(self, row):
+        """The row's values the pop-out shows, as the document holds them (a short column reads None)."""
+        angle = self.document.angle_row(row)
+        values = {name: angle.get(name) for name in ("RB_Ymin", "RB_Ymax", "BkgROI", "tof_min", "tof_max", "useBS")}
+        values["data_x_range"] = self.document.get("data_x_range")
+        return values
+
+    def _events_for_row(self, row):
+        """B2: the row's run, as ``(events, title, tof_band)``, or None when the user cancels choosing a file.
+
+        The file is the reducer's own name for the row's run, ``NEXUSpathRB / REF_L_<RBnum>.nxs.h5``
+        (``nr_reduction_calc.py:325``), when RBnum is set and the file exists. Otherwise (an authored file holds no
+        RBnum) a file dialog asks, starting in that NeXus folder when it exists, else where it was last. The view
+        filter starts at the run's chopper band when it has a chopper log, else the full TOF span (B8). A read
+        failure raises, and ``@guarded`` reports it in the panel.
+        """
+        runs = self.document.get("RBnum")
+        run = runs[row] if isinstance(runs, list) and row < len(runs) else None
+        try:
+            folder = Path(self.document.config.NEXUSpathRB)
+        except TypeError:  # an experiment_id of None makes the path property raise
+            folder = None
+        path = None
+        if run is not None and folder is not None:
+            path = folder / f"REF_L_{run}.nxs.h5"  # the reducer's own name for the run (nr_reduction_calc.py:325)
+            if not path.is_file():
+                path = None
+        if path is None:
+            start = str(folder) if folder is not None and folder.is_dir() else self.settings.value("roi_nexus_dir", "")
+            chosen, _ = QtWidgets.QFileDialog.getOpenFileName(
+                self, f"The NeXus file of angle {row + 1}", start, "NeXus (*.nxs.h5);;All files (*)"
+            )
+            if not chosen:
+                return None
+            path = Path(chosen)
+            self.settings.setValue("roi_nexus_dir", str(path.parent))
+        events = roi_estimate.load_event_pixels(path, max_events=MAX_ROI_EVENTS)
+        try:
+            meta = roi_estimate.read_nexus_metadata(path)
+            title = f"{meta['title']} (run {meta['run_number']})"
+        except (OSError, KeyError, ValueError):
+            meta, title = None, path.name
+        try:
+            band = roi_estimate.lambda_to_tof(roi_estimate.chopper_lambda_range(path), meta["start_time"])
+        except (OSError, KeyError, ValueError, TypeError):
+            band = None  # no chopper log: the view filter starts at the full span
+        return events, title, band
+
     # -- refresh -----------------------------------------------------------
 
     @guarded
@@ -817,6 +1227,8 @@ class SettingsEditorTab(QtWidgets.QWidget):
 
         The single entry point a resolution layer uses: replacing the document
         without the three refreshes leaves the view showing the previous one.
+        A document adopted here is shown as it holds: its IPTS is resolved by a
+        Load only (``load_settings``; editor-ipts-inference v2, design A3).
         """
         self.document = document
         self.refresh_angles()
@@ -897,6 +1309,7 @@ class SettingsEditorTab(QtWidgets.QWidget):
     def refresh_scalars(self):
         for name, editor in self.editors.items():
             self._show(fs.get(name), editor, self.document.get(name))
+        self._show_derived_paths()
 
     def refresh_report(self):
         lines = []
@@ -922,25 +1335,41 @@ class SettingsEditorTab(QtWidgets.QWidget):
             lines.append("Notes:")
             lines.extend(f"  - {note}" for note in notes)
 
+        # A changed value is spelled as the file holds it (file_spelling, the rules save() applies): one
+        # value, one spelling between this report and the saved file. The Angles-table cell keeps the
+        # scientists' true/false (_cell_text).
         changed = self.document.changed_vs_seed()
         if changed:
             lines.append("")
             lines.append("Changed from the seed:")
+            count = self.document.reduction_angles
             for name in sorted(changed):
                 before, after = changed[name]
-                lines.append(f"  - {name}: {before!r} -> {after!r}")
+                field = fs.BY_NAME.get(name)
+                lines.append(f"  - {name}: {file_spelling(field, before)} -> {file_spelling(field, after, count)}")
         self.report.setPlainText("\n".join(lines))
 
     # -- files -------------------------------------------------------------
 
+    def _settings_dialog_folders(self):
+        """Where the Load and Save dialogs open, and their sidebar (I5, A5): the IPTS's shared folder and its
+        settings folders, unless the remembered folder is already under that IPTS (``load_start_folder``)."""
+        ipts = self.document.get("experiment_id")
+        remembered = self.settings.value("settings_editor_dir", "")
+        return load_start_folder(ipts, remembered), settings_folders(ipts)
+
     @guarded
     def load_settings(self):
-        path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self,
-            "Load reduction settings",
-            self.settings.value("settings_editor_dir", ""),
-            "Settings (*.json *.dat);;All files (*)",
-        )
+        start, sidebar = self._settings_dialog_folders()
+        with _file_dialog_sidebar(sidebar):
+            path, _ = QtWidgets.QFileDialog.getOpenFileName(
+                self,
+                "Load reduction settings",
+                start,
+                "Settings (*.json *.dat);;All files (*)",
+                "",
+                QtWidgets.QFileDialog.DontUseNativeDialog,
+            )
         if not path:
             return
         # The refreshes are INSIDE the try. They were outside it, and the catch
@@ -948,7 +1377,13 @@ class SettingsEditorTab(QtWidgets.QWidget):
         # a sequence ({"tof_min": 5}) raised TypeError out of the slot and
         # aborted the launcher.
         try:
-            self.set_document(SettingsDocument.from_file(path))
+            document = SettingsDocument.from_file(path)
+            # The Load's IPTS (editor-ipts-inference, I1), with the IPTS the header holds now as the field's: the
+            # file's own; else its runs'; else the header's; else the folder a file without runs came from. Here
+            # only (v2, A3): a document injected or adopted again is not resolved, so nothing infers over an IPTS
+            # the user cleared or typed (I6).
+            document.resolve_ipts(normalise_experiment_id(self.editors["experiment_id"].text()))
+            self.set_document(document)
         except Exception as exc:  # noqa: BLE001
             QtWidgets.QMessageBox.warning(self, "Could not load settings", str(exc))
             self.report_problem(exc)
@@ -957,12 +1392,16 @@ class SettingsEditorTab(QtWidgets.QWidget):
 
     @guarded
     def save_settings(self):
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self,
-            "Save reduction settings",
-            self.settings.value("settings_editor_dir", ""),
-            "Settings (*.json);;All files (*)",
-        )
+        start, sidebar = self._settings_dialog_folders()
+        with _file_dialog_sidebar(sidebar):
+            path, _ = QtWidgets.QFileDialog.getSaveFileName(
+                self,
+                "Save reduction settings",
+                start,
+                "Settings (*.json);;All files (*)",
+                "",
+                QtWidgets.QFileDialog.DontUseNativeDialog,
+            )
         if not path:
             return
         # load_from_file dispatches on the suffix, so a name saved without a
