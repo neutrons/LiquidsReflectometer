@@ -8,8 +8,9 @@ run; each call merges the new run with the files already in the output folder
 each position's entry comes from the same source as that position's data -- so
 any number of reductions, in any order, gives the same per-run log headers
 (``NR_runs``, ``Run Title``, ``Angles``) and data as reducing the sequence once.
-(``Scaling factors`` and ``Lambda Range`` still describe only the last call:
-tasking finding F17, not covered here.)
+``Scaling factors`` and ``Lambda Range`` are per position too (F17,
+header-scale-factors-per-position): the factor applied to each position's data
+and the range its reduction used; ``Config.ScaleFactor`` stays the authored list.
 
 The inputs here are **synthetic**: ``NR_Reduction._reduce_single_run`` (the
 physics) is replaced by a stub returning a made-up R(Q) = 1e-6 Q^-4 -- not a
@@ -111,6 +112,11 @@ def env(tmp_path, monkeypatch):
         zeros = np.zeros_like(q)
         # reduce() takes the title from self.log_values and the angles from the returned log_vals
         self.log_values = {"title": title(rb_num), "ths": ths(rb_num), "thi": THI, "ThCen": ths(rb_num) + THCEN_OFFSET}
+        # As the real _reduce_single_run does (header-scale-factors-per-position): the call's wavelength range
+        # (nr_reduction_calc.py:391-397) and the authored scale factor applied to the data (:1139-1140).
+        self.config.LambdaMinUse = self.config.LambdaMin[i]
+        self.config.LambdaMaxUse = self.config.LambdaMax[i]
+        r, dr = r * self.config.ScaleFactor[i], dr * self.config.ScaleFactor[i]
         result = {"q": q, "r": r, "dr": dr, "dq": dq, "t": zeros, "l": zeros, "dt": zeros, "dl": zeros}
         return result, self.config, self.log_values
 
@@ -130,7 +136,7 @@ def read_outputs(out):
     """{file name: (header dict, data array)} for every .dat file in the output folder."""
     outputs = {}
     for path in sorted(Path(out).glob("*.dat")):
-        header = {}
+        header, records = {}, {}
         with open(path) as f:
             for line in f:
                 if not line.startswith("#"):
@@ -144,6 +150,20 @@ def read_outputs(out):
                     header.update(json.loads(line[len("Angles: "):]))
                 elif line.startswith("Header format: "):
                     header["format"] = line
+                elif line.startswith("Scaling factors = "):
+                    records["scale"] = json.loads(line[len("Scaling factors = "):])["scale_factor"]
+                elif line.startswith("Lambda Range = "):
+                    try:
+                        lam = json.loads(line[len("Lambda Range = "):])
+                        records["lambda_min"], records["lambda_max"] = lam["lambda_min"], lam["lambda_max"]
+                    except (ValueError, TypeError, KeyError):
+                        records["lambda_min"] = records["lambda_max"] = line[len("Lambda Range = "):]
+                elif line.startswith("Config: "):
+                    config = json.loads(line[len("Config: "):])
+                    records["config_scale"] = config.get("ScaleFactor")
+                    records["config_lambda_min"] = config.get("LambdaMinUse")
+                    records["config_lambda_max"] = config.get("LambdaMaxUse")
+        header["records"] = records
         outputs[path.name] = (header, np.loadtxt(path, unpack=True))
     return outputs
 
@@ -168,7 +188,9 @@ def expected_header(present):
 
 
 def headers_only(outputs):
-    return {name: {k: v for k, v in header.items() if k != "format"} for name, (header, _) in outputs.items()}
+    """The per-run log headers (M1's scope); the F17 records are compared by their own tests."""
+    return {name: {k: v for k, v in header.items() if k not in ("format", "records")}
+            for name, (header, _) in outputs.items()}
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +209,7 @@ def test_header_format_marker_precedes_config(env):
     reduce_runs(env, [R1])
     path = next(env.out.glob("*_1_*.dat"))
     lines = [line for line in path.read_text().splitlines() if line.startswith("#")]
-    marker = [i for i, line in enumerate(lines) if line.startswith("# Header format: 2")]
+    marker = [i for i, line in enumerate(lines) if line.startswith("# Header format: 3")]
     config = [i for i, line in enumerate(lines) if line.startswith("# Config: ")]
     assert marker and config and marker[0] < config[0]
     # load_from_file() stops at "# Config:" and must still find the settings
@@ -603,3 +625,264 @@ def test_a_position_whose_every_file_is_a_misnamed_copy_stays_a_gap(remeasured, 
     for copy in (partial_name(1, R2), partial_name(1, R3)):
         assert f"{copy} is not used" in out, copy
     assert f"sequence position 1 has files for runs [{R2}, {R3}]; none of them belongs to it" in out
+
+
+# ---------------------------------------------------------------------------
+# header-scale-factors-per-position (F17): the scale factor applied to each position's data and the
+# wavelength range its reduction used, per sequence position, the same in every file whatever the order
+
+AUTHORED = [1, 2, 1]
+
+
+def records(header):
+    return header["records"]
+
+
+@pytest.fixture
+def batch(env, tmp_path_factory):
+    """The whole sequence in one call (the GUI batch): ground truth for the applied factors, no priors."""
+    reference = SimpleNamespace(**{**vars(env), "out": tmp_path_factory.mktemp("batch")})
+    nrff.reduce_from_file([R1, R2, R3], env.settings, EXPERIMENT, datapath=env.nexus, plot=False,
+                          override_params={"Spath": reference.out, "subname": "autoreduction"},
+                          check_for_prior=True)
+    return read_outputs(reference.out)
+
+
+def scale_of(outputs, name=None):
+    header = outputs[name or COMBINED][0]
+    return records(header)["scale"]
+
+
+@pytest.mark.parametrize("runs", SCENARIOS.values(), ids=SCENARIOS.keys())
+def test_scale_record_is_the_same_in_any_order(env, batch, runs):
+    """Every file of every scenario carries the batch's per-position scale factors (rel 1e-9: V7, a product of
+    per-call factors agrees across orders to rounding). Before: the list of the last call (V1)."""
+    reduce_runs(env, runs)
+    expected = scale_of(batch)
+    assert all(v is not None for v in expected)
+    for name, (header, _) in read_outputs(env.out).items():
+        assert records(header)["scale"] == pytest.approx(expected, rel=1e-9), name
+
+
+@pytest.mark.parametrize("reverse_q", [False, True], ids=["sequence order is Q order", "reverse Q"])
+@pytest.mark.parametrize("runs", [[R1, R2, R3], [R3, R1, R2, R1]], ids=["in order", "out of order"])
+def test_scale_record_is_what_was_applied(env, runs, reverse_q):
+    """Each position file's R column divided by the stub's unscaled R is the recorded factor: the record states
+    what was applied to that position's data, whichever position the merge scaled (Q order is not sequence
+    order with reverse_q)."""
+    env.reverse_q = reverse_q
+    reduce_runs(env, runs)
+    outputs = read_outputs(env.out)
+    for run in RUNS:
+        seq = RUNS[run][0]
+        header, data = outputs[partial_name(seq, run)]
+        _, unscaled, _, _ = synthetic_curve(seq - 1, reverse_q)
+        applied = data[1] / unscaled
+        assert applied == pytest.approx(np.full_like(applied, records(header)["scale"][seq - 1]), rel=1e-9), run
+
+
+def with_settings(env, **changes):
+    settings = json.loads(env.settings.read_text())
+    settings.update(changes)
+    env.settings.write_text(json.dumps(settings))
+
+
+@pytest.mark.parametrize("runs", [*SCENARIOS.values(), "batch"], ids=[*SCENARIOS.keys(), "batch"])
+def test_config_scale_factor_is_the_authored_list(env, runs):
+    """R4 (decision F17-1): Config.ScaleFactor stays the authored input in every file. The applied factor lives in
+    the Scaling factors line only; written into the config it would be multiplied into the data again when the
+    header is used as a settings file (V5)."""
+    with_settings(env, ScaleFactor=list(AUTHORED))
+    if runs == "batch":
+        nrff.reduce_from_file([R1, R2, R3], env.settings, EXPERIMENT, datapath=env.nexus, plot=False,
+                              override_params={"Spath": env.out, "subname": "autoreduction"}, check_for_prior=True)
+    else:
+        reduce_runs(env, runs)
+    for name, (header, _) in read_outputs(env.out).items():
+        assert records(header)["config_scale"] == AUTHORED, name
+
+
+@pytest.mark.parametrize("runs", SCENARIOS.values(), ids=SCENARIOS.keys())
+def test_lambda_range_is_recorded_per_position(env, runs):
+    """The wavelength range each position's reduction used, in the Lambda Range line and in Config's
+    LambdaMinUse/LambdaMaxUse, by sequence position. Before: the last call's scalars."""
+    reduce_runs(env, runs)
+    for name, (header, _) in read_outputs(env.out).items():
+        r = records(header)
+        assert (r["lambda_min"], r["lambda_max"]) == ([2.7, 2.6, 2.5], [9.5, 9.5, 9.5]), name
+        assert (r["config_lambda_min"], r["config_lambda_max"]) == ([2.7, 2.6, 2.5], [9.5, 9.5, 9.5]), name
+
+
+def test_a_first_call_for_a_later_position_records_null_at_the_gaps(env):
+    """Battery row 10 survived without this: the merge rebuilds gaps from its positions, so reduce()'s own gap
+    entries reach a file only when no merge runs, as in the first call of a sequence for a later position."""
+    reduce_runs(env, [R3])
+    for name, (header, _) in read_outputs(env.out).items():
+        r = records(header)
+        assert r["scale"][:2] == [None, None] and r["lambda_min"] == [None, None, 2.5], name
+
+
+def test_gap_records_null(env):
+    """A position with no run has no applied factor and no range: null in the three records."""
+    reduce_runs(env, [R1, R3])
+    for name, (header, _) in read_outputs(env.out).items():
+        r = records(header)
+        assert r["scale"][1] is None and r["lambda_min"][1] is None and r["lambda_max"][1] is None, name
+        assert None not in (r["scale"][0], r["scale"][2]), name
+
+
+def test_autoscale_off_records_the_authored_factor(env):
+    """With autoscale off, the factor applied to each position is the authored one."""
+    with_settings(env, AutoScale=False, ScaleFactor=list(AUTHORED))
+    reduce_runs(env, [R1, R2, R3, R2])
+    for name, (header, _) in read_outputs(env.out).items():
+        assert records(header)["scale"] == AUTHORED, name
+
+
+def write_format2_file(out, run, nr_runs, scale, lam=(2.5, 9.5), list_lines=False):
+    """A partial file as M1 (header format 2) wrote it: positional logs, but the Scaling factors line holds the
+    writing call's list and the Lambda Range line its scalars. With `list_lines`, the Lambda Range line parses as
+    per-position lists too: a format-2 file whose lines look like records, which only the marker can refuse."""
+    seq = RUNS[run][0]
+    q, r, dr, dq = synthetic_curve(seq - 1, reverse_q=False)
+    entries = [e or None for e in nr_runs]
+    angles = {"THS": [ths(e) if e else None for e in entries], "THI": [THI if e else None for e in entries],
+              "ThCen": [thcen(e) if e else None for e in entries]}
+    head = "\n".join([
+        f"NR_runs = {nr_runs}",
+        f"Run Title: {json.dumps({'title': [title(e) if e else None for e in entries]})}",
+        f"Scaling factors = {json.dumps({'scale_factor': scale})}",
+        (f"Lambda Range = {json.dumps({'lambda_min': [lam[0]] * len(nr_runs), 'lambda_max': [lam[1]] * len(nr_runs)})}"
+         if list_lines else f"Lambda Range = {lam[0]}Å to {lam[1]}Å"),
+        f"Angles: {json.dumps(angles)}",
+        "Header format: 2 (Run Title, Angles and NR_runs are indexed by sequence position)",
+        "---" * 20,
+        f"Config: {json.dumps({'RBnum': nr_runs, 'ScaleFactor': scale})}",
+        "---" * 20,
+        "columns = Q, R, dR, dQ (sigma)",
+        "---" * 20,
+    ])
+    np.savetxt(out / partial_name(seq, run), np.column_stack((q, r, dr, dq)), header=head, delimiter="\t")
+
+
+@pytest.mark.parametrize("legacy", [False, "list lines", True], ids=["format 2", "format 2, list-shaped lines", "no marker"])
+def test_prior_without_format_3_does_not_vouch_then_heals_when_rereduced(env, capsys, legacy):
+    """R2: before this slug, every writer put the writing call's list into every file, so no format-2 (or legacy)
+    entry is provably the file's own. Such a prior gives null for its position's scale and range, with a notice,
+    and the position heals when its run is reduced again."""
+    for run in (R1, R2, R3):
+        if legacy is True:
+            write_legacy_file(env.out, run, [R1, R2, R3], [R1, R2, R3])
+        else:
+            # "list lines" (battery row 4 survived without it): the records parse, so only the marker refuses them
+            write_format2_file(env.out, run, [R1, R2, R3], [1, 0.5, 0.25], list_lines=legacy == "list lines")
+    reduce_runs(env, [R2])
+    out = capsys.readouterr().out
+    r = records(read_outputs(env.out)[COMBINED][0])
+    assert r["scale"][0] is None and r["scale"][2] is None and r["scale"][1] is not None
+    assert r["lambda_min"] == [None, 2.6, None] and r["lambda_max"] == [None, 9.5, None]
+    for run in (R1, R3):
+        assert f"{partial_name(RUNS[run][0], run)}: the header does not vouch for its scale factor" in out, run
+    reduce_runs(env, [R1, R3])
+    healed = records(read_outputs(env.out)[COMBINED][0])
+    assert healed["lambda_min"] == [2.7, 2.6, 2.5] and None not in healed["scale"]
+
+
+def rewrite_header_line(path, prefix, line):
+    text = path.read_text().splitlines()
+    path.write_text("\n".join(line if t.startswith(prefix) else t for t in text) + "\n")
+
+
+@pytest.mark.parametrize("damage", ["list shorter than NR_runs", "another run at the position"])
+def test_inconsistent_format_3_header_does_not_vouch(env, damage):
+    """A format-3 prior whose records do not line up with its NR_runs is not vouched for: null, never a guess."""
+    reduce_runs(env, [R1, R2, R3])
+    path = env.out / partial_name(1, R1)
+    if damage == "list shorter than NR_runs":
+        rewrite_header_line(path, "# Scaling factors = ", '# Scaling factors = {"scale_factor": [1.0, 0.5]}')
+    else:
+        rewrite_header_line(path, "# NR_runs = ", f"# NR_runs = [{R2}, {R2}, {R3}]")
+    reduce_runs(env, [R3])
+    assert records(read_outputs(env.out)[COMBINED][0])["scale"][0] is None
+
+
+def test_returned_config_keeps_scalar_lambda_use(env):
+    """R5: in memory, LambdaMinUse/LambdaMaxUse stay the per-call scalars web_report formats with %6.4g (V4); the
+    per-position lists exist in the records and the written header only."""
+    reduce_runs(env, [R1, R2])
+    config = nrff.reduce_from_file([R3], env.settings, EXPERIMENT, datapath=env.nexus, plot=False,
+                                   override_params={"Spath": env.out, "subname": "autoreduction"},
+                                   check_for_prior=True)[3]
+    assert isinstance(config.LambdaMinUse, float) and isinstance(config.LambdaMaxUse, float)
+
+
+def test_template_style_caller_gets_no_format_3_marker(tmp_path):
+    """V10/R3: a save_results caller that supplies no records (the template path) gets today's lines and marker 2,
+    never a format-3 claim it cannot back."""
+    from lr_reduction import save_reduced_data
+    from lr_reduction.nr_reduction_config import NRReductionConfig
+
+    config = NRReductionConfig()
+    config.RBnum, config.ScaleFactor, config.Spath, config.Sname = [R1], [1.5], tmp_path, "template"
+    config.LambdaMinUse, config.LambdaMaxUse = 2.5, 9.5
+    logs = {"title": [title(R1)], "ths": [ths(R1)], "thi": [THI], "ThCen": [thcen(R1)]}
+    q = np.linspace(0.01, 0.1, 5)
+    save_reduced_data.save_results({"Q": q, "R": q, "dR": q, "dQ": q}, config, logs)
+    lines = [line for line in (tmp_path / "template.dat").read_text().splitlines() if line.startswith("#")]
+    assert any(line.startswith("# Header format: 2") for line in lines)
+    assert "# Scaling factors = {\"scale_factor\": [1.5]}" in lines
+    assert "# Lambda Range = 2.5Å to 9.5Å" in lines
+    # a partial record set is no record set (frame F20): format 2 and today's lines, never a half format 3
+    save_reduced_data.save_results({"Q": q, "R": q, "dR": q, "dQ": q}, config, {**logs, "scale": [2.0]},
+                                   sname="partial")
+    partial = (tmp_path / "partial.dat").read_text().splitlines()
+    assert any(line.startswith("# Header format: 2") for line in partial)
+    assert "# Scaling factors = {\"scale_factor\": [1.5]}" in partial
+
+
+@pytest.mark.parametrize("runs", [[R1, R2, R3], [R3, R1, R2, R1], "one call"], ids=["in order", "out of order", "one call"])
+def test_eight_column_files_carry_the_same_records(env, runs):
+    """The _8col files carry the 4-column files' records. "one call" reduces the whole sequence at once, with no
+    priors, so reduce()'s own 8-column files are the ones kept (frame rows F2 and F4 survived without it)."""
+    for call in ([[R1, R2, R3]] if runs == "one call" else [[run] for run in runs]):
+        nrff.reduce_from_file(call, env.settings, EXPERIMENT, datapath=env.nexus, plot=False,
+                              override_params={"Spath": env.out, "subname": "autoreduction", "save8col": True},
+                              check_for_prior=True)
+    outputs = read_outputs(env.out)
+    for name in [n for n in outputs if n.endswith("_8col.dat")]:
+        assert records(outputs[name][0]) == records(outputs[name.replace("_8col.dat", ".dat")][0]), name
+
+
+def test_remeasured_position_records_follow_the_winner(remeasured):
+    """D-5: position 2's records are the winning run's: its scale is what was applied to R2B's data."""
+    reduce_runs(remeasured, [R1, R2, R3, R2B, R2])
+    outputs = read_outputs(remeasured.out)
+    header, data = outputs[partial_name(2, R2B)]
+    _, unscaled, _, _ = synthetic_curve(1, reverse_q=False)
+    applied = data[1] / unscaled
+    assert records(outputs[COMBINED][0])["scale"][1] == pytest.approx(float(applied[0]), rel=1e-9)
+    assert applied == pytest.approx(np.full_like(applied, applied[0]), rel=1e-9)
+
+
+def test_nr_runs_header_round_trips_numpy_integers(tmp_path):
+    """R6: a run passed as a numpy integer, or as digits, is written as a plain int, so read_prior_header can read
+    the line back; a run number that is not an integer is refused, never written."""
+    from lr_reduction import save_reduced_data
+    from lr_reduction.nr_reduction_config import NRReductionConfig
+
+    def save(runs, name):
+        config = NRReductionConfig()
+        config.RBnum, config.Spath, config.Sname = runs, tmp_path, name
+        logs = {"title": [None] * len(runs), "ths": [None] * len(runs), "thi": [None] * len(runs),
+                "ThCen": [None] * len(runs)}
+        q = np.linspace(0.01, 0.1, 5)
+        save_reduced_data.save_results({"Q": q, "R": q, "dR": q, "dQ": q}, config, logs)
+        return tmp_path / f"{name}.dat"
+
+    path = save([np.int64(R1), None, "221474"], "numpy")
+    assert nrff.read_prior_header(path)["NR_runs"] == [R1, None, R3]
+    path = save([float(R1), np.int32(R2)], "integral")  # an integral float is a whole run number (frame F18)
+    assert nrff.read_prior_header(path)["NR_runs"] == [R1, R2]
+    for bad in (3.5, "x", True):  # True is an int subclass, not a run number (frame F17)
+        with pytest.raises(ValueError, match="run number"):
+            save([bad], f"bad-{bad}")

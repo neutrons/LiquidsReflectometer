@@ -8,7 +8,15 @@ import lr_reduction.nr_tools as tools
 
 # Header format 2: "Run Title", "Angles" and "NR_runs" are lists indexed by sequence position
 # (seq_num - 1), with null where no run was reduced. Files without the line predate it.
-HEADER_FORMAT = 2
+# Header format 3 (header-scale-factors-per-position, F17): "Scaling factors" and "Lambda Range" are
+# per-position records too -- the factor applied to each position's data and the wavelength range its
+# reduction used -- and Config's LambdaMinUse/LambdaMaxUse hold them as lists. Written only when the
+# caller supplies the records; a caller without them (the template path) still writes format 2.
+HEADER_FORMAT = 3
+LOGS_ONLY_HEADER_FORMAT = 2
+
+#: The per-position records a format-3 header carries, beside the logs (NR_Reduction.reduce() builds them).
+RECORD_KEYS = ("scale", "lambda_min", "lambda_max")
 
 
 def save_results(results, config_header, log_values, sname = None, full=True, eight_column=False, sequence=None):
@@ -49,9 +57,39 @@ def save_results(results, config_header, log_values, sname = None, full=True, ei
                 array, header=head, delimiter='\t')
     print(f"Saved result to {output_file}")
 
+def _header_runs(runs):
+    """The run numbers as NR_runs writes them: plain ints, None for a gap (R6).
+
+    A numpy integer, digits, or an integral float are written as the int they are, so read_prior_header's
+    ast.literal_eval reads the line back and the file can vouch for its own entries (``np.int64(221472)`` cannot
+    be read back). Anything else is refused, never written.
+    """
+    if not isinstance(runs, (list, tuple)):
+        return runs
+    plain = []
+    for run in runs:
+        if run is None:
+            plain.append(None)
+        elif isinstance(run, (bool, np.bool_)):
+            raise ValueError(f"run number {run!r} is not an integer; NR_runs cannot hold it")
+        elif isinstance(run, (int, np.integer)):
+            plain.append(int(run))
+        elif isinstance(run, str) and run.strip().isdigit():
+            plain.append(int(run))
+        elif isinstance(run, (float, np.floating)) and float(run).is_integer():
+            plain.append(int(run))
+        else:
+            raise ValueError(f"run number {run!r} is not an integer; NR_runs cannot hold it")
+    return plain
+
+
 def _build_header(config_header, log_values, full=True, eight_column=False, sequence=None):
     """
     Wrapper to handle assembly logic for the output file header.
+
+    With the per-position records (RECORD_KEYS) in ``log_values``, the header is format 3: the Scaling factors
+    and Lambda Range lines, and Config's LambdaMinUse/LambdaMaxUse, are lists by sequence position (the config
+    object itself keeps its scalars). Without them, today's lines and format 2.
     """
 
     if eight_column:
@@ -64,28 +102,45 @@ def _build_header(config_header, log_values, full=True, eight_column=False, sequ
     else:
         sorted_config = config_header
 
+    records = all(key in log_values for key in RECORD_KEYS)
     try:
-        config_json = json.dumps(make_json_safe(sorted_config))
+        config_values = make_json_safe(sorted_config)
+        json.dumps(config_values)
     except:
-        config_json = sorted_config.__dict__
-        config_json = json.dumps(make_json_safe(config_json))
+        config_values = make_json_safe(sorted_config.__dict__)
+    if records:
+        # Config's runtime-owned range is per position in the file; the config object keeps its scalars (R5)
+        config_values = {**config_values,
+                         "LambdaMinUse": tools.clean_log_value(log_values["lambda_min"]),
+                         "LambdaMaxUse": tools.clean_log_value(log_values["lambda_max"])}
+    config_json = json.dumps(config_values)
 
     angle_header = json.dumps({"THS": tools.clean_log_value(log_values['ths']), "THI": tools.clean_log_value(log_values['thi']), "ThCen": tools.clean_log_value(log_values['ThCen'])})
     title_header = json.dumps({"title": log_values['title']})
-    scale_factor_header = json.dumps({"scale_factor": tools.clean_log_value(sorted_config.ScaleFactor)})
-    # TODO: Lambda Use values need to be arrays and stored angles need to be arrays.
+    if records:
+        scale_factor_header = json.dumps({"scale_factor": tools.clean_log_value(log_values["scale"])})
+        lambda_header = json.dumps({"lambda_min": tools.clean_log_value(log_values["lambda_min"]),
+                                    "lambda_max": tools.clean_log_value(log_values["lambda_max"])})
+        marker = (f"Header format: {HEADER_FORMAT} (Run Title, Angles, NR_runs, Scaling factors and Lambda Range "
+                  f"are indexed by sequence position)")
+    else:
+        scale_factor_header = json.dumps({"scale_factor": tools.clean_log_value(sorted_config.ScaleFactor)})
+        lambda_header = f"{sorted_config.LambdaMinUse}\u212B to {sorted_config.LambdaMaxUse}\u212B"
+        marker = (f"Header format: {LOGS_ONLY_HEADER_FORMAT} (Run Title, Angles and NR_runs are indexed by "
+                  f"sequence position)")
+    nr_runs = _header_runs(sorted_config.RBnum)
     if full:
         head = (
-            f"NR_runs = {sorted_config.RBnum}\n"
+            f"NR_runs = {nr_runs}\n"
             f"Run Title: {title_header}\n"
             f"DB = {sorted_config.DBname}\n"
             f"Method = {sorted_config.method_per_run}\n"
             f"Normalize = {sorted_config.Normalize}\n"
             f"Autoscale = {sorted_config.AutoScale}\n"
             f"Scaling factors = {scale_factor_header}\n"
-            f"Lambda Range = {sorted_config.LambdaMinUse}\u212B to {sorted_config.LambdaMaxUse}\u212B\n"
+            f"Lambda Range = {lambda_header}\n"
             f"Angles: {angle_header}\n"
-            f"Header format: {HEADER_FORMAT} (Run Title, Angles and NR_runs are indexed by sequence position)\n"
+            f"{marker}\n"
             f"{'---' * 20}\n"
             f"Config: {config_json}\n"
             f"{'---' * 20}\n"
@@ -95,16 +150,16 @@ def _build_header(config_header, log_values, full=True, eight_column=False, sequ
 
     else:
         head = (
-            f"NR_runs = {sorted_config.RBnum}\n"
+            f"NR_runs = {nr_runs}\n"
             f"Run Title: {title_header}\n"
             f"DB = {sorted_config.DBname}\n"
             f"Method = {sorted_config.method_per_run}\n"
             f"Normalize = {sorted_config.Normalize}\n"
             f"Autoscale = {sorted_config.AutoScale}\n"
             f"Scaling factors = {scale_factor_header}\n"
-            f"Lambda Range = {sorted_config.LambdaMinUse}\u212B to {sorted_config.LambdaMaxUse}\u212B\n"
+            f"Lambda Range = {lambda_header}\n"
             f"Angles: {angle_header}\n"
-            f"Header format: {HEADER_FORMAT} (Run Title, Angles and NR_runs are indexed by sequence position)\n"
+            f"{marker}\n"
             f"{'---' * 20}\n"
             f"Config: {config_json}\n"
             f"{'---' * 20}\n"

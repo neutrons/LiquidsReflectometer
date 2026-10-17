@@ -96,9 +96,9 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
 
             # check dictionaries and arrays aren't empty - they're empty if no priors found
             if dict_output:
-                # update the config scaling factors
-                config_final.ScaleFactor = scaling_factors
-                # the headers describe the whole set, one entry per sequence position
+                # config_final.ScaleFactor stays the authored input (R4): the factor applied to each position
+                # is in the "scale" record the headers write. the headers describe the whole set, one entry
+                # per sequence position
                 config_final.RBnum = position_run_nums
 
                 # save files
@@ -277,9 +277,9 @@ def load_prior_data(results, matched_files, updated_config, initial_seq, initial
     loaded_run_nums = []
     #TODO: This needs cleaning up!
 
-    # Logs of the current reduction, by sequence position like initial_seq (None where no run)
+    # Logs and records of the current reduction, by sequence position like initial_seq (None where no run)
     current_logs = results["used_log_vals"]
-    loaded_logs = [{k: current_logs[k][pos] for k in LOG_KEYS}
+    loaded_logs = [{k: current_logs[k][pos] for k in LOG_KEYS + save_fn.RECORD_KEYS}
                    for pos, seq in enumerate(initial_seq) if seq is not None]
 
     # Remove None entries from initial set
@@ -367,11 +367,18 @@ def load_prior_data(results, matched_files, updated_config, initial_seq, initial
             data, logs = existing_data[idx], loaded_logs[idx]
         else:
             filepath = Path(updated_config.Spath) / filename
-            logs = own_logs_from_header(read_prior_header(filepath), seq_num, run_num)
+            header = read_prior_header(filepath)
+            logs = own_logs_from_header(header, seq_num, run_num)
             if logs is None:
                 print(f"{filename}: header does not identify the logs of run {run_num}; reading title and angles "
                       f"from its NeXus file, ThCen unknown until run {run_num} is reduced again")
                 logs = read_logs_from_nexus(run_num, updated_config.NEXUSpathRB)
+            records = own_records_from_header(header, seq_num, run_num)
+            if records is None:
+                print(f"{filename}: the header does not vouch for its scale factor and wavelength range (header "
+                      f"format {header['format']}); null until run {run_num} is reduced again")
+                records = {k: None for k in save_fn.RECORD_KEYS}
+            logs = {**logs, **records}
             data = np.loadtxt(filepath, unpack=True)
         combined_data[seq_num - 1] = data
         combined_seq_nums[seq_num - 1] = seq_num
@@ -385,8 +392,9 @@ def load_prior_data(results, matched_files, updated_config, initial_seq, initial
     sorted_seq_num = [combined_seq_nums[i] for i in indices]
     sorted_run_num = [combined_run_nums[i] for i in indices]
 
-    # logs stay by sequence position, like the config lists they are written next to
-    position_logs = {k: [None if logs is None else logs[k] for logs in combined_logs] for k in LOG_KEYS}
+    # logs and records stay by sequence position, like the config lists they are written next to
+    position_logs = {k: [None if logs is None else logs[k] for logs in combined_logs]
+                     for k in LOG_KEYS + save_fn.RECORD_KEYS}
 
     return sorted_data, sorted_seq_num, sorted_run_num, combined_run_nums, position_logs
 
@@ -396,7 +404,7 @@ def read_prior_header(filepath):
     Read the run list, format marker and per-run logs from the header of a saved partial file.
     Missing or unreadable entries are None.
     """
-    header = {"format": None, "NR_runs": None, **{k: None for k in LOG_KEYS}}
+    header = {"format": None, "NR_runs": None, **{k: None for k in LOG_KEYS + save_fn.RECORD_KEYS}}
     with open(filepath, "r") as f:
         for line in f:
             if not line.startswith("#"):
@@ -411,6 +419,12 @@ def read_prior_header(filepath):
                     header["ths"], header["thi"], header["ThCen"] = angles["THS"], angles["THI"], angles["ThCen"]
                 elif line.startswith("# Header format: "):
                     header["format"] = int(line[len("# Header format: "):].split()[0])
+                elif line.startswith("# Scaling factors = "):
+                    header["scale"] = json.loads(line[len("# Scaling factors = "):])["scale_factor"]
+                elif line.startswith("# Lambda Range = "):
+                    # format 3 only: an older "2.5\u212b to 9.5\u212b" line is not JSON, and stays None
+                    lam = json.loads(line[len("# Lambda Range = "):])
+                    header["lambda_min"], header["lambda_max"] = lam["lambda_min"], lam["lambda_max"]
             except (ValueError, SyntaxError, KeyError, TypeError):
                 pass  # an unreadable entry stays None, so the header cannot vouch for its logs
     return header
@@ -440,6 +454,29 @@ def own_logs_from_header(header, seq_num, run_num):
     if len(lists[0]) != len(runs):
         return None
     return {k: header[k][seq_num - 1] for k in LOG_KEYS}
+
+
+def own_records_from_header(header, seq_num, run_num):
+    """
+    The records (save_fn.RECORD_KEYS: the scale factor applied to the position's data and its wavelength
+    range) of run `run_num` at sequence position `seq_num`, from its own file's header, or None when the header
+    cannot vouch for them.
+
+    Only header format 3 can (R2). Before it, both writers -- NR_Reduction.reduce() and the merge rewrite --
+    put the writing call's list into every file, and a format-2 header lists the whole set in NR_runs, so the
+    writing call cannot be identified: no earlier entry is provably the file's own. Not re-derived either: the
+    NeXus file holds neither, and recomputing the range would state what today's code would use. A format-3
+    header vouches when every record is a list as long as NR_runs and the run at the position is `run_num`.
+    """
+    runs = header["NR_runs"]
+    lists = [header[k] for k in save_fn.RECORD_KEYS]
+    if header["format"] != save_fn.HEADER_FORMAT or not isinstance(runs, list):
+        return None
+    if not all(isinstance(values, list) and len(values) == len(runs) for values in lists):
+        return None
+    if len(runs) < seq_num or runs[seq_num - 1] != run_num:
+        return None
+    return {k: header[k][seq_num - 1] for k in save_fn.RECORD_KEYS}
 
 
 def read_logs_from_nexus(run_num, datapath):
@@ -507,10 +544,11 @@ def find_combine_priors(updated_config, run_nums, results, group_output_sorted, 
 
                 print('Scaling factor:', np.round(scale, 3))
                 scaling_factors.append(scale)
+                # The factor this call applies to the position's data goes into its "scale" record (unknown
+                # stays unknown); config.ScaleFactor, the authored input, is not touched (R4).
                 position = sorted_seq_num[run] - 1
-                while position >= len(initial_scalefactors):
-                    initial_scalefactors.append(1)
-                initial_scalefactors[position] *= scale
+                if position_logs["scale"][position] is not None:
+                    position_logs["scale"][position] *= scale
 
             Q.append(result[0, :])
             R.append(result[1, :])
