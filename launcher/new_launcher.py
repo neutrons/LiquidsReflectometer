@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 import sys
 
+from launcher.runtime_env import prepare_runtime_env
+
+# Before anything imports matplotlib: the tabs below do, and matplotlib fixes its cache directory then. This keeps
+# it out of $XDG_CACHE_HOME, which the analysis nodes' login hook deletes (launcher/runtime_env.py).
+prepare_runtime_env()
+
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 
 from launcher.app_identity import ensure_identity, migrate_legacy_settings
@@ -9,6 +15,7 @@ from launcher.apps.file_batch import FileBatchTab
 from launcher.apps.overplot import Overplot
 from launcher.apps.settings_editor import SettingsEditorTab
 from launcher.apps.sld_calculator import SLD
+from launcher.apps.time_resolved import TimeResolvedTab
 
 #REFERENCE_DIRECTIVE = "Click to choose a 60Hz reference R(Q) file"
 #TEMPLATE_DIRECTIVE = "Click to choose a 30Hz template"
@@ -56,6 +63,12 @@ class ReductionInterface(QTabWidget):
         self.sld_tab = SLD()
         self.addTab(self.sld_tab, "SLD calculator")
         self.setTabText(tab_id, "SLD calculator")
+
+        # Time-resolved reduction tab, after the tabs that were there before it
+        tab_id += 1
+        self.time_resolved_tab = TimeResolvedTab()
+        self.addTab(self.time_resolved_tab, "Time resolved")
+        self.setTabText(tab_id, "Time resolved")
 
         ## Batch template reduction tab
         #tab_id += 1

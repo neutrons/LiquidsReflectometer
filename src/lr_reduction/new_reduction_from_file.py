@@ -20,7 +20,7 @@ LOG_KEYS = ("title", "ths", "thi", "ThCen")
 
 
 def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = None, override_params: dict = None, plot=True,
-                     save_json=False, check_for_prior=False, save_pdf_summary=False):
+                     save_json=False, check_for_prior=False, save_pdf_summary=False, start_times=None, end_times=None):
     """
     Wrapper function to reduce a single run with reading of parameters from the header of a file or a saved json file, instead of the xml.
     Then collect like results within the save folder and combine them together.
@@ -35,6 +35,8 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
     save_json: optional to save out a separate json setting file
     check_for_prior: optional to look in the save folder for other runs with the same prefix to join together. Important for autoreduction.
     save_pdf_summary: optional save of plots as a pdf output
+    start_times, end_times: optional time windows to reduce instead of each whole run, in seconds from the run's
+        first pulse (binary_processing.time_windows). Every header written names them ("Time resolved:").
 
     returns
         combined_results: dict of Q, R, dR, dQ. This is assembled with anything else on same seq num. #TODO: check if need individual one returned too.
@@ -42,6 +44,8 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
 
     all_results = []
     all_figures = []
+    # the window these reductions read, for every header they write, the priors' re-saves included
+    time_window = None if start_times is None and end_times is None else (start_times, end_times)
     group_output = group_runs(run_array, experiment_id, datapath)
     output_figures = []
 
@@ -83,7 +87,8 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
 
         # Run reduction
         reducer = NR_Reduction(config_new)
-        results = reducer.reduce(eight_col=eight_col, plot=plot, save_pdf_summary=save_pdf_summary)
+        results = reducer.reduce(eight_col=eight_col, plot=plot, save_pdf_summary=save_pdf_summary,
+                                  start_times=start_times, end_times=end_times)
 
         config_final = results["config"]
         figures_out = results["figures"]
@@ -106,21 +111,21 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
                 # TODO: this is resaving them. Think this is the best option.
                 for i in range(len(dict_output)):
                     sname = f"{config_final.Sname}_{sorted_seq_nums[i]}_{sorted_run_nums[i]}{config_final.subname}"
-                    save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=sname)
+                    save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=sname, time_window=time_window)
                     if eight_col:
-                        save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=sname, eight_column=True)
+                        save_fn.save_results(dict_output[i], config_final, used_theta_vals, sname=sname, eight_column=True, time_window=time_window)
                 # Always make the final plot, only show it if plot is True
                 new_plot = plot_reflectivity(dict_output, RQ4=False, show_fig=plot)
                 figures_out.append(new_plot)
                 output_figures.append(new_plot)
                 # concatenated
                 try:
-                    save_fn.save_results(combine_results, config_final, used_theta_vals, full=True, sname=f"{config_final.Sname}_combined{config_final.subname}")
+                    save_fn.save_results(combine_results, config_final, used_theta_vals, full=True, sname=f"{config_final.Sname}_combined{config_final.subname}", time_window=time_window)
                 except KeyError as e:
                     print(f"Warning: combined results missing expected key {e}; skipping save_results for combined output")
                 if eight_col:
                     try:
-                        save_fn.save_results(combine_results, config_final, used_theta_vals, eight_column=True, full=True, sname=f"{config_final.Sname}_combined{config_final.subname}")
+                        save_fn.save_results(combine_results, config_final, used_theta_vals, eight_column=True, full=True, sname=f"{config_final.Sname}_combined{config_final.subname}", time_window=time_window)
                     except KeyError as e:
                         print(f"Warning: combined results missing expected key {e}; skipping save_results (8col) for combined output")
 

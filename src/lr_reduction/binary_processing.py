@@ -1,3 +1,6 @@
+import logging
+from pathlib import Path
+
 import h5py
 import numpy as np
 from scipy.special import lambertw
@@ -8,7 +11,10 @@ from scipy.special import lambertw
 
 # TODO: link up the parts that are self. from copying across.
 
-def convert_to_binary(fname, lowres, collapse_x = True, tofbin=50, tofmax=100000, tofmin=0, deadtime=4.2, tof_step=100, n_y=304, n_x=256):  # noqa: ARG001 -- collapse_x documented as planned/not implemented; callers pass it
+logger = logging.getLogger(__name__)
+
+
+def convert_to_binary(fname, lowres, collapse_x = True, tofbin=50, tofmax=100000, tofmin=0, deadtime=4.2, tof_step=100, n_y=304, n_x=256, start_times=None, end_times=None):  # noqa: ARG001 -- collapse_x documented as planned/not implemented; callers pass it
     '''
     Main function for converting to load the file, apply the dead-time correction and obtain y vs tof data (non-event).
 
@@ -17,13 +23,23 @@ def convert_to_binary(fname, lowres, collapse_x = True, tofbin=50, tofmax=100000
     :param collapse_x: planned option to keep the x-pixel direction but not implemented. True sums over x-pixels in the lowres range.
     :param tofbin: default bin size for tof histogramming
     :param tofmax: default max tof for histogramming (mainly important for non-standard chopper configurations)
-    :return: tof_array, y_tof_corr, error_array_corr
+    :param start_times: default None, the whole run. The start of each time window, in seconds from the run's first
+        pulse (see load_and_extract and time_windows). Must match the length of end_times.
+    :param end_times: default None. The end of each time window. Must match the length of start_times.
+    :return: tof_array, y_tof_corr, error_array_corr, log_values, DTC
+    :raises ValueError: when no pulse read has proton charge (a window after the run or between two pulses, or a
+        run without beam): there is nothing to normalise by.
     '''
     # Include option to collapse along the x-pixel direction between the min/max bounds
     # Assume wksp has had the DTC applied.
 
     # Example using the h5py to extract info as can be easier to manipulate that mantid wksp
-    e_offset, event_id, error_event_offset, pcharge, cPc, log_values = load_and_extract(fname)
+    e_offset, event_id, error_event_offset, pcharge, cPc, log_values = load_and_extract(fname, start_times=start_times, end_times=end_times)
+
+    if not np.any(cPc != 0):
+        raise ValueError(f"No proton charge in {Path(fname).name}{describe_windows(start_times, end_times)}: "
+                         "nothing to reduce")
+
     tof_array, DTC, error_counts = get_deadtime_correction(error_event_offset, e_offset, cPc, tofbin, tofmax, tofmin, deadtime=deadtime, tof_step=tof_step)
     tof_array, y_tof, error_array = get_y_tof(tof_array, event_id, e_offset, lowres, pcharge, n_y, n_x)
 
@@ -38,26 +54,197 @@ def convert_to_binary(fname, lowres, collapse_x = True, tofbin=50, tofmax=100000
     tof_array = tof_array / 1000
     return tof_array, y_tof_corr, error_array_corr, log_values, DTC
 
-def load_and_extract(fname):
+
+def time_windows(start_times, end_times):
+    '''
+    The time windows to read, as (start, end) pairs in the order given, or None for the whole run.
+
+    Times are seconds from the run's first pulse (event_time_zero). A window is half-open, start <= t < end, at every
+    end (pulse_mask); the slicing functions close the run's final window by moving its end past the last pulse
+    (close_final_window). Two numbers (or 0-d arrays) are one window.
+    Windows may be disjoint or overlap: the selection concatenates them and deduplicates nothing.
+
+    :raises ValueError: one of the lists missing, lists of unequal length, an empty list (None is the spelling of
+        "the whole run"), or a start not before its end. Raised before anything is read.
+    '''
+    if start_times is None and end_times is None:
+        return None
+    if start_times is None or end_times is None:
+        raise ValueError("start_times and end_times must either both be provided or both be None.")
+    starts = [start_times] if np.ndim(start_times) == 0 else list(start_times)  # a number, or a 0-d array: one window
+    ends = [end_times] if np.ndim(end_times) == 0 else list(end_times)
+    if len(starts) != len(ends):
+        raise ValueError("Start and end times for time slices must be the same length.")
+    if not starts:
+        raise ValueError("Empty start and end time lists hold no window; None reads the whole run.")
+    for start, end in zip(starts, ends):
+        if start >= end:
+            raise ValueError(f"Start time ({start}) must be less than end time ({end}).")
+    return list(zip(starts, ends))
+
+
+def describe_windows(start_times, end_times):
+    '''" for the time window(s) [a, b), ..." for messages, or "" for the whole run.'''
+    windows = time_windows(start_times, end_times)
+    if windows is None:
+        return ""
+    return " for the time window(s) " + ", ".join(f"[{start}, {end})" for start, end in windows)
+
+
+def load_and_extract(fname, start_times = None, end_times = None):
     '''
     Load the nexus file and extract the relevant arrays using h5py.
 
-    :param fname: File to load
-    :return: e_offset, event_id, error_event_offset, pcharge
-    '''
-    # Example using the h5py to extract info as can be easier to manipulate that mantid wksp
-    f = h5py.File(fname, 'r')
+    With start_times and end_times, only the pulses inside the time windows are kept (time_windows says what a window
+    is; event_time_filter selects). The windows are checked before the file is opened.
 
-    e_offset = np.array(f['entry/bank1_events/event_time_offset'][:])
-    event_id = np.array(f['entry/bank1_events/event_id'][:])
-    error_event_offset = np.array(f['entry/bank_error_events/event_time_offset'][:])
-    pcharge=np.array(f['entry/proton_charge'][:])
-    # This is single value. TODO: streamline so don't need this and the previous log.
-    cPC=np.array(f['entry/DASlogs/proton_charge/value'][:])
+    :param fname: File to load
+    :param start_times: default None, the whole run; else the windows' starts, seconds from the run's first pulse
+    :param end_times: default None; else the windows' ends
+    :return: e_offset, event_id, error_event_offset, pcharge, cPC, log_values. For the whole run pcharge is the run's
+        total as the file records it (entry/proton_charge), as before time slicing; for windows it is the sum of the
+        selected pulses' charge.
+    '''
+    windows = time_windows(start_times, end_times)
+    with h5py.File(fname, 'r') as f:
+        e_offset = np.array(f['entry/bank1_events/event_time_offset'][:]) # TOF
+        event_id = np.array(f['entry/bank1_events/event_id'][:]) # position on detector
+        error_event_offset = np.array(f['entry/bank_error_events/event_time_offset'][:]) # error TOF
+        cPC=np.array(f['entry/DASlogs/proton_charge/value'][:]) # the charge of each pulse
+        if windows is None:
+            # This is single value. TODO: streamline so don't need this and the previous log.
+            pcharge=np.array(f['entry/proton_charge'][:])
+        else:
+            pulses = {
+                "event_time": np.array(f['entry/bank1_events/event_time_zero'][:]), # pulses, s
+                "event_index": np.array(f['entry/bank1_events/event_index'][:]), # each pulse's first event
+                "error_event_time": np.array(f['entry/bank_error_events/event_time_zero'][:]), # error pulses, s
+                "error_event_index": np.array(f['entry/bank_error_events/event_index'][:]), # each error pulse's first event
+                "charge_time": np.array(f['entry/DASlogs/proton_charge/time'][:]), # the charge log's pulses, s
+            }
 
     log_values = get_log_values(fname)
 
-    return e_offset, event_id, error_event_offset, pcharge, cPC, log_values
+    if windows is None:
+        return e_offset, event_id, error_event_offset, pcharge, cPC, log_values
+
+    logger.info("Processing with time filter: %s%s", Path(fname).name, describe_windows(start_times, end_times))
+    masked_e_offset, masked_event_id, masked_e_offset_error, masked_cPC = event_time_filter(
+        start_times, end_times, pulses["event_time"], event_id, e_offset, pulses["event_index"],
+        pulses["error_event_time"], error_event_offset, pulses["error_event_index"], cPC, pulses["charge_time"])
+    masked_pcharge = np.array([np.sum(masked_cPC)])
+    return masked_e_offset, masked_event_id, masked_e_offset_error, masked_pcharge, masked_cPC, log_values
+
+
+def pulse_mask(pulse_times, start, end):
+    '''
+    The pulses of a window: a mask over pulse_times, true for each pulse with start <= t < end. A pulse belongs to a
+    window by its own time, wherever it sits in the file: real runs can record pulse times that go back near the end
+    (REF_L_198410), so the times are never assumed sorted, and an out-of-order pulse is taken by the window its time is
+    in. The window is half-open at every end, the last pulse's time included: a window is closed at the run's end only
+    by moving its end past the run's last pulse, which the slicing functions do for the final window
+    (close_final_window).
+    '''
+    pulse_times = np.asarray(pulse_times)
+    return (pulse_times >= start) & (pulse_times < end)
+
+
+def event_mask(event_index, n_events, pulses):
+    '''
+    The events of the selected pulses: a mask over the n_events events, true for each event of a pulse whose mask
+    entry is true. Pulse i's events are event_index[i] : event_index[i + 1] (the last pulse's run to n_events); a pulse
+    without events selects none.
+    '''
+    event_index = np.asarray(event_index, dtype=np.int64)
+    counts = np.diff(np.append(event_index, n_events))
+    return np.repeat(np.asarray(pulses, dtype=bool), counts)
+
+
+def read_run_end(fname):
+    '''
+    The run's end, as close_final_window needs it: (last_pulse, duration). last_pulse is the latest pulse time over the
+    three banks the selection reads (the detector events, the error events and the charge log), the latest, not the
+    last recorded; None for a run with no pulse. duration is entry/duration as recorded (float32 on the real files,
+    which can round below the last pulse time), or None.
+    '''
+    with h5py.File(fname, 'r') as f:
+        times = [np.asarray(f[name][:]) for name in ('entry/bank1_events/event_time_zero',
+                                                     'entry/bank_error_events/event_time_zero',
+                                                     'entry/DASlogs/proton_charge/time') if name in f]
+        duration = float(np.asarray(f['entry/duration'][:]).ravel()[0]) if 'entry/duration' in f else None
+    latest = [float(np.max(t)) for t in times if len(t)]
+    return (max(latest) if latest else None), duration
+
+
+def final_windows(windows, last_pulse, duration):
+    '''
+    The indices of the run's final window among windows ((start, end) pairs): those that reach the run's end and end
+    last. A window reaches the run's end when its end is at or past the earlier of the run's last pulse time and its
+    recorded duration (the float32 duration can round below the last pulse). Of the windows that reach it, the final
+    one ends last; windows that overlap and end together at that end are all final, each taking its share of the
+    run's last pulses (a pulse in two windows is taken twice). A window list that stops short of the run's end has
+    none. Contiguous windows have one.
+    '''
+    marks = [m for m in (last_pulse, duration) if m is not None]
+    if not marks:
+        return []
+    reach = min(marks)
+    ends = [end for _start, end in windows if end >= reach]
+    if not ends:
+        return []
+    last = max(ends)
+    return [i for i, (_start, end) in enumerate(windows) if end == last]
+
+
+def close_final_window(windows, last_pulse, duration):
+    '''
+    The windows, with the run's final window (final_windows) closed at the run's end: if its end does not pass the
+    last pulse, it is moved just past it (numpy.nextafter), so its half-open selection takes every remaining pulse in
+    every bank. Every other window is returned as given and stays half-open, even when its end equals the last pulse
+    time, so contiguous windows partition the run: no pulse lost at the end, none taken twice.
+    '''
+    windows = [(start, end) for start, end in windows]
+    if last_pulse is None:
+        return windows
+    for i in final_windows(windows, last_pulse, duration):
+        if windows[i][1] <= last_pulse:
+            windows[i] = (windows[i][0], float(np.nextafter(last_pulse, np.inf)))
+    return windows
+
+
+def event_time_filter(start_times, end_times, event_time, event_id, e_offset, event_index,
+                       error_event_time, error_event_offset, error_event_index, cPC, charge_time):
+    '''
+    The events, error events and pulse charges of the time windows, concatenated in the order of the windows.
+
+    Each bank is selected by the same predicate on its own pulse times (pulse_mask: start <= t < end, whatever order
+    the times are in): the detector events by event_time_zero and event_index, the error events by their bank's, and
+    the charge by the proton-charge log's own times. A pulse in two overlapping windows is taken twice.
+
+    :return: masked_e_offset, masked_event_id, masked_e_offset_error, masked_cPC
+    '''
+    masked_event_id = []
+    masked_e_offset = []
+    masked_e_offset_error = []
+    masked_cPC = []
+
+    for start, end in time_windows(start_times, end_times):
+        events = event_mask(event_index, len(event_id), pulse_mask(event_time, start, end))
+        masked_event_id.append(event_id[events])
+        masked_e_offset.append(e_offset[events])
+
+        errors = event_mask(error_event_index, len(error_event_offset), pulse_mask(error_event_time, start, end))
+        masked_e_offset_error.append(error_event_offset[errors])
+
+        masked_cPC.append(cPC[pulse_mask(charge_time, start, end)])
+
+    # Concatenate them back into one.
+    masked_event_id = np.concatenate(masked_event_id)
+    masked_e_offset = np.concatenate(masked_e_offset)
+    masked_e_offset_error = np.concatenate(masked_e_offset_error)
+    masked_cPC = np.concatenate(masked_cPC)
+
+    return masked_e_offset, masked_event_id, masked_e_offset_error, masked_cPC
 
 
 def get_deadtime_correction(error_event_offset, e_offset, pcharge, tofbin=50, tofmax=50000, tofmin=0, use_bad_counts=True, deadtime=4.2, tof_step=100):  # noqa: ARG001 -- tof_step kept for API compatibility (callers pass it)
@@ -158,7 +345,7 @@ def get_log_values(fname):
         #log_values["distance_sample_detector"] = f['entry/DASlogs/BL4B:CS:Autoreduce:Sequence:DistanceSampleDetector/value'][0]
         #log_values["template_id"] = f['entry/DASlogs/BL4B:CS:Autoreduce:Sequence:TemplateId/value'][0]
     except Exception as e:  # noqa: BLE001 -- tolerate any missing/odd DASlog entry; partial log_values is the intended behavior
-        print(f'Cannot process {fname} b/c {e} fails to extract')
+        logger.warning("Cannot process %s because %s fails to extract", fname, e)
         pass
     # Get slit gap openings.
     log_values["siY"]=np.array(f['entry/DASlogs/BL4B:Mot:si:Y:Gap:Readback/average_value'][0])
@@ -175,13 +362,13 @@ def get_log_values(fname):
     try:
         log_values["coordinates"] = f['entry/DASlogs/BL4B:CS:Mode:Coordinates/value'][0] # This is one that shows earth vs beam center 0=earth; 1=beam
     except:
-        print("Older run doesn't include coordinates PV")
+        logger.info("Older run doesn't include coordinates PV")
         pass
 
     try:
         log_values["incident_theta"] = f['entry/DASlogs/BL4B:CS:BeamToEarthCenterAngleOffset/value'][0]
     except:
-        print("Older run doesn't include Beam-Earth centered angle, set to default 4.0deg")
+        logger.info("Older run doesn't include Beam-Earth centered angle, set to default 4.0deg")
         log_values["incident_theta"] = 4.0
 
     # TODO: check if we need any of the other chopper parts.
@@ -191,7 +378,7 @@ def get_log_values(fname):
     try:
         log_values["chopper_mod"]=np.array(f['entry/DASlogs/BL4B:Chop:Skf2:ChopperModerator/value'][0])
     except:
-        print("Run missing the chopper moderator log value")
+        logger.warning("Run missing the chopper moderator log value")
         pass
     log_values['emission_mod_distance'] = np.array(f['entry/DASlogs/BL4B:Det:TH:DlyDet:BasePath/value'][0]) * 1000
     off =np.array(f['entry/DASlogs/BL4B:Chop:Skf2:ChopperOffset/value'][0]) # 114.0

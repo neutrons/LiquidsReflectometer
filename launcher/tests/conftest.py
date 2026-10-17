@@ -26,6 +26,14 @@ QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
 for _format in (QtCore.QSettings.IniFormat, QtCore.QSettings.NativeFormat):
     QtCore.QSettings.setPath(_format, QtCore.QSettings.UserScope, _SCRATCH_ROOT)
 
+# --- matplotlib's cache, preset at IMPORT ------------------------------------
+# Importing launcher.new_launcher chooses MPLCONFIGDIR (launcher/runtime_env.py)
+# and leaves a value already set alone. Presetting it here keeps a test that
+# imports the launcher from creating the per-user directory under /var/tmp, and
+# keeps this run's font cache in the scratch root. setdefault: a value the
+# developer or CI set wins, as it does for the launcher.
+os.environ.setdefault("MPLCONFIGDIR", os.path.join(_SCRATCH_ROOT, "matplotlib"))
+
 
 # --- What the teardown frees -------------------------------------------------
 # Only the windows a test made and nothing else owns: a parentless top-level

@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -6,6 +7,8 @@ from matplotlib import pyplot as plt
 
 import lr_reduction.binary_processing as BP
 import lr_reduction.nr_tools as tools
+
+logger = logging.getLogger(__name__)
 
 
 class Direct_Beam:  # noqa: N801 -- public API name; rename deferred (imported by callers)
@@ -69,7 +72,8 @@ class Direct_Beam:  # noqa: N801 -- public API name; rename deferred (imported b
             return f'IPTS-{m.group(1)}'
         return s
 
-    def create_db(self, run_list, save_name, plot=True, mu_file = None, flip_atten=False, return_traces=False, experiment_id=None):
+    def create_db(self, run_list, save_name, plot=True, mu_file = None, flip_atten=False, return_traces=False, experiment_id=None, cd_list=None,
+                  start_times = None, end_times = None):
         """
         Create a direct beam spectrum from the given run list including an attenuation correction for Cd foils (if used).
         Saves the file to the specified location, with header information of the DB pixel position.
@@ -82,12 +86,19 @@ class Direct_Beam:  # noqa: N801 -- public API name; rename deferred (imported b
         flip_atten: whether to flip the attenuator values (earlier runs had an issue in the log files)
         return_traces: whether to return the individual traces for each run in addition to the combined spectrum
         experiment_id: optional experiment ID to use for determining default paths (overrides instance-level ID)
+        cd_list: optional Cd attenuator setting for each run, in run order, replacing the runs' Atten logs: each entry is
+            what the Atten log holds (the four foil flags _extract_cd_values reads). One entry per run, else ValueError.
+            The runs are reduced in order of increasing Cd either way.
+        start_times, end_times: optional time windows to read of each run (binary_processing.time_windows)
 
         Returns:
         lam_out: array of wavelength values for the direct beam spectrum
         int_out: array of intensity values for the direct beam spectrum
         err_out: array of error values for the direct beam spectrum
         """
+
+        if cd_list is not None and len(cd_list) != len(run_list):
+            raise ValueError(f"cd_list needs one Atten setting per run: {len(cd_list)} for {len(run_list)} runs")
 
         # loop over the Cd spectra measurements
         LAM = []
@@ -120,13 +131,19 @@ class Direct_Beam:  # noqa: N801 -- public API name; rename deferred (imported b
             raise ValueError('NEXUSpath/savepath not set: provide experiment_id or supply NEXUSpath/savepath when constructing Direct_Beam or call create_db with experiment_id')
 
         # Pre-sort the runs into order by Cd amount in case run in a different order
-        for run in run_list:
+        for ii, run in enumerate(run_list):
             fname = os.path.join(nexus_base, f'REF_L_{run}.nxs.h5')
             log_values = BP.get_log_values(fname)             # Just need the Atten log value at this point. But can use existing function
+            # if cd_list provided then let this overwrite the log values
+            # short-term fix, hopefully not needed long term, otherwise should put before the file load.
+            if cd_list is not None:
+                log_values['Atten']=cd_list[ii]
+                logger.info("Run %s: Atten from cd_list, %s, in place of the log's", run, cd_list[ii])
 
+            logger.debug("Run %s: Atten %s", run, log_values['Atten'])
             # Need to split some parts out into separate functions if the logic is correct.
             Cd_thickness = self._extract_cd_values(log_values, flip_atten)
-            print(f'Run {run}: Cd thickness = {Cd_thickness:.5f} cm')
+            logger.info("Run %s: Cd thickness = %.5f cm", run, Cd_thickness)
             Cd_values.append(Cd_thickness)
 
         # Sort the Cd_values by value - increasing Cd
@@ -136,9 +153,12 @@ class Direct_Beam:  # noqa: N801 -- public API name; rename deferred (imported b
         for i, run in enumerate(run_list):
             # get header info from Nexus: atten and chop2 phase
             fname = os.path.join(nexus_base, f'REF_L_{run}.nxs.h5')
+            logger.info("Reducing %s", fname)
 
+            # A run (or window) without proton charge raises, naming itself (binary_processing.convert_to_binary)
             tof_array, y_tof_corr, error_array_corr, log_values, DTC_corr = BP.convert_to_binary(fname, self.low_res, collapse_x = True, tofbin=self.tofbin, tofmax=self.tofmax,
-                                                                                                 tofmin=self.tofmin, deadtime=self.deadtime, tof_step=self.tof_step)
+                                                                                                 tofmin=self.tofmin, deadtime=self.deadtime, tof_step=self.tof_step,
+                                                                                                 start_times=start_times, end_times=end_times)
             T = tof_array * 1000
             DTC = DTC_corr
             y_tof_corr = np.flipud(y_tof_corr) # flip the y-axis to match the orientation of the detector
@@ -161,7 +181,7 @@ class Direct_Beam:  # noqa: N801 -- public API name; rename deferred (imported b
                 # Read from settings.json if not provided
                 settings = tools.read_settings(time=log_values['start_time'])
                 mu_file = settings['cd-attenuator-correction-file']
-                print(f'Using Cd attenuation file: {mu_file}')
+                logger.info("Using Cd attenuation file: %s", mu_file)
 
             # read in Cd linear attenuation coefficient data
             L_ENDF, mu_ENDF = np.loadtxt(mu_file, unpack=True, skiprows=1)
@@ -174,7 +194,6 @@ class Direct_Beam:  # noqa: N801 -- public API name; rename deferred (imported b
                 low_tag = False
             T, I, E, DTC = self._trim_and_chop(T, I, E, DTC, log_values["chop2_PD"], lowest = low_tag)
             T = T * 1e-3 # convert to ms
-            #print(f'Run {run}: After trimming and chopping, {len(T)} points remain')
 
             # TODO: use logic from nr_reduction_calc
             # convert to Lambda
@@ -188,9 +207,9 @@ class Direct_Beam:  # noqa: N801 -- public API name; rename deferred (imported b
             # This allows the program to handle slit-scan DBs
             try:
                 n = log_values["scale_multiplier"]
-                print(f'Using {n} as scale multiplier')
+                logger.info("Using %s as scale multiplier", n)
             except Exception as e:  # noqa: BLE001 -- any lookup failure falls back to scale multiplier 1.0 by design
-                print(f'Using 1.0 as scale multiplier b/c {e} not in {repr(log_values)}')
+                logger.warning("Using 1.0 as scale multiplier because %s is not in %r", e, log_values)
                 n = 1.0
 
             I_trans = I / trans
@@ -246,7 +265,7 @@ class Direct_Beam:  # noqa: N801 -- public API name; rename deferred (imported b
         SigmaPos = np.round(np.std(db_pixel_list),2)
         MeanTTHD = np.round(np.mean(tthd),2)
         SigmaTTHD = np.round(np.std(tthd),2)
-        print(f'Average DB pixel: {MeanPos} +/- {SigmaPos}')
+        logger.info("Average DB pixel: %s +/- %s", MeanPos, SigmaPos)
         return MeanPos, SigmaPos, MeanTTHD, SigmaTTHD
 
     def _lam_error_sort(self, LAM, INT, ERR):

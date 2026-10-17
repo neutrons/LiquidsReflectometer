@@ -105,9 +105,11 @@ def env(tmp_path, monkeypatch):
     settings_file.write_text(json.dumps(settings))
     state = SimpleNamespace(nexus=nexus, out=out, settings=settings_file, reverse_q=False)
 
-    def fake_reduce_single_run(self, i, rb_num):
+    def fake_reduce_single_run(self, i, rb_num, save=True, start_times=None, end_times=None):  # noqa: ARG001
         seq = RUNS[rb_num][0]
         assert i == seq - 1, "reduce() must pass the run's sequence position"
+        # The real one's signature (time-slicing-reconcile): these reductions have no time window, so none arrives
+        assert start_times is None and end_times is None, (start_times, end_times)
         q, r, dr, dq = synthetic_curve(i, state.reverse_q)
         zeros = np.zeros_like(q)
         # reduce() takes the title from self.log_values and the angles from the returned log_vals
@@ -308,8 +310,8 @@ def remeasured(env, monkeypatch):
     write_nexus(env.nexus, R2B)
     stub = NR_Reduction._reduce_single_run  # env's physics stub
 
-    def remeasured_stub(self, i, rb_num):
-        result, config, logs = stub(self, i, rb_num)
+    def remeasured_stub(self, i, rb_num, save=True, start_times=None, end_times=None):
+        result, config, logs = stub(self, i, rb_num, save, start_times=start_times, end_times=end_times)
         if rb_num == R2B:
             result = {**result, "q": result["q"] * R2B_Q_STRETCH}
         return result, config, logs
