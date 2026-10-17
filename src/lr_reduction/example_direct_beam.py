@@ -20,3 +20,15 @@ db.DTCcut_config1 = 1.8
 run_list = np.arange(225318,225321+1)
 DB_out = db.create_db(run_list=run_list, save_name='direct_beam_test.dat',
                       plot=True, flip_atten=True)
+
+# new test for position offset
+db.savepath = '/SNS/REF_L/shared/lr_reduction/new_workflow_test_outputs/'  # Set the directory where you want to save the output
+db.NEXUSpath = '/SNS/REF_L/IPTS-36119/nexus/'  # Set the path to your Nexus file
+db.Chop2_cut_fn = [2.077, -16818.0]
+db.DTCcut = 1.25
+db.DTCcut_config1 = 1.8
+db.y_ROI = [200,250]
+
+run_list = [235850]
+DB_out = db.create_db(run_list=run_list, save_name='direct_beam_test_pixel_offset.dat',
+                      plot=True, flip_atten=False)
