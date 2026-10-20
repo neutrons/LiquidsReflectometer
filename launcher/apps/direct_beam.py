@@ -6,6 +6,8 @@ from matplotlib.figure import Figure
 from qtpy import QtCore
 from qtpy.QtWidgets import (
     QCheckBox,
+    QDialog,
+    QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
@@ -49,20 +51,19 @@ except Exception:
         Direct_Beam = None
 
 
-class CdSettingsDialog(QMessageBox):
+class CdSettingsDialog(QDialog):
     def __init__(self, parent=None, defaults=None, initial_defaults=None):
         super().__init__(parent)
-        # Using simple dialog via QMessageBox with custom widget is cumbersome; build a QDialog-like widget
-        from qtpy.QtWidgets import QDialog, QDialogButtonBox, QFormLayout
-        self.dlg = QDialog(parent)
-        self.dlg.setWindowTitle("Cd settings")
+        self.setWindowTitle("Cd settings")
         layout = QVBoxLayout()
         form = QFormLayout()
 
         # Widgets
-        self.mu_file_edit = QLineEdit(self.dlg)
-        self.cd_edit = QLineEdit(self.dlg)
-        self.flip_check = QCheckBox('Flip attenuator mapping', self.dlg)
+        self.mu_file_edit = QLineEdit(self)
+        self.cd_edit = QLineEdit(self)
+        # the Cd list routinely holds content like "5, 126.5, 249.5, 499.0"
+        self.cd_edit.setMinimumWidth(320)
+        self.flip_check = QCheckBox('Flip attenuator mapping', self)
 
         # store working defaults (what the dialog initially shows) and the canonical
         # initial defaults used for the Reset action
@@ -88,15 +89,15 @@ class CdSettingsDialog(QMessageBox):
         self.reset_btn.clicked.connect(self._reset_defaults)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.dlg.accept)
-        buttons.rejected.connect(self.dlg.reject)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
 
         # buttons layout: reset button then ok/cancel
         hb = QHBoxLayout()
         hb.addWidget(self.reset_btn)
         hb.addWidget(buttons)
         layout.addLayout(hb)
-        self.dlg.setLayout(layout)
+        self.setLayout(layout)
 
     def _reset_defaults(self):
         # restore widgets to the canonical initial defaults (not the current working defaults)
@@ -108,9 +109,6 @@ class CdSettingsDialog(QMessageBox):
             self.flip_check.setChecked(bool(d.get('flip_atten', False)))
         except Exception:
             pass
-
-    def exec_(self):
-        return self.dlg.exec_()
 
     def get_values(self):
         def parse_list(s):
@@ -126,19 +124,19 @@ class CdSettingsDialog(QMessageBox):
         }
 
 
-class ModeratorDialog(QMessageBox):
+class ModeratorDialog(QDialog):
     def __init__(self, parent=None, defaults=None, initial_defaults=None):
-        from qtpy.QtWidgets import QDialog, QDialogButtonBox, QFormLayout
         super().__init__(parent)
-        self.dlg = QDialog(parent)
-        self.dlg.setWindowTitle('Moderator settings')
+        self.setWindowTitle('Moderator settings')
         layout = QVBoxLayout()
         form = QFormLayout()
 
-        self.chop2_edit = QLineEdit(self.dlg)
-        self.dMod_edit = QDoubleSpinBox(self.dlg)
+        self.chop2_edit = QLineEdit(self)
+        self.chop2_edit.setMinimumWidth(320)
+        self.dMod_edit = QDoubleSpinBox(self)
         self.dMod_edit.setRange(0.0, 1e6)
-        self.t0_edit = QLineEdit(self.dlg)
+        self.t0_edit = QLineEdit(self)
+        self.t0_edit.setMinimumWidth(320)
 
         # store working defaults and canonical initial defaults for reset
         self._defaults = defaults or {}
@@ -158,13 +156,13 @@ class ModeratorDialog(QMessageBox):
         self.reset_btn.clicked.connect(self._reset_defaults)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.dlg.accept)
-        buttons.rejected.connect(self.dlg.reject)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
         hb = QHBoxLayout()
         hb.addWidget(self.reset_btn)
         hb.addWidget(buttons)
         layout.addLayout(hb)
-        self.dlg.setLayout(layout)
+        self.setLayout(layout)
 
     def _reset_defaults(self):
         d = self._initial_defaults or {}
@@ -180,9 +178,6 @@ class ModeratorDialog(QMessageBox):
             self.t0_edit.setText(','.join([str(x) for x in d.get('t0', [])]))
         except Exception:
             self.t0_edit.setText('')
-
-    def exec_(self):
-        return self.dlg.exec_()
 
     def get_values(self):
         def parse_pair(s):
