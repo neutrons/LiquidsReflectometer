@@ -16,7 +16,7 @@ from lr_reduction.nr_reduction_calc import NR_Reduction  # TODO: Fix names of fi
 from lr_reduction.nr_reduction_config import NRReductionConfig
 
 
-def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True, eight_col=None, save_pdf_summary=False):
+def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True, eight_col=None, save_pdf_summary=False):  # noqa: ARG001 -- save_pdf_summary is public API (TODO in save_reduced_data); kept
     """
     Wrapper function to reduce a single run with reading of parameters from an xml template of the lr_reduction format.
     Then collect like results within the save folder and combine them together.
@@ -162,7 +162,7 @@ def config_from_template(template_data):
     # NOTE: Various of the config items expect arrays so ensure is set as single item array here.
 
     # Determine reduction method from template
-    if template_data.q_method != False and template_data.q_method is not None: # Should this be None or False? Not sure where the False comes from...
+    if template_data.q_method is not False and template_data.q_method is not None: # Should this be None or False? Not sure where the False comes from...
         method = template_data.q_method
     else:
         method = 'MeanTheta' if template_data.const_q else 'constantTOF' #TODO: decide if this should be MeanTheta or constantQ
@@ -175,7 +175,7 @@ def config_from_template(template_data):
     config.RB_Ymin = [template_data.data_peak_range[0]]
     config.RB_Ymax = [template_data.data_peak_range[1]]
 
-    if template_data.subtract_background == True:
+    if template_data.subtract_background is True:
         config.useBS = [1]
     else:
         config.useBS = [0]
@@ -292,7 +292,6 @@ def assemble_results(seq_id, output_dir, autoscale = True, plot=True, RQ4=False,
     data_array = []
     config_array = []
     for idx, file in enumerate(full_names):
-        seq_id_store = seq_list[idx]
         data = np.loadtxt(Path(output_dir) / file, unpack=True) # TODO: sort as Path.
         #output = nrff.load_from_file(Path(output_dir) / file)
         #data_load = output["data"]
