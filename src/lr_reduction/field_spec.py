@@ -72,7 +72,7 @@ __all__ = [
     "CALC_THETA_CHOICES", "DET_RES_CHOICES", "METHOD_CHOICES", "PEAK_TYPE_CHOICES",
     "Field", "FIELD_SPEC", "BY_NAME", "PER_ANGLE_NAMES", "OPTIONAL_LIST_NAMES",
     "RUNTIME_OWNED_NAMES", "INT_ENCODED_NAMES", "DEFAULT_IF_EMPTY_NAMES", "ANGLE_DEFINING_NAMES",
-    "EDITOR_START_NAMES", "GROUPS", "TYPES",
+    "EDITOR_START_NAMES", "HEADER_NAMES", "GROUPS", "TYPES",
     "as_boolean", "get", "fields_in",
 ]
 
@@ -762,6 +762,12 @@ def _check_choice_labels(field):
 for _field in FIELD_SPEC:
     if _field.choice_labels:
         _check_choice_labels(_field)
+
+#: The fields the settings editor shows in its header, above the angles, instead of in its list: the IPTS and
+#: the two input paths it roots (the scientists' item 6). The overrides' derived paths are shown, never written.
+HEADER_NAMES = ("experiment_id", "_NEXUSpathRB_override", "_DBpath_override")
+for _name in HEADER_NAMES:
+    BY_NAME[_name]  # an unknown name raises KeyError at import
 
 #: Groups in the order the editor should present them.
 GROUPS = tuple(dict.fromkeys(f.group for f in FIELD_SPEC))
