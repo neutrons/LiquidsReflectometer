@@ -505,19 +505,29 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
         tuple
             (Yfit, Ifit, RBpixel, Icalc, ThCen, tthd)
         """
+        ## NOTE: this section is complicated slightly with the pixel indexing and reverse ranges.
+        ## Need to handle careful and is probably a better approach.
+
         # Find pixel range to fit based on run Ymin/max values and the background parameters.
         if self.config.useBS[i]:
             sorted_bkgdROI = self._background_roi_sorter(self.config.BkgROI[i], self.config.RB_Ymin[i], self.config.RB_Ymax[i])
-            p1 = tools.find_pixel_index(ypix, sorted_bkgdROI[0]) + int(self.config.peak_pad)
-            p0 = tools.find_pixel_index(ypix, sorted_bkgdROI[3]) - int(self.config.peak_pad)
+            p1 = tools.find_pixel_index(ypix, sorted_bkgdROI[0])
+            p0 = tools.find_pixel_index(ypix, sorted_bkgdROI[3])
         else:
             # if BS not used then just want to take the RB_Ymin and RB_Ymax values
-            p1 = tools.find_pixel_index(ypix, np.min([self.config.RB_Ymin[i], self.config.RB_Ymax[i]])) + int(self.config.peak_pad)
-            p0 = tools.find_pixel_index(ypix, np.max([self.config.RB_Ymin[i], self.config.RB_Ymax[i]])) - int(self.config.peak_pad)
+            p1 = tools.find_pixel_index(ypix, np.min([self.config.RB_Ymin[i], self.config.RB_Ymax[i]]))
+            p0 = tools.find_pixel_index(ypix, np.max([self.config.RB_Ymin[i], self.config.RB_Ymax[i]]))
+
+        p_db = tools.find_pixel_index(ypix, int(DBpixel))
 
         # Need to make sure  the cropped range includes the DBpixel for the later calculation
-        p1_max = np.max([p1, int(DBpixel) + int(self.config.peak_pad)])
-        p0_min = np.min([p0, int(DBpixel) - int(self.config.peak_pad)])
+        p1_max = np.max([p1, p_db]) + int(self.config.peak_pad)
+        p0_min = np.min([p0, p_db]) - int(self.config.peak_pad)
+
+        # make sure can't go outside the size of the detector
+        n_pixels = np.min([len(ypix), RB.shape[0]])
+        p1_max = np.min([p1_max, n_pixels]) + 1
+        p0_min = np.max([p0_min, 0])
 
         Ydata = ypix[p0_min:p1_max]
         # Collapse intensity per pixel
@@ -531,11 +541,14 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
         RBpixel = par[1]
         dPix = RBpixel - DBpixel
         dMM = dPix * self.settings['pixel_width']
-        alpha = np.arcsin(dMM / self.settings['sample_detector_distance']) * 180 / np.pi
+        alpha = np.arctan(dMM / self.settings['sample_detector_distance']) * 180 / np.pi
         ThetaCalc = alpha * 0.5 + (self.log_values['tthd'] - DBtthd) / 2
         # TODO: Alter the function to do the calculation once and apply different angle offsets
         # Calculate expected beam profile on detector using logs
-        Icalc_nonfit, Ymm_notfit = tools.calc_beam_on_detector(Yfit, DBpixel, self.log_values['siY'], self.log_values['s1Y'],
+        diff_tthd = self.log_values['tthd'] - DBtthd - 2*ThCen
+        calc_pixel_diff = np.tan(np.radians(diff_tthd)) * self.settings['sample_detector_distance'] / self.settings['pixel_width']
+
+        Icalc_nonfit, Ymm_notfit = tools.calc_beam_on_detector(Yfit, DBpixel-calc_pixel_diff, self.log_values['siY'], self.log_values['s1Y'],
                                             self.settings['interslit_distance'], self.settings['si_sample_distance'],
                                          self.settings['sample_detector_distance'], self.settings['pixel_width'],
                                          self.config.DetSigma, self.config.DetResFn)
@@ -573,10 +586,11 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
             ax.plot(Yfit, Icalc_nonfit, '--g', label='Center from log')
             if self.config.useCalcTheta:
                 ax.plot(Yfit, Icalc, '-b', label='Calculated')
-            ax.plot([self.config.RB_Ymin[i], self.config.RB_Ymin[i]], [min(Idata), max(Idata)],
-                    '--k', linewidth=1, label='Data ROI')
-            ax.plot([self.config.RB_Ymax[i], self.config.RB_Ymax[i]], [min(Idata), max(Idata)],
-                    '--k', linewidth=1)
+            plt.axvspan(self.config.RB_Ymin[i],self.config.RB_Ymax[i], color='blue',alpha=0.2)
+            ax.vlines(DBpixel, np.min([Ifit]), np.max([Ifit]), colors='g',linestyles='dashdot', linewidth=1, label='DB position')
+            if self.config.useBS[i]:
+                plt.axvspan(sorted_bkgdROI[0], sorted_bkgdROI[1],color='green', alpha=0.2)
+                plt.axvspan(sorted_bkgdROI[2], sorted_bkgdROI[3],color='green', alpha=0.2)
             ax.set_title('Vertical beam distribution', fontsize=16)
             ax.set_xlabel('Detector Pixel', fontsize=14)
             ax.legend()
