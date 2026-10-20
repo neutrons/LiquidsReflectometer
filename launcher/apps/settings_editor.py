@@ -281,6 +281,22 @@ class SettingsEditorTab(QtWidgets.QWidget):
         return str(value)
 
     @staticmethod
+    def _row_header(row, surplus):
+        """A row beyond the reduction's angle count says so, and says why.
+
+        The row stays visible and editable: hiding it would hide a held value
+        and let Add reuse its slot. Remove angle on it drops the surplus entries.
+        """
+        if not surplus:
+            return QtWidgets.QTableWidgetItem(str(row + 1))
+        item = QtWidgets.QTableWidgetItem(f"{row + 1} (surplus)")
+        item.setToolTip(
+            "Beyond the angles the reduction uses: it never reads these entries. "
+            "Remove angle on this row drops them."
+        )
+        return item
+
+    @staticmethod
     def _cell_text(field, value):
         """Render one Angles-table cell.
 
@@ -340,6 +356,8 @@ class SettingsEditorTab(QtWidgets.QWidget):
         item = self.angle_table.item(row, column)
         value = fs.get(name).coerce_element(item.text() if item is not None else "")
         self.document.set_angle_field(row, name, value)
+        self.refresh_column(column)
+        self.refresh_marks()
         self.refresh_report()
 
     @guarded
@@ -402,8 +420,45 @@ class SettingsEditorTab(QtWidgets.QWidget):
                     self.angle_table.setItem(
                         row, column, QtWidgets.QTableWidgetItem(self._cell_text(fs.get(name), value))
                     )
+            self.refresh_marks()
         finally:
             self._populating = False
+
+    def refresh_column(self, column):
+        """Re-draw one column from the document, after an edit to it.
+
+        An edit can change cells the user did not type in: writing out a list
+        the reducer filled itself puts its value at the other angles, and a
+        refused λ leaves the edited cell unset. The text is set on the existing
+        items, never by replacing them, because this runs inside the table's own
+        cellChanged signal for one of them.
+        """
+        field = fs.get(fs.PER_ANGLE_NAMES[column])
+        populating, self._populating = self._populating, True
+        try:
+            for row in range(self.angle_table.rowCount()):
+                # A row past n_angles is left from before an edit that emptied the
+                # last λ entry back to None; it holds nothing.
+                value = self.document.angle_row(row)[field.name] if row < self.document.n_angles else None
+                text = self._cell_text(field, value)
+                item = self.angle_table.item(row, column)
+                if item is None:
+                    self.angle_table.setItem(row, column, QtWidgets.QTableWidgetItem(text))
+                elif item.text() != text:
+                    item.setText(text)
+        finally:
+            self._populating = populating
+
+    def refresh_marks(self):
+        """Mark the rows beyond the reduction's angle count, from the document as it is now.
+
+        Run after every change that can move the count: Load, Add, Remove, and
+        a cell edit (an angle-defining value typed into a surplus row makes it an
+        angle). The only place a mark is decided.
+        """
+        count = self.document.reduction_angles
+        for row in range(self.angle_table.rowCount()):
+            self.angle_table.setVerticalHeaderItem(row, self._row_header(row, surplus=row >= count))
 
     def refresh_scalars(self):
         for name, editor in self.editors.items():
@@ -423,6 +478,15 @@ class SettingsEditorTab(QtWidgets.QWidget):
             lines.extend(f"  - {message}" for message in problems)
         else:
             lines.append("No problems found.")
+
+        # Notes are true of a file that reduces (surplus entries; a default the
+        # reducer will fill), so they sit in their own section, apart from the
+        # problems.
+        notes = self.document.notes()
+        if notes:
+            lines.append("")
+            lines.append("Notes:")
+            lines.extend(f"  - {note}" for note in notes)
 
         changed = self.document.changed_vs_seed()
         if changed:
