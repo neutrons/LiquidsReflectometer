@@ -138,9 +138,11 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
             self.create_figures = False
         self.fig_store = []
 
+        # logs are indexed by sequence position (None where no run), like RBnum
         used_theta_vals = {"thi": [], "ths": [], "ThCen": [], "title": []}
         # TODO: Add handling for summed run files.
         non_specified = []
+        partial_results = []
         last_valid_idx = None
         valid_rb_nums = []
         for i, rb_num in enumerate(self.config.RBnum):
@@ -148,6 +150,8 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
             if rb_num is None:
                 print("No run completed at sequence ID", i+1)
                 non_specified.append(i)
+                for values in used_theta_vals.values():
+                    values.append(None)
                 continue
 
             result, config_out, log_vals = self._reduce_single_run(i, rb_num)
@@ -187,12 +191,14 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
             T.append(result['t'])
             last_valid_idx = len(R) - 1
             valid_rb_nums.append(rb_num)
-            if save_all:
-                # save out individual parts
-                # TODO: Need to fix the saving logic for multiple runs!! At the moment the save looks for the capitals...
-                result_out = {'Q': result['q'], 'R': result['r'], 'dR': result['dr'], 'dQ': result['dq'],
-                            'T': result['t'], 'L': result['l'], 'dT': result['dt'], 'dL': result['dl']}
-                #self.save_results(result_out, self.config, self.log_values, sname=f"{self.config.Sname}_{i}", method=self.config.method_per_run[i])
+            # TODO: Need to fix the saving logic for multiple runs!! At the moment the save looks for the capitals...
+            result_out = {'Q': result['q'], 'R': result['r'], 'dR': result['dr'], 'dQ': result['dq'],
+                        'T': result['t'], 'L': result['l'], 'dT': result['dt'], 'dL': result['dl']}
+            partial_results.append((i, rb_num, result_out))
+
+        if save_all:
+            # save out individual parts once all runs are reduced, so each header lists every run of the set
+            for i, rb_num, result_out in partial_results:
                 save_fn.save_results(result_out, self.config, used_theta_vals, sname=f"{self.config.Sname}_{i+1}_{rb_num}{self.config.subname}")
                 if eight_col:
                     save_fn.save_results(result_out, self.config, used_theta_vals, sname=f"{self.config.Sname}_{i+1}_{rb_num}{self.config.subname}", eight_column=True)
