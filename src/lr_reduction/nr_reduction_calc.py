@@ -138,8 +138,11 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
             self.create_figures = False
         self.fig_store = []
 
-        # logs are indexed by sequence position (None where no run), like RBnum
-        used_theta_vals = {"thi": [], "ths": [], "ThCen": [], "title": []}
+        # logs and records are indexed by sequence position (None where no run), like RBnum. The records
+        # (save_fn.RECORD_KEYS, header-scale-factors-per-position): the factor applied to the position's data
+        # -- the authored ScaleFactor times this call's autoscale factor -- and the wavelength range its
+        # reduction used. config.ScaleFactor stays the authored input (R4); the range stays a scalar (R5).
+        used_theta_vals = {"thi": [], "ths": [], "ThCen": [], "title": [], **{k: [] for k in save_fn.RECORD_KEYS}}
         # TODO: Add handling for summed run files.
         non_specified = []
         partial_results = []
@@ -156,6 +159,7 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
 
             result, config_out, log_vals = self._reduce_single_run(i, rb_num)
             print("Completed reduction for run", rb_num)
+            applied = 1  # this call's autoscale factor for the run (1: off, or first in the call)
             # TODO: add better autoscaling options.
             if self.config.AutoScale and last_valid_idx is not None:
 
@@ -174,8 +178,11 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
                 result['r'] = result['r'] * scale
                 result['dr'] = result['dr'] * scale
                 print('Scaling factor: ', np.round(scale,3))
-                self.config.ScaleFactor[i] *= scale
+                applied = scale
 
+            used_theta_vals["scale"].append(float(self.config.ScaleFactor[i]) * applied)
+            used_theta_vals["lambda_min"].append(float(self.config.LambdaMinUse))
+            used_theta_vals["lambda_max"].append(float(self.config.LambdaMaxUse))
             used_theta_vals["thi"].append(np.round(log_vals["thi"], 3))
             used_theta_vals["ths"].append(np.round(log_vals["ths"], 3))
             used_theta_vals["ThCen"].append(np.round(log_vals["ThCen"], 3))
