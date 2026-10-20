@@ -2175,3 +2175,170 @@ def test_a_list_unset_at_every_angle_implies_the_reductions_default():
     tests above held only [] and one broadcast entry, never unset entries."""
     doc = SettingsDocument.from_dict({**_THREE_ANGLES, "method_per_run": [None, None, None]})
     assert [doc.implied_entry(k, "method_per_run") for k in range(3)] == ["meanTheta"] * 3
+
+
+# --------------------------------------------------------------------------
+# editor-defaults-and-theta — a new file starts at gaussian / 1.0 (the library keeps rectangular / 0.8); the
+# theta enumeration is held canonical when the reducer accepts the value, and kept as loaded when it does not
+# --------------------------------------------------------------------------
+
+
+def test_a_document_the_editor_creates_starts_at_gaussian_and_1():
+    """U1, D1: the starting values are part of the seed, so nothing shows as changed in a new file."""
+    doc = SettingsDocument.for_new_file()
+    assert doc.get("DetResFn") == "gaussian"
+    assert doc.get("DetSigma") == 1.0 and type(doc.get("DetSigma")) is float
+    assert doc.changed_vs_seed() == {}
+
+
+def test_the_library_and_a_bare_document_keep_rectangular_and_0_8():
+    """U2, D2: only a document the editor creates starts at the new values."""
+    config = NRReductionConfig()
+    assert (config.DetResFn, config.DetSigma) == ("rectangular", 0.8)
+    assert (fs.get("DetResFn").default, fs.get("DetSigma").default) == ("rectangular", 0.8)
+    doc = SettingsDocument()
+    assert (doc.get("DetResFn"), doc.get("DetSigma")) == ("rectangular", 0.8)
+
+
+def test_a_loaded_file_without_the_resolution_keys_holds_what_its_reduction_uses(tmp_path):
+    """U3, D2, A2: a file that omits them is reduced with the library's rectangular / 0.8 (json_to_config starts
+    from NRReductionConfig()), so that is what the editor shows, not the new file's starting values."""
+    seed = tmp_path / "s.json"
+    seed.write_text(json.dumps({"Sname": "old"}))
+    doc = SettingsDocument.from_file(seed)
+    assert (doc.get("DetResFn"), doc.get("DetSigma")) == ("rectangular", 0.8)
+
+
+def test_the_fields_with_a_starting_value_are_exactly_the_resolution_pair():
+    """U4: declared on the Field and derived into EDITOR_START_NAMES; every other field starts at its default."""
+    assert {name: fs.get(name).starting_value() for name in fs.EDITOR_START_NAMES} == {
+        "DetResFn": "gaussian", "DetSigma": 1.0,
+    }
+    assert all(f.starting_value() == f.default for f in fs.FIELD_SPEC if f.name not in fs.EDITOR_START_NAMES)
+
+
+_ABSENT = object()
+
+# (id, the value in the file, the value held after load, reported?) — plan §3's table, one row per spelling.
+_THETA_LOADS = [
+    ("absent", _ABSENT, False, False),
+    ("false", False, False, False),
+    ("null", None, False, False),
+    ("zero", 0, False, False),
+    ("empty", "", False, False),
+    ("true", True, "detector_angle", False),
+    ("detector_angle", "detector_angle", "detector_angle", False),
+    ("Detector_Angle", "Detector_Angle", "detector_angle", False),
+    ("DETECTOR_ANGLE", "DETECTOR_ANGLE", "detector_angle", False),
+    ("sample_angle", "sample_angle", "sample_angle", False),
+    ("Sample_Angle", "Sample_Angle", "sample_angle", False),
+    ("SAMPLE_ANGLE", "SAMPLE_ANGLE", "sample_angle", False),
+    ("string-true", "true", "true", True),
+    ("string-TRUE", "TRUE", "TRUE", True),
+    ("string-yes", "yes", "yes", True),
+    ("one", 1, 1, True),
+    ("string-True", "True", "True", True),
+    ("detector", "detector", "detector", True),
+    ("sample", "sample", "sample", True),
+    ("a-list", ["detector_angle"], ["detector_angle"], True),
+]
+
+
+def _theta_document(tmp_path, loaded):
+    seed = tmp_path / "seed.json"
+    seed.write_text(json.dumps({} if loaded is _ABSENT else {"useCalcTheta": loaded}))
+    return SettingsDocument.from_file(seed)
+
+
+@pytest.mark.parametrize("loaded, held, reported", [pytest.param(*row[1:], id=row[0]) for row in _THETA_LOADS])
+def test_loading_holds_a_theta_value_the_reducer_accepts_canonically_and_keeps_the_rest(tmp_path, loaded, held,
+                                                                                        reported):
+    """U5, D5, D6. What the reducer accepts is held as the value it acts on: True and any case of a name as the
+    lower-case name, any falsy value as False. What it rejects (it raises on "true") is kept exactly as loaded
+    and reported with the three forms it accepts. Either way nothing shows as changed, and a save writes what
+    is held."""
+    doc = _theta_document(tmp_path, loaded)
+    value = doc.get("useCalcTheta")
+    assert value == held and type(value) is type(held)
+    lines = [message for message in doc.validate() if "useCalcTheta" in message]
+    assert bool(lines) is reported, lines
+    if reported:
+        assert all(form in lines[0] for form in ("False", "True", "trust sample angle")), lines[0]
+    assert doc.changed_vs_seed() == {}
+    saved = json.loads(doc.save(tmp_path / "out.json").read_text())["useCalcTheta"]
+    assert saved == held and type(saved) is type(held)
+
+
+@pytest.mark.parametrize("loaded", [pytest.param(row[1], id=row[0]) for row in _THETA_LOADS
+                                    if row[1] is not _ABSENT])
+def test_the_reduction_reads_the_saved_theta_value_as_it_read_the_loaded_one(tmp_path, loaded):
+    """U7, D7: the reducer's own normalisation (NR_Reduction._validate_config, nr_reduction_calc.py:90-97) does
+    the same with the saved value as with the loaded one, for every spelling. It reads both as the same name,
+    or both as off, or rejects both: a canonicalisation it does not perform itself ("sample" -> "sample_angle")
+    would turn a file it rejects into one it reduces. Off is compared by truthiness, which is all its readers
+    test (:92, :543, :574; :550 compares a name), so no reader sees which falsy value it was."""
+
+    def outcome(value):
+        reduction = _bare_reduction(RBnum=[1], DBname=["db.dat"], RB_Ymin=[1], RB_Ymax=[2], useCalcTheta=value)
+        try:
+            reduction._validate_config()
+        except (ValueError, AttributeError) as exc:  # AttributeError: .lower() on a non-string
+            return ("rejected", type(exc).__name__)
+        return ("reads", reduction.config.useCalcTheta or False)
+
+    doc = _theta_document(tmp_path, loaded)
+    saved = json.loads(doc.save(tmp_path / "out.json").read_text())["useCalcTheta"]
+    assert outcome(saved) == outcome(loaded)
+
+
+def test_the_readers_of_use_calc_theta_are_the_ones_d7_cleared():
+    """U7's pin, D7. Holding a falsy value as False and True as "detector_angle" is safe only while no reader of
+    useCalcTheta tells them apart. These are its mentions in the library at dispatch (reader, writer or carrier,
+    each read): nr_reduction_calc (the rule and three reads), web_report (prints it), new_reduction_from_template
+    (copies it into a template), nr_reduction_config (the default) and the example scripts (writers). A new mention
+    changes this count: read it, and remove the canonicalisation it can see from D5, before updating the count."""
+    library = pathlib.Path(fs.__file__).parent
+    declarations = {"field_spec.py", "settings_document.py", "reduction_domains.py"}
+    mentions = {
+        path.name: count
+        for path in sorted(library.glob("*.py"))
+        if path.name not in declarations and (count := path.read_text().count("useCalcTheta"))
+    }
+    assert mentions == {
+        "EBW_nr_reduction_test.py": 2,
+        "example_nr_from_template.py": 2,
+        "example_nr_reduction.py": 5,
+        "new_reduction_from_template.py": 3,
+        "new_reduction_template_reader.py": 1,
+        "nr_reduction_calc.py": 11,
+        "nr_reduction_config.py": 1,
+        "web_report.py": 1,
+    }
+
+
+def test_every_theta_choice_has_one_label_and_every_label_maps_back():
+    """U6, D3, D4: one mapping, declared on the Field, read in both directions; False is an entry of its own."""
+    field = fs.get("useCalcTheta")
+    assert field.label == "Apply theta calculation"
+    assert [label for _, label in field.choice_labels] == ["False", "True", "trust sample angle"]
+    assert {stored for stored, _ in field.choice_labels} == {False, *fs.CALC_THETA_CHOICES}
+    for stored, label in field.choice_labels:
+        assert field.label_for(stored) == label
+        back = field.value_for(label)
+        assert back == stored and type(back) is type(stored)
+    assert field.label_for(True) == "True" and field.label_for("Sample_Angle") == "trust sample angle"
+    assert field.label_for(None) == "False" and field.label_for("true") is None
+
+
+def test_a_stored_choice_without_a_label_fails_the_check_run_at_import():
+    """§5, pathological: a choice added to CALC_THETA_CHOICES without a label fails at import (the check runs
+    on every field there), never an unlabelled entry. Two choices with one label fail too."""
+    import dataclasses
+
+    field = fs.get("useCalcTheta")
+    fs._check_choice_labels(field)
+    with pytest.raises(ValueError, match="useCalcTheta"):
+        fs._check_choice_labels(dataclasses.replace(field, allowed=(*field.allowed, "fitted_angle")))
+    with pytest.raises(ValueError, match="share a label"):
+        fs._check_choice_labels(dataclasses.replace(
+            field, choice_labels=((False, "False"), ("detector_angle", "True"), ("sample_angle", "True"))))
