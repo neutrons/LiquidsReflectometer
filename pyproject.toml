@@ -220,6 +220,18 @@ markers = [
 # signal (the default) cannot interrupt a test blocked in Qt's C++ event loop;
 # this selects the method wherever a timeout is armed, and arms none by itself.
 timeout_method = "thread"
+filterwarnings = [
+  # matplotlib 3.9.4's _mathtext / _fontconfig_pattern still call pyparsing's
+  # deprecated camelCase API, and pyparsing 3.3.2 warns about it while parsing
+  # mathtext and classic.mplstyle. Third-party: no matplotlib release removes
+  # this today, so the filter is the fix rather than a stopgap (revisit if a
+  # future matplotlib migrates AND is co-installable with the facility Mantid).
+  # Scoped to pyparsing's own category, which this repo never raises
+  # first-party — `git grep "import pyparsing" src launcher` is empty — so our
+  # own DeprecationWarnings still surface. tests/test_warning_hygiene.py pins
+  # both halves of that.
+  "ignore::pyparsing.warnings.PyparsingDeprecationWarning",
+]
 addopts = "--import-mode=importlib"  # to allow a unit test and integration test with the same module name
 
 #########
