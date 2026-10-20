@@ -108,7 +108,8 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
         if not self.config.tof_max:
             self.config.tof_max = [100000] * n_settings # TODO: Work out where to set this up properly!
 
-    def reduce(self, save=True, save_all=True, plot=None, eight_col=None, save_pdf_summary=False):
+    def reduce(self, save=True, save_all=True, plot=None, eight_col=None, save_pdf_summary=False,
+               start_times = None, end_times = None):
         """
         Perform the reduction of all angle settings and combine into an output.
 
@@ -117,6 +118,8 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
         plot: (optional) show the NR plot on completion
         eight_col: (optional) allows override of saving out the 8 column data, otherwise read from the config.
         save_pdf_summary: (optional) allows save of PDF plot summary for diagnostics
+        start_times, end_times: (optional) time windows to reduce instead of each whole run, in seconds from the run's
+            first pulse (binary_processing.time_windows); the headers written name them. The config is not changed.
 
         Returns
         -------
@@ -125,6 +128,9 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
         """
         Q, R, dR, dQ = [], [], [], []
         L, T, dL, dT = [], [], [], []
+        # The time window this call reads, for the headers (save_fn.save_results): a record of the call, as the
+        # scale and range records are, never a write into the shared config (R4/R5).
+        time_window = None if start_times is None and end_times is None else (start_times, end_times)
         if not eight_col:
             eight_col = self.config.save8col
 
@@ -157,7 +163,7 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
                     values.append(None)
                 continue
 
-            result, config_out, log_vals = self._reduce_single_run(i, rb_num)
+            result, config_out, log_vals = self._reduce_single_run(i, rb_num, start_times=start_times, end_times=end_times)
             print("Completed reduction for run", rb_num)
             applied = 1  # this call's autoscale factor for the run (1: off, or first in the call)
             # TODO: add better autoscaling options.
@@ -206,9 +212,9 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
         if save_all:
             # save out individual parts once all runs are reduced, so each header lists every run of the set
             for i, rb_num, result_out in partial_results:
-                save_fn.save_results(result_out, self.config, used_theta_vals, sname=f"{self.config.Sname}_{i+1}_{rb_num}{self.config.subname}")
+                save_fn.save_results(result_out, self.config, used_theta_vals, sname=f"{self.config.Sname}_{i+1}_{rb_num}{self.config.subname}", time_window=time_window)
                 if eight_col:
-                    save_fn.save_results(result_out, self.config, used_theta_vals, sname=f"{self.config.Sname}_{i+1}_{rb_num}{self.config.subname}", eight_column=True)
+                    save_fn.save_results(result_out, self.config, used_theta_vals, sname=f"{self.config.Sname}_{i+1}_{rb_num}{self.config.subname}", eight_column=True, time_window=time_window)
 
         # Combine results for all settings
         Q_combined = np.concatenate(Q)
@@ -226,9 +232,9 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
                            'T': T_combined[idx], 'L': L_combined[idx], 'dT': dT_combined[idx], 'dL': dL_combined[idx]}
 
         if save or save_all:    #TODO: fix the saving parts here this is messy!
-            save_fn.save_results(combine_results, self.config, used_theta_vals, full=True, sname=f"{self.config.Sname}_combined{self.config.subname}")
+            save_fn.save_results(combine_results, self.config, used_theta_vals, full=True, sname=f"{self.config.Sname}_combined{self.config.subname}", time_window=time_window)
             if eight_col:
-                save_fn.save_results(combine_results, self.config, used_theta_vals, eight_column=True, full=True, sname=f"{self.config.Sname}_combined{self.config.subname}")
+                save_fn.save_results(combine_results, self.config, used_theta_vals, eight_column=True, full=True, sname=f"{self.config.Sname}_combined{self.config.subname}", time_window=time_window)
         # TODO: Decide whether to keep in here or have as a separate part after the reduciton....?
         # Always create this last figure and store into the output just have optional show.
         fig, ax = plt.subplots()
@@ -309,7 +315,7 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
             tof_array, y_tof_corr, error_array_corr, log_values = self._make_binary_files(rb_num, self.config.tof_min[i], self.config.tof_max[i])
             return tof_array, y_tof_corr, error_array_corr, log_values
 
-    def _make_binary_files(self, rb_num, tof_min=0, tof_max=50000):
+    def _make_binary_files(self, rb_num, tof_min=0, tof_max=50000, start_times=None, end_times=None):
         """
         Make binary files.
 
@@ -354,7 +360,9 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
                 deadtime=self.config.dead_time,
                 tof_step=self.config.dead_time_tof_step,
                 n_y=304,    # TODO: Work out how to add here when settings not created yet.
-                n_x=256
+                n_x=256,
+                start_times=start_times,
+                end_times=end_times
             )
 
             print(f"Binary data computed successfully for run {rb_num}")
@@ -363,7 +371,7 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
         except Exception as e:  # noqa: BLE001 -- boundary wrap: any failure becomes a RuntimeError naming the run
             raise RuntimeError(f"Failed to compute binary data for run {rb_num}: {str(e)}")
 
-    def _load_and_extract_lambda(self, i, rb_num):
+    def _load_and_extract_lambda(self, i, rb_num, start_times=None, end_times=None):
         """
         Load binary TOF data and convert to lambda space including the emission time correction.
         Return arrays for run and direct beam with matching bins.
@@ -383,7 +391,7 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
              ThCen)
         """
         # Get binary data recompute to ensure correct x-ranges etc.
-        tRB, nRB, nRBE, log_values = self._make_binary_files(rb_num, self.config.tof_min[i], self.config.tof_max[i])
+        tRB, nRB, nRBE, log_values = self._make_binary_files(rb_num, self.config.tof_min[i], self.config.tof_max[i], start_times=start_times, end_times=end_times)
         self.log_values = log_values
         # Read in the instrument settings file from the json. # TODO: A little more logic should be added to mimic prior setup.
         settings = tools.read_settings(log_values["start_time"])
@@ -960,7 +968,7 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
 
         return theta, mode
 
-    def _reduce_single_run(self, i, rb_num, save=True):  # noqa: ARG002 -- save kept for API compatibility (callers pass it)
+    def _reduce_single_run(self, i, rb_num, save=True, start_times=None, end_times=None):  # noqa: ARG002 -- save kept for API compatibility (callers pass it)
         """
         Reduce a single run setting using the pre-defined config.
 
@@ -978,7 +986,7 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
         """
         # Load and extract data to lambda space
         # Note: q and lDB are available as self.q, not needed in unpacking
-        _, iDB, eDB, _, _, _, ypix, RB, RBE, LAMBDA, LambdaBinSize, _, mode = self._load_and_extract_lambda(i, rb_num)
+        _, iDB, eDB, _, _, _, ypix, RB, RBE, LAMBDA, LambdaBinSize, _, mode = self._load_and_extract_lambda(i, rb_num, start_times=start_times, end_times=end_times)
         ## NOTE: Is the q value needed from the output above?! Track through the self.q...?
 
         # Crop to y-pixel ROI

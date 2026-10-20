@@ -19,7 +19,7 @@ LOGS_ONLY_HEADER_FORMAT = 2
 RECORD_KEYS = ("scale", "lambda_min", "lambda_max")
 
 
-def save_results(results, config_header, log_values, sname = None, full=True, eight_column=False, sequence=None):
+def save_results(results, config_header, log_values, sname = None, full=True, eight_column=False, sequence=None, time_window=None):
     """
     Save results as .dat file with header
     results: results to save
@@ -29,6 +29,8 @@ def save_results(results, config_header, log_values, sname = None, full=True, ei
     full: flag to include more information in the header
     eight_column: option to save out 8-column data with L, dL, T, dT in addition to the standard 4 column
     sequence: option to specify index within the set of runs for selecting settings from config into the header #TODO: should this be in the method?
+    time_window: the (start_times, end_times) the reduction read, for the header's "Time resolved:" line; None (the
+        whole run) writes no such line, so a run reduced whole has the header it had before time slicing
 
     Parameters
     ----------
@@ -42,7 +44,8 @@ def save_results(results, config_header, log_values, sname = None, full=True, ei
     else:
         array = np.column_stack((results['Q'], results['R'], results['dR'], results['dQ']))
 
-    head = _build_header(full=full, eight_column=eight_column, config_header=config_header, sequence=sequence, log_values=log_values)
+    head = _build_header(full=full, eight_column=eight_column, config_header=config_header, sequence=sequence, log_values=log_values,
+                         time_window=time_window)
 
     if not sname:
         output_file = config_header.Spath / f"{config_header.Sname}"
@@ -83,13 +86,16 @@ def _header_runs(runs):
     return plain
 
 
-def _build_header(config_header, log_values, full=True, eight_column=False, sequence=None):
+def _build_header(config_header, log_values, full=True, eight_column=False, sequence=None, time_window=None):
     """
     Wrapper to handle assembly logic for the output file header.
 
     With the per-position records (RECORD_KEYS) in ``log_values``, the header is format 3: the Scaling factors
     and Lambda Range lines, and Config's LambdaMinUse/LambdaMaxUse, are lists by sequence position (the config
     object itself keeps its scalars). Without them, today's lines and format 2.
+
+    With a time_window, one "Time resolved: <start_times>, <end_times>" line, before the format marker; without one,
+    none. The window is the call's, as the records are: it is never read from the config.
     """
 
     if eight_column:
@@ -129,6 +135,7 @@ def _build_header(config_header, log_values, full=True, eight_column=False, sequ
         marker = (f"Header format: {LOGS_ONLY_HEADER_FORMAT} (Run Title, Angles and NR_runs are indexed by "
                   f"sequence position)")
     nr_runs = _header_runs(sorted_config.RBnum)
+    window_line = "" if time_window is None else f"Time resolved: {time_window[0]}, {time_window[1]}\n"
     if full:
         head = (
             f"NR_runs = {nr_runs}\n"
@@ -140,6 +147,7 @@ def _build_header(config_header, log_values, full=True, eight_column=False, sequ
             f"Scaling factors = {scale_factor_header}\n"
             f"Lambda Range = {lambda_header}\n"
             f"Angles: {angle_header}\n"
+            f"{window_line}"
             f"{marker}\n"
             f"{'---' * 20}\n"
             f"Config: {config_json}\n"
@@ -159,6 +167,7 @@ def _build_header(config_header, log_values, full=True, eight_column=False, sequ
             f"Scaling factors = {scale_factor_header}\n"
             f"Lambda Range = {lambda_header}\n"
             f"Angles: {angle_header}\n"
+            f"{window_line}"
             f"{marker}\n"
             f"{'---' * 20}\n"
             f"Config: {config_json}\n"
