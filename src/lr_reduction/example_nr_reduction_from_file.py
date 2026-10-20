@@ -142,7 +142,6 @@ def test_incidenttheta():
 
     return output
 
-
 if __name__ == '__main__':
     # Run examples
     example_from_dat()
@@ -157,3 +156,4 @@ if __name__ == '__main__':
     example_with_8col_search()
     test_for_autoreduction()
     test_incidenttheta()
+
