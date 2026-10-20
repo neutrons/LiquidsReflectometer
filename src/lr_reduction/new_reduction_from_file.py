@@ -146,12 +146,10 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
 
         if save_json:
             filepath_out = Path(config_final.Spath / f"{config_final.Sname}_settings.json")
-            with open(filepath_out, "w") as f:
-                json.dump(
-                    save_fn.make_json_safe(config_final.__dict__),
-                    f,
-                    indent=2
-                    )
+            # Through the helper, not a second inline copy. The duplicate is how
+            # the public saver stayed broken and unnoticed: the flow that
+            # actually saves never exercised it.
+            save_config_json(filepath_out, config_final)
 
     # Might need to come back to which figures are output.
     return all_results, output_figures, sorted_run_nums, config_final
@@ -476,8 +474,30 @@ def load_from_file(filepath):
     return {"data": data, "config": config}
 
 def save_config_json(filepath, config):
+    """Write ``config`` as a settings JSON that :func:`json_to_config` reads back.
+
+    This called `json_to_config` — the LOADER — where it needed the saver, so
+    there was no input for which it worked: a dict raised ``TypeError`` (the
+    config the loader builds is not serializable) and a config raised
+    ``AttributeError`` (no ``.items()``). Nothing called it, because the working
+    saver was three lines inlined in the reduction flow; the codebase carried a
+    correct saver that could not be reused and a reusable saver that was broken,
+    and the broken one was the public name a newcomer reaches for.
+
+    ``__dict__`` is the right source rather than an implementation-detail
+    shortcut, though not for the reason first given here: ``Spath`` **does**
+    have a setter, so the public form would survive the ``hasattr`` gate. The
+    real reasons are that the private ``_*_override`` names **re-derive** their
+    paths from ``experiment_id`` on load, whereas the public form freezes the
+    resolved absolute path into the file; and that ``base_path`` is a property
+    with **no** setter, so any "save every public attribute" scheme hits
+    ``AttributeError: property 'base_path' has no setter`` on reload.
+    """
+    # Serialize BEFORE opening. `json.dump` raising part-way through left a
+    # truncated file behind, so a failed save destroyed the previous settings.
+    payload = json.dumps(save_fn.make_json_safe(config.__dict__), indent=2)
     with open(filepath, "w") as f:
-        json.dump(json_to_config(config), f, indent=2)
+        f.write(payload)
 
 def plot_reflectivity(data_array, RQ4=False, log_x = True, show_fig=True):
     """
