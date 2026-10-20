@@ -72,7 +72,7 @@ __all__ = [
     "CALC_THETA_CHOICES", "DET_RES_CHOICES", "METHOD_CHOICES", "PEAK_TYPE_CHOICES",
     "Field", "FIELD_SPEC", "BY_NAME", "PER_ANGLE_NAMES", "OPTIONAL_LIST_NAMES",
     "RUNTIME_OWNED_NAMES", "INT_ENCODED_NAMES", "DEFAULT_IF_EMPTY_NAMES", "ANGLE_DEFINING_NAMES",
-    "EDITOR_START_NAMES", "HEADER_NAMES", "GROUPS", "TYPES",
+    "EDITOR_START_NAMES", "HEADER_NAMES", "SECTION_ORDER", "GROUPS", "TYPES",
     "as_boolean", "get", "fields_in",
 ]
 
@@ -512,8 +512,8 @@ def _path_problem(value):
     return ""
 
 RUNS = "Runs and angles"
-PATHS = "Paths"
-NAMING = "Output naming"
+# One section for what the header (HEADER_NAMES) leaves of the output naming and the paths (item 7 (viii)).
+OUTPUT = "Output naming and paths"
 PROCESSING = "Processing"
 BACKGROUND = "Background"
 QSPACE = "Q-space"
@@ -573,32 +573,32 @@ FIELD_SPEC = (
           per_angle=True, default_if_empty=True, reducer_default=1),
 
     # ---- scalars ---------------------------------------------------------
-    Field("Sname", "Output name", NAMING, "str", "reduction_output",
+    Field("Sname", "Output name", OUTPUT, "str", "reduction_output",
           "Base name for the reduced output files.", no_separators=True),
     # A directory NAME, not a path: it is joined verbatim onto /SNS/REF_L, so
     # an absolute value replaces the base entirely and a '..' walks out of it.
-    Field("experiment_id", "IPTS", NAMING, "str", "",
+    Field("experiment_id", "IPTS", OUTPUT, "str", "",
           "IPTS identifier. Also the root of every default path.",
           no_separators=True),
-    Field("subname", "Output subtitle", NAMING, "str", None,
+    Field("subname", "Output subtitle", OUTPUT, "str", None,
           "Optional subtitle appended to saved file names.", no_separators=True),
-    Field("DTCsubname", "Dead-time-corrected suffix", NAMING, "str", "_DTC",
+    Field("DTCsubname", "Dead-time-corrected suffix", OUTPUT, "str", "_DTC",
           "Suffix for dead-time-corrected outputs.", no_separators=True),
-    Field("BINsubname", "Binned suffix", NAMING, "str", "_DTC",
+    Field("BINsubname", "Binned suffix", OUTPUT, "str", "_DTC",
           "Suffix for binned outputs.", no_separators=True),
-    Field("errBINsubname", "Binned-error suffix", NAMING, "str", "_err_DTC",
+    Field("errBINsubname", "Binned-error suffix", OUTPUT, "str", "_err_DTC",
           "Suffix for binned uncertainty outputs.", no_separators=True),
     Field("data_x_range", "Detector X range", RUNS, "list[int]", [50, 200],
           "Detector pixel range integrated over in X. Two values, not per angle."),
 
-    Field("_Spath_override", "Output path", PATHS, "path", None,
+    Field("_Spath_override", "Output path", OUTPUT, "path", None,
           "Where reduced data is written. Unset uses <IPTS>/shared/reduced."),
-    Field("_NEXUSpathRB_override", "NeXus path", PATHS, "path", None,
+    Field("_NEXUSpathRB_override", "NeXus path", OUTPUT, "path", None,
           "Where run NeXus files are read from. Unset uses <IPTS>/nexus."),
-    Field("_DBpath_override", "Direct-beam path", PATHS, "path", None,
+    Field("_DBpath_override", "Direct-beam path", OUTPUT, "path", None,
           "Where direct-beam files are read from. Unset uses "
           "<IPTS>/shared/transmission."),
-    Field("_BINpath_override", "Binned-output path", PATHS, "path", None,
+    Field("_BINpath_override", "Binned-output path", OUTPUT, "path", None,
           "Where binned output is written. Unset uses <IPTS>/shared/reduced."),
 
     Field("Normalize", "Normalize to critical edge", PROCESSING, "bool", False,
@@ -769,8 +769,34 @@ HEADER_NAMES = ("experiment_id", "_NEXUSpathRB_override", "_DBpath_override")
 for _name in HEADER_NAMES:
     BY_NAME[_name]  # an unknown name raises KeyError at import
 
-#: Groups in the order the editor should present them.
-GROUPS = tuple(dict.fromkeys(f.group for f in FIELD_SPEC))
+#: The sections of the editor's list, in the order the scientists asked for (item 7): how often each is
+#: opened and changed, not where its fields happen to sit in FIELD_SPEC. Every group with a field in the list
+#: (not per-angle, not in the header) is here exactly once; _check_section_order enforces it at import.
+SECTION_ORDER = (RUNS, PROCESSING, QSPACE, WAVELENGTH, DEADTIME, RESOLUTION, PEAK, OUTPUT, GEOMETRY, RUNTIME)
+
+
+def _check_section_order(fields, order):
+    """Raise ``ValueError`` unless `order` names each group that has a field in the editor's list exactly once,
+    and nothing else.
+
+    Run at import, so a field added later with a group of its own fails here, naming the group, instead of
+    leaving its field out of every section. A raise, not an ``assert``: ``python -O`` strips asserts.
+    """
+    if len(order) != len(set(order)):
+        raise ValueError(f"SECTION_ORDER lists a group twice: {order}")
+    listed = {f.group for f in fields if not f.per_angle and f.name not in HEADER_NAMES}
+    missing, extra = sorted(listed - set(order)), sorted(set(order) - listed)
+    if missing or extra:
+        raise ValueError(
+            f"SECTION_ORDER does not match the groups of the editor's list: missing {missing}, not a section {extra}"
+        )
+
+
+_check_section_order(FIELD_SPEC, SECTION_ORDER)
+
+#: Every group: the sections in their declared order, then the groups with no field in the list (per-angle only:
+#: their fields are columns of the Angles table).
+GROUPS = SECTION_ORDER + tuple(g for g in dict.fromkeys(f.group for f in FIELD_SPEC) if g not in SECTION_ORDER)
 
 
 def get(name):
