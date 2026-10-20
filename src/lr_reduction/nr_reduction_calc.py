@@ -504,9 +504,9 @@ class NR_Reduction:
         tuple
             (Yfit, Ifit, RBpixel, Icalc, ThCen, tthd)
         """
-        ## NOTE: this section is complicated slightly with the pixel indexing and reverse ranges. 
+        ## NOTE: this section is complicated slightly with the pixel indexing and reverse ranges.
         ## Need to handle careful and is probably a better approach.
-        
+
         # Find pixel range to fit based on run Ymin/max values and the background parameters.
         if self.config.useBS[i]:
             sorted_bkgdROI = self._background_roi_sorter(self.config.BkgROI[i], self.config.RB_Ymin[i], self.config.RB_Ymax[i])
@@ -517,8 +517,8 @@ class NR_Reduction:
             p1 = tools.find_pixel_index(ypix, np.min([self.config.RB_Ymin[i], self.config.RB_Ymax[i]]))
             p0 = tools.find_pixel_index(ypix, np.max([self.config.RB_Ymin[i], self.config.RB_Ymax[i]]))
 
-        p_db = tools.find_pixel_index(ypix, int(DBpixel)) 
-        
+        p_db = tools.find_pixel_index(ypix, int(DBpixel))
+
         # Need to make sure  the cropped range includes the DBpixel for the later calculation
         p1_max = np.max([p1, p_db]) + int(self.config.peak_pad)
         p0_min = np.min([p0, p_db]) - int(self.config.peak_pad)

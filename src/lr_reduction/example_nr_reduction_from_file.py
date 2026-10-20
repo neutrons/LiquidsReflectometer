@@ -156,4 +156,3 @@ if __name__ == '__main__':
     example_with_8col_search()
     test_for_autoreduction()
     test_incidenttheta()
-
