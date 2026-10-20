@@ -130,6 +130,12 @@ class Field:
         angle of such a list writes this at the others, so they reduce as before
         (``SettingsDocument.set_angle_field``). ``None`` for every other field.
         Pinned against the reducer by a test.
+    candidates_folder
+        For a per-angle column of file names: the config path property naming
+        the folder the reducer reads them from (``DBname``: ``DBpath``,
+        ``nr_reduction_calc.py:402`` joins the two). The editor offers that
+        folder's files as the column's choices
+        (``SettingsDocument.candidates``). ``None`` for every other field.
     """
 
     name: str
@@ -152,6 +158,7 @@ class Field:
     case_sensitive: bool = False
     value_notes: Tuple[Tuple[str, str], ...] = ()
     reducer_default: Any = None
+    candidates_folder: Optional[str] = None
 
     # -- type vocabulary ------------------------------------------------
 
@@ -459,7 +466,8 @@ FIELD_SPEC = (
           "to meanTheta.",
           allowed=METHOD_CHOICES, per_angle=True, broadcast_ok=True, reducer_default="meanTheta"),
     Field("DBname", "Direct-beam file", RUNS, "list[str]", [],
-          "Pre-processed direct-beam file backing each angle.", per_angle=True),
+          "Pre-processed direct-beam file backing each angle.", per_angle=True,
+          candidates_folder="DBpath"),
     Field("RBnum", "Run numbers", RUNS, "list[int]", [],
           "Run numbers reduced at each angle. Supplied by the reduction run, "
           "not authored here.",

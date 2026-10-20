@@ -49,9 +49,26 @@ from lr_reduction.save_reduced_data import make_json_safe
 #: thread. Truncation is announced, never silent.
 MAX_REPORTED_PROBLEMS = 200
 
+#: Cap on the file names a cell offers (``SettingsDocument.candidates``). A
+#: direct-beam folder holds tens of files; a folder of tens of thousands is
+#: listed once, sorted, and cut here, and the caller says so.
+MAX_CANDIDATES = 2000
+
+#: The file types a direct-beam entry names: the reducer loads ``.txt`` and
+#: ``.dat`` direct-beam files. Matched case-insensitively.
+CANDIDATE_SUFFIXES = (".txt", ".dat")
+
 #: Returned by ``SettingsDocument._compact_reading`` for a list the reducer reads
 #: as it is held. ``None`` cannot mark that: it is what a derived λ reads.
 _NOT_COMPACT = object()
+
+
+def _is_file(entry):
+    """``entry.is_file()``, with a failed stat counted as "not a file" rather than ending the listing."""
+    try:
+        return entry.is_file()
+    except OSError:
+        return False
 
 
 def _held_as_bool(value):
@@ -383,6 +400,57 @@ class SettingsDocument:
             updated = None
         self._refused.pop(name, None)
         self.set(name, updated)
+
+    def implied_entry(self, index, name):
+        """The value the reduction uses at angle ``index`` where the list holds none, else ``None``.
+
+        A compact list leaves the angles it does not give to the reducer
+        (``_compact_reading``): the broadcast entry, or the reducer's own default.
+        The editor shows that value, marked as implied, so a drop-down never says
+        "unset" where the reduction has a value (``editor-combos`` C7). ``None``
+        when the list holds an entry there; for a row past the reduction's count,
+        which it never reads; for a list it reads as held, where an unset entry is
+        a problem rather than a default; and for a derived λ, which is computed
+        per run and is not known here.
+        """
+        field = fs.get(name)
+        count = self.reduction_angles
+        if not field.per_angle or not 0 <= index < count:
+            return None
+        current = self.get(name)
+        if isinstance(current, (list, tuple)) and index < len(current) and current[index] is not None:
+            return None
+        reading = self._compact_reading(field, current, count)
+        return None if reading is _NOT_COMPACT else reading
+
+    def candidates(self, name, limit=MAX_CANDIDATES):
+        """The file names a per-angle cell offers, as ``(names, total)``.
+
+        The ``*.txt`` and ``*.dat`` files in the folder ``Field.candidates_folder``
+        names (``DBname``: ``DBpath``, where the reducer reads each entry,
+        ``nr_reduction_calc.py:402``), sorted, at most ``limit`` of them, with how
+        many there were so a caller can say the list was cut. A sub-folder is not
+        offered.
+
+        Every failure is ``([], 0)``. The folder is on a facility mount, where a
+        missing IPTS folder, a permission, a stale handle or an unresolvable path
+        (an ``experiment_id`` of ``None`` makes the property itself raise) are
+        ordinary, and the caller is a Qt slot. Nothing is cached: each call lists
+        the folder the document resolves now, so the names follow the path. The
+        caller asks when a cell offers candidates, never per keystroke or refresh.
+        """
+        folder_property = fs.get(name).candidates_folder
+        if folder_property is None:
+            return [], 0
+        try:
+            with os.scandir(getattr(self._config, folder_property)) as entries:
+                names = sorted(
+                    entry.name for entry in entries
+                    if entry.name.lower().endswith(CANDIDATE_SUFFIXES) and _is_file(entry)
+                )
+        except (OSError, TypeError, ValueError):
+            return [], 0
+        return names[:limit], len(names)
 
     def angle_row(self, index):
         """Every per-angle value for one angle, as a dict."""
