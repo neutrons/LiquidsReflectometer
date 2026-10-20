@@ -45,9 +45,7 @@ class ReductionInterface(QTabWidget):
         #self.addTab(self.roi_tab, "ROI selector")
         #self.setTabText(tab_id, "ROI selector")
 
-        # Reduction settings editor. Supersedes the JSONSettingsBuilderTab this
-        # module imported in a comment for a module that never existed
-        # (`git log --all -S json_settings_builder` finds only the comment).
+        # Simple settings editor
         tab_id += 1
         self.settings_editor_tab = SettingsEditorTab()
         self.addTab(self.settings_editor_tab, "Settings editor")
