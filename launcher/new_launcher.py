@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 import sys
 
-#from launcher.apps.json_settings_builder import JSONSettingsBuilderTab
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 
 from launcher.app_identity import ensure_identity, migrate_legacy_settings
 from launcher.apps.direct_beam import DirectBeamTab
 from launcher.apps.file_batch import FileBatchTab
 from launcher.apps.overplot import Overplot
+from launcher.apps.settings_editor import SettingsEditorTab
 from launcher.apps.sld_calculator import SLD
 
 #REFERENCE_DIRECTIVE = "Click to choose a 60Hz reference R(Q) file"
@@ -44,6 +44,14 @@ class ReductionInterface(QTabWidget):
         #self.roi_tab = ROISelector()
         #self.addTab(self.roi_tab, "ROI selector")
         #self.setTabText(tab_id, "ROI selector")
+
+        # Reduction settings editor. Supersedes the JSONSettingsBuilderTab this
+        # module imported in a comment for a module that never existed
+        # (`git log --all -S json_settings_builder` finds only the comment).
+        tab_id += 1
+        self.settings_editor_tab = SettingsEditorTab()
+        self.addTab(self.settings_editor_tab, "Settings editor")
+        self.setTabText(tab_id, "Settings editor")
 
         # SLD calculator
         tab_id += 1
