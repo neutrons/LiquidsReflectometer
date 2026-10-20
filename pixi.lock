@@ -523,7 +523,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zstandard-0.25.0-py311haee01d2_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zstd-1.5.7-hb78ec9c_6.conda
       - pypi: https://files.pythonhosted.org/packages/14/2f/967ba146e6d58cf6a652da73885f52fc68001525b4197effc174321d70b4/jmespath-1.1.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/33/6f/1481597e859ef19508b345eec4afd1416ed6e6b459c75a64026ef193aecf/regex-2026.5.9-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/45/6c/e7098d8b846ccdbf431d8c081b61e496526a27a28094ed09e0dce21b3f54/regex-2026.7.19-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/d2/b8/f0b9b880c03a3db8eaff63d76ca751ac7d8e45483fb7a0bb9f8e5c6ce433/toml_cli-0.8.2-py3-none-any.whl
       - pypi: ./
   docs:
@@ -1028,7 +1028,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zstandard-0.25.0-py311haee01d2_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zstd-1.5.7-hb78ec9c_6.conda
       - pypi: https://files.pythonhosted.org/packages/14/2f/967ba146e6d58cf6a652da73885f52fc68001525b4197effc174321d70b4/jmespath-1.1.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/33/6f/1481597e859ef19508b345eec4afd1416ed6e6b459c75a64026ef193aecf/regex-2026.5.9-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/45/6c/e7098d8b846ccdbf431d8c081b61e496526a27a28094ed09e0dce21b3f54/regex-2026.7.19-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/d2/b8/f0b9b880c03a3db8eaff63d76ca751ac7d8e45483fb7a0bb9f8e5c6ce433/toml_cli-0.8.2-py3-none-any.whl
       - pypi: ./
 packages:
@@ -4453,8 +4453,8 @@ packages:
   timestamp: 1753035921043
 - pypi: ./
   name: lr-reduction
-  version: 2.10.0.dev20260610180700+gf5b8e45
-  sha256: c96e2caeff01ea7f7a3784c263ecddb20b1501bc82c5002baf5cd521ef471085
+  version: 2.10.0.dev20260819080735+ge6e4e27
+  sha256: f9ae9a68ffb8f096c0b4e8bf04308fbe261f3dd83a35ee95b71633293f0bd718
   requires_python: '>=3.11'
   editable: true
 - conda: https://conda.anaconda.org/conda-forge/noarch/lsprotocol-2025.0.0-pyhe01879c_0.conda
@@ -6667,10 +6667,10 @@ packages:
   - pkg:pypi/referencing?source=hash-mapping
   size: 51788
   timestamp: 1760379115194
-- pypi: https://files.pythonhosted.org/packages/33/6f/1481597e859ef19508b345eec4afd1416ed6e6b459c75a64026ef193aecf/regex-2026.5.9-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+- pypi: https://files.pythonhosted.org/packages/45/6c/e7098d8b846ccdbf431d8c081b61e496526a27a28094ed09e0dce21b3f54/regex-2026.7.19-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
   name: regex
-  version: 2026.5.9
-  sha256: 2a661a7d270a61f7cf460caee8b9fa2d5ef9e5c681234bcb9e0fe14f488e7dfc
+  version: 2026.7.19
+  sha256: 09f3e5287f94f17b709dc9a9e70865855feee835c861613be144218ce4ca82cc
   requires_python: '>=3.10'
 - conda: https://conda.anaconda.org/conda-forge/linux-64/reproc-14.2.7.post0-hb03c661_0.conda
   sha256: ee62a35f1e63791a7d62bfde35920feb225b7a42cbd0675db1d23791314a3c09
