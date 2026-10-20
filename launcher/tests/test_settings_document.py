@@ -17,12 +17,12 @@ import textwrap
 
 import pytest
 
-from lr_reduction import field_spec as fs
-from lr_reduction import settings_document as sd
+from launcher.model import field_spec as fs
+from launcher.model import settings_document as sd
+from launcher.model.settings_document import SettingsDocument
 from lr_reduction.new_reduction_from_file import json_to_config, save_config_json
 from lr_reduction.nr_reduction_config import NRReductionConfig
 from lr_reduction.save_reduced_data import make_json_safe
-from lr_reduction.settings_document import SettingsDocument
 
 # --------------------------------------------------------------------------
 # FIELD_SPEC must mirror the real class, in both directions
@@ -338,7 +338,7 @@ def test_model_modules_import_no_qt(module):
     is Qt-free — so the first version of this guard failed on prose. `ast` sees
     only actual import statements.
     """
-    source = (pathlib.Path(__file__).parents[3] / "src" / "lr_reduction" / f"{module}.py").read_text()
+    source = (pathlib.Path(__file__).parents[2] / "launcher" / "model" / f"{module}.py").read_text()
     imported = set()
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Import):
@@ -700,7 +700,7 @@ def test_the_model_pulls_no_qt_into_a_fresh_interpreter():
     program = textwrap.dedent(
         """
         import sys
-        from lr_reduction import field_spec, settings_document
+        from launcher.model import field_spec, settings_document
         qt = sorted(m for m in sys.modules
                     if m.split(".")[0] in {"qtpy", "PyQt5", "PyQt6", "PySide2", "PySide6"})
         assert not qt, f"model imports pulled in Qt: {qt}"
@@ -2299,7 +2299,7 @@ def test_the_readers_of_use_calc_theta_are_the_ones_d7_cleared():
     each read): nr_reduction_calc (the rule and three reads), web_report (prints it), new_reduction_from_template
     (copies it into a template), nr_reduction_config (the default) and the example scripts (writers). A new mention
     changes this count: read it, and remove the canonicalisation it can see from D5, before updating the count."""
-    library = pathlib.Path(fs.__file__).parent
+    library = pathlib.Path(__file__).resolve().parents[2] / "src" / "lr_reduction"
     declarations = {"field_spec.py", "settings_document.py", "reduction_domains.py"}
     mentions = {
         path.name: count
@@ -2356,7 +2356,7 @@ def test_derived_path_is_what_the_reduction_would_use_if_the_override_were_unset
     """U1: answered by NRReductionConfig's own properties with the override disregarded, whether one is held or
     not, and without touching the document. No IPTS, or one validate() reports, gives None: the header then says
     so rather than presenting /SNS/REF_L/nexus or a traversed path as the reduction's."""
-    from lr_reduction.settings_document import SettingsDocument as Document
+    from launcher.model.settings_document import SettingsDocument as Document
 
     doc = Document.from_dict({"experiment_id": "IPTS-36119", "_DBpath_override": "/elsewhere/db"})
     before = repr(doc.to_dict())
@@ -2388,7 +2388,7 @@ def test_derived_path_follows_the_config_class_not_a_copy_of_its_rule():
 def test_an_ipts_typed_as_a_number_is_stored_as_the_directory_name(typed, stored):
     """U2, P5: a bare number and a lower-case ipts- are the directory name IPTS-<n> (file_batch.py's convention);
     anything else is stored as typed and left to validate(); an empty entry is "", never None (F7)."""
-    from lr_reduction.settings_document import normalise_experiment_id
+    from launcher.model.settings_document import normalise_experiment_id
 
     value = normalise_experiment_id(typed)
     assert value == stored and type(value) is str
@@ -2553,7 +2553,7 @@ def test_the_notes_carry_no_python_spelling_and_no_source_reference():
 def test_file_spelling_spells_each_kind_of_value_as_the_file_does():
     """U3/K3: the int-encoded booleans as 1/0, an all-unset reducer-filled list as [], a scalar boolean
     and None as JSON writes them, strings quoted."""
-    from lr_reduction.settings_document import file_spelling
+    from launcher.model.settings_document import file_spelling
 
     assert file_spelling(fs.BY_NAME["useBS"], [True, False, True], 3) == "[1, 0, 1]"
     assert file_spelling(fs.BY_NAME["ThetaShift"], [None, None, None], 3) == "[]"
@@ -2567,7 +2567,7 @@ def test_file_spelling_spells_each_kind_of_value_as_the_file_does():
 def test_file_spelling_agrees_with_what_save_writes_key_by_key(tmp_path):
     """U3/K4: one helper, beside the file encoding: for every field, the spelling equals the JSON of the
     value save() wrote for that key."""
-    from lr_reduction.settings_document import file_spelling
+    from launcher.model.settings_document import file_spelling
 
     doc = SettingsDocument.from_dict({
         **_THREE_ANGLES,

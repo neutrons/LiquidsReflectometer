@@ -6,7 +6,7 @@ cites has to live in the repository so it can be re-run.
 | Script | Answers | Cited from |
 |---|---|---|
 | `measure_fit_path_dependence.py` | How far do the scaling-factor fit parameters move when only Mantid's minimizer changes? | `tests/test_scaling_factors_workflow.py`, the `_TOL` bar for `b` |
-| `roi_estimate_mutations.py` | Does each guard and rule in `src/lr_reduction/roi_estimate.py` have a test that fails without it? One mutation per row, the tests that went red, and the measured table at the file's end. | `tests/unit/lr_reduction/test_roi_estimate.py` (I5–I7 test the battery itself); the roi-estimate and roi-popout-data commit bodies |
+| `roi_estimate_mutations.py` | Does each guard and rule in `launcher/model/roi_estimate.py` have a test that fails without it? One mutation per row, the tests that went red, and the measured table at the file's end. | `launcher/tests/test_roi_estimate.py` (I5–I7 test the battery itself); the roi-estimate and roi-popout-data commit bodies |
 
 Run from the repository root:
 
