@@ -463,8 +463,8 @@ def read_template(template_file: str, sequence_number: int) -> ReductionParamete
     Read template from file.
     @param sequence_number: the ID of the data set within the sequence of runs
     """
-    fd = open(template_file, "r")
-    xml_str = fd.read()
+    with open(template_file, "r") as fd:
+        xml_str = fd.read()
     data_sets = reduction_template_reader.from_xml(xml_str)
     if len(data_sets) >= sequence_number:
         data_set = data_sets[sequence_number - 1]
@@ -472,9 +472,13 @@ def read_template(template_file: str, sequence_number: int) -> ReductionParamete
         data_set = data_sets[0]
     else:
         raise RuntimeError("Invalid reduction template")
-    # Same anchoring as template.read_template; this fork is scheduled for
-    # unification (TODO above) but must not resolve paths differently meanwhile.
-    data_set.scaling_factor_file = _resolve_scaling_factor_file(data_set.scaling_factor_file, template_file)
+    # Same anchoring as template.read_template, so the two do not resolve paths
+    # differently while this fork awaits unification (TODO above). Guarded
+    # because this fork parses with new_reduction_template_reader, whose
+    # ReductionParameters has no scaling_factor_file at all — an unguarded
+    # assignment raises AttributeError on every call here.
+    if getattr(data_set, "scaling_factor_file", None):
+        data_set.scaling_factor_file = _resolve_scaling_factor_file(data_set.scaling_factor_file, template_file)
     return data_set
 
 def plot_reflectivity(data_array, RQ4=False, log_x = True):
