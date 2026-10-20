@@ -203,6 +203,16 @@ class SettingsEditorTab(QtWidgets.QWidget):
             return editor
 
         editor = QtWidgets.QLineEdit()
+        if field.runtime_owned:
+            # The reduction's record of what it used (LambdaMinUse/LambdaMaxUse):
+            # shown, never edited. It is deliberately not connected to
+            # anything, so no signal, typed or programmatic, reaches the
+            # document. Measured before this change: a bare editingFinished
+            # turned the recorded 2.95 into [2.95], changing its shape with no
+            # keystroke at all.
+            editor.setReadOnly(True)
+            self._show(field, editor, value)
+            return editor
         if field.type in ("int", "float"):
             validator = (
                 QtGui.QIntValidator() if field.type == "int" else QtGui.QDoubleValidator()
@@ -269,6 +279,23 @@ class SettingsEditorTab(QtWidgets.QWidget):
         if isinstance(value, (list, tuple)):
             return ", ".join("" if v is None else str(v) for v in value)
         return str(value)
+
+    @staticmethod
+    def _cell_text(field, value):
+        """Render one Angles-table cell.
+
+        A boolean column shows ``true``/``false``, the scientists' spelling and
+        the one a two-item drop-down can take over, for ``True``/``1`` and
+        ``False``/``0`` alike, because the reducer writes the integers. Anything
+        else renders as :meth:`_as_text` does, so a stray ``2`` or ``"0"``
+        stays visible as itself beside the problem ``validate()`` reports. Both
+        spellings read back through ``Field.coerce_element``.
+        """
+        if field.element_type == "bool":
+            boolean = fs.as_boolean(value)
+            if boolean is not None:
+                return "true" if boolean else "false"
+        return SettingsEditorTab._as_text(value)
 
     def _build_report_panel(self):
         panel = QtWidgets.QGroupBox("Validation and changes")
@@ -368,11 +395,12 @@ class SettingsEditorTab(QtWidgets.QWidget):
                 values = self.document.angle_row(row)
                 for column, name in enumerate(fs.PER_ANGLE_NAMES):
                     value = values[name]
-                    # _as_text, not str(): repr of a nested list ("[120, 130]")
-                    # is re-parsed by coerce_element into ['[120', '130]'], so
-                    # BkgROI was corrupted by any edit to its row.
+                    # Through _as_text, not str(): repr of a nested list
+                    # ("[120, 130]") is re-parsed by coerce_element into
+                    # ['[120', '130]'], so BkgROI was corrupted by any edit to
+                    # its row.
                     self.angle_table.setItem(
-                        row, column, QtWidgets.QTableWidgetItem(self._as_text(value))
+                        row, column, QtWidgets.QTableWidgetItem(self._cell_text(fs.get(name), value))
                     )
         finally:
             self._populating = False
