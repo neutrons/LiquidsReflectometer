@@ -204,8 +204,8 @@ def test_the_launcher_carries_the_tab_after_the_others(isolated_qapp):
     window = ReductionInterface()
     try:
         titles = [window.tabText(i) for i in range(window.count())]
-        assert titles == ["Overplot", "Direct beam", "Batch file", "Settings editor", "SLD calculator",
-                          "Time resolved"], titles
+        assert titles == ["Overplot", "Direct beam", "Batch file", "Time resolved", "Settings editor", "SLD calculator",
+                         ], titles
         assert isinstance(window.time_resolved_tab, TimeResolvedTab)
     finally:
         window.close()
