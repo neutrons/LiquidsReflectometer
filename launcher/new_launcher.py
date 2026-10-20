@@ -2,9 +2,9 @@
 import sys
 
 #from launcher.apps.json_settings_builder import JSONSettingsBuilderTab
-from qtpy import QtCore
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 
+from launcher.app_identity import ensure_identity, migrate_legacy_settings
 from launcher.apps.direct_beam import DirectBeamTab
 from launcher.apps.file_batch import FileBatchTab
 from launcher.apps.overplot import Overplot
@@ -20,8 +20,6 @@ class ReductionInterface(QTabWidget):
         self.setWindowTitle("New Reflectometry Launcher")
         layout = QGridLayout()
         self.setLayout(layout)
-
-        self.settings = QtCore.QSettings()
 
         # Overplot tab
         tab_id = 0
@@ -61,6 +59,11 @@ class ReductionInterface(QTabWidget):
 
 # referenced by pyproject.toml, part of the GUI system
 def main():
+    # One QSettings identity for every layer of the launcher, established
+    # before anything can construct a QSettings. T2/T3 adopt launcher's
+    # app_identity module rather than repeating the literals.
+    ensure_identity()
+    migrate_legacy_settings()
     app = QApplication([])
     window = ReductionInterface()
     window.show()
