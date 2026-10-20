@@ -21,7 +21,7 @@ repos:
     rev: v0.15.0
     hooks:
       - id: ruff-check
-        args: [--fix, --exit-non-zero-on-fix]
+        args: [--fix, --exit-non-zero-on-fix, --extend-select, RUF100]
         types_or: [python, pyi, jupyter]
         exclude: "tests/data/.*"
   - repo: local

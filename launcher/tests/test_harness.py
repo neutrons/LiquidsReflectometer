@@ -217,7 +217,7 @@ def test_import_scope_redirect_holds_without_any_fixture(tmp_path):
         check=False,
     )
     assert proc.returncode == 0, proc.stderr.decode(errors="replace")[-2000:]
-    paths = eval(proc.stdout.decode().split("PATHS", 1)[1].strip())  # noqa: S307 — our own literal
+    paths = eval(proc.stdout.decode().split("PATHS", 1)[1].strip())  # our own literal
     for path in paths:
         assert not path.startswith(str(home)), f"settings escaped to the real config root: {path}"
         assert "launcher-tests-settings-" in path, f"not inside the scratch root: {path}"
