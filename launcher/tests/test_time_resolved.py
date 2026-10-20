@@ -28,7 +28,7 @@ def boxes(monkeypatch):
 
 
 @pytest.fixture
-def tab(isolated_qapp, monkeypatch, boxes):
+def tab(isolated_qapp, monkeypatch, boxes):  # isolated_qapp: a QApplication and a per-test QSettings
     """The tab, with both reductions replaced by stand-ins that record their arguments and whether Reduce was
     enabled while they ran."""
     from launcher.apps import time_resolved

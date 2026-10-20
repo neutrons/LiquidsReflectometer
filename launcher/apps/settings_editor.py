@@ -516,7 +516,7 @@ class _FileDialogSidebar(QtCore.QObject):
         self._urls = [QtCore.QUrl.fromLocalFile(folder) for folder in folders]
         self._own = None
 
-    def eventFilter(self, watched, event):
+    def eventFilter(self, watched, event):  # Qt's name
         # Never raise here: an exception out of a PyQt virtual reaches qFatal() and aborts the launcher.
         try:
             if isinstance(watched, QtWidgets.QFileDialog):
@@ -559,7 +559,7 @@ def guarded(method):
     def wrapper(self, *args, **kwargs):
         try:
             return method(self, *args, **kwargs)
-        except Exception as exc:
+        except Exception as exc:  # the point is to catch everything
             self.report_problem(exc)
             return None
 
