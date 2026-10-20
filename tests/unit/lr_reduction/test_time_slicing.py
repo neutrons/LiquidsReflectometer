@@ -458,7 +458,7 @@ def slicing(tmp_path, monkeypatch):
     write_run(nexus / f"REF_L_{RUN}.nxs.h5")
     calls, fail = [], []  # fail: (window, exception) pairs; a window may hold lists, so not a dict key
 
-    def fake_reduce_single_run(self, i, rb_num, save=True, start_times=None, end_times=None):  # noqa: ARG001
+    def fake_reduce_single_run(self, i, rb_num, save=True, start_times=None, end_times=None):  # noqa: ARG001 -- the real method's signature; save is not used
         calls.append({"window": (start_times, end_times), "subname": self.config.subname,
                       "Spath": Path(self.config.Spath), "nexus": Path(self.config.NEXUSpathRB)})
         if start_times is not None and end_times is not None:  # what the real file read selects for this window

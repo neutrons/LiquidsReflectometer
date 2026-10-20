@@ -35,7 +35,7 @@ def maker(tmp_path, monkeypatch):
         seen["logs"].append(run)
         return {"Atten": np.array(LOGGED[run])}
 
-    def convert(fname, *args, **kwargs):  # noqa: ARG001
+    def convert(fname, *args, **kwargs):  # noqa: ARG001 -- convert_to_binary's signature; the stand-in reads only the file name and the window
         seen["reduced"].append(int(re.search(r"REF_L_(\d+)", str(fname)).group(1)))
         seen["windows"].append((kwargs.get("start_times"), kwargs.get("end_times")))
         raise StopError

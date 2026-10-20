@@ -105,7 +105,7 @@ def env(tmp_path, monkeypatch):
     settings_file.write_text(json.dumps(settings))
     state = SimpleNamespace(nexus=nexus, out=out, settings=settings_file, reverse_q=False)
 
-    def fake_reduce_single_run(self, i, rb_num, save=True, start_times=None, end_times=None):  # noqa: ARG001
+    def fake_reduce_single_run(self, i, rb_num, save=True, start_times=None, end_times=None):  # noqa: ARG001 -- the real method's signature; save is not used
         seq = RUNS[rb_num][0]
         assert i == seq - 1, "reduce() must pass the run's sequence position"
         # The real one's signature (time-slicing-reconcile): these reductions have no time window, so none arrives
