@@ -11,6 +11,10 @@ on its line, whatever code it names. These tests are the guard:
   a tag goes dead. pyproject.toml's selection is left alone: that file is also pixi's self-package manifest, and any
   edit to it leaves pixi.lock out of date;
 - no tag is a blanket: each names its codes after a colon (`# noqa: BLE001 -- the reason`).
+
+Frozen files are not ours to lint: the legacy-reduction files kept at upstream's content (PR #219 review, 2026-10-20) are
+excluded by the `ruff-check` hook's `exclude`, so these tests skip what that `exclude` names, from the same config (one
+source), and a guard checks that it names exactly those files and nothing else.
 """
 
 import io
@@ -20,6 +24,7 @@ import subprocess
 import tokenize
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +33,22 @@ TREES = ("src", "launcher", "tests", "scripts")
 #: exemption), then a colon, whitespace or the end. Prose that mentions noqa is not one.
 DIRECTIVE = re.compile(r"#\s*(?:(?:ruff|flake8)\s*:\s*)?noqa(?=[\s:]|$)(?P<rest>.*)", re.IGNORECASE)
 SCOPED = re.compile(r"\s*:\s*[A-Z]+[0-9]+(?:\s*,\s*[A-Z]+[0-9]+)*")
+#: The legacy-reduction files kept at upstream's content (PR #219 review, 2026-10-20). The hook's `exclude` is what the
+#: tests read; this list is only the guard's authority on what that `exclude` may name.
+FROZEN = (
+    "launcher/apps/roi_selector.py",
+    "launcher/scripts/off_spec.py",
+    "launcher/scripts/quick_reduce.py",
+    "launcher/scripts/refracted_beam.py",
+    "launcher/scripts/xrr_reduction.py",
+    "src/lr_reduction/background.py",
+    "src/lr_reduction/dead_time_correction.py",
+    "src/lr_reduction/new_reduction_template_reader.py",
+    "src/lr_reduction/output.py",
+    "src/lr_reduction/peak_finding.py",
+    "src/lr_reduction/reduction_template_reader.py",
+    "src/lr_reduction/time_resolved.py",
+)
 
 
 def ruff(*args, stdin=None):
@@ -39,19 +60,44 @@ def ruff(*args, stdin=None):
                           input=stdin, capture_output=True, text=True, check=False, timeout=300)
 
 
-def hook_args():
-    """The args of the pre-commit `ruff-check` hook, the one place this repository runs ruff."""
+def ruff_hook():
+    """The pre-commit `ruff-check` hook, the one place this repository runs ruff."""
     config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
     hooks = [hook for repo in config["repos"] for hook in repo.get("hooks", []) if hook.get("id") == "ruff-check"]
     assert len(hooks) == 1, hooks
-    return [str(arg) for arg in hooks[0].get("args", [])]
+    return hooks[0]
+
+
+def hook_args():
+    """The args of the pre-commit `ruff-check` hook."""
+    return [str(arg) for arg in ruff_hook().get("args", [])]
+
+
+def hook_excluded_paths():
+    """The file paths the hook's `exclude` names literally, one per line of its verbose regex (`tests/data/.*`, a
+    pattern, is not a path)."""
+    paths = []
+    for line in str(ruff_hook().get("exclude", "")).splitlines():
+        entry = line.strip().rstrip("|")
+        if not entry or entry.startswith("(?x)") or entry.startswith(")") or ".*" in entry:
+            continue
+        paths.append(entry.replace("\\.", "."))
+    return paths
 
 
 def python_files():
+    """The Python files ruff is ours to run on: not test data, not what the hook excludes."""
+    excluded = re.compile(str(ruff_hook().get("exclude", "")) or r"(?!)")
     for tree in TREES:
         for path in sorted((ROOT / tree).rglob("*.py")):
-            if (ROOT / "tests" / "data") not in path.parents:
+            if (ROOT / "tests" / "data") not in path.parents and not excluded.search(path.relative_to(ROOT).as_posix()):
                 yield path
+
+
+def ruff_on_ours(*args):
+    """`ruff check` on the trees with the hook's excluded files left out, as the hook leaves them out."""
+    frozen = hook_excluded_paths()
+    return ruff(*args, *(["--extend-exclude", ",".join(frozen)] if frozen else []), *TREES)
 
 
 def noqa_directives(path):
@@ -66,7 +112,7 @@ def noqa_directives(path):
 def test_ruff_reports_no_unused_noqa_tag():
     """U2: with the hook's selection (the repository's, plus RUF100), RUF100 reports no tag in src, launcher, tests or
     scripts, and the tree is otherwise clean."""
-    result = ruff("--extend-select", "RUF100", *TREES)
+    result = ruff_on_ours("--extend-select", "RUF100")
     unused = [line for line in result.stdout.splitlines() if "RUF100" in line]
     assert unused == [], "\n".join(unused)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -74,8 +120,9 @@ def test_ruff_reports_no_unused_noqa_tag():
 
 def test_no_noqa_tag_where_ruff_does_not_look():
     """U2: a tag in a file ruff does not lint silences nothing. The files ruff lints are ruff's own list
-    (--show-files), so this follows pyproject.toml's exclusions."""
-    listed = ruff("--show-files", *TREES)
+    (--show-files), so this follows pyproject.toml's exclusions and the hook's (passed as --extend-exclude); the
+    files the hook excludes are skipped, as they are not ours to lint."""
+    listed = ruff_on_ours("--show-files")
     assert listed.returncode == 0, listed.stdout + listed.stderr
     linted = {Path(line.strip()).resolve() for line in listed.stdout.splitlines() if line.strip()}
     unlinted = [f"{path.relative_to(ROOT)}:{line}: {comment}" for path in python_files() if path.resolve() not in linted
@@ -103,3 +150,23 @@ def test_every_noqa_tag_names_its_codes():
     blankets = [f"{path.relative_to(ROOT)}:{line}: {comment}" for path in python_files()
                 for line, comment, rest in noqa_directives(path) if not SCOPED.match(rest)]
     assert blankets == [], "\n".join(blankets)
+
+
+def test_the_hook_excludes_exactly_the_frozen_files():
+    """The skip above follows the hook's `exclude`, so the `exclude` must not grow. Read two ways, as pre-commit reads it
+    and line by line: compiled, it matches every frozen file and no other tracked Python file outside tests/data/ (a
+    pattern-shaped widening — a `.*` line, an entry on the `(?x)` line, an alternative after the close, a wider
+    tests/data/ — fails here); literally, every path it names exists and is a frozen file, and every frozen file is
+    named (a typo'd extra path, which hides nothing, fails here)."""
+    if not (ROOT / ".git").exists():
+        pytest.skip("not a git checkout: the tracked files cannot be listed")
+    excluded = re.compile(str(ruff_hook().get("exclude", "")))
+    assert [path for path in FROZEN if not excluded.search(path)] == []
+    tracked = subprocess.run(["git", "ls-files", "*.py"], cwd=ROOT, capture_output=True, text=True, check=True, timeout=60)
+    hidden = [path for path in tracked.stdout.split()
+              if excluded.search(path) and path not in FROZEN and not path.startswith("tests/data/")]
+    assert hidden == [], hidden
+    named = hook_excluded_paths()
+    missing = [path for path in named if not (ROOT / path).is_file()]
+    assert missing == [], missing
+    assert sorted(named) == sorted(FROZEN), sorted(set(named) ^ set(FROZEN))

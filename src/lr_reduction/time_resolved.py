@@ -22,7 +22,7 @@ def reduce_30Hz_from_ws(
     ref_ws_30Hz,
     data_60Hz,
     template_data,
-    scan_index=1,  # noqa: ARG001 -- template_data is already read for scan_index; callers pass it
+    scan_index=1,  # noqa ARG001
     template_reference=None,
     q_summing=None,
 ):

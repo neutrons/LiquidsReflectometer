@@ -105,6 +105,7 @@ class Refracted(object):
                 self.p_vs_t[y_pixel_min:y_pixel_max, i], pars, method="leastsq", x=self.y_pixel[y_pixel_min:y_pixel_max]
             )
 
+            a = fit.params["g_amplitude"].value
             c = fit.params["g_center"].value
             width = fit.params["g_sigma"].value
 
@@ -229,7 +230,7 @@ class Refracted(object):
         _theta_boundaries = self.compute_angle_from_pixel(
             pixel_boundaries, pixel_size=self.pixel_size, offset=self.offset
         )
-        ax.pcolormesh(self.wl_boundaries, _theta_boundaries, np.log(self.p_vs_t), cmap=cmap)
+        im = ax.pcolormesh(self.wl_boundaries, _theta_boundaries, np.log(self.p_vs_t), cmap=cmap)
 
         # Plot the specular reflection angle, and the refracted angle as a function of wavelength
         # Reflection (constant)
@@ -289,6 +290,7 @@ class Refracted(object):
 
         fit = gauss.fit(self.y_counts[x_min:x_max], pars, method="leastsq", x=self.y_pixel[x_min:x_max])
 
+        a = fit.params["g_amplitude"]
         c = fit.params["g_center"]
         width = fit.params["g_sigma"]
 
@@ -305,6 +307,7 @@ class Refracted(object):
 
         fit_r = gauss.fit(self.y_counts[x_min_r:x_max_r], pars, method="leastsq", x=self.y_pixel[x_min_r:x_max_r])
 
+        a = fit_r.params["g_amplitude"]
         c = fit_r.params["g_center"]
         width = fit_r.params["g_sigma"]
 
@@ -332,7 +335,7 @@ class Refracted(object):
         fig, ax = plt.subplots(figsize=(8, 8))
         cmap = plt.get_cmap("jet")
         # Colormesh plots axes using bin boundaries
-        ax.pcolormesh(self.tof_boundaries, np.arange(self.p_vs_t.shape[0] + 1), np.log(self.p_vs_t), cmap=cmap)
+        im = ax.pcolormesh(self.tof_boundaries, np.arange(self.p_vs_t.shape[0] + 1), np.log(self.p_vs_t), cmap=cmap)
         ax.set_title("pixel vs TOF")
 
         ax.scatter(
