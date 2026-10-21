@@ -35,7 +35,7 @@ must exclude it.
 from dataclasses import dataclass
 from typing import Any, Optional, Tuple
 
-from lr_reduction.reduction_domains import (
+from lr_reduction.reduction_choices import (
     CALC_THETA_CHOICES,
     DET_RES_CHOICES,
     DET_RES_NOTES,
@@ -52,7 +52,7 @@ from lr_reduction.reduction_domains import (
 # this comment claimed "drift is structurally impossible" and that was an
 # overclaim:
 #
-#   * the enforcing VALIDATORS derive from reduction_domains — nr_reduction_calc
+#   * the enforcing VALIDATORS derive from reduction_choices — nr_reduction_calc
 #     builds valid_methods/valid_calc_theta from it, and nr_tools builds its
 #     error messages from it. Those cannot drift.
 #   * the DISPATCH does not. `if method == 'meantheta' ... elif 'constantq'` in

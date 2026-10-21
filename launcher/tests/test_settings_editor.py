@@ -960,7 +960,7 @@ def test_the_wheel_never_changes_a_table_drop_down(tmp_path, monkeypatch, name, 
 
 
 def test_the_q_method_cell_offers_exactly_the_declared_methods_and_unset():
-    """V4: from the declaration (reduction_domains.METHOD_CHOICES), not a literal list; "" is unset."""
+    """V4: from the declaration (reduction_choices.METHOD_CHOICES), not a literal list; "" is unset."""
     tab = SettingsEditorTab(SettingsDocument.from_dict(_THREE_ANGLES))
     assert _items(_open_cell_editor(tab, 0, "method_per_run")) == ["", *fs.METHOD_CHOICES]
 

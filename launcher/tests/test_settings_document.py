@@ -567,12 +567,12 @@ def test_the_legacy_true_is_migrated_to_the_reducers_meaning():
 
 def test_the_choice_lists_are_the_reducers_own():
     """Imported from one definition, not hand-mirrored."""
-    from lr_reduction import reduction_domains
+    from lr_reduction import reduction_choices
 
-    assert fs.get("useCalcTheta").allowed is reduction_domains.CALC_THETA_CHOICES
-    assert fs.get("method_per_run").allowed is reduction_domains.METHOD_CHOICES
-    assert fs.get("peak_type").allowed is reduction_domains.PEAK_TYPE_CHOICES
-    assert fs.get("DetResFn").allowed is reduction_domains.DET_RES_CHOICES
+    assert fs.get("useCalcTheta").allowed is reduction_choices.CALC_THETA_CHOICES
+    assert fs.get("method_per_run").allowed is reduction_choices.METHOD_CHOICES
+    assert fs.get("peak_type").allowed is reduction_choices.PEAK_TYPE_CHOICES
+    assert fs.get("DetResFn").allowed is reduction_choices.DET_RES_CHOICES
 
 
 def test_the_reducer_validates_against_the_shared_domains():
@@ -588,8 +588,8 @@ def test_the_reducer_validates_against_the_shared_domains():
     from lr_reduction import nr_reduction_calc
 
     source = inspect.getsource(nr_reduction_calc.NR_Reduction._validate_config)
-    assert "domains.METHOD_CHOICES" in source
-    assert "domains.CALC_THETA_CHOICES" in source
+    assert "choices.METHOD_CHOICES" in source
+    assert "choices.CALC_THETA_CHOICES" in source
     assert "'meantheta'" not in source
 
 
@@ -812,13 +812,13 @@ def test_a_peak_type_outside_the_domain_is_rejected_by_the_fitter(monkeypatch):
     """
     import numpy as np
 
-    from lr_reduction import nr_tools, reduction_domains
+    from lr_reduction import nr_tools, reduction_choices
 
     ypix = np.arange(40.0)
     iY = 100.0 * np.exp(-0.5 * ((ypix - 20.0) / 3.0) ** 2) + 1.0
 
     monkeypatch.setattr(
-        reduction_domains, "PEAK_TYPE_CHOICES", ("gauss", "supergauss", "hexagauss")
+        reduction_choices, "PEAK_TYPE_CHOICES", ("gauss", "supergauss", "hexagauss")
     )
     with pytest.raises(ValueError) as raised:
         nr_tools.fit_peak(ypix, iY, peaktype="sombrero", bkgtype="none")
@@ -829,9 +829,9 @@ def test_a_detector_resolution_outside_the_domain_is_rejected_by_nr_tools(monkey
     """The same derivation guard for the other nr_tools domain."""
     import numpy as np
 
-    from lr_reduction import nr_tools, reduction_domains
+    from lr_reduction import nr_tools, reduction_choices
 
-    monkeypatch.setattr(reduction_domains, "DET_RES_CHOICES", ("rectangular", "hexbox"))
+    monkeypatch.setattr(reduction_choices, "DET_RES_CHOICES", ("rectangular", "hexbox"))
     with pytest.raises(ValueError) as raised:
         nr_tools.calc_beam_on_detector(
             Ypix=np.arange(64.0), CenPix=32.0, Si=0.25, S1=0.39, dS1Si=1000.0,
@@ -844,13 +844,13 @@ def test_a_detector_resolution_outside_the_domain_is_rejected_by_nr_tools(monkey
 def test_the_detector_resolution_disagreement_is_recorded_not_hidden():
     """'none' is accepted by one consumer and crashes the other.
 
-    reduction_domains records that rather than picking a side, and the editor
+    reduction_choices records that rather than picking a side, and the editor
     reports the reason instead of a bare "not one of".
     """
-    from lr_reduction import reduction_domains
+    from lr_reduction import reduction_choices
 
-    assert "none" not in reduction_domains.DET_RES_CHOICES
-    assert "none" in reduction_domains.DET_RES_TOLERATED
+    assert "none" not in reduction_choices.DET_RES_CHOICES
+    assert "none" in reduction_choices.DET_RES_TOLERATED
     message = fs.get("DetResFn").check_element("none")
     assert "UnboundLocalError" in message
 
@@ -872,7 +872,7 @@ def test_default_if_empty_names_are_exactly_the_reducers_optional_arrays():
 # The domain contract: what derives, and what only a pin can catch
 # --------------------------------------------------------------------------
 #
-# The validators derive from reduction_domains, so they cannot drift. The
+# The validators derive from reduction_choices, so they cannot drift. The
 # DISPATCH cannot derive — each branch computes something different — so adding
 # a value to a domain does NOT teach the reducer to compute it. These pins are
 # what catch that, and the positive drivers below assert the other direction:
@@ -897,10 +897,10 @@ def test_theta_dispatch_is_a_subset_of_the_declared_methods():
     Recorded as its own tuple so the dispatch's error message names what that
     function can actually compute, instead of the full domain.
     """
-    from lr_reduction import reduction_domains
+    from lr_reduction import reduction_choices
 
-    assert set(reduction_domains.THETA_DISPATCH_CHOICES) < set(fs.METHOD_CHOICES)
-    assert reduction_domains.THETA_DISPATCH_CHOICES == ("constantQ", "meanTheta")
+    assert set(reduction_choices.THETA_DISPATCH_CHOICES) < set(fs.METHOD_CHOICES)
+    assert reduction_choices.THETA_DISPATCH_CHOICES == ("constantQ", "meanTheta")
 
 
 def _beam_kwargs(**overrides):
@@ -936,10 +936,10 @@ def test_the_tolerated_detector_resolution_is_accepted_by_nr_tools():
 
 def test_the_theta_dispatch_message_names_the_methods_it_handles(monkeypatch):
     """Derivation pin for the one message v3 left literal."""
-    from lr_reduction import reduction_domains
+    from lr_reduction import reduction_choices
 
     monkeypatch.setattr(
-        reduction_domains, "THETA_DISPATCH_CHOICES", ("constantQ", "meanTheta", "hexTheta")
+        reduction_choices, "THETA_DISPATCH_CHOICES", ("constantQ", "meanTheta", "hexTheta")
     )
     reduction = _bare_reduction()
     with pytest.raises(ValueError) as raised:
@@ -2300,7 +2300,7 @@ def test_the_readers_of_use_calc_theta_are_the_ones_d7_cleared():
     (copies it into a template), nr_reduction_config (the default) and the example scripts (writers). A new mention
     changes this count: read it, and remove the canonicalisation it can see from D5, before updating the count."""
     library = pathlib.Path(__file__).resolve().parents[2] / "src" / "lr_reduction"
-    declarations = {"field_spec.py", "settings_document.py", "reduction_domains.py"}
+    declarations = {"field_spec.py", "settings_document.py", "reduction_choices.py"}
     mentions = {
         path.name: count
         for path in sorted(library.glob("*.py"))
