@@ -8,6 +8,7 @@ uses INFO and says so once; no value can make ``import lr_reduction`` fail.
 """
 
 import contextlib
+import io
 import logging
 import os
 import subprocess
@@ -34,12 +35,19 @@ def _clear():
     logging.getLogger("lr_reduction").setLevel(logging.NOTSET)
 
 
+def _package_state():
+    """What a test may change on the package logger and this module gives back: its handlers, level, propagate and
+    disabled. Not saved: its filters, and handlers on other loggers (root's handler of this name is only cleared)."""
+    package = logging.getLogger("lr_reduction")
+    return list(package.handlers), package.level, package.propagate, package.disabled
+
+
 @contextlib.contextmanager
 def _isolated_package_logger():
     """Inside: no handler of this name on the package logger or on root, and the package level NOTSET. On exit: the
-    package logger's handlers and level as they were on entry."""
+    package logger's state (`_package_state`) as it was on entry."""
     package = logging.getLogger("lr_reduction")
-    saved = (list(package.handlers), package.level)
+    handlers, level, propagate, disabled = _package_state()
     _clear()
     try:
         yield
@@ -47,9 +55,19 @@ def _isolated_package_logger():
         _clear()
         for handler in list(package.handlers):
             package.removeHandler(handler)
-        for handler in saved[0]:
+        for handler in handlers:
             package.addHandler(handler)
-        package.setLevel(saved[1])
+        package.setLevel(level)
+        package.propagate, package.disabled = propagate, disabled
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _module_gives_the_package_logger_back():
+    """The module leaves the package logger as it found it, whatever the order of its tests: if the per-test fixture
+    below stops restoring, the module ends in an error here, not in a later module that finds package logging off."""
+    before = _package_state()
+    yield
+    assert _package_state() == before
 
 
 @pytest.fixture(autouse=True)
@@ -143,6 +161,15 @@ def test_a_second_call_replaces_the_handler():
     assert second is not first
     assert _console_handlers() == [second]
     assert second.level == logging.DEBUG
+
+
+def test_a_second_call_prints_on_the_stdout_of_the_moment(monkeypatch):
+    configure_console_logging("INFO")
+    now = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", now)
+    configure_console_logging("INFO")
+    logging.getLogger("lr_reduction.unit_probe").info("ping")
+    assert now.getvalue().splitlines() == ["INFO lr_reduction.unit_probe: ping"]
 
 
 def test_the_package_logger_is_given_back_after_each_test():
