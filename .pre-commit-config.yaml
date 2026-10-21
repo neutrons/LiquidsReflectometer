@@ -23,7 +23,23 @@ repos:
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix, --extend-select, RUF100]
         types_or: [python, pyi, jupyter]
-        exclude: "tests/data/.*"
+        # frozen legacy-reduction files (PR #219 review, 2026-10-20): upstream's content, not linted
+        exclude: |
+          (?x)^(
+            tests/data/.*|
+            launcher/apps/roi_selector\.py|
+            launcher/scripts/off_spec\.py|
+            launcher/scripts/quick_reduce\.py|
+            launcher/scripts/refracted_beam\.py|
+            launcher/scripts/xrr_reduction\.py|
+            src/lr_reduction/background\.py|
+            src/lr_reduction/dead_time_correction\.py|
+            src/lr_reduction/new_reduction_template_reader\.py|
+            src/lr_reduction/output\.py|
+            src/lr_reduction/peak_finding\.py|
+            src/lr_reduction/reduction_template_reader\.py|
+            src/lr_reduction/time_resolved\.py
+          )$
   - repo: local
     hooks:
       - id: pixi-lock-format
