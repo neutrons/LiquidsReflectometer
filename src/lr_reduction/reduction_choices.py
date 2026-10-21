@@ -1,6 +1,6 @@
-"""Canonical value domains for the reduction configuration.
+"""The allowed values (the choices) of the reduction configuration.
 
-One definition per domain, imported by both the code that *enforces* it and the
+One definition per set of choices, imported by both the code that *enforces* it and the
 code that *offers* it to a user. Before this module the settings editor's
 choice lists hand-mirrored bare local lists inside
 :mod:`lr_reduction.nr_reduction_calc`, which is a copy waiting to drift: the
@@ -30,7 +30,7 @@ METHOD_CHOICES = ("meanTheta", "constantQ", "constantTOF")
 #: ``constantTOF`` is validated by ``_validate_config`` but has no branch there —
 #: it takes a different route through the reduction. Recorded as its own tuple
 #: so the theta dispatch's error message can derive from what that function
-#: actually handles, rather than from the full domain, which would name a method
+#: actually handles, rather than from the full set, which would name a method
 #: it cannot compute.
 THETA_DISPATCH_CHOICES = ("constantQ", "meanTheta")
 
@@ -60,7 +60,7 @@ CALC_THETA_CHOICES = ("detector_angle", "sample_angle")
 #: the inconsistency is resolved belongs in one of the two consumers, not here.
 DET_RES_CHOICES = ("rectangular", "gaussian")
 
-#: Values a consumer tolerates that this domain deliberately does not offer,
+#: Values a consumer tolerates that this module deliberately does not offer,
 #: with the reason. Keyed by field-declared value.
 #: What nr_tools tolerates in addition to DET_RES_CHOICES. Kept separate so
 #: the editor's offer and the reducer's acceptance are not conflated.
