@@ -25,18 +25,26 @@ def _console_handlers(logger_name="lr_reduction"):
     return [h for h in logging.getLogger(logger_name).handlers if h.get_name() == HANDLER_NAME]
 
 
-@pytest.fixture(autouse=True)
-def _reset():
-    """After each test: no handler of this name on the package logger or on root, and the package level NOTSET.
-
-    Root is cleared too, so a handler attached to the wrong logger cannot leak from one test into the next.
-    """
-    yield
+def _clear():
     for name in ("lr_reduction", None):
         logger = logging.getLogger(name)
         for handler in [h for h in logger.handlers if h.get_name() == HANDLER_NAME]:
             logger.removeHandler(handler)
     logging.getLogger("lr_reduction").setLevel(logging.NOTSET)
+
+
+@pytest.fixture(autouse=True)
+def _reset():
+    """Before and after each test: no handler of this name on the package logger or on root, and the package level
+    NOTSET.
+
+    Before, because the import-time call has already attached a handler bound to the stdout of the moment, so a test
+    run alone, or first, must not reuse it; after, so nothing leaks into the next test. Root is cleared too, so a
+    handler attached to the wrong logger cannot leak from one test into the next.
+    """
+    _clear()
+    yield
+    _clear()
 
 
 @pytest.mark.parametrize("value", [None, "", "  "], ids=["none", "empty", "blank"])
