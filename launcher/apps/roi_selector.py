@@ -497,7 +497,7 @@ class ROISelector(QWidget):
             pass
     # update when log-color checkbox toggled (created below)
 
-    def _set_bkg_mode(self, _index: int):
+    def _set_bkg_mode(self, index: int):
         """Set background mode based on combo box index.
 
         Index meanings:
@@ -920,13 +920,12 @@ class ROISelector(QWidget):
                             if getattr(chosen, 'background_roi', None):
                                 b = chosen.background_roi
                                 if len(b) >= 4:
-                                    self.bkg1_min.setValue(int(b[0]))
-                                    self.bkg1_max.setValue(int(b[1]))
-                                    self.bkg2_min.setValue(int(b[2]))
-                                    self.bkg2_max.setValue(int(b[3]))
+                                    self.bkg1_min.setValue(int(b[0])); self.bkg1_max.setValue(int(b[1]))
+                                    self.bkg2_min.setValue(int(b[2])); self.bkg2_max.setValue(int(b[3]))
                             # set background mode according to template flags (subtract_background, two_backgrounds)
                             try:
                                 sb = getattr(chosen, 'subtract_background', True)
+                                two = getattr(chosen, 'two_backgrounds', True)
                                 if not sb:
                                     # No background
                                     self.bkg_mode_cb.setCurrentText("No background")
@@ -1048,6 +1047,7 @@ class ROISelector(QWidget):
                                 self.bkg2_max.setValue(int(back2_to))
                             # background flag
                             background_flag = get('background_flag')
+                            two_bg = get('two_backgrounds')
                             if background_flag is not None and background_flag.lower() in ('false', '0'):
                                 try:
                                     self.bkg_mode_cb.setCurrentText("No background")
@@ -1509,6 +1509,7 @@ class ROISelector(QWidget):
             }
 
             # no extra artist name mapping needed; heatmap overlay lines are non-pickable
+            artist_name_map = {}
 
             self._active_line = None
 
@@ -1586,7 +1587,7 @@ class ROISelector(QWidget):
                     pass
                 self.canvas.draw_idle()
 
-            def on_release(_event):
+            def on_release(event):
                 self._active_line = None
 
             self._drag_cids.append(self.canvas.mpl_connect('pick_event', on_pick))
@@ -1775,8 +1776,7 @@ class ROISelector(QWidget):
             if '-' in t:
                 try:
                     a, b = t.split('-', 1)
-                    a = int(a)
-                    b = int(b)
+                    a = int(a); b = int(b)
                     if b >= a:
                         runs.extend(list(range(a, b + 1)))
                 except Exception:
