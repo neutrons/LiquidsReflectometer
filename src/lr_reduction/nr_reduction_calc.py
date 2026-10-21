@@ -14,7 +14,7 @@ from scipy.ndimage import gaussian_filter1d, uniform_filter1d
 
 import lr_reduction.binary_processing as BP
 import lr_reduction.nr_tools as tools
-import lr_reduction.reduction_domains as domains
+import lr_reduction.reduction_choices as choices
 import lr_reduction.save_reduced_data as save_fn
 from lr_reduction.user_defined_function import UserDefinedFunction
 
@@ -82,13 +82,13 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
         self.config.method_per_run = [method.lower() for method in self.config.method_per_run]  # Ensure methods are lowercase
 
         # Check method of valid format (meanTheta, constantQ, constantTOF)
-        valid_methods = domains.lowered(domains.METHOD_CHOICES)
+        valid_methods = choices.lowered(choices.METHOD_CHOICES)
         for method in self.config.method_per_run:
             if method not in valid_methods:
                 raise ValueError(f"Invalid method: {method}. Use one of {valid_methods}")
 
         # Check method for useCalcTheta and deal with legacy use of "True"
-        valid_calc_theta = domains.lowered(domains.CALC_THETA_CHOICES)
+        valid_calc_theta = choices.lowered(choices.CALC_THETA_CHOICES)
         if self.config.useCalcTheta:
             if self.config.useCalcTheta is True:
                 self.config.useCalcTheta = 'detector_angle'
@@ -700,10 +700,10 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
             # Message derived, dispatch above deliberately left literal: each
             # branch computes something different, so there is nothing to
             # derive it from. The contents-equality pin in the settings tests is
-            # what catches a domain that grows past what this handles.
+            # what catches a set of choices that grows past what this handles.
             raise ValueError(
                 "Theta calculation only defined for config.method %s"
-                % " or ".join(repr(c) for c in domains.THETA_DISPATCH_CHOICES)
+                % " or ".join(repr(c) for c in choices.THETA_DISPATCH_CHOICES)
             )
 
         # Store theta bins for next calculation.

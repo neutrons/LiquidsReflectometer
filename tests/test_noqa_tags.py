@@ -12,8 +12,8 @@ on its line, whatever code it names. These tests are the guard:
   edit to it leaves pixi.lock out of date;
 - no tag is a blanket: each names its codes after a colon (`# noqa: BLE001 -- the reason`).
 
-Frozen files are not ours to lint: the legacy-reduction files kept at upstream's content (PR #219 review, 2026-10-20) are
-excluded by the `ruff-check` hook's `exclude`, so these tests skip what that `exclude` names, from the same config (one
+Frozen files are not ours to lint: the legacy-reduction files kept at upstream's content (PR #219 review, 2026-10-20), and
+the template system's two (2026-10-21), are excluded by the `ruff-check` hook's `exclude`, so these tests skip what that `exclude` names, from the same config (one
 source), and a guard checks that it names exactly those files and nothing else.
 """
 
@@ -33,8 +33,9 @@ TREES = ("src", "launcher", "tests", "scripts")
 #: exemption), then a colon, whitespace or the end. Prose that mentions noqa is not one.
 DIRECTIVE = re.compile(r"#\s*(?:(?:ruff|flake8)\s*:\s*)?noqa(?=[\s:]|$)(?P<rest>.*)", re.IGNORECASE)
 SCOPED = re.compile(r"\s*:\s*[A-Z]+[0-9]+(?:\s*,\s*[A-Z]+[0-9]+)*")
-#: The legacy-reduction files kept at upstream's content (PR #219 review, 2026-10-20). The hook's `exclude` is what the
-#: tests read; this list is only the guard's authority on what that `exclude` may name.
+#: The legacy-reduction files kept at upstream's content (PR #219 review, 2026-10-20), and the template system's two
+#: (`template.py`, `new_reduction_from_template.py`; 2026-10-21). The hook's `exclude` is what the tests read; this list is
+#: only the guard's authority on what that `exclude` may name.
 FROZEN = (
     "launcher/apps/roi_selector.py",
     "launcher/scripts/off_spec.py",
@@ -43,10 +44,12 @@ FROZEN = (
     "launcher/scripts/xrr_reduction.py",
     "src/lr_reduction/background.py",
     "src/lr_reduction/dead_time_correction.py",
+    "src/lr_reduction/new_reduction_from_template.py",
     "src/lr_reduction/new_reduction_template_reader.py",
     "src/lr_reduction/output.py",
     "src/lr_reduction/peak_finding.py",
     "src/lr_reduction/reduction_template_reader.py",
+    "src/lr_reduction/template.py",
     "src/lr_reduction/time_resolved.py",
 )
 
