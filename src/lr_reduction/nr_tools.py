@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import curve_fit
 
-import lr_reduction.reduction_domains as domains
+import lr_reduction.reduction_choices as choices
 
 
 def safe_divide(numerator, denominator):
@@ -230,7 +230,7 @@ def fit_peak(ypix, iY, peaktype="gauss", bkgtype="none"):
     else:
         raise ValueError(
             "peaktype must be one of %s"
-            % ", ".join(repr(c) for c in domains.PEAK_TYPE_CHOICES)
+            % ", ".join(repr(c) for c in choices.PEAK_TYPE_CHOICES)
         )
 
     # --- Evaluate fit and extract background ---
@@ -400,10 +400,10 @@ def calc_beam_on_detector(Ypix, CenPix, Si, S1, dS1Si, dSiSam, dSamDet, mmpix, D
         kernel /= kernel.sum()
         I = np.convolve(I, kernel, mode="same")
 
-    elif DetResFn not in list(domains.DET_RES_TOLERATED) + [None]:
+    elif DetResFn not in list(choices.DET_RES_TOLERATED) + [None]:
         raise ValueError(
             "DetResFn must be one of %s, or 'none'"
-            % ", ".join(repr(c) for c in domains.DET_RES_CHOICES)
+            % ", ".join(repr(c) for c in choices.DET_RES_CHOICES)
         )
 
     # normalize
