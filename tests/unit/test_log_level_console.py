@@ -7,6 +7,7 @@ the old behaviour: Python's lastResort handler prints WARNING and above on stder
 uses INFO and says so once; no value can make ``import lr_reduction`` fail.
 """
 
+import contextlib
 import logging
 import os
 import subprocess
@@ -33,18 +34,36 @@ def _clear():
     logging.getLogger("lr_reduction").setLevel(logging.NOTSET)
 
 
+@contextlib.contextmanager
+def _isolated_package_logger():
+    """Inside: no handler of this name on the package logger or on root, and the package level NOTSET. On exit: the
+    package logger's handlers and level as they were on entry."""
+    package = logging.getLogger("lr_reduction")
+    saved = (list(package.handlers), package.level)
+    _clear()
+    try:
+        yield
+    finally:
+        _clear()
+        for handler in list(package.handlers):
+            package.removeHandler(handler)
+        for handler in saved[0]:
+            package.addHandler(handler)
+        package.setLevel(saved[1])
+
+
 @pytest.fixture(autouse=True)
 def _reset():
-    """Before and after each test: no handler of this name on the package logger or on root, and the package level
-    NOTSET.
+    """Each test starts with no handler of this name on the package logger or on root and the package level NOTSET,
+    and the package logger is given back as it was.
 
-    Before, because the import-time call has already attached a handler bound to the stdout of the moment, so a test
-    run alone, or first, must not reuse it; after, so nothing leaks into the next test. Root is cleared too, so a
-    handler attached to the wrong logger cannot leak from one test into the next.
+    Cleared before, because the import-time call has already attached a handler bound to the stdout of the moment, so a
+    test run alone, or first, must not reuse it; cleared after, so nothing leaks into the next test (root too, so a
+    handler attached to the wrong logger cannot leak); restored after, so the test modules that run later in the
+    session see the import-time configuration, not package logging switched off.
     """
-    _clear()
-    yield
-    _clear()
+    with _isolated_package_logger():
+        yield
 
 
 @pytest.mark.parametrize("value", [None, "", "  "], ids=["none", "empty", "blank"])
@@ -90,7 +109,7 @@ def test_level_names_and_integers(value, level):
     assert logging.getLogger("lr_reduction").level == level
 
 
-@pytest.mark.parametrize("value", ["²", "①", "-5", "1.5", "verbose", " 7 x"])
+@pytest.mark.parametrize("value", ["²", "①", "-5", "1.5", "verbose", " 7 x", pytest.param("9" * 5000, id="5000-digits")])
 def test_invalid_values_use_info_and_warn_once_and_never_raise(value, capsys):
     handler = configure_console_logging(value)
     assert handler.level == logging.INFO
@@ -103,6 +122,36 @@ def test_invalid_values_use_info_and_warn_once_and_never_raise(value, capsys):
     for accepted in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "positive integer", "NOTSET"):
         assert accepted in lines[0]
     assert err == ""
+
+
+def test_surrounding_whitespace_is_ignored(capsys):
+    handler = configure_console_logging(" debug\n")
+    assert handler.level == logging.DEBUG
+    assert logging.getLogger("lr_reduction").level == logging.DEBUG
+    assert capsys.readouterr() == ("", "")
+
+
+@pytest.mark.parametrize("value", [None, "DEBUG", "NOTSET", "verbose"])
+def test_records_still_propagate(value):
+    configure_console_logging(value)
+    assert logging.getLogger("lr_reduction").propagate is True
+
+
+def test_a_second_call_replaces_the_handler():
+    first = configure_console_logging("INFO")
+    second = configure_console_logging("DEBUG")
+    assert second is not first
+    assert _console_handlers() == [second]
+    assert second.level == logging.DEBUG
+
+
+def test_the_package_logger_is_given_back_after_each_test():
+    handler = configure_console_logging("INFO")
+    with _isolated_package_logger():
+        assert _console_handlers() == []
+        assert configure_console_logging("NOTSET") is None
+    assert _console_handlers() == [handler]
+    assert logging.getLogger("lr_reduction").level == logging.INFO
 
 
 def test_second_call_updates_both_levels_without_a_second_handler():
@@ -154,6 +203,16 @@ def test_fresh_process_invalid_value_imports_and_warns():
     lines = result.stdout.splitlines()
     assert len(lines) == 3, lines
     assert lines[0].startswith("WARNING lr_reduction: ") and "'²'" in lines[0]
+    assert lines[1:] == ["INFO lr_reduction.probe: ping", "WARNING lr_reduction.probe: w"]
+    assert result.stderr == ""
+
+
+def test_fresh_process_very_long_number_imports_and_warns():
+    result = _fresh_process("9" * 5000)
+    assert result.returncode == 0, result.stderr
+    lines = result.stdout.splitlines()
+    assert len(lines) == 3, [line[:80] for line in lines]
+    assert lines[0].startswith("WARNING lr_reduction: ") and "'9999" in lines[0]
     assert lines[1:] == ["INFO lr_reduction.probe: ping", "WARNING lr_reduction.probe: w"]
     assert result.stderr == ""
 
