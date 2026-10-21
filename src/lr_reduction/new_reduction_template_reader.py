@@ -33,7 +33,7 @@ from lr_reduction.instrument_settings import InstrumentSettings
 #    import mantid
 
 #    MANTID_VERSION = mantid.__version__
-#except:
+#except:  # noqa: E722
 #    MANTID_VERSION = "None"
 
 
