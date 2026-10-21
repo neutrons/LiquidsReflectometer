@@ -24,6 +24,8 @@ repos:
         args: [--fix, --exit-non-zero-on-fix, --extend-select, RUF100]
         types_or: [python, pyi, jupyter]
         # frozen legacy-reduction files (PR #219 review, 2026-10-20): upstream's content, not linted
+        # lint through `pre-commit run ruff-check --all-files`; `ruff check .` by hand reports the frozen files' findings
+        # drop an entry when the file is next intentionally changed or deleted
         exclude: |
           (?x)^(
             tests/data/.*|

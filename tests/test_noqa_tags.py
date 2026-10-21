@@ -24,6 +24,7 @@ import subprocess
 import tokenize
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -119,7 +120,8 @@ def test_ruff_reports_no_unused_noqa_tag():
 
 def test_no_noqa_tag_where_ruff_does_not_look():
     """U2: a tag in a file ruff does not lint silences nothing. The files ruff lints are ruff's own list
-    (--show-files), so this follows pyproject.toml's exclusions."""
+    (--show-files), so this follows pyproject.toml's exclusions and the hook's (passed as --extend-exclude); the
+    files the hook excludes are skipped, as they are not ours to lint."""
     listed = ruff_on_ours("--show-files")
     assert listed.returncode == 0, listed.stdout + listed.stderr
     linted = {Path(line.strip()).resolve() for line in listed.stdout.splitlines() if line.strip()}
@@ -151,8 +153,19 @@ def test_every_noqa_tag_names_its_codes():
 
 
 def test_the_hook_excludes_exactly_the_frozen_files():
-    """The skip above follows the hook's `exclude`, so the `exclude` must not grow: every path it names exists and is a
-    frozen file, and every frozen file is named. A typo, or a non-frozen file added to hide its lint, fails here."""
+    """The skip above follows the hook's `exclude`, so the `exclude` must not grow. Read two ways, as pre-commit reads it
+    and line by line: compiled, it matches every frozen file and no other tracked Python file outside tests/data/ (a
+    pattern-shaped widening — a `.*` line, an entry on the `(?x)` line, an alternative after the close, a wider
+    tests/data/ — fails here); literally, every path it names exists and is a frozen file, and every frozen file is
+    named (a typo'd extra path, which hides nothing, fails here)."""
+    if not (ROOT / ".git").exists():
+        pytest.skip("not a git checkout: the tracked files cannot be listed")
+    excluded = re.compile(str(ruff_hook().get("exclude", "")))
+    assert [path for path in FROZEN if not excluded.search(path)] == []
+    tracked = subprocess.run(["git", "ls-files", "*.py"], cwd=ROOT, capture_output=True, text=True, check=True, timeout=60)
+    hidden = [path for path in tracked.stdout.split()
+              if excluded.search(path) and path not in FROZEN and not path.startswith("tests/data/")]
+    assert hidden == [], hidden
     named = hook_excluded_paths()
     missing = [path for path in named if not (ROOT / path).is_file()]
     assert missing == [], missing
