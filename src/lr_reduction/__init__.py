@@ -21,8 +21,9 @@ def configure_console_logging(value: str | None) -> logging.Handler | None:
     for old in [h for h in package.handlers if h.get_name() == _HANDLER_NAME]:
         package.removeHandler(old)
     text = (value or "").strip().upper() or "INFO"
-    # str.isdecimal() is exactly what int() accepts as an unsigned number, and int() refuses more than 4300 digits,
-    # so a number is read only when it is short (no level needs ten digits): neither call can raise.
+    # A number is read only when it is all decimal digits, every one of which int() parses, and shorter than ten
+    # (no level needs more), far inside int()'s digit limit (4300 by default, never set below 640): neither call can
+    # raise. Signed or underscored forms ("+5", "1_0"), which int() would accept, take the invalid path.
     level = int(text) if text.isdecimal() and len(text) < 10 else logging.getLevelNamesMapping().get(text)
     invalid = level is None
     level = logging.INFO if invalid else level
