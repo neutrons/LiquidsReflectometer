@@ -142,7 +142,6 @@ def test_incidenttheta():
 
     return output
 
-
 if __name__ == '__main__':
     # Run examples
     example_from_dat()
