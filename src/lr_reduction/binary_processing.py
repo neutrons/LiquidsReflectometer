@@ -345,7 +345,7 @@ def get_log_values(fname):
         #log_values["distance_sample_detector"] = f['entry/DASlogs/BL4B:CS:Autoreduce:Sequence:DistanceSampleDetector/value'][0]
         #log_values["template_id"] = f['entry/DASlogs/BL4B:CS:Autoreduce:Sequence:TemplateId/value'][0]
     except Exception as e:  # noqa: BLE001 -- tolerate any missing/odd DASlog entry; partial log_values is the intended behavior
-        logger.warning("Cannot process %s because %s fails to extract", fname, e)
+        logger.info("Cannot process %s because %s fails to extract", fname, e)
         pass
     # Get slit gap openings.
     log_values["siY"]=np.array(f['entry/DASlogs/BL4B:Mot:si:Y:Gap:Readback/average_value'][0])
@@ -378,7 +378,7 @@ def get_log_values(fname):
     try:
         log_values["chopper_mod"]=np.array(f['entry/DASlogs/BL4B:Chop:Skf2:ChopperModerator/value'][0])
     except:
-        logger.warning("Run missing the chopper moderator log value")
+        logger.info("Run missing the chopper moderator log value")
         pass
     log_values['emission_mod_distance'] = np.array(f['entry/DASlogs/BL4B:Det:TH:DlyDet:BasePath/value'][0]) * 1000
     off =np.array(f['entry/DASlogs/BL4B:Chop:Skf2:ChopperOffset/value'][0]) # 114.0

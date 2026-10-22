@@ -210,7 +210,7 @@ class Direct_Beam:  # noqa: N801 -- public API name; rename deferred (imported b
                 n = log_values["scale_multiplier"]
                 logger.info("Using %s as scale multiplier", n)
             except Exception as e:  # noqa: BLE001 -- any lookup failure falls back to scale multiplier 1.0 by design
-                logger.warning("Using 1.0 as scale multiplier because %s is not in %r", e, log_values)
+                logger.info("Using 1.0 as scale multiplier because %s is not in %r", e, log_values)
                 n = 1.0
 
             I_trans = I / trans
