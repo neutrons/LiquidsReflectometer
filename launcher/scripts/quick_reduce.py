@@ -52,7 +52,7 @@ def process(run_number, db_run_number, peak_pixel, db_peak_pixel, output_dir=Non
 
     ax = plt.subplot(2, 1, 2)
     plt.errorbar(qz, r, yerr=dr)
-    plt.xlabel("q [$1/\AA$]")
+    plt.xlabel(r"q [$1/\AA$]")
     plt.ylabel("R(q)")
     ax.set_yscale("log")
     ax.set_xscale("log")

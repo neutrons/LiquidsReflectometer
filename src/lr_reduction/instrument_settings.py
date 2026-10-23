@@ -28,5 +28,5 @@ class InstrumentSettings:
     xi_reference: float = 445
     s1_sample_distance: float = 1.485
     wavelength_resolution_function: str = (
-        "name=UserFunction, Formula=L - A * exp(-k * x), L=0.07564423, A=0.13093263, k=0.34918918"  # noqa: N815
+        "name=UserFunction, Formula=L - A * exp(-k * x), L=0.07564423, A=0.13093263, k=0.34918918"
     )
