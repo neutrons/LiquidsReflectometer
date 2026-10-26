@@ -111,15 +111,41 @@ jobs:
   publish:
     runs-on: ubuntu-24.04
     needs: [build]
-    if:  startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/exp-next'
+    # every push to exp-next publishes; exp-qa and exp publish only on tags
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/exp-next'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           ref: ${{ github.ref }}
+          fetch-depth: 0 # full history so the label step can test branch ancestry
 
       - name: Setup Pixi
         uses: prefix-dev/setup-pixi@v0.9.4
+
+      - name: Determine conda label
+        id: label
+        run: |
+          set -euo pipefail
+          label=""
+          case "${GITHUB_REF}" in
+            refs/heads/exp-next) label="exp-next" ;;
+            refs/tags/v*rc*)     label="exp-qa" ;; # release candidate, same convention as qa upstream
+            refs/tags/v*)        label="exp" ;;    # release, same convention as main upstream
+          esac
+          if [ -z "${label}" ]; then
+            echo "::error::cannot derive a conda label from ${GITHUB_REF}"
+            exit 1
+          fi
+          # A tag push carries no branch name, so confirm the tagged commit really is
+          # on the branch the tag name implies. HEAD is used instead of github.sha
+          # because they differ for annotated tags.
+          if ! git merge-base --is-ancestor HEAD "origin/${label}"; then
+            echo "::error::${GITHUB_REF} is not on branch ${label}; refusing to publish under label '${label}'"
+            exit 1
+          fi
+          echo "Publishing ${GITHUB_REF} under label '${label}'"
+          echo "label=${label}" >> "$GITHUB_OUTPUT"
 
       - name: Download conda package artifact
         uses: actions/download-artifact@v7
@@ -132,18 +158,16 @@ jobs:
           anaconda-token: ${{ secrets.ANACONDA_TOKEN }}
           organization: neutrons
           package-path: ${{ env.PKG_NAME }}-*.conda
-          # Publish from 'exp-next' under the 'exp-next' label; otherwise use the default
-          # label (empty string) which maps to 'dev', 'rc', or 'main' based on the branch.
-          label: ${{ (github.ref == 'refs/heads/exp-next' && 'exp-next') || (github.ref == 'refs/heads/exp-qa' && 'exp-qa') || (github.ref == 'refs/heads/exp' && 'exp') || '' }}
+          label: ${{ steps.label.outputs.label }}
 
       - name: Remove old packages
-        if: github.ref == 'refs/heads/exp-next'
+        if: steps.label.outputs.label == 'exp-next'
         uses: neutrons/conda-actions/pkg-remove@v1
         with:
           anaconda_token: ${{ secrets.ANACONDA_TOKEN }}
           organization: neutrons
           package_name: ${{ env.PKG_NAME }}
-          label: ${{ env.CONDA_LABEL }}
+          label: ${{ steps.label.outputs.label }}
           keep: 5
 
   # Trigger GitLab dev deploy pipeline
