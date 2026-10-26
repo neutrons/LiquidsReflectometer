@@ -5,7 +5,7 @@ on:
   pull_request:
   push:
     branches: [exp-next, exp-qa, exp]
-    tags: ["v*"]
+    tags: ["exp[0-9]*"] # exp3.0, exp3.0rc1, ...; versioningit strips the exp prefix
 
 # cancel previous job if new commit is pushed
 concurrency:
@@ -129,7 +129,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [build]
     # every push to exp-next publishes; exp-qa and exp publish only on tags
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/exp-next'
+    if: startsWith(github.ref, 'refs/tags/exp') || github.ref == 'refs/heads/exp-next'
     defaults:
       run:
         shell: bash -el {0}
@@ -150,8 +150,8 @@ jobs:
           label=""
           case "${GITHUB_REF}" in
             refs/heads/exp-next) label="exp-next" ;;
-            refs/tags/v*rc*)     label="exp-qa" ;; # release candidate, same convention as qa upstream
-            refs/tags/v*)        label="exp" ;;    # release, same convention as main upstream
+            refs/tags/exp[0-9]*rc*) label="exp-qa" ;; # release candidate, same convention as qa upstream
+            refs/tags/exp[0-9]*)    label="exp" ;;    # release, same convention as main upstream
           esac
           if [ -z "${label}" ]; then
             echo "::error::cannot derive a conda label from ${GITHUB_REF}"
