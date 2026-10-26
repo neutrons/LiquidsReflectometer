@@ -794,7 +794,7 @@ def _plot2d(
     )
     fig = go.Figure(data=plotly_objects, layout=layout)
 
-    div_html = pyo.plot(fig, output_type="div", include_plotlyjs=False)#, show_link=False)
+    div_html = pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
 
     return div_html
 
@@ -935,7 +935,7 @@ def _plot1d(
     )
 
     fig = go.Figure(data=data, layout=layout)
-    return pyo.plot(fig, output_type="div", include_plotlyjs=False)#, show_link=False)
+    return pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
 
 
 def _plot_text(text, title=""):
@@ -975,6 +975,6 @@ def _plot_text(text, title=""):
     )
 
     fig = go.Figure(layout=layout)
-    plot = pyo.plot(fig, output_type="div", include_plotlyjs=False)#, show_link=False)
+    plot = pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
 
     return plot

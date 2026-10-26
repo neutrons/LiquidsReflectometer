@@ -2,7 +2,6 @@ import os
 
 import mantid.simpleapi as mtd_api
 import numpy as np
-import pytest
 
 from lr_reduction.legacy.scaling_factors import workflow as sf_workflow
 from lr_reduction.legacy.utils import amend_config
@@ -48,7 +47,6 @@ def check_results(data_file, reference):
             assert delta < 0.02
 
 
-@pytest.mark.datarepo
 def test_compute_sf(nexus_dir):
     """
     Test the computation of scaling factors
@@ -74,7 +72,6 @@ def test_compute_sf(nexus_dir):
     check_results(output_cfg, "data/sf_197912_Si_auto.cfg")
 
 
-@pytest.mark.datarepo
 def test_compute_sf_with_deadtime(nexus_dir):
     """
     Test the computation of scaling factors
@@ -94,7 +91,6 @@ def test_compute_sf_with_deadtime(nexus_dir):
     check_results(output_cfg, "data/sf_197912_Si_dt_par_42_200.cfg")
 
 
-@pytest.mark.datarepo
 def test_compute_sf_with_deadtime_tof_300(nexus_dir):
     """
     Test the computation of scaling factors
@@ -123,7 +119,6 @@ def test_compute_sf_with_deadtime_tof_300(nexus_dir):
     check_results(output_cfg, "data/sf_197912_Si_dt_par_46_300.cfg")
 
 
-@pytest.mark.datarepo
 def test_compute_sf_with_deadtime_tof_200(nexus_dir):
     """
     Test the computation of scaling factors
@@ -152,7 +147,6 @@ def test_compute_sf_with_deadtime_tof_200(nexus_dir):
     check_results(output_cfg, "data/sf_197912_Si_dt_par_46_200.cfg")
 
 
-@pytest.mark.datarepo
 def test_compute_sf_with_deadtime_tof_200_sort(nexus_dir):
     """
     Test the computation of scaling factors

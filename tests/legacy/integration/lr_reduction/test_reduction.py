@@ -27,7 +27,6 @@ def cleanup_partial_files(output_dir, runs):
             os.remove(reduced_path)
 
 
-@pytest.mark.datarepo
 def test_info(nexus_dir):
     """
     Test utility functions to get basic info
@@ -39,7 +38,6 @@ def test_info(nexus_dir):
     assert wl_max == 16.3
 
 
-@pytest.mark.datarepo
 def test_attenuation(nexus_dir):
     """
     Test attenuation calculation can complete
@@ -49,7 +47,6 @@ def test_attenuation(nexus_dir):
     event_reduction.process_attenuation(ws_sc, 0.005)
 
 
-@pytest.mark.datarepo
 def test_q_summing(template_dir, nexus_dir):
     """
     Test Q summing process
@@ -90,7 +87,6 @@ def test_q_summing(template_dir, nexus_dir):
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
-@pytest.mark.datarepo
 @pytest.mark.parametrize(
     "template_file, q_summing, expected_q_summing, tof_weighted",
     [
@@ -124,7 +120,6 @@ def test_q_summing_as_option(template_dir, nexus_dir, template_file, q_summing, 
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
-@pytest.mark.datarepo
 def test_full_reduction(template_dir, nexus_dir):
     """
     Test the full reduction chain
@@ -179,7 +174,6 @@ def test_full_reduction(template_dir, nexus_dir):
     cleanup_partial_files(output_dir, range(198409, 198417))
 
 
-@pytest.mark.datarepo
 def test_reduce_workflow(template_dir, nexus_dir, tmp_path):
     template_path = os.path.join(template_dir, "template.xml")
     output_dir = tmp_path
@@ -202,7 +196,6 @@ def test_reduce_workflow(template_dir, nexus_dir, tmp_path):
         average_fractional_difference = np.fabs(np.sum(fractional_differences) / len(_refl[i]))
         assert average_fractional_difference < 0.07
 
-@pytest.mark.datarepo
 def test_reduce_workflow_with_stitching_automatic_average(template_dir, nexus_dir, tmp_path):
     """
     Test the complete working, but this time we average the point in the
@@ -230,7 +223,6 @@ def test_reduce_workflow_with_stitching_automatic_average(template_dir, nexus_di
     # TODO: Add to this test once save/loading is complete in ewm13786
 
 
-@pytest.mark.datarepo
 def test_reduce_functional_bck(nexus_dir, template_dir, tmp_path):
     os.chdir(Path(template_dir).parent)
     template_path = os.path.join(template_dir, "template_fbck.xml")
@@ -279,7 +271,6 @@ def test_compute_wavelength_resolution_n_spectra():
         _, _ = event_reduction.compute_wavelength_resolution(ws)
 
 
-@pytest.mark.datarepo
 def test_reduce_bck_option_mismatch(template_dir, nexus_dir, tmp_path):
     """
     Ask for functional background but pass by a background range with
@@ -311,7 +302,6 @@ def test_reduce_bck_option_mismatch(template_dir, nexus_dir, tmp_path):
         assert average_fractional_difference < 0.07
 
 
-@pytest.mark.datarepo
 def test_reduce_workflow_with_overlap_avg(template_dir, nexus_dir, tmp_path):
     """
     Test the complete working, but this time we average the point in the
@@ -348,7 +338,6 @@ def test_reduce_workflow_with_overlap_avg(template_dir, nexus_dir, tmp_path):
         assert average_fractional_difference < 0.07
 
 
-@pytest.mark.datarepo
 def test_quick_reduce(nexus_dir, datarepo_dir):
     """
     Test the quick reduction workflow
@@ -370,7 +359,6 @@ def test_quick_reduce(nexus_dir, datarepo_dir):
         assert np.fabs(np.sum(_data[i] - _refl[i])) < 1e-5
 
 
-@pytest.mark.datarepo
 def test_reduce_workflow_201282(template_dir, nexus_dir):
     """
     Test to reproduce autoreduction output
@@ -407,7 +395,6 @@ def test_reduce_workflow_201282(template_dir, nexus_dir):
         assert average_fractional_difference < 0.07
 
 
-@pytest.mark.datarepo
 def test_background_subtraction(template_dir, nexus_dir):
     """
     Test with background subtraction off for the data and on for the normalization

@@ -6,7 +6,7 @@ import mantid.simpleapi as mtd_api
 import numpy as np
 import pytest
 
-from lr_reduction.operations.algorithms.calculate_dead_time_correction import SingleReadoutDeadTimeCorrection
+from lr_reduction.operations.algorithms.calculate_dead_time_corrections import SingleReadoutDeadTimeCorrection
 
 
 @pytest.fixture(scope="module")
