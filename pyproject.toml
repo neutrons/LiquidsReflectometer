@@ -56,8 +56,7 @@ method = "git"
 default-tag = "0.0.1"
 # The exp line is versioned by its own tags, named exp<version> (exp3.0, exp3.0rc1, ...),
 # and ignores every other tag: the upstream release tags (v2.10.0, ...) inherited from
-# next, the exp-* coordination tags (exp-review-group3, ...), and the lightweight tags the
-# agentic workflow pushes (qa/*, review/*, triage/*, analysis/*). Without this allow-list,
+# next and the exp-* review tags (exp-review-group3, ...). Without this allow-list,
 # `git describe` picks the NEAREST tag, so a sync merge from next would pull the version
 # back onto the upstream numbering, and a non-PEP440 tag would raise InvalidVersionError
 # at build/env-prep time. Upstream's own glob (v[0-9]*) never sees exp tags either.

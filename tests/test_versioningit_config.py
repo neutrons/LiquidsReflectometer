@@ -97,15 +97,13 @@ def test_computed_version_does_not_regress():
 def test_match_glob_present():
     """The exp line is versioned by exp<version> tags only. The allow-list keeps
     `git describe` from feeding versioningit an upstream v* tag inherited from next
-    (which would pull the version back onto the upstream numbering after a sync merge),
-    an exp-* coordination tag, or one of the agentic workflow's qa/*, review/*,
-    triage/*, analysis/* tags (-> InvalidVersionError at build/env-prep time). See
-    tasking/plan/lr_reduction_exp/findings.md F3."""
+    (which would pull the version back onto the upstream numbering after a sync merge)
+    or an exp-* review tag (-> InvalidVersionError at build/env-prep time)."""
     cfg = _versioningit_cfg()
     vcs = cfg["vcs"]
     assert "match" in vcs, "[tool.versioningit.vcs].match is required so versioningit only sees exp<version> tags."
     assert vcs["match"] == ["exp[0-9]*"], (
-        f"unexpected match glob {vcs['match']!r}; expected ['exp[0-9]*'] so exp-* coordination "
+        f"unexpected match glob {vcs['match']!r}; expected ['exp[0-9]*'] so exp-* review "
         "tags and upstream v* tags are ignored."
     )
     assert cfg.get("tag2version", {}).get("rmprefix") == "exp", (
