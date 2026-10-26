@@ -27,11 +27,6 @@ homepage = "https://github.com/neutrons/LiquidsReflectometer"
 repository = "https://github.com/neutrons/LiquidsReflectometer"
 documentation = "https://lr-reduction.readthedocs.io/latest/index.html"
 
-[project.scripts]
-lr-reduce-run = "lr_reduction.api.manual:main"
-lr-reduce-autoreduce = "lr_reduction.api.autoreduce:main"
-lr-reduce-batch = "lr_reduction.api.batch:main"
-
 ####################
 ### Build config ###
 ####################
@@ -107,7 +102,6 @@ qtpy = ">=2.4.3"
 
 [tool.pixi.pypi-dependencies]
 lr_reduction = { path = ".", editable = true }  # editable install of lr_reduction
-orsopy = "*"
 
 ### Pixi build configuration
 
