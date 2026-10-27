@@ -15,10 +15,10 @@ lr_reduction.operations.algorithms.cd_attenuation_correction
    :undoc-members:
    :show-inheritance:
 
-lr_reduction.operations.algorithms.calculate_dead_time_corrections
+lr_reduction.operations.algorithms.calculate_dead_time_correction
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-.. automodule:: lr_reduction.operations.algorithms.calculate_dead_time_corrections
+.. automodule:: lr_reduction.operations.algorithms.calculate_dead_time_correction
    :members:
    :undoc-members:
    :show-inheritance:

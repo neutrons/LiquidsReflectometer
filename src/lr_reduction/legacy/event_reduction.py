@@ -16,7 +16,7 @@ from lr_reduction.legacy import background
 from lr_reduction.legacy.gravity_correction import GravityDirection, gravity_correction
 from lr_reduction.legacy.instrument_settings import InstrumentSettings
 from lr_reduction.legacy.utils import mantid_algorithm_exec
-from lr_reduction.operations.algorithms import calculate_dead_time_corrections
+from lr_reduction.operations.algorithms import calculate_dead_time_correction
 
 PLANCK_CONSTANT = 6.626e-34  # m^2 kg s^-1
 NEUTRON_MASS = 1.675e-27  # kg
@@ -233,7 +233,7 @@ def get_dead_time_correction(ws, template_data):
     run_number = ws.getRun().getProperty("run_number").value
     error_ws = api.LoadErrorEventsNexus("REF_L_%s" % run_number)
     corr_ws = mantid_algorithm_exec(
-        calculate_dead_time_corrections.SingleReadoutDeadTimeCorrection,
+        calculate_dead_time_correction.SingleReadoutDeadTimeCorrection,
         InputWorkspace=ws,
         InputErrorEventsWorkspace=error_ws,
         Paralyzable=template_data.paralyzable,
