@@ -5,7 +5,7 @@ import os
 import numpy as np
 import pytest
 from mantid.api import AlgorithmManager, IEventWorkspace
-from mantid.kernel import DateAndTime, PhysicalConstants
+from mantid.kernel import DateAndTime, FloatTimeSeriesProperty, PhysicalConstants
 from mantid.simpleapi import (
     CloneWorkspace,
     ConvertToEventWorkspace,
@@ -21,33 +21,31 @@ from mantid.simpleapi import (
     mtd,
 )
 
-from lr_reduction.models.config import EmissionTimeConfig
 from lr_reduction.operations.algorithms.convert_tof_to_wavelength import (
     FORMULA_PARAMETER,
+    MULTIPLIER_LOG,
+    OFFSET_LOG,
     T0_LOG,
     T1_LOG,
     ConvertTofToWavelength,
     emission_time_formula,
 )
-from lr_reduction.operations.emission_time import (
-    CHOPPER_MODERATOR_LOG,
-    CHOPPER_MULTIPLIER_LOG,
-    CHOPPER_OFFSET_LOG,
-    resolve_emission_coefficients,
-)
 from lr_reduction.utils.sample_logs import SampleLogs
 
-# Realistic coefficients: t1 is a few us/A against m_n * L / h ~ 3460 us/A on REF_L.
-T0 = 10.0  # us
-T1 = 2.0  # us / A
+# Production chopper settings, as recorded in the ChopperOffset and ChopperMultiplier logs.
+T0 = 114.0  # us
+T1 = 29.5  # us / A
 
 TOF_RANGE = (5000.0, 60000.0)  # us, about 1.4-17 Angstrom on REF_L
 EVENTS_PER_PIXEL = 200
+PULSE_TIME = DateAndTime("2026-01-01T00:00:00")
 
-# The design's tolerance for the exact formula, met only with ModeratorTzero's Niter=2 and tolTOF=0.1.
+# The algorithm's promise against the exact formula.
 EXACT_RTOL = 1e-8
-# The documented gap between the two-pass iteration and the exact answer.
-TWO_PASS_RTOL = 1e-5
+# The legacy two-pass formula is not exact. Its relative gap is
+#   t1 * (t0 + t1 * TOF / A) / (A * (TOF - t0)),   A = m_n * L / h ~ 3460 us/A on REF_L,
+# about 2.4e-4 at the shortest TOF for the production coefficients.
+TWO_PASS_RTOL = 5e-4
 
 
 def closed_form(tof_us, path_m, t0=T0, t1=T1):
@@ -77,7 +75,12 @@ def assert_matches(output, reference_input, oracle, rtol):
         np.testing.assert_allclose(output.getSpectrum(index).getTofs(), expected, rtol=rtol, atol=0)
 
 
-def run(input_workspace, output_name=None, **properties):
+def exact_for(t0, t1):
+    """The closed form for coefficients other than the module defaults, as an `assert_matches` oracle."""
+    return lambda tof, path: closed_form(tof, path, t0=t0, t1=t1)
+
+
+def run(input_workspace, **properties):
     """Run the algorithm directly and return the output workspace."""
     algorithm = ConvertTofToWavelength()
     algorithm.initialize()
@@ -85,9 +88,17 @@ def run(input_workspace, output_name=None, **properties):
     algorithm.setProperty("InputWorkspace", input_workspace)
     for name, value in properties.items():
         algorithm.setProperty(name, value)
-    algorithm.setPropertyValue("OutputWorkspace", output_name or mtd.unique_hidden_name())
+    algorithm.setPropertyValue("OutputWorkspace", mtd.unique_hidden_name())
     algorithm.execute()
     return algorithm.getProperty("OutputWorkspace").value
+
+
+def add_series_log(workspace, name, values):
+    """Record `values` as a time series, the shape the DAS writes chopper PVs in."""
+    series = FloatTimeSeriesProperty(name)
+    for seconds, value in enumerate(values):
+        series.addValue(PULSE_TIME + int(seconds * 1e9), value)
+    workspace.mutableRun().addProperty(name, series, True)
 
 
 @pytest.fixture
@@ -102,9 +113,13 @@ def workspaces():
 
 @pytest.fixture
 def event_workspace(workspaces):
-    """Factory for a small four-pixel event workspace in TOF carrying the real REF_L instrument."""
+    """Factory for a small four-pixel event workspace in TOF carrying the real REF_L instrument.
 
-    def make():
+    `logs` maps chopper log names to values; by default both coefficient logs hold the
+    production settings.
+    """
+
+    def make(logs=None):
         name = mtd.unique_hidden_name()
         workspaces.append(name)
         workspace = CreateSampleWorkspace(
@@ -119,44 +134,49 @@ def event_workspace(workspaces):
         )
         # Evenly spaced events over the whole band, so every pixel is populated and the
         # comparison covers short and long wavelengths alike.
-        pulse_time = DateAndTime("2026-01-01T00:00:00")
         for index in range(workspace.getNumberHistograms()):
             events = workspace.getSpectrum(index)
             for tof in np.linspace(*TOF_RANGE, EVENTS_PER_PIXEL):
-                events.addEventQuickly(float(tof), pulse_time)
+                events.addEventQuickly(float(tof), PULSE_TIME)
         # Keep the sample workspace's spectrum map: the four pixels map to REF_L detector IDs,
         # so each spectrum gets a real pixel position and flight path.
         LoadInstrument(Workspace=name, InstrumentName="REF_L", RewriteSpectraMap=False)
+        for log_name, value in ({OFFSET_LOG: T0, MULTIPLIER_LOG: T1} if logs is None else logs).items():
+            add_series_log(workspace, log_name, [value])
         return mtd[name]
 
     return make
 
 
-def test_matches_exact_formula_per_pixel(event_workspace):
+def test_coefficients_default_to_chopper_logs(event_workspace):
     workspace = event_workspace()
+    output = run(workspace)
+
+    assert_matches(output, workspace, closed_form, EXACT_RTOL)
+    logs = SampleLogs(output)
+    assert (logs[T0_LOG], logs[T1_LOG]) == (T0, T1)
+
+
+def test_given_coefficients_override_logs(event_workspace):
+    workspace = event_workspace()
+    output = run(workspace, T0=50.0, T1=10.0)
+    assert_matches(output, workspace, exact_for(50.0, 10.0), EXACT_RTOL)
+
+
+def test_each_coefficient_falls_back_to_its_own_log(event_workspace):
+    workspace = event_workspace()
+    output = run(workspace, T0=50.0)
+    assert_matches(output, workspace, exact_for(50.0, T1), EXACT_RTOL)
+
+
+def test_given_coefficients_need_no_logs(event_workspace):
+    workspace = event_workspace(logs={})
     output = run(workspace, T0=T0, T1=T1)
     assert_matches(output, workspace, closed_form, EXACT_RTOL)
 
 
-def test_single_iteration_misses_exact_formula(event_workspace):
-    # Pins the iteration settings: one pass (the two-pass result) is not good enough for the
-    # tolerance the algorithm promises, so ModeratorTzero must be told to iterate.
-    workspace = event_workspace()
-    copy = mtd.unique_hidden_name()
-    CloneWorkspace(InputWorkspace=workspace, OutputWorkspace=copy)
-    SetInstrumentParameter(
-        Workspace=copy, ParameterName=FORMULA_PARAMETER, ParameterType="String", Value=emission_time_formula(T0, T1)
-    )
-    ModeratorTzero(InputWorkspace=copy, EMode="Elastic", Niter=1, OutputWorkspace=copy)
-    once = ConvertUnits(InputWorkspace=copy, Target="Wavelength", EMode="Elastic", OutputWorkspace=copy)
-    try:
-        with pytest.raises(AssertionError):
-            assert_matches(once, workspace, closed_form, EXACT_RTOL)
-    finally:
-        DeleteWorkspace(copy)
-
-
-def test_zero_coefficients_is_plain_convert_units(event_workspace, workspaces):
+def test_zero_coefficients_turn_correction_off(event_workspace, workspaces):
+    # The logs are present, but zeros are what the configuration passes to switch the correction off.
     workspace = event_workspace()
     output = run(workspace, T0=0.0, T1=0.0)
 
@@ -169,12 +189,30 @@ def test_zero_coefficients_is_plain_convert_units(event_workspace, workspaces):
     assert not output.getInstrument().hasParameter(FORMULA_PARAMETER)
 
 
+@pytest.mark.parametrize("niter", [1, 2], ids=["mantid-default", "two-iterations"])
+def test_looser_iteration_settings_miss_exact_formula(event_workspace, niter):
+    # Pins the iteration settings: at the production slope each iteration gains only ~120x, so
+    # Mantid's defaults (and the two iterations once thought enough) fall short of 1e-8.
+    workspace = event_workspace()
+    copy = mtd.unique_hidden_name()
+    CloneWorkspace(InputWorkspace=workspace, OutputWorkspace=copy)
+    SetInstrumentParameter(
+        Workspace=copy, ParameterName=FORMULA_PARAMETER, ParameterType="String", Value=emission_time_formula(T0, T1)
+    )
+    ModeratorTzero(InputWorkspace=copy, EMode="Elastic", Niter=niter, OutputWorkspace=copy)
+    loose = ConvertUnits(InputWorkspace=copy, Target="Wavelength", EMode="Elastic", OutputWorkspace=copy)
+    try:
+        with pytest.raises(AssertionError):
+            assert_matches(loose, workspace, closed_form, EXACT_RTOL)
+    finally:
+        DeleteWorkspace(copy)
+
+
 def test_input_is_unchanged(event_workspace):
     workspace = event_workspace()
-    assert workspace.getNumberEvents() > 0
     tofs_before = [workspace.getSpectrum(i).getTofs().copy() for i in range(workspace.getNumberHistograms())]
 
-    run(workspace, T0=T0, T1=T1)
+    run(workspace)
 
     assert workspace.getAxis(0).getUnit().unitID() == "TOF"
     assert not workspace.getInstrument().hasParameter(FORMULA_PARAMETER)
@@ -184,7 +222,7 @@ def test_input_is_unchanged(event_workspace):
 
 def test_output_is_event_workspace_in_wavelength_carrying_formula(event_workspace):
     workspace = event_workspace()
-    output = run(workspace, T0=T0, T1=T1)
+    output = run(workspace)
 
     assert isinstance(output, IEventWorkspace)
     assert output.getAxis(0).getUnit().unitID() == "Wavelength"
@@ -200,21 +238,24 @@ def test_geometry_reaches_conversion_through_instrument(event_workspace):
     MoveInstrumentComponent(Workspace=workspace, ComponentName="moderator", Z=-15.0, RelativePosition=False)
     assert workspace.spectrumInfo().l1() != pytest.approx(l1_before)
 
-    output = run(workspace, T0=T0, T1=T1)
+    output = run(workspace)
     assert_matches(output, workspace, closed_form, EXACT_RTOL)
-
-
-def test_sample_logs_record_applied_coefficients(event_workspace):
-    output = run(event_workspace(), T0=T0, T1=T1)
-    logs = SampleLogs(output)
-    assert logs[T0_LOG] == T0
-    assert logs[T1_LOG] == T1
 
 
 def test_agrees_with_two_pass_calculation(event_workspace):
     workspace = event_workspace()
-    output = run(workspace, T0=T0, T1=T1)
+    output = run(workspace)
     assert_matches(output, workspace, two_pass, TWO_PASS_RTOL)
+    # The gap is real: the two-pass formula is not a stand-in for the exact one.
+    with pytest.raises(AssertionError):
+        assert_matches(output, workspace, two_pass, 1e-5)
+
+
+def test_formula_round_trips_negative_and_small_coefficients(event_workspace):
+    # The formula is text: a negative slope and an exponent-notation offset must survive it.
+    workspace = event_workspace()
+    output = run(workspace, T0=1e-5, T1=-1.5)
+    assert_matches(output, workspace, exact_for(1e-5, -1.5), EXACT_RTOL)
 
 
 def test_history_records_algorithm_and_coefficients(event_workspace, workspaces):
@@ -225,15 +266,15 @@ def test_history_records_algorithm_and_coefficients(event_workspace, workspaces)
     workspaces.append(output_name)
     algorithm = AlgorithmManager.create("ConvertTofToWavelength")
     algorithm.setProperty("InputWorkspace", workspace.name())
-    algorithm.setProperty("T0", T0)
-    algorithm.setProperty("T1", T1)
+    algorithm.setProperty("T0", 50.0)
+    algorithm.setProperty("T1", 10.0)
     algorithm.setProperty("OutputWorkspace", output_name)
     algorithm.execute()
 
     last = mtd[output_name].getHistory().lastAlgorithm()
     assert last.name() == "ConvertTofToWavelength"
-    assert float(last.getPropertyValue("T0")) == T0
-    assert float(last.getPropertyValue("T1")) == T1
+    assert float(last.getPropertyValue("T0")) == 50.0
+    assert float(last.getPropertyValue("T1")) == 10.0
 
 
 def test_rejects_input_not_in_tof(event_workspace, workspaces):
@@ -251,43 +292,50 @@ def test_rejects_workspace_without_source_or_sample(workspaces):
     CreateWorkspace(DataX=[1000.0, 2000.0, 3000.0], DataY=[1.0, 1.0], UnitX="TOF", OutputWorkspace=histogram_name)
     no_instrument = ConvertToEventWorkspace(InputWorkspace=histogram_name, OutputWorkspace=event_name)
     with pytest.raises(RuntimeError, match="InputWorkspace: instrument has no source or sample position"):
-        run(no_instrument)
+        run(no_instrument, T0=T0, T1=T1)
+
+
+@pytest.mark.parametrize(("name", "log_name"), [("T0", OFFSET_LOG), ("T1", MULTIPLIER_LOG)])
+def test_rejects_missing_log_when_coefficient_not_given(event_workspace, name, log_name):
+    with pytest.raises(RuntimeError, match=f"{name}: not set, and the run's log cannot supply it: .*{log_name}"):
+        run(event_workspace(logs={}))
+
+
+def test_rejects_log_that_varies_across_run(event_workspace):
+    workspace = event_workspace(logs={OFFSET_LOG: T0})
+    add_series_log(workspace, MULTIPLIER_LOG, [T1, T1 + 1.0])
+    with pytest.raises(RuntimeError, match="T1: not set, and the run's log cannot supply it: .*varies across the run"):
+        run(workspace)
+
+
+def test_rejects_non_finite_log(event_workspace):
+    workspace = event_workspace(logs={OFFSET_LOG: np.inf, MULTIPLIER_LOG: T1})
+    with pytest.raises(RuntimeError, match=f"T0: log '{OFFSET_LOG}' is not a finite number"):
+        run(workspace)
 
 
 @pytest.mark.parametrize("name", ["T0", "T1"])
 @pytest.mark.parametrize("value", [np.nan, np.inf, -np.inf])
-def test_rejects_non_finite_coefficient(event_workspace, name, value):
-    with pytest.raises(RuntimeError, match=f"{name}: must be a finite number"):
+def test_rejects_non_finite_given_coefficient(event_workspace, name, value):
+    with pytest.raises(RuntimeError, match=f"{name}: the given value is not a finite number"):
         run(event_workspace(), **{name: value})
-
-
-def test_formula_round_trips_negative_and_small_coefficients(event_workspace):
-    # The formula is text: a negative slope and an exponent-notation offset must survive it.
-    workspace = event_workspace()
-    output = run(workspace, T0=1e-5, T1=-1.5)
-    assert_matches(output, workspace, lambda tof, path: closed_form(tof, path, t0=1e-5, t1=-1.5), EXACT_RTOL)
 
 
 @pytest.fixture(scope="module")
 def real_run(nexus_dir):
-    """A real REF_L run with chopper emission-time logs injected: no run in the test-data
-    repository records them, so the values here stand in for what the DAS writes."""
+    """A real REF_L run with the chopper coefficient logs injected: no run in the test-data
+    repository records them, so the production settings stand in for what the DAS writes."""
     name = mtd.unique_hidden_name()
-    LoadEventNexus(Filename=os.path.join(nexus_dir, "REF_L_198409.nxs.h5"), OutputWorkspace=name)
-    logs = SampleLogs(name)
-    logs.insert(CHOPPER_MODERATOR_LOG, [1])
-    logs.insert(CHOPPER_OFFSET_LOG, [T0], unit="microsecond")
-    logs.insert(CHOPPER_MULTIPLIER_LOG, [T1], unit="microsecond/Angstrom")
+    workspace = LoadEventNexus(Filename=os.path.join(nexus_dir, "REF_L_198409.nxs.h5"), OutputWorkspace=name)
+    add_series_log(workspace, OFFSET_LOG, [T0])
+    add_series_log(workspace, MULTIPLIER_LOG, [T1])
     yield mtd[name]
     DeleteWorkspace(name)
 
 
 @pytest.mark.datarepo
-def test_real_run_agrees_with_two_pass_from_chopper_logs(real_run):
-    t0, t1 = resolve_emission_coefficients(EmissionTimeConfig(), real_run)
-    assert (t0, t1) == (T0, T1)
-
-    output = run(real_run, T0=t0, T1=t1)
+def test_real_run_converts_with_its_chopper_logs(real_run):
+    output = run(real_run)
 
     assert output.getNumberEvents() == real_run.getNumberEvents()
     assert SampleLogs(output)["gd_prtn_chrg"] == SampleLogs(real_run)["gd_prtn_chrg"]
@@ -296,5 +344,7 @@ def test_real_run_agrees_with_two_pass_from_chopper_logs(real_run):
     populated = [i for i in range(real_run.getNumberHistograms()) if real_run.getSpectrum(i).getNumberEvents()]
     assert populated
     for index in populated:
-        expected = two_pass(real_run.getSpectrum(index).getTofs(), flight_path(real_run, index), t0=t0, t1=t1)
-        np.testing.assert_allclose(output.getSpectrum(index).getTofs(), expected, rtol=TWO_PASS_RTOL, atol=0)
+        tofs, path = real_run.getSpectrum(index).getTofs(), flight_path(real_run, index)
+        wavelengths = output.getSpectrum(index).getTofs()
+        np.testing.assert_allclose(wavelengths, closed_form(tofs, path), rtol=EXACT_RTOL, atol=0)
+        np.testing.assert_allclose(wavelengths, two_pass(tofs, path), rtol=TWO_PASS_RTOL, atol=0)

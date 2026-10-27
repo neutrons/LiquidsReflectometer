@@ -123,11 +123,13 @@ class DeadTimeConfig(BaseModel):
 
 
 class EmissionTimeConfig(BaseModel):
-    """Emission-time (moderator) correction parameters.
+    """Emission-time (moderator) correction parameters (§2.1.3).
 
-    TODO: §2.1.3 (Q1):
-        whether emission-time coefficients should be caller-configurable at all,
-        or always derived instrument-side, is still open.
+    How these map onto the `ConvertTofToWavelength` algorithm:
+
+    - by default, `T0` and `T1` are left unset, so each run's own chopper logs supply them;
+    - `coefficients` overrides both, for every run;
+    - `apply: false` passes `T0 = T1 = 0`, a plain TOF -> wavelength conversion.
     """
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
@@ -136,7 +138,7 @@ class EmissionTimeConfig(BaseModel):
         None,
         description=(
             "Linear emission-time model `[t0, t1]` in microseconds and microseconds per Angstrom. "
-            "When omitted, the coefficients are read from the reflected run's chopper logs"
+            "When omitted, the coefficients are read from each run's chopper logs"
         ),
     )
 

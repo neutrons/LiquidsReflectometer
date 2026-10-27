@@ -8,9 +8,15 @@ folded into one step.
 import math
 
 from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, PythonAlgorithm
-from mantid.kernel import Direction, PhysicalConstants
+from mantid.kernel import Direction, PhysicalConstants, Property
 
+from lr_reduction.exceptions import SampleLogsError
 from lr_reduction.utils.sample_logs import SampleLogs
+
+#: Chopper PV holding the emission-time offset t0, in microseconds. Default for `T0`.
+OFFSET_LOG = "BL4B:Chop:Skf2:ChopperOffset"
+#: Chopper PV holding the emission-time slope t1, in microseconds per Angstrom. Default for `T1`.
+MULTIPLIER_LOG = "BL4B:Chop:Skf2:ChopperMultiplier"
 
 #: Name of the instrument parameter `ModeratorTzero` reads the emission-delay formula from.
 FORMULA_PARAMETER = "t0_formula"
@@ -20,11 +26,14 @@ T0_LOG = "lr_emission_t0"
 T1_LOG = "lr_emission_t1"
 
 # `ModeratorTzero` stopping criteria. Each iteration shrinks the error against the closed form
-# by roughly the ratio t1 / (m_n * L / h), about 1/1000 on REF_L. Measured on Mantid 6.16.1
-# against the closed form: Niter=1 leaves ~1e-6 relative error (the two-pass result), Niter=2
-# with tolTOF=0.1 us leaves ~1e-9. The unit tests pin these values at a 1e-8 tolerance.
-_NITER = 2
-_TOL_TOF = 0.1  # microseconds
+# by the ratio t1 / (m_n * L / h), only about 1/120 on REF_L for the production slope of
+# ~29.5 us/A. Measured on Mantid 6.16.1 with t0 = 114 us, t1 = 29.5 us/A (max relative error):
+# Niter=2, tolTOF=0.1 us gives 1.9e-6; tolTOF >= 0.01 us halts the iteration at 1.5e-8 however
+# many passes are allowed; Niter=10, tolTOF=1e-6 us gives 9e-13. Iteration stops as soon as
+# the TOF stops changing, so the generous cap costs little (~0.1 s per million events). The
+# unit tests pin the result to the closed form at 1e-8.
+_NITER = 10
+_TOL_TOF = 1e-6  # microseconds
 
 # h^2 / (2 m_n) in meV * Angstrom^2, so that lambda = sqrt(_LAMBDA_SQ_ENERGY / E). Built from
 # Mantid's own constants rather than a textbook value: ModeratorTzero converts each event's
@@ -61,15 +70,19 @@ class ConvertTofToWavelength(PythonAlgorithm):
 
     with ``L`` the full flight path of the pixel that recorded the event.
 
+    The coefficients default to the run's own chopper logs, ``ChopperOffset`` for `T0` and
+    ``ChopperMultiplier`` for `T1`; either property, when set, overrides its log. Setting both
+    to zero turns the correction off, leaving a plain `ConvertUnits` to wavelength. The
+    ``ChopperModerator`` flag is not consulted, matching the prototype workflow. The applied
+    values are recorded on the output in the ``lr_emission_t0`` and ``lr_emission_t1`` logs.
+
     The arithmetic is delegated to two Mantid algorithms run on a copy of the input:
     `ModeratorTzero`, which reads the delay formula from an instrument parameter this
     algorithm writes onto the copy and iterates to the solution above; and `ConvertUnits`,
     which rescales each event by its own pixel's flight path and labels the axis Wavelength.
     Both read the geometry from the workspace's instrument, so any override applied earlier
-    by the instrument-settings step reaches the conversion without extra code.
-
-    With both coefficients zero the correction is skipped and the result is exactly a plain
-    `ConvertUnits` to wavelength. The input is never modified.
+    by the instrument-settings step reaches the conversion without extra code. The input is
+    never modified.
     """
 
     def category(self):
@@ -92,8 +105,16 @@ class ConvertTofToWavelength(PythonAlgorithm):
             IEventWorkspaceProperty("InputWorkspace", "", Direction.Input),
             "Event workspace in TOF, carrying the instrument geometry in force. Not modified",
         )
-        self.declareProperty("T0", 0.0, doc="Emission-time offset t0, in microseconds")
-        self.declareProperty("T1", 0.0, doc="Emission-time slope t1, in microseconds per Angstrom")
+        self.declareProperty(
+            "T0",
+            Property.EMPTY_DBL,
+            doc=f"Emission-time offset t0, in microseconds. Default: the run's ``{OFFSET_LOG}`` log",
+        )
+        self.declareProperty(
+            "T1",
+            Property.EMPTY_DBL,
+            doc=f"Emission-time slope t1, in microseconds per Angstrom. Default: the run's ``{MULTIPLIER_LOG}`` log",
+        )
         self.declareProperty(
             IEventWorkspaceProperty("OutputWorkspace", "", Direction.Output),
             "New event workspace in wavelength (Angstrom)",
@@ -103,27 +124,32 @@ class ConvertTofToWavelength(PythonAlgorithm):
         issues = {}
 
         workspace = self.getProperty("InputWorkspace").value
-        if workspace is not None:
-            unit = workspace.getAxis(0).getUnit().unitID()
-            if unit != "TOF":
-                issues["InputWorkspace"] = f"X axis must be in TOF, not {unit!r}"
-            else:
-                instrument = workspace.getInstrument()
-                if instrument.getSource() is None or instrument.getSample() is None:
-                    issues["InputWorkspace"] = (
-                        "instrument has no source or sample position, so the flight path cannot be computed"
-                    )
+        if workspace is None:
+            return issues
 
-        for name in ("T0", "T1"):
-            value = self.getProperty(name).value
-            if not math.isfinite(value):
-                issues[name] = f"must be a finite number, got {value}"
+        unit = workspace.getAxis(0).getUnit().unitID()
+        if unit != "TOF":
+            issues["InputWorkspace"] = f"X axis must be in TOF, not {unit!r}"
+        else:
+            instrument = workspace.getInstrument()
+            if instrument.getSource() is None or instrument.getSample() is None:
+                issues["InputWorkspace"] = (
+                    "instrument has no source or sample position, so the flight path cannot be computed"
+                )
+
+        for property_name, log_name in (("T0", OFFSET_LOG), ("T1", MULTIPLIER_LOG)):
+            try:
+                self._coefficient(property_name, log_name)
+            except SampleLogsError as exc:
+                issues[property_name] = f"not set, and the run's log cannot supply it: {exc}"
+            except ValueError as exc:
+                issues[property_name] = str(exc)
 
         return issues
 
     def PyExec(self):  # noqa: N802
-        t0 = self.getProperty("T0").value
-        t1 = self.getProperty("T1").value
+        t0 = self._coefficient("T0", OFFSET_LOG)
+        t1 = self._coefficient("T1", MULTIPLIER_LOG)
 
         # Work on a copy: the formula parameter is written onto the workspace's instrument
         # parameter map, and ModeratorTzero shifts events in place.
@@ -155,6 +181,28 @@ class ConvertTofToWavelength(PythonAlgorithm):
         logs.insert(T1_LOG, t1, unit="microsecond/Angstrom")
 
         self.setProperty("OutputWorkspace", workspace)
+
+    def _coefficient(self, property_name, log_name):
+        """The value of `property_name` if it was set, otherwise the input run's `log_name` log.
+
+        Raises
+        ------
+        SampleLogsError
+            The property is unset and the log is missing, or varies across the run, so it has
+            no single value to apply.
+        ValueError
+            The value, from either source, is not a finite number.
+        """
+        prop = self.getProperty(property_name)
+        if prop.isDefault:
+            value = SampleLogs(self.getProperty("InputWorkspace").value)[log_name]
+            source = f"log {log_name!r}"
+        else:
+            value, source = prop.value, "the given value"
+        # bool is an int, but a flag is not a coefficient.
+        if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+            raise ValueError(f"{source} is not a finite number: {value!r}")
+        return float(value)
 
     def _run_child(self, name, output_property="OutputWorkspace", **properties):
         """Run a child algorithm and return its output workspace (None if `output_property` is None).

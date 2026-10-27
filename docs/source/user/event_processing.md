@@ -82,21 +82,18 @@ $$
 where $t$ is the recorded time of flight and $L$ is the full flight path of the pixel that
 recorded the event, taken from the workspace's instrument (including any instrument-settings
 override). This is done by the `ConvertTofToWavelength` algorithm, which takes an event
-workspace in TOF and the two coefficients `T0` (µs) and `T1` (µs/Å), and returns a new event
-workspace in wavelength. It records the applied values in the sample logs `lr_emission_t0` and
-`lr_emission_t1`. With both coefficients zero it is a plain TOF → wavelength conversion.
+workspace in TOF and returns a new event workspace in wavelength.
 
-The coefficients are chosen from the `corrections.emission_time` configuration block:
+By default, each run's coefficients come from its own chopper logs:
+`BL4B:Chop:Skf2:ChopperOffset` gives $t_0$ (µs) and `BL4B:Chop:Skf2:ChopperMultiplier` gives
+$t_1$ (µs/Å). The `BL4B:Chop:Skf2:ChopperModerator` flag is not consulted. If a run lacks one of
+these logs, the reduction stops with an error naming it. The `corrections.emission_time` block
+of the configuration can change this:
 
-- `apply: false` turns the correction off (`t0 = t1 = 0`).
-- `coefficients: [t0, t1]` gives the coefficients explicitly. These take precedence over the logs.
-- Otherwise they are read from the reflected run's chopper logs: `BL4B:Chop:Skf2:ChopperOffset`
-  ($t_0$) and `BL4B:Chop:Skf2:ChopperMultiplier` ($t_1$) when `BL4B:Chop:Skf2:ChopperModerator`
-  is 1, and zero when it is 0. If the run has none of these logs, the reduction stops with an
-  error asking for one of the two settings above.
+- `coefficients: [t0, t1]` overrides the logged values, for every run.
+- `apply: false` turns the correction off, leaving a plain TOF → wavelength conversion.
 
-The direct beams that a reflected run is divided by use the same coefficients as the reflected
-run, so that the correction cancels consistently in the ratio.
+The applied values are recorded in the output's sample logs `lr_emission_t0` and `lr_emission_t1`.
 
 ### Gravity correction
 

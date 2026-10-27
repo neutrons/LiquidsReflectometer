@@ -12,10 +12,6 @@ from lr_reduction.exceptions.config import (
     ConfigParseError,
     ConfigValidationError,
 )
-from lr_reduction.exceptions.corrections import (
-    CorrectionError,
-    EmissionTimeCorrectionError,
-)
 from lr_reduction.exceptions.results import (
     IncompleteDataError,
     MalformedDataError,
@@ -48,8 +44,6 @@ __all__ = [
     "ConfigNotFoundError",
     "ConfigParseError",
     "ConfigValidationError",
-    "CorrectionError",
-    "EmissionTimeCorrectionError",
     "IncompleteDataError",
     "IncompleteRunDataError",
     "LoaderError",
