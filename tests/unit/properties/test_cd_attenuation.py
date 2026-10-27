@@ -1,17 +1,29 @@
 """Unit tests for the Cd attenuation transmission correction functions."""
 
+import os
+
 import numpy as np
 import pytest
 from mantid.api import IEventWorkspace
-from mantid.simpleapi import ConvertUnits, CreateSampleWorkspace, CreateWorkspace, DeleteWorkspace, Rebin, mtd
+from mantid.kernel import Int32TimeSeriesProperty
+from mantid.simpleapi import (
+    ConvertUnits,
+    CreateSampleWorkspace,
+    CreateWorkspace,
+    DeleteWorkspace,
+    LoadEventNexus,
+    Rebin,
+    mtd,
+)
 
-from lr_reduction.exceptions import LrValidationError, SampleLogsError
+from lr_reduction.exceptions import LogNotFoundError, LrValidationError, SampleLogsError
 from lr_reduction.properties import cd_attenuation
 from lr_reduction.properties.cd_attenuation import (
     CD_FOILS,
     _load_cd_attenuation_data,
     apply_correction,
     compute_cd_thickness,
+    get_attenuator_log,
     get_transmission_workspace,
 )
 
@@ -21,6 +33,9 @@ RTOL = 1e-6
 # Stages 1 and 3 in the beam: 57.5 + 249.5 microns.
 MODERATE_THICKNESS = 0.0307
 FULL_STACK_THICKNESS = sum(CD_FOILS) * 1e-4
+
+MENU_LOG = "BL4B:Actuator:Menu"
+STAGE_LOGS = [f"BL4B:Actuator:{stage}MRb" for stage in ("50", "100", "200", "400")]
 
 
 def _delete_transmission_workspaces():
@@ -147,6 +162,114 @@ def test_missing_table_raises_and_is_not_cached(monkeypatch, tmp_path):
     monkeypatch.undo()
     wavelength, _ = _load_cd_attenuation_data()
     assert len(wavelength) == 1000
+
+
+######################
+### Attenuator log ###
+######################
+
+
+def add_int_series(ws, name, values):
+    """Record `values` as a time series log, as the DAS writes the actuator logs."""
+    series = Int32TimeSeriesProperty(name)
+    for second, value in enumerate(values):
+        series.addValue(f"2020-01-01T00:00:0{second}", value)
+    mtd[ws].getRun().addProperty(name, series, True)
+
+
+def add_stage_logs(ws, stages):
+    """Record one per-stage actuator log per flag, as older files without the Menu log do."""
+    for name, state in zip(STAGE_LOGS, stages, strict=True):
+        add_int_series(ws, name, [state])
+
+
+@pytest.mark.parametrize(
+    ("code", "atten"),
+    [
+        (0, [0, 0, 0, 0]),
+        (1, [1, 0, 0, 0]),
+        (3, [1, 1, 0, 0]),
+        (10, [0, 1, 0, 1]),
+        (15, [1, 1, 1, 1]),
+    ],
+)
+def test_menu_code_is_decoded_least_significant_bit_first(make_events, code, atten):
+    """Bit i of the Menu code is stage i of `CD_FOILS`; 10 is asymmetric, so the order is pinned."""
+    ws = make_events()
+    add_int_series(ws, MENU_LOG, [code])
+
+    assert get_attenuator_log(ws) == atten
+
+
+@pytest.mark.parametrize("stages", [[0, 0, 0, 0], [1, 0, 1, 0], [0, 1, 1, 1]])
+def test_stage_logs_are_read_without_a_menu_log(make_events, stages):
+    ws = make_events()
+    add_stage_logs(ws, stages)
+
+    assert get_attenuator_log(ws) == stages
+
+
+def test_menu_log_takes_precedence_over_stage_logs(make_events):
+    ws = make_events()
+    add_int_series(ws, MENU_LOG, [1])
+    add_stage_logs(ws, [0, 1, 1, 1])
+
+    assert get_attenuator_log(ws) == [1, 0, 0, 0]
+
+
+@pytest.mark.parametrize("code", [-1, 16])
+def test_out_of_range_menu_code_raises(make_events, code):
+    ws = make_events()
+    add_int_series(ws, MENU_LOG, [code])
+
+    with pytest.raises(SampleLogsError, match="0-15"):
+        get_attenuator_log(ws)
+
+
+def test_missing_attenuator_logs_raise(make_events):
+    with pytest.raises(LogNotFoundError, match="50MRb"):
+        get_attenuator_log(make_events())
+
+
+def test_missing_stage_log_raises(make_events):
+    """Without the Menu log, every stage needs its own log."""
+    ws = make_events()
+    for name in STAGE_LOGS[:-1]:
+        add_int_series(ws, name, [1])
+
+    with pytest.raises(LogNotFoundError, match="400MRb"):
+        get_attenuator_log(ws)
+
+
+@pytest.fixture
+def load_run_logs(nexus_dir):
+    """Factory loading only a REF_L run's logs; deletes each workspace on teardown."""
+    names = []
+
+    def load(run_number):
+        name = mtd.unique_hidden_name()
+        LoadEventNexus(
+            Filename=os.path.join(nexus_dir, f"REF_L_{run_number}.nxs.h5"), MetaDataOnly=True, OutputWorkspace=name
+        )
+        names.append(name)
+        return name
+
+    yield load
+    for name in names:
+        if mtd.doesExist(name):
+            DeleteWorkspace(name)
+
+
+@pytest.mark.datarepo
+@pytest.mark.parametrize(
+    ("run_number", "atten"),
+    [
+        (234266, [1, 1, 0, 0]),  # Menu code 3; its per-stage _RBV logs are known to read 0
+        (220063, [1, 1, 1, 1]),  # predates the Menu log, so read from the *MRb logs
+    ],
+)
+def test_attenuator_log_of_a_measured_run(load_run_logs, run_number, atten):
+    assert get_attenuator_log(load_run_logs(run_number)) == atten
 
 
 ####################

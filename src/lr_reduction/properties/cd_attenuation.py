@@ -12,7 +12,7 @@ import numpy as np
 from mantid.api import IEventWorkspace, MatrixWorkspace
 from mantid.simpleapi import ConvertToHistogram, CreateWorkspace, Divide
 
-from lr_reduction.exceptions import LrValidationError, SampleLogsError
+from lr_reduction.exceptions import LogNotFoundError, LrValidationError, SampleLogsError
 from lr_reduction.types import MantidWorkspace, MantidWorkspaceName
 from lr_reduction.utils.sample_logs import SampleLogs
 from lr_reduction.utils.workspace import workspace_exists, workspace_handle
@@ -27,6 +27,9 @@ CD_FOILS = (57.5, 126.5, 126.5 + 123.0, 2 * (126.5 + 123.0))
 _MAX_ATTENUATION_EXPONENT = 0.5 * np.log(np.finfo(np.float32).max)
 
 _THICKNESS_LOG = "cd_thickness"
+
+#######################################################################################
+### Private helpers
 
 
 @lru_cache(maxsize=1)
@@ -48,44 +51,74 @@ def _load_cd_attenuation_data() -> tuple[np.ndarray, np.ndarray]:
     return wavelength, mu
 
 
-def compute_cd_thickness(atten, flip_atten: bool = False) -> float:
-    """Total Cd thickness in the beam, from a run's ``Atten`` log value.
+def _is_transmission_for(name: MantidWorkspaceName, thickness: float) -> bool:
+    """Whether the workspace of this name is the transmission this module built for `thickness`.
 
-    Parameters
-    ----------
-    atten
-        One flag per attenuator stage, ordered as `CD_FOILS`: 1 in the beam, 0 out. Entries
-        beyond ``len(CD_FOILS)`` are ignored.
-    flip_atten
-        Whether the log was recorded with inverted polarity, 0 meaning in the beam.
-
-    Returns
-    -------
-    float
-        The summed thickness of the stages in the beam, in centimeters.
-
-    Raises
-    ------
-    SampleLogsError
-        `atten` is not a flat sequence of numbers, holds fewer entries than there are stages,
-        or holds a value other than 0 or 1.
+    The name is shared, process-global state: a workspace written over it — an `apply_correction`
+    output, say — or a rounded name shared by two thicknesses must be rebuilt, not reused.
     """
+    if not workspace_exists(name):
+        return False
+    ws = workspace_handle(name)
+    if not isinstance(ws, MatrixWorkspace) or not ws.isHistogramData():
+        return False
+    logs = SampleLogs(ws)
+    return _THICKNESS_LOG in logs and logs[_THICKNESS_LOG] == thickness
+
+
+def _check_event_wavelengths(ws: IEventWorkspace, cd_thickness: float, bin_edges: np.ndarray) -> None:
+    """Raise unless the correction reaches every event and keeps its weight finite.
+
+    Both would otherwise fail silently: Mantid leaves an event outside the transmission's bins
+    unscaled, and a weight or squared error past the float32 range becomes inf.
+    """
+    # Despite the name, these return the events' X values in the workspace's current unit;
+    # ConvertUnits rewrites each event's "tof" field in place, so here they are wavelengths.
+    wavelength_min, wavelength_max = ws.getTofMin(), ws.getTofMax()
+    if wavelength_min < bin_edges[0] or wavelength_max >= bin_edges[-1]:
+        raise LrValidationError(
+            f"Events span {wavelength_min:.3f}-{wavelength_max:.3f} Angstrom, beyond the Cd attenuation "
+            f"table's {bin_edges[0]:.3f}-{bin_edges[-1]:.3f} Angstrom"
+        )
+    _, mu = _load_cd_attenuation_data()
+    first_bin, last_bin = np.searchsorted(bin_edges, [wavelength_min, wavelength_max], side="right") - 1
+    exponent = mu[first_bin : last_bin + 1].max() * cd_thickness
+    if exponent > _MAX_ATTENUATION_EXPONENT:
+        raise LrValidationError(
+            f"Cd transmission falls to exp(-{exponent:.1f}) within the events' wavelength range; "
+            f"correcting it would overflow the float32 event weights"
+        )
+
+
+#######################################################################################
+### Public API
+
+
+def get_attenuator_log(ws) -> list[int]:
+    """Get the attenuator log from a direct-beam workspace.
+
+    Returns a list of 0/1 flags, one per attenuator stage, in the order of `CD_FOILS`.
+    """
+
+    def _to_bits(n: int) -> list[int]:
+        """Convert an integer 0-15 to a list of attenuator flags (LSB-first binary)."""
+        if not 0 <= n <= 15:
+            raise SampleLogsError(f"Attenuator code must be 0-15, got {n}")
+        return [(n >> i) & 1 for i in range(4)]
+
     try:
-        states = np.asarray(atten, dtype=float)
-    except (TypeError, ValueError) as exc:
-        raise SampleLogsError(
-            f"Atten log must hold one numeric flag per attenuator stage, got {type(atten).__name__}"
-        ) from exc
-    if states.ndim != 1:
-        raise SampleLogsError(f"Atten log must hold one flag per attenuator stage, got a {states.ndim}-d value")
-    if states.size < len(CD_FOILS):
-        raise SampleLogsError(f"Atten log holds {states.size} values, fewer than the {len(CD_FOILS)} attenuator stages")
-    states = states[: len(CD_FOILS)]
-    if not np.isin(states, (0.0, 1.0)).all():
-        raise SampleLogsError(f"Atten log values must each be 0 or 1, got {states.tolist()}")
-    if flip_atten:
-        states = 1.0 - states
-    return float(np.dot(CD_FOILS, states)) * 1e-4  # microns -> cm
+        atten = _to_bits(int(SampleLogs(ws)["BL4B:Actuator:Menu"]))
+        return atten
+    except LogNotFoundError:
+        # Older data files lack the Actuator:Menu log, and used a different name for the attenuator flags.
+        logs = [
+            SampleLogs(ws).mean("BL4B:Actuator:50MRb"),
+            SampleLogs(ws).mean("BL4B:Actuator:100MRb"),
+            SampleLogs(ws).mean("BL4B:Actuator:200MRb"),
+            SampleLogs(ws).mean("BL4B:Actuator:400MRb"),
+        ]
+        atten = [int(i) for i in logs]
+        return atten
 
 
 def get_transmission_workspace(cd_thickness: float) -> MatrixWorkspace:
@@ -127,19 +160,44 @@ def get_transmission_workspace(cd_thickness: float) -> MatrixWorkspace:
     return transmission
 
 
-def _is_transmission_for(name: MantidWorkspaceName, thickness: float) -> bool:
-    """Whether the workspace of this name is the transmission this module built for `thickness`.
+def compute_cd_thickness(atten: list[int], flip_atten: bool = False) -> float:
+    """Total Cd thickness in the beam, from a run's ``Atten`` log value.
 
-    The name is shared, process-global state: a workspace written over it — an `apply_correction`
-    output, say — or a rounded name shared by two thicknesses must be rebuilt, not reused.
+    Parameters
+    ----------
+    atten
+        One flag per attenuator stage, ordered as `CD_FOILS`: 1 in the beam, 0 out.
+        Entries beyond ``len(CD_FOILS)`` are ignored.
+    flip_atten
+        Whether the log was recorded with inverted polarity, 0 meaning in the beam.
+
+    Returns
+    -------
+    float
+        The summed thickness of the stages in the beam, in centimeters.
+
+    Raises
+    ------
+    SampleLogsError
+        `atten` is not a flat sequence of numbers, holds fewer entries than there are stages,
+        or holds a value other than 0 or 1.
     """
-    if not workspace_exists(name):
-        return False
-    ws = workspace_handle(name)
-    if not isinstance(ws, MatrixWorkspace) or not ws.isHistogramData():
-        return False
-    logs = SampleLogs(ws)
-    return _THICKNESS_LOG in logs and logs[_THICKNESS_LOG] == thickness
+    try:
+        states = np.asarray(atten, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise SampleLogsError(
+            f"Atten log must hold one numeric flag per attenuator stage, got {type(atten).__name__}"
+        ) from exc
+    if states.ndim != 1:
+        raise SampleLogsError(f"Atten log must hold one flag per attenuator stage, got a {states.ndim}-d value")
+    if states.size < len(CD_FOILS):
+        raise SampleLogsError(f"Atten log holds {states.size} values, fewer than the {len(CD_FOILS)} attenuator stages")
+    states = states[: len(CD_FOILS)]
+    if not np.isin(states, (0.0, 1.0)).all():
+        raise SampleLogsError(f"Atten log values must each be 0 or 1, got {states.tolist()}")
+    if flip_atten:
+        states = 1.0 - states
+    return float(np.dot(CD_FOILS, states)) * 1e-4  # microns -> cm
 
 
 def apply_correction(
@@ -182,27 +240,3 @@ def apply_correction(
     if isinstance(ws, IEventWorkspace) and ws.getNumberEvents() > 0:
         _check_event_wavelengths(ws, cd_thickness, transmission.readX(0))
     return Divide(LHSWorkspace=ws, RHSWorkspace=transmission, OutputWorkspace=output_workspace)
-
-
-def _check_event_wavelengths(ws: IEventWorkspace, cd_thickness: float, bin_edges: np.ndarray) -> None:
-    """Raise unless the correction reaches every event and keeps its weight finite.
-
-    Both would otherwise fail silently: Mantid leaves an event outside the transmission's bins
-    unscaled, and a weight or squared error past the float32 range becomes inf.
-    """
-    # Despite the name, these return the events' X values in the workspace's current unit;
-    # ConvertUnits rewrites each event's "tof" field in place, so here they are wavelengths.
-    wavelength_min, wavelength_max = ws.getTofMin(), ws.getTofMax()
-    if wavelength_min < bin_edges[0] or wavelength_max >= bin_edges[-1]:
-        raise LrValidationError(
-            f"Events span {wavelength_min:.3f}-{wavelength_max:.3f} Angstrom, beyond the Cd attenuation "
-            f"table's {bin_edges[0]:.3f}-{bin_edges[-1]:.3f} Angstrom"
-        )
-    _, mu = _load_cd_attenuation_data()
-    first_bin, last_bin = np.searchsorted(bin_edges, [wavelength_min, wavelength_max], side="right") - 1
-    exponent = mu[first_bin : last_bin + 1].max() * cd_thickness
-    if exponent > _MAX_ATTENUATION_EXPONENT:
-        raise LrValidationError(
-            f"Cd transmission falls to exp(-{exponent:.1f}) within the events' wavelength range; "
-            f"correcting it would overflow the float32 event weights"
-        )
