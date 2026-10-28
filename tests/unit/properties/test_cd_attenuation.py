@@ -304,14 +304,9 @@ def test_thickness_accepts_any_flat_numeric_sequence(atten):
     assert compute_cd_thickness(atten) == pytest.approx(MODERATE_THICKNESS)
 
 
-def test_entries_beyond_the_stages_are_ignored():
-    assert compute_cd_thickness([1, 0, 1, 0, 1]) == pytest.approx(MODERATE_THICKNESS)
-
-
 def test_short_log_raises_sample_logs_error():
-    with pytest.raises(SampleLogsError, match="fewer than the 4") as excinfo:
+    with pytest.raises(SampleLogsError, match="must be a 1D array of length 4") as excinfo:
         compute_cd_thickness([1, 0, 1])
-
     assert type(excinfo.value) is SampleLogsError
 
 

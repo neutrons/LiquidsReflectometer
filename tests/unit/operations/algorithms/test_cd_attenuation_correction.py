@@ -17,15 +17,17 @@ from mantid.simpleapi import (
 
 from lr_reduction.exceptions import LogNotFoundError, LrValidationError, SampleLogsError
 from lr_reduction.operations.algorithms.cd_attenuation_correction import CdAttenuationCorrection
-from lr_reduction.properties.cd_attenuation import _load_cd_attenuation_data, get_transmission_workspace
+from lr_reduction.properties.cd_attenuation import (
+    MENU_LOG,
+    STAGE_LOGS,
+    _load_cd_attenuation_data,
+    get_transmission_workspace,
+)
 
 # Event weights are stored as float32.
 RTOL = 1e-6
 
 OUTPUT_WORKSPACE = "cd_attenuation_corrected"
-
-MENU_LOG = "BL4B:Actuator:Menu"
-STAGE_LOGS = [f"BL4B:Actuator:{stage}MRb" for stage in ("50", "100", "200", "400")]
 
 
 def _delete_transmission_workspaces():

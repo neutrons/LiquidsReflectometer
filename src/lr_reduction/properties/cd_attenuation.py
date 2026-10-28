@@ -17,16 +17,24 @@ from lr_reduction.types import MantidWorkspace, MantidWorkspaceName
 from lr_reduction.utils.sample_logs import SampleLogs
 from lr_reduction.utils.workspace import workspace_exists, workspace_handle
 
-cd_attenuation_file = Path(__file__).parent / "Cd-attenuation.csv"
+#######################################################################################
+### Constants
 
 #: Cumulative Cd thickness in microns that each attenuator stage puts in the beam, in log order.
 CD_FOILS = (57.5, 126.5, 126.5 + 123.0, 2 * (126.5 + 123.0))
 
+# Sample log names for the attenuator flags, in order of the stages in `CD_FOILS`. The Menu log is preferred,
+MENU_LOG = "BL4B:Actuator:Menu"
+STAGE_LOGS = [f"BL4B:Actuator:{stage}MRb" for stage in ("50", "100", "200", "400")]
+THICKNESS_LOG = "cd_thickness"
+
 # Mantid stores weighted-event weights and squared errors as float32. Dividing by T = exp(-μ·d)
 # scales a squared error by exp(2·μ·d), which overflows to inf beyond this exponent.
+# TODO (Glass): Might get rid of this limit
 _MAX_ATTENUATION_EXPONENT = 0.5 * np.log(np.finfo(np.float32).max)
 
-_THICKNESS_LOG = "cd_thickness"
+# Path to the Cd attenuation table, in wavelength (Å) vs. linear attenuation coefficient μ (cm^-1).
+cd_attenuation_file = Path(__file__).parent / "Cd-attenuation.csv"
 
 #######################################################################################
 ### Private helpers
@@ -63,7 +71,7 @@ def _is_transmission_for(name: MantidWorkspaceName, thickness: float) -> bool:
     if not isinstance(ws, MatrixWorkspace) or not ws.isHistogramData():
         return False
     logs = SampleLogs(ws)
-    return _THICKNESS_LOG in logs and logs[_THICKNESS_LOG] == thickness
+    return THICKNESS_LOG in logs and logs[THICKNESS_LOG] == thickness
 
 
 def _check_event_wavelengths(ws: IEventWorkspace, cd_thickness: float, bin_edges: np.ndarray) -> None:
@@ -112,10 +120,10 @@ def get_attenuator_log(ws) -> list[int]:
     except LogNotFoundError:
         # Older data files lack the Actuator:Menu log, and used a different name for the attenuator flags.
         logs = [
-            SampleLogs(ws).mean("BL4B:Actuator:50MRb"),
-            SampleLogs(ws).mean("BL4B:Actuator:100MRb"),
-            SampleLogs(ws).mean("BL4B:Actuator:200MRb"),
-            SampleLogs(ws).mean("BL4B:Actuator:400MRb"),
+            SampleLogs(ws).single_value("BL4B:Actuator:50MRb", operation=np.max),
+            SampleLogs(ws).single_value("BL4B:Actuator:100MRb", operation=np.max),
+            SampleLogs(ws).single_value("BL4B:Actuator:200MRb", operation=np.max),
+            SampleLogs(ws).single_value("BL4B:Actuator:400MRb", operation=np.max),
         ]
         atten = [int(i) for i in logs]
         return atten
@@ -156,18 +164,17 @@ def get_transmission_workspace(cd_thickness: float) -> MatrixWorkspace:
     wavelength, mu = _load_cd_attenuation_data()
     CreateWorkspace(OutputWorkspace=name, DataX=wavelength, DataY=np.exp(-mu * thickness), UnitX="Wavelength")
     transmission = ConvertToHistogram(InputWorkspace=name, OutputWorkspace=name)
-    SampleLogs(transmission).insert(_THICKNESS_LOG, thickness, unit="cm")
+    SampleLogs(transmission).insert(THICKNESS_LOG, thickness, unit="cm")
     return transmission
 
 
 def compute_cd_thickness(atten: list[int], flip_atten: bool = False) -> float:
-    """Total Cd thickness in the beam, from a run's ``Atten`` log value.
+    """Total Cd thickness in the beam, from a run's attenuator sample logs.
 
     Parameters
     ----------
     atten
         One flag per attenuator stage, ordered as `CD_FOILS`: 1 in the beam, 0 out.
-        Entries beyond ``len(CD_FOILS)`` are ignored.
     flip_atten
         Whether the log was recorded with inverted polarity, 0 meaning in the beam.
 
@@ -179,22 +186,23 @@ def compute_cd_thickness(atten: list[int], flip_atten: bool = False) -> float:
     Raises
     ------
     SampleLogsError
-        `atten` is not a flat sequence of numbers, holds fewer entries than there are stages,
-        or holds a value other than 0 or 1.
+        Issue with list of attenuator flags: is not a flat sequence of numbers,
+        holds fewer entries than there are stages, or holds a value other than 0 or 1.
     """
     try:
         states = np.asarray(atten, dtype=float)
     except (TypeError, ValueError) as exc:
         raise SampleLogsError(
-            f"Atten log must hold one numeric flag per attenuator stage, got {type(atten).__name__}"
+            f"`atten` list must hold one numeric flag per attenuator stage, got {type(atten).__name__}"
         ) from exc
-    if states.ndim != 1:
-        raise SampleLogsError(f"Atten log must hold one flag per attenuator stage, got a {states.ndim}-d value")
-    if states.size < len(CD_FOILS):
-        raise SampleLogsError(f"Atten log holds {states.size} values, fewer than the {len(CD_FOILS)} attenuator stages")
+    if states.ndim != 1 or states.size != len(CD_FOILS):
+        raise SampleLogsError(
+            f"`atten` list must be a 1D array of length {len(CD_FOILS)}, "
+            f"got a {states.ndim}-d array with length {states.size}."
+        )
     states = states[: len(CD_FOILS)]
     if not np.isin(states, (0.0, 1.0)).all():
-        raise SampleLogsError(f"Atten log values must each be 0 or 1, got {states.tolist()}")
+        raise SampleLogsError(f"`atten` list values must each be 0 or 1, got {states.tolist()}")
     if flip_atten:
         states = 1.0 - states
     return float(np.dot(CD_FOILS, states)) * 1e-4  # microns -> cm
