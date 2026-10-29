@@ -176,7 +176,7 @@ def test_given_coefficients_need_no_logs(event_workspace):
 
 
 def test_zero_coefficients_turn_correction_off(event_workspace, workspaces):
-    # The logs are present, but zeros are what the configuration passes to switch the correction off.
+    # The logs are present, but explicit zeros override them and leave nothing to correct.
     workspace = event_workspace()
     output = run(workspace, T0=0.0, T1=0.0)
 
@@ -187,6 +187,34 @@ def test_zero_coefficients_turn_correction_off(event_workspace, workspaces):
     for index in range(workspace.getNumberHistograms()):
         np.testing.assert_array_equal(output.getSpectrum(index).getTofs(), plain.getSpectrum(index).getTofs())
     assert not output.getInstrument().hasParameter(FORMULA_PARAMETER)
+
+
+def test_flag_turns_correction_off_without_logs(event_workspace, workspaces):
+    workspace = event_workspace(logs={})
+    output = run(workspace, ApplyEmissionTimeCorrection=False)
+
+    plain_name = mtd.unique_hidden_name()
+    workspaces.append(plain_name)
+    plain = ConvertUnits(InputWorkspace=workspace, Target="Wavelength", EMode="Elastic", OutputWorkspace=plain_name)
+    assert plain.getNumberEvents() > 0
+    for index in range(workspace.getNumberHistograms()):
+        np.testing.assert_array_equal(output.getSpectrum(index).getTofs(), plain.getSpectrum(index).getTofs())
+    assert not output.getInstrument().hasParameter(FORMULA_PARAMETER)
+    logs = SampleLogs(output)
+    assert (logs[T0_LOG], logs[T1_LOG]) == (0.0, 0.0)
+
+
+def test_large_accepted_slope_matches_exact_formula(event_workspace):
+    # Ten times the production slope: each iteration gains only ~12x, still within the cap.
+    workspace = event_workspace()
+    output = run(workspace, T1=300.0)
+    assert_matches(output, workspace, exact_for(T0, 300.0), EXACT_RTOL)
+
+
+def test_rejects_slope_too_large_to_converge(event_workspace):
+    # At this slope ten iterations would leave ~0.3% error.
+    with pytest.raises(RuntimeError, match=r"T1: 2000.0 us/A is too large .*must not exceed"):
+        run(event_workspace(), T1=2000.0)
 
 
 @pytest.mark.parametrize("niter", [1, 2], ids=["mantid-default", "two-iterations"])

@@ -9,6 +9,7 @@ import math
 
 from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, PythonAlgorithm
 from mantid.kernel import Direction, PhysicalConstants, Property
+from mantid.simpleapi import CloneWorkspace, ConvertUnits, ModeratorTzero, SetInstrumentParameter
 
 from lr_reduction.exceptions import SampleLogsError
 from lr_reduction.utils.sample_logs import SampleLogs
@@ -31,9 +32,11 @@ T1_LOG = "lr_emission_t1"
 # Niter=2, tolTOF=0.1 us gives 1.9e-6; tolTOF >= 0.01 us halts the iteration at 1.5e-8 however
 # many passes are allowed; Niter=10, tolTOF=1e-6 us gives 9e-13. Iteration stops as soon as
 # the TOF stops changing, so the generous cap costs little (~0.1 s per million events). The
-# unit tests pin the result to the closed form at 1e-8.
+# unit tests pin the result to the closed form at 1e-8. The error after `_NITER` passes is about
+# ratio ** (_NITER + 1), so slopes with ratio above `_MAX_SLOPE_RATIO` are rejected (~1e-11 at the cap).
 _NITER = 10
 _TOL_TOF = 1e-6  # microseconds
+_MAX_SLOPE_RATIO = 0.1
 
 # h^2 / (2 m_n) in meV * Angstrom^2, so that lambda = sqrt(_LAMBDA_SQ_ENERGY / E). Built from
 # Mantid's own constants rather than a textbook value: ModeratorTzero converts each event's
@@ -59,6 +62,11 @@ def emission_time_formula(t0: float, t1: float) -> str:
     return f"{t0:.17g} + {t1:.17g} * sqrt({_LAMBDA_SQ_ENERGY:.17g} / incidentEnergy)"
 
 
+def _us_per_angstrom(path_m: float) -> float:
+    """Flight time per Angstrom of wavelength, m_n * L / h, in microseconds per Angstrom."""
+    return PhysicalConstants.NeutronMass * path_m / PhysicalConstants.h * 1e-4
+
+
 class ConvertTofToWavelength(PythonAlgorithm):
     """Convert an event workspace from TOF to wavelength, removing the moderator emission delay.
 
@@ -72,9 +80,10 @@ class ConvertTofToWavelength(PythonAlgorithm):
 
     The coefficients default to the run's own chopper logs, ``ChopperOffset`` for `T0` and
     ``ChopperMultiplier`` for `T1`; either property, when set, overrides its log. Setting both
-    to zero turns the correction off, leaving a plain `ConvertUnits` to wavelength. The
-    ``ChopperModerator`` flag is not consulted, matching the prototype workflow. The applied
-    values are recorded on the output in the ``lr_emission_t0`` and ``lr_emission_t1`` logs.
+    to zero, or setting `ApplyEmissionTimeCorrection` to false, turns the correction off, leaving a
+    plain `ConvertUnits` to wavelength; the logs are then not needed. The ``ChopperModerator``
+    flag is not consulted, matching the prototype workflow. The applied values are recorded on
+    the output in the ``lr_emission_t0`` and ``lr_emission_t1`` logs.
 
     The arithmetic is delegated to two Mantid algorithms run on a copy of the input:
     `ModeratorTzero`, which reads the delay formula from an instrument parameter this
@@ -104,6 +113,11 @@ class ConvertTofToWavelength(PythonAlgorithm):
         self.declareProperty(
             IEventWorkspaceProperty("InputWorkspace", "", Direction.Input),
             "Event workspace in TOF, carrying the instrument geometry in force. Not modified",
+        )
+        self.declareProperty(
+            "ApplyEmissionTimeCorrection",
+            True,
+            doc="Remove the moderator emission delay. If false, T0 and T1 are ignored and a plain conversion is done",
         )
         self.declareProperty(
             "T0",
@@ -137,44 +151,59 @@ class ConvertTofToWavelength(PythonAlgorithm):
                     "instrument has no source or sample position, so the flight path cannot be computed"
                 )
 
+        if not self.getProperty("ApplyEmissionTimeCorrection").value:
+            return issues
+
+        coefficients = {}
         for property_name, log_name in (("T0", OFFSET_LOG), ("T1", MULTIPLIER_LOG)):
             try:
-                self._coefficient(property_name, log_name)
+                coefficients[property_name] = self._coefficient(property_name, log_name)
             except SampleLogsError as exc:
                 issues[property_name] = f"not set, and the run's log cannot supply it: {exc}"
             except ValueError as exc:
                 issues[property_name] = str(exc)
 
+        if "T1" in coefficients and "InputWorkspace" not in issues:
+            # shortcut: bound uses L1 only, stricter than min(L1 + L2); use that if a real slope ever hits it.
+            max_slope = _MAX_SLOPE_RATIO * _us_per_angstrom(workspace.spectrumInfo().l1())
+            if abs(coefficients["T1"]) > max_slope:
+                issues["T1"] = (
+                    f"{coefficients['T1']} us/A is too large for ModeratorTzero to converge on this "
+                    f"instrument; |T1| must not exceed {max_slope:.1f} us/A"
+                )
+
         return issues
 
     def PyExec(self):  # noqa: N802
-        t0 = self._coefficient("T0", OFFSET_LOG)
-        t1 = self._coefficient("T1", MULTIPLIER_LOG)
+        if self.getProperty("ApplyEmissionTimeCorrection").value:
+            t0 = self._coefficient("T0", OFFSET_LOG)
+            t1 = self._coefficient("T1", MULTIPLIER_LOG)
+        else:
+            t0 = t1 = 0.0
 
         # Work on a copy: the formula parameter is written onto the workspace's instrument
         # parameter map, and ModeratorTzero shifts events in place.
-        workspace = self._run_child("CloneWorkspace", InputWorkspace=self.getProperty("InputWorkspace").value)
+        workspace = CloneWorkspace(InputWorkspace=self.getProperty("InputWorkspace").value, StoreInADS=False)
 
         if t0 != 0.0 or t1 != 0.0:
-            self._run_child(
-                "SetInstrumentParameter",
-                output_property=None,
+            SetInstrumentParameter(
                 Workspace=workspace,
                 ParameterName=FORMULA_PARAMETER,
                 ParameterType="String",
                 Value=emission_time_formula(t0, t1),
+                StoreInADS=False,
             )
             # EMode must be Elastic. ModeratorTzero's default (Indirect) assumes an
             # indirect-geometry spectrometer and silently produces wrong TOFs on REF_L.
-            workspace = self._run_child(
-                "ModeratorTzero",
+            workspace = ModeratorTzero(
                 InputWorkspace=workspace,
                 EMode="Elastic",
                 Niter=_NITER,
                 tolTOF=_TOL_TOF,
+                StoreInADS=False,
             )
 
-        workspace = self._run_child("ConvertUnits", InputWorkspace=workspace, Target="Wavelength", EMode="Elastic")
+        workspace = ConvertUnits(InputWorkspace=workspace, Target="Wavelength", EMode="Elastic", StoreInADS=False)
 
         logs = SampleLogs(workspace)
         logs.insert(T0_LOG, t0, unit="microsecond")
@@ -203,21 +232,6 @@ class ConvertTofToWavelength(PythonAlgorithm):
         if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
             raise ValueError(f"{source} is not a finite number: {value!r}")
         return float(value)
-
-    def _run_child(self, name, output_property="OutputWorkspace", **properties):
-        """Run a child algorithm and return its output workspace (None if `output_property` is None).
-
-        Child algorithms keep their intermediates out of the analysis data service, and their
-        calls are nested under this algorithm in the output's history rather than appearing
-        as siblings of it.
-        """
-        algorithm = self.createChildAlgorithm(name)
-        for key, value in properties.items():
-            algorithm.setProperty(key, value)
-        if output_property is not None:
-            algorithm.setPropertyValue(output_property, "_unused")
-        algorithm.execute()
-        return algorithm.getProperty(output_property).value if output_property is not None else None
 
 
 AlgorithmFactory.subscribe(ConvertTofToWavelength)

@@ -129,7 +129,7 @@ class EmissionTimeConfig(BaseModel):
 
     - by default, `T0` and `T1` are left unset, so each run's own chopper logs supply them;
     - `coefficients` overrides both, for every run;
-    - `apply: false` passes `T0 = T1 = 0`, a plain TOF -> wavelength conversion.
+    - `apply: false` passes `ApplyEmissionTimeCorrection=False`, a plain TOF -> wavelength conversion.
     """
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)

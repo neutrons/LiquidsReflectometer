@@ -93,6 +93,9 @@ of the configuration can change this:
 - `coefficients: [t0, t1]` overrides the logged values, for every run.
 - `apply: false` turns the correction off, leaving a plain TOF → wavelength conversion.
 
+A slope $|t_1|$ above a tenth of $m_n L_1 / h$ (about 350 µs/Å on REF_L) is rejected: the
+iterative solution would not converge to the exact wavelength.
+
 The applied values are recorded in the output's sample logs `lr_emission_t0` and `lr_emission_t1`.
 
 ### Gravity correction
