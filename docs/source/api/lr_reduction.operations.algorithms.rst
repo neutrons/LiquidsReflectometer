@@ -38,3 +38,11 @@ lr_reduction.operations.algorithms.apply_dead_time_correction
    :members:
    :undoc-members:
    :show-inheritance:
+
+lr_reduction.operations.algorithms.trim_direct_beam_tof
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. automodule:: lr_reduction.operations.algorithms.trim_direct_beam_tof
+   :members:
+   :undoc-members:
+   :show-inheritance:

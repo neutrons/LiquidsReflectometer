@@ -18,7 +18,10 @@ from mantid.simpleapi import (
 from lr_reduction.legacy import event_reduction
 from lr_reduction.legacy.reduction_template_reader import ReductionParameters
 from lr_reduction.legacy.utils import amend_config
-from lr_reduction.operations.algorithms.apply_dead_time_correction import ApplyDeadTimeCorrection
+from lr_reduction.operations.algorithms.apply_dead_time_correction import (
+    ApplyDeadTimeCorrection,
+    dead_time_curve_issues,
+)
 
 # Events of the sample workspace span this TOF range.
 TOF_MIN, TOF_MAX = 8000.0, 56000.0
@@ -90,6 +93,72 @@ def run_algorithm(input_workspace, curve):
     algorithm = make_algorithm(input_workspace, curve)
     algorithm.execute()
     return mtd[OUTPUT_WORKSPACE]
+
+
+# dead_time_curve_issues, the curve checks shared by every algorithm consuming the curve
+
+EVENTS_RANGE = (TOF_MIN, TOF_MAX)
+
+
+def curve_issues(curve, tof_range=EVENTS_RANGE):
+    return dead_time_curve_issues(mtd[curve], tof_range)
+
+
+@pytest.mark.parametrize("tof_range", [EVENTS_RANGE, None])
+def test_valid_curve_has_no_issues(make_curve, tof_range):
+    assert curve_issues(make_curve(), tof_range) == []
+
+
+def test_curve_edges_equal_to_the_events_range_cover_it(make_curve):
+    assert curve_issues(make_curve(x_min=TOF_MIN, x_max=TOF_MAX)) == []
+
+
+def test_curve_not_in_tof_is_an_issue(make_curve):
+    issues = curve_issues(make_curve(unit="Wavelength"))
+
+    assert len(issues) == 1
+    assert "TOF" in issues[0]
+
+
+def test_several_spectra_skip_the_per_spectrum_checks(make_curve):
+    """Which spectrum to check is undefined, so the NaN and the short coverage go unreported."""
+    issues = curve_issues(make_curve(factors=(1.0, np.nan, 1.2, 1.3), x_min=TOF_MIN + 1000.0, spectra=2))
+
+    assert len(issues) == 1
+    assert "one spectrum, found 2" in issues[0]
+
+
+def test_coverage_is_not_checked_without_a_tof_range(make_curve):
+    assert curve_issues(make_curve(x_min=TOF_MIN + 1000.0), tof_range=None) == []
+
+
+@pytest.mark.parametrize(("x_min", "x_max"), [(TOF_MIN + 1000.0, 60000.0), (0.0, TOF_MAX - 1000.0)])
+def test_curve_not_covering_the_tof_range_is_an_issue(make_curve, x_min, x_max):
+    issues = curve_issues(make_curve(x_min=x_min, x_max=x_max))
+
+    assert len(issues) == 1
+    assert "does not cover" in issues[0]
+
+
+@pytest.mark.parametrize(("bad", "reason"), [(np.nan, "undefined"), (np.inf, "undefined"), (-0.1, "negative")])
+def test_invalid_factor_is_an_issue(make_curve, bad, reason):
+    issues = curve_issues(make_curve(factors=(1.0, bad, 1.2, 1.3)))
+
+    assert len(issues) == 1
+    assert reason in issues[0]
+
+
+def test_every_issue_of_a_curve_is_reported_in_check_order(make_curve):
+    curve = make_curve(factors=(1.0, np.nan, -0.1, 1.3), x_min=TOF_MIN + 1000.0, unit="Wavelength")
+
+    issues = curve_issues(curve)
+
+    assert len(issues) == 4
+    for issue, reason in zip(issues, ["TOF", "does not cover", "undefined", "negative"], strict=True):
+        assert reason in issue
+
+
+# ApplyDeadTimeCorrection
 
 
 def test_valid_inputs_pass(events, make_curve):
