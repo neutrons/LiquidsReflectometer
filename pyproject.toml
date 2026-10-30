@@ -155,12 +155,13 @@ versioningit = ">=3.2.0"
 [tool.pixi.feature.build.pypi-dependencies]
 toml-cli = "*"
 
-[tool.pixi.feature.dev.dependencies]  # necessary for development and testing
+[tool.pixi.feature.dev.dependencies]  # development and testing dependencies
 pre-commit = "*"
 ruff = "*"
 codecov = "*"
 pytest = "*"
 pytest-cov = "*"
+mantidworkbench = ">=6.16.1,<7"
 
 [tool.pixi.feature.docs.dependencies]
 sphinx = "*"
