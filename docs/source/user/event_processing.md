@@ -69,6 +69,35 @@ between the moderator and the detector.
 The $t_{off}$, $A$, and $L$ parameters are process variables that are stored in the
 data file and can be changed in the data acquisition system.
 
+#### In the new reduction workflow
+
+The new workflow models the emission delay as linear in wavelength,
+$t_{emit}(\lambda) = t_0 + t_1 \lambda$, and folds it into the conversion to wavelength.
+Each event's wavelength is the exact solution
+
+$$
+\lambda = \frac{h \, (t - t_0)}{m_n L + h \, t_1}
+$$
+
+where $t$ is the recorded time of flight and $L$ is the full flight path of the pixel that
+recorded the event, taken from the workspace's instrument (including any instrument-settings
+override). This is done by the `ConvertTofToWavelength` algorithm, which takes an event
+workspace in TOF and returns a new event workspace in wavelength.
+
+By default, each run's coefficients come from its own chopper logs:
+`BL4B:Chop:Skf2:ChopperOffset` gives $t_0$ (µs) and `BL4B:Chop:Skf2:ChopperMultiplier` gives
+$t_1$ (µs/Å). The `BL4B:Chop:Skf2:ChopperModerator` flag is not consulted. If a run lacks one of
+these logs, the reduction stops with an error naming it. The `corrections.emission_time` block
+of the configuration can change this:
+
+- `coefficients: [t0, t1]` overrides the logged values, for every run.
+- `apply: false` turns the correction off, leaving a plain TOF → wavelength conversion.
+
+A slope $|t_1|$ above a tenth of $m_n L_1 / h$ (about 350 µs/Å on REF_L) is rejected: the
+iterative solution would not converge to the exact wavelength.
+
+The applied values are recorded in the output's sample logs `lr_emission_t0` and `lr_emission_t1`.
+
 ### Gravity correction
 
 The reflected angle of each neutron is corrected for the effect of gravity according to

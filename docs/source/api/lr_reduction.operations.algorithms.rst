@@ -15,6 +15,14 @@ lr_reduction.operations.algorithms.cd_attenuation_correction
    :undoc-members:
    :show-inheritance:
 
+lr_reduction.operations.algorithms.convert_tof_to_wavelength
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. automodule:: lr_reduction.operations.algorithms.convert_tof_to_wavelength
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 lr_reduction.operations.algorithms.calculate_dead_time_correction
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
