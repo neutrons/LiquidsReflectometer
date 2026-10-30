@@ -1,14 +1,21 @@
 #!/usr/bin/env python
 import sys
 
-#from launcher.apps.json_settings_builder import JSONSettingsBuilderTab
-from qtpy import QtCore
+from launcher.runtime_env import prepare_runtime_env
+
+# Before anything imports matplotlib: the tabs below do, and matplotlib fixes its cache directory then. This keeps
+# it out of $XDG_CACHE_HOME, which the analysis nodes' login hook deletes (launcher/runtime_env.py).
+prepare_runtime_env()
+
 from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 
+from launcher.app_identity import ensure_identity, migrate_legacy_settings
 from launcher.apps.direct_beam import DirectBeamTab
 from launcher.apps.file_batch import FileBatchTab
 from launcher.apps.overplot import Overplot
+from launcher.apps.settings_editor import SettingsEditorTab
 from launcher.apps.sld_calculator import SLD
+from launcher.apps.time_resolved import TimeResolvedTab
 
 #REFERENCE_DIRECTIVE = "Click to choose a 60Hz reference R(Q) file"
 #TEMPLATE_DIRECTIVE = "Click to choose a 30Hz template"
@@ -20,8 +27,6 @@ class ReductionInterface(QTabWidget):
         self.setWindowTitle("New Reflectometry Launcher")
         layout = QGridLayout()
         self.setLayout(layout)
-
-        self.settings = QtCore.QSettings()
 
         # Overplot tab
         tab_id = 0
@@ -41,11 +46,17 @@ class ReductionInterface(QTabWidget):
         self.addTab(self.file_batch_tab, "Batch file")
         self.setTabText(tab_id, "Batch file")
 
-        ## ROI selector
-        #tab_id += 1
-        #self.roi_tab = ROISelector()
-        #self.addTab(self.roi_tab, "ROI selector")
-        #self.setTabText(tab_id, "ROI selector")
+        # Time-resolved reduction tab
+        tab_id += 1
+        self.time_resolved_tab = TimeResolvedTab()
+        self.addTab(self.time_resolved_tab, "Time resolved")
+        self.setTabText(tab_id, "Time resolved")
+
+        # Simple settings editor
+        tab_id += 1
+        self.settings_editor_tab = SettingsEditorTab()
+        self.addTab(self.settings_editor_tab, "Settings editor")
+        self.setTabText(tab_id, "Settings editor")
 
         # SLD calculator
         tab_id += 1
@@ -61,6 +72,11 @@ class ReductionInterface(QTabWidget):
 
 # referenced by pyproject.toml, part of the GUI system
 def main():
+    # One QSettings identity for every layer of the launcher, established
+    # before anything can construct a QSettings. T2/T3 adopt launcher's
+    # app_identity module rather than repeating the literals.
+    ensure_identity()
+    migrate_legacy_settings()
     app = QApplication([])
     window = ReductionInterface()
     window.show()
