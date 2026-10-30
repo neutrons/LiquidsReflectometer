@@ -9,6 +9,46 @@ from mantid.kernel import Direction
 from mantid.simpleapi import Multiply, RebinToWorkspace, logger
 
 
+def dead_time_curve_issues(curve_ws, tof_range=None):
+    """Return what is wrong with a ``DTC(TOF)`` curve from SingleReadoutDeadTimeCorrection.
+
+    Shared by every algorithm that consumes the curve, so their checks cannot drift apart.
+
+    Parameters
+    ----------
+    curve_ws
+        The dead time correction curve workspace.
+    tof_range
+        ``(tof_min, tof_max)`` of the events the curve is applied to, which its edges must cover;
+        None skips the coverage check.
+
+    Returns
+    -------
+        The problems found, empty when the curve is valid.
+    """
+    issues = []
+    if curve_ws.getAxis(0).getUnit().unitID() != "TOF":
+        issues.append("the X axis must be in TOF")
+    if curve_ws.getNumberHistograms() != 1:
+        issues.append(f"it must have exactly one spectrum, found {curve_ws.getNumberHistograms()}")
+        return issues
+
+    tof_edges = curve_ws.readX(0)
+    if tof_range is not None:
+        tof_min, tof_max = tof_range
+        if tof_edges[0] > tof_min or tof_edges[-1] < tof_max:
+            issues.append(
+                f"its TOF range [{tof_edges[0]}, {tof_edges[-1]}] does not cover "
+                f"the events' TOF range [{tof_min}, {tof_max}]"
+            )
+    factors = curve_ws.readY(0)
+    if not np.all(np.isfinite(factors)):
+        issues.append("it contains undefined (NaN or infinite) values")
+    if np.any(factors < 0):
+        issues.append("it contains negative values")
+    return issues
+
+
 class ApplyDeadTimeCorrection(PythonAlgorithm):
     def category(self):
         return "Reflectometry\\SNS"
@@ -43,25 +83,10 @@ class ApplyDeadTimeCorrection(PythonAlgorithm):
         if input_ws.getAxis(0).getUnit().unitID() != "TOF":
             issues["InputWorkspace"] = "The X axis must be in TOF"
 
-        curve_issues = []
-        if curve_ws.getAxis(0).getUnit().unitID() != "TOF":
-            curve_issues.append("the X axis must be in TOF")
-        if curve_ws.getNumberHistograms() != 1:
-            curve_issues.append(f"it must have exactly one spectrum, found {curve_ws.getNumberHistograms()}")
-        else:
-            tof_edges = curve_ws.readX(0)
-            if "InputWorkspace" not in issues and input_ws.getNumberEvents() > 0:
-                tof_min, tof_max = input_ws.getTofMin(), input_ws.getTofMax()
-                if tof_edges[0] > tof_min or tof_edges[-1] < tof_max:
-                    curve_issues.append(
-                        f"its TOF range [{tof_edges[0]}, {tof_edges[-1]}] does not cover "
-                        f"the events' TOF range [{tof_min}, {tof_max}]"
-                    )
-            factors = curve_ws.readY(0)
-            if not np.all(np.isfinite(factors)):
-                curve_issues.append("it contains undefined (NaN or infinite) values")
-            if np.any(factors < 0):
-                curve_issues.append("it contains negative values")
+        tof_range = None
+        if "InputWorkspace" not in issues and input_ws.getNumberEvents() > 0:
+            tof_range = (input_ws.getTofMin(), input_ws.getTofMax())
+        curve_issues = dead_time_curve_issues(curve_ws, tof_range)
         if curve_issues:
             issues["DeadTimeCorrectionWorkspace"] = "Invalid dead time correction curve: " + "; ".join(curve_issues)
 
