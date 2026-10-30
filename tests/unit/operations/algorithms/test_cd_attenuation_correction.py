@@ -15,9 +15,9 @@ from mantid.simpleapi import (
     mtd,
 )
 
-from lr_reduction.exceptions import LogNotFoundError, LrValidationError, SampleLogsError
 from lr_reduction.operations.algorithms.cd_attenuation_correction import CdAttenuationCorrection
 from lr_reduction.properties.cd_attenuation import (
+    CD_FOILS,
     MENU_LOG,
     STAGE_LOGS,
     _load_cd_attenuation_data,
@@ -28,6 +28,8 @@ from lr_reduction.properties.cd_attenuation import (
 RTOL = 1e-6
 
 OUTPUT_WORKSPACE = "cd_attenuation_corrected"
+
+FULL_STACK_THICKNESS = sum(CD_FOILS) * 1e-4
 
 
 def _delete_transmission_workspaces():
@@ -146,16 +148,6 @@ def test_flip_atten_reads_zero_as_in_the_beam(make_direct_beam):
     assert_corrected(corrected, 57.5e-4)
 
 
-def test_missing_attenuator_logs_raise(make_direct_beam):
-    with pytest.raises(LogNotFoundError, match="Actuator"):
-        run_algorithm(make_direct_beam())
-
-
-def test_out_of_range_menu_code_raises(make_direct_beam):
-    with pytest.raises(SampleLogsError, match="0-15"):
-        run_algorithm(make_direct_beam(menu=16))
-
-
 def test_histogram_input_is_rejected():
     """The correction is applied per event, so the input must be an event workspace."""
     histogram = CreateWorkspace(DataX=[1.0, 2.0], DataY=[1.0], UnitX="Wavelength", OutputWorkspace="cd_histogram")
@@ -202,7 +194,10 @@ def test_correction_on_a_measured_run(menu_run):
 
 
 @pytest.mark.datarepo
-def test_full_stack_on_a_measured_run_would_overflow(full_stack_run):
-    """932.5 microns of Cd attenuates the longest wavelengths past what float32 weights can undo."""
-    with pytest.raises(LrValidationError, match="overflow"):
-        run_algorithm(full_stack_run)
+def test_full_stack_on_a_measured_run_drops_overflowing_events(full_stack_run):
+    """932.5 microns of Cd attenuates the longest wavelengths past what float32 weights can undo,
+    so those events are dropped and the rest corrected."""
+    corrected = run_algorithm(full_stack_run)
+
+    assert 0 < corrected.getNumberEvents() < mtd[full_stack_run].getNumberEvents()
+    assert_corrected(corrected, FULL_STACK_THICKNESS)

@@ -19,8 +19,10 @@ from mantid.simpleapi import (
 from lr_reduction.exceptions import LogNotFoundError, LrValidationError, SampleLogsError
 from lr_reduction.properties import cd_attenuation
 from lr_reduction.properties.cd_attenuation import (
+    _MAX_ATTENUATION_EXPONENT,
     CD_FOILS,
     _load_cd_attenuation_data,
+    _overflow_cutoff_wavelength,
     apply_correction,
     compute_cd_thickness,
     get_attenuator_log,
@@ -155,7 +157,7 @@ def test_table_is_read_once():
 @pytest.mark.usefixtures("loader_cache")
 def test_missing_table_raises_and_is_not_cached(monkeypatch, tmp_path):
     """A failed read propagates numpy's error, and the next call reads the file again."""
-    monkeypatch.setattr(cd_attenuation, "cd_attenuation_file", tmp_path / "missing.csv")
+    monkeypatch.setattr(cd_attenuation, "CD_ATTENUATION_FILE", tmp_path / "missing.csv")
     with pytest.raises(FileNotFoundError):
         _load_cd_attenuation_data()
 
@@ -463,11 +465,48 @@ def test_correction_rejects_events_beyond_the_table(make_events, output_name, to
         apply_correction(events, MODERATE_THICKNESS, output_name)
 
 
-def test_correction_rejects_a_transmission_that_would_overflow_float32(make_events, output_name):
-    """The full stack at ~15 Angstrom scales squared errors past the float32 range."""
+def test_no_cutoff_when_every_event_is_safe(make_events):
     events = make_events()
+    bin_edges = get_transmission_workspace(MODERATE_THICKNESS).readX(0)
 
-    with pytest.raises(LrValidationError, match="float32"):
+    assert _overflow_cutoff_wavelength(mtd[events], MODERATE_THICKNESS, bin_edges) is None
+
+
+def test_cutoff_sits_just_below_the_first_overflowing_bin(make_events):
+    """The full stack overflows from ~7.9 Angstrom, inside the events' ~2.1-14.8 Angstrom span."""
+    events = make_events()
+    bin_edges = get_transmission_workspace(FULL_STACK_THICKNESS).readX(0)
+    _, mu = _load_cd_attenuation_data()
+    first_overflow = np.argmax(mu * FULL_STACK_THICKNESS > _MAX_ATTENUATION_EXPONENT)
+
+    cutoff = _overflow_cutoff_wavelength(mtd[events], FULL_STACK_THICKNESS, bin_edges)
+
+    assert cutoff < bin_edges[first_overflow]
+    assert np.nextafter(cutoff, np.inf) == bin_edges[first_overflow]
+
+
+def test_correction_drops_events_that_would_overflow_float32(make_events, output_name):
+    """Events past the cutoff are filtered out; the rest are corrected with finite weights."""
+    events = make_events()
+    bin_edges = get_transmission_workspace(FULL_STACK_THICKNESS).readX(0)
+    cutoff = _overflow_cutoff_wavelength(mtd[events], FULL_STACK_THICKNESS, bin_edges)
+
+    corrected = apply_correction(events, FULL_STACK_THICKNESS, output_name)
+
+    assert 0 < corrected.getNumberEvents() < mtd[events].getNumberEvents()
+    for index in range(corrected.getNumberHistograms()):
+        event_list = corrected.getSpectrum(index)
+        assert np.all(event_list.getTofs() <= cutoff)
+        scale = expected_scale(event_list.getTofs(), FULL_STACK_THICKNESS)
+        np.testing.assert_allclose(event_list.getWeights(), scale, rtol=RTOL)
+        np.testing.assert_allclose(event_list.getWeightErrors(), scale, rtol=RTOL)
+
+
+def test_correction_rejects_events_that_would_all_overflow_float32(make_events, output_name):
+    """With every event above ~8.4 Angstrom, the full stack leaves nothing that can be corrected."""
+    events = make_events(tof_min=32000.0)
+
+    with pytest.raises(LrValidationError, match="All events would overflow"):
         apply_correction(events, FULL_STACK_THICKNESS, output_name)
 
 
