@@ -62,14 +62,30 @@ def test_format_retains_git_hash():
     )
 
 
+def _exp_tags_reachable_from_head():
+    import subprocess
+
+    out = subprocess.run(
+        ["git", "tag", "--merged", "HEAD", "--list", "exp[0-9]*"],
+        capture_output=True,
+        text=True,
+        cwd=os.path.join(_HERE, os.pardir),
+    )
+    return out.stdout.split()
+
+
 def test_computed_version_does_not_regress():
     """Belt-and-suspenders: if versioningit is importable, the computed version's release
-    must be >= (2, 10, 0) so it sorts at/above the published 2.10.0.dev80 baseline."""
+    must be >= (2, 10, 0) so it sorts at/above the 2.10.0.dev builds already published
+    under the exp label. Until the first exp<version> tag exists, versioningit falls back
+    to default-tag and the computed version is not meaningful, so skip."""
     import pytest
 
     versioningit = pytest.importorskip("versioningit")
     from packaging.version import Version
 
+    if not _exp_tags_reachable_from_head():
+        pytest.skip("no exp<version> tag reachable from HEAD yet; versioningit is on default-tag")
     raw = versioningit.get_version(project_dir=os.path.join(_HERE, os.pardir))
     v = Version(raw.replace(".dirty", ""))
     assert v.release >= (2, 10, 0), (
@@ -79,31 +95,36 @@ def test_computed_version_does_not_regress():
 
 
 def test_match_glob_present():
-    """The agentic workflow pushes lightweight coordination tags (qa/*, review/*,
-    triage/*, analysis/*). Without a release-tag allow-list, `git describe` could feed
-    one of those to versioningit -> InvalidVersionError at build/env-prep time. A
-    positive match glob keeps only release tags as version candidates. See
-    tasking/plan/lr_reduction_exp/findings.md F3."""
-    vcs = _versioningit_cfg()["vcs"]
-    assert "match" in vcs, (
-        "[tool.versioningit.vcs].match is required so versioningit ignores the workflow's "
-        "qa/*, review/*, triage/*, analysis/* coordination tags."
+    """The exp line is versioned by exp<version> tags only. The allow-list keeps
+    `git describe` from feeding versioningit an upstream v* tag inherited from next
+    (which would pull the version back onto the upstream numbering after a sync merge)
+    or an exp-* review tag (-> InvalidVersionError at build/env-prep time)."""
+    cfg = _versioningit_cfg()
+    vcs = cfg["vcs"]
+    assert "match" in vcs, "[tool.versioningit.vcs].match is required so versioningit only sees exp<version> tags."
+    assert vcs["match"] == ["exp[0-9]*"], (
+        f"unexpected match glob {vcs['match']!r}; expected ['exp[0-9]*'] so exp-* review "
+        "tags and upstream v* tags are ignored."
     )
-    assert any("v" in g and "[0-9]" in g for g in vcs["match"]), (
-        f"unexpected match glob {vcs['match']!r}; expected a release-tag glob like ['v[0-9]*']."
+    assert cfg.get("tag2version", {}).get("rmprefix") == "exp", (
+        "[tool.versioningit.tag2version].rmprefix must be 'exp' so exp3.0rc1 -> 3.0rc1."
     )
 
 
 def test_match_glob_finds_a_release_tag():
-    """Sanity: the configured glob matches at least one tag reachable from HEAD, so
-    versioning still resolves (catches a future glob typo)."""
+    """Sanity: once an exp<version> tag is reachable from HEAD, the configured glob
+    resolves to it (catches a future glob typo). Skipped until the first exp tag exists."""
     import re
     import subprocess
 
+    import pytest
+
+    if not _exp_tags_reachable_from_head():
+        pytest.skip("no exp<version> tag reachable from HEAD yet")
     globs = _versioningit_cfg()["vcs"]["match"]
     cmd = ["git", "describe", "--tags", *(f"--match={g}" for g in globs), "HEAD"]
     out = subprocess.run(cmd, capture_output=True, text=True, cwd=os.path.join(_HERE, os.pardir))
     assert out.returncode == 0, f"git describe with match={globs} failed: {out.stderr!r}"
-    assert re.match(r"^v\d", out.stdout.strip()), (
-        f"git describe returned {out.stdout.strip()!r}; expected a v-prefixed release tag."
+    assert re.match(r"^exp\d", out.stdout.strip()), (
+        f"git describe returned {out.stdout.strip()!r}; expected an exp-prefixed release tag."
     )

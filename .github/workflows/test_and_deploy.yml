@@ -4,8 +4,13 @@ on:
   workflow_dispatch:
   pull_request:
   push:
-    branches: [next, qa, main, exp]  # Temporarily include 'exp' to enable publishing from that branch
-    tags: ["v*"]
+    branches: [exp-next, exp-qa, exp]
+    tags: ["exp[0-9]*"] # exp3.0, exp3.0rc1, ...; versioningit strips the exp prefix
+
+# cancel previous job if new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   PKG_NAME: lr_reduction
@@ -23,35 +28,40 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # Fetch all history for accurate versioning
           fetch-tags: true # Fetch tags to ensure versioning works correctly
-          submodules: recursive
 
       - name: Set up Pixi
-        uses: prefix-dev/setup-pixi@v0.9.4
+        uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
         with:
           manifest-path: pyproject.toml
 
       - name: Configure Git credentials for code.ornl.gov
+        # Dependabot has no access to the data repository token
+        if: github.actor != 'dependabot[bot]'
         env:
           TOKEN: ${{ secrets.DATA_READ_TOKEN }}
         run: |
           git config --global url."https://gitlab-ci-token:${TOKEN}@code.ornl.gov/".insteadOf "https://code.ornl.gov/"
 
       - name: Download test data
+        if: github.actor != 'dependabot[bot]'
         run: |
           git submodule update --init
           git submodule foreach --recursive git lfs pull
           echo "data repo size: $(du -sh tests/data/liquidsreflectometer-data)"
 
       - name: Test with coverage
+        env:
+          # Dependabot runs without the test data, so skip the tests that need it
+          PYTEST_MARKERS: ${{ github.actor == 'dependabot[bot]' && 'not datarepo' || '' }}
         run: |
-          pixi run test-reduction
+          pixi run test-reduction -m "$PYTEST_MARKERS"
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         if: github.actor != 'dependabot[bot]'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -70,40 +80,47 @@ jobs:
     defaults:
       run:
         shell: bash -el {0}
-
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 100
+          fetch-depth: 0 # Fetch all history for accurate versioning
           fetch-tags: true
           ref: ${{ github.ref }}
 
       - name: Setup Pixi
-        uses: prefix-dev/setup-pixi@v0.9.4
+        uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
 
       - name: Build conda package
         run: |
           pixi run conda-build
-          mkdir -p /tmp/local-channel/noarch
-          cp *.conda /tmp/local-channel/noarch/
-          # extract version from the package file name "lr_reduction-<version>-<build>.conda"
-          echo "PKG_VERSION=$(ls *.conda | cut -d'-' -f2)" >> $GITHUB_ENV
+
+          # Stage the package in a local channel layout for pkg-install, which indexes it.
+          mkdir -p local-channel/noarch
+          cp *.conda local-channel/noarch/
+
+      # pkg-verify requires a conda env that already has the package
+      # installed (and micromamba on PATH); pkg-install sets both up.
+      - name: Install built conda package
+        id: install
+        uses: neutrons/gh-actions/pkg-install@eb7a7c6fcfd0cda1a7b238329afc0afd09a4f4af # v2
+        with:
+          package-name: ${{ env.PKG_NAME }}
+          local-channel: ./local-channel
+          extra-channels: neutrons mantid
 
       - name: Verify Conda Package
-        uses: neutrons/conda-actions/pkg-verify@v1
+        uses: neutrons/gh-actions/pkg-verify@eb7a7c6fcfd0cda1a7b238329afc0afd09a4f4af # v2
         with:
-          python-version: "3.11"
-          local-channel: /tmp/local-channel
-          package-name: ${{ env.PKG_NAME }}=${{ env.PKG_VERSION }} # install exact version
-          extra-channels: neutrons mantid
+          package-name: ${{ env.PKG_NAME }}
+          conda-env-name: ${{ steps.install.outputs.conda-env }}
           extra-commands: |
             python -c "import lr_reduction"
             python -c "import lr_autoreduce"
             python -c "import mantid"
 
       - name: upload conda package as artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: artifact-conda-package
           path: ${{ env.PKG_NAME }}-*.conda
@@ -111,56 +128,82 @@ jobs:
   publish:
     runs-on: ubuntu-24.04
     needs: [build]
-    if:  startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/next' || github.ref == 'refs/heads/exp'
+    # every push to exp-next publishes; exp-qa and exp publish only on tags
+    if: startsWith(github.ref, 'refs/tags/exp') || github.ref == 'refs/heads/exp-next'
+    defaults:
+      run:
+        shell: bash -el {0}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.ref }}
+          fetch-depth: 0 # full history so the label step can test branch ancestry
 
       - name: Setup Pixi
-        uses: prefix-dev/setup-pixi@v0.9.4
+        uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
+
+      - name: Determine conda label
+        id: label
+        run: |
+          set -euo pipefail
+          label=""
+          case "${GITHUB_REF}" in
+            refs/heads/exp-next) label="exp-next" ;;
+            refs/tags/exp[0-9]*rc*) label="exp-qa" ;; # release candidate, same convention as qa upstream
+            refs/tags/exp[0-9]*)    label="exp" ;;    # release, same convention as main upstream
+          esac
+          if [ -z "${label}" ]; then
+            echo "::error::cannot derive a conda label from ${GITHUB_REF}"
+            exit 1
+          fi
+          # A tag push carries no branch name, so confirm the tagged commit really is
+          # on the branch the tag name implies. HEAD is used instead of github.sha
+          # because they differ for annotated tags.
+          if ! git merge-base --is-ancestor HEAD "origin/${label}"; then
+            echo "::error::${GITHUB_REF} is not on branch ${label}; refusing to publish under label '${label}'"
+            exit 1
+          fi
+          echo "Publishing ${GITHUB_REF} under label '${label}'"
+          echo "label=${label}" >> "$GITHUB_OUTPUT"
 
       - name: Download conda package artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: artifact-conda-package
 
       - name: Upload package to anaconda
-        uses: neutrons/conda-actions/publish@v1
+        uses: neutrons/gh-actions/publish@eb7a7c6fcfd0cda1a7b238329afc0afd09a4f4af # v2
         with:
           anaconda-token: ${{ secrets.ANACONDA_TOKEN }}
           organization: neutrons
           package-path: ${{ env.PKG_NAME }}-*.conda
-          # Publish from 'exp' under the 'exp' label; otherwise use the default
-          # label (empty string) which maps to 'dev', 'rc', or 'main' based on the branch.
-          label: ${{ github.ref == 'refs/heads/exp' && 'exp' || '' }}
+          label: ${{ steps.label.outputs.label }}
 
       - name: Remove old packages
-        if: github.ref == 'refs/heads/next' || github.ref == 'refs/heads/exp'
-        uses: neutrons/conda-actions/pkg-remove@v1
+        if: steps.label.outputs.label == 'exp-next'
+        uses: neutrons/gh-actions/pkg-remove@eb7a7c6fcfd0cda1a7b238329afc0afd09a4f4af # v2
         with:
-          anaconda_token: ${{ secrets.ANACONDA_TOKEN }}
+          anaconda-token: ${{ secrets.ANACONDA_TOKEN }}
           organization: neutrons
-          package_name: ${{ env.PKG_NAME }}
-          label: ${{ env.CONDA_LABEL }}
+          package-name: ${{ env.PKG_NAME }}
+          label: ${{ steps.label.outputs.label }}
           keep: 5
 
   # Trigger GitLab dev deploy pipeline
   deploy-dev:
     runs-on: ubuntu-latest
-    needs: [tests, build, publish]
+    needs: [tests, build]
     if: github.ref == 'refs/heads/next'
     steps:
       - name: Get Environment Name
-        uses: neutrons/branch-mapper@main
+        uses: neutrons/gh-actions/branch-mapper@eb7a7c6fcfd0cda1a7b238329afc0afd09a4f4af # v2
         id: env_name
         with:
           prefix: lr_reduction
 
       - name: Trigger Dev Deploy
-        # use https://github.com/eic/trigger-gitlab-ci/pull/14 until merged
-        uses: eic/trigger-gitlab-ci@d984d8d53d871d2fdc1325639d94322da6e8747f
+        uses: eic/trigger-gitlab-ci@v3.3
         id: trigger
         with:
           url: https://code.ornl.gov
@@ -174,15 +217,14 @@ jobs:
           body: |
             GitLab pipeline for ${{ steps.env_name.outputs.name }} has been submitted for this commit: ${{ steps.trigger.outputs.web_url }}
 
-  # Trigger GitLab exp deploy pipeline
-  deploy-exp:
+  # Trigger GitLab exp-next deploy pipeline
+  deploy-exp-next:
     runs-on: ubuntu-latest
     needs: [build, publish]
-    if: github.ref == 'refs/heads/exp'
+    if: github.ref == 'refs/heads/exp-next'
     steps:
       - name: Trigger Exp Deploy
-        # use https://github.com/eic/trigger-gitlab-ci/pull/14 until merged
-        uses: eic/trigger-gitlab-ci@d984d8d53d871d2fdc1325639d94322da6e8747f
+        uses: eic/trigger-gitlab-ci@v3.3
         id: trigger
         with:
           url: https://code.ornl.gov

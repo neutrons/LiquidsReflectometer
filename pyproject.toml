@@ -54,13 +54,17 @@ packages = ["src/lr_reduction", "src/lr_autoreduce", "launcher"]
 [tool.versioningit.vcs]
 method = "git"
 default-tag = "0.0.1"
-# Only release tags (v1, v2.3, v2.10.0rc1, ...) are version candidates. Without
-# this, `git describe` (and thus versioningit) would pick up ANY tag at HEAD --
-# including the lightweight coordination tags the agentic workflow pushes
-# (qa/*, review/*, triage/*, analysis/*). A non-PEP440 tag like qa/cd-dialog-resize
-# then raises InvalidVersionError at build/env-prep time (looks like a "test infra"
-# failure). The match glob makes versioningit ignore every non-release tag.
-match = ["v[0-9]*"]
+# The exp line is versioned by its own tags, named exp<version> (exp3.0, exp3.0rc1, ...),
+# and ignores every other tag: the upstream release tags (v2.10.0, ...) inherited from
+# next and the exp-* review tags (exp-review-group3, ...). Without this allow-list,
+# `git describe` picks the NEAREST tag, so a sync merge from next would pull the version
+# back onto the upstream numbering, and a non-PEP440 tag would raise InvalidVersionError
+# at build/env-prep time. Upstream's own glob (v[0-9]*) never sees exp tags either.
+match = ["exp[0-9]*"]
+
+[tool.versioningit.tag2version]
+# exp3.0rc1 -> 3.0rc1
+rmprefix = "exp"
 
 [tool.versioningit.next-version]
 # "minor" bumps (e.g. v2.9.0rc1) -> next_version (e.g. 2.10.0) which drops the rc
