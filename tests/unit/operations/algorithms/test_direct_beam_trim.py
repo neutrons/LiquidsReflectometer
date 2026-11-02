@@ -112,7 +112,7 @@ def make_algorithm(input_workspace, curve, **properties):
     # As through mantid.simpleapi, so a refusal in PyExec raises rather than only being logged.
     algorithm.setRethrows(True)
     algorithm.setProperty("InputWorkspace", input_workspace)
-    algorithm.setProperty("CorrectionWorkspace", curve)
+    algorithm.setProperty("DeadTimeCorrectionWorkspace", curve)
     algorithm.setProperty("DeadTimeThreshold", 1.25)
     algorithm.setProperty("IntensityThreshold", 2.0)
     for name, value in {**IDENTITY_CHOPPER, **properties}.items():
@@ -321,7 +321,7 @@ def test_history_records_the_algorithm_and_its_inputs(make_events, make_curve):
     last = history.getAlgorithmHistory(history.size() - 1)
     assert last.name() == "TrimDirectBeamTof"
     assert last.getPropertyValue("InputWorkspace") == events
-    assert last.getPropertyValue("CorrectionWorkspace") == curve
+    assert last.getPropertyValue("DeadTimeCorrectionWorkspace") == curve
 
 
 # Validation and errors
@@ -343,6 +343,12 @@ def test_input_without_events_is_rejected(make_events, make_curve):
 def test_invalid_curve_is_rejected(make_events, make_curve):
     with pytest.raises(RuntimeError, match="dead time correction curve.*negative"):
         run_algorithm(make_events(), make_curve(over=(3,), value=-1.0))
+
+
+def test_clamped_curve_is_rejected(make_events, make_curve):
+    """The clamp zeroes over-threshold bins, which would otherwise silently disable the dead-time cut."""
+    with pytest.raises(RuntimeError, match="dead time correction curve.*below 1.*UseDeadTimeThreshold=False"):
+        run_algorithm(make_events(), make_curve(over=(3,), value=0.0))
 
 
 def test_curve_not_covering_the_events_is_rejected(make_events, make_curve):
@@ -381,7 +387,7 @@ def test_thresholds_are_mandatory(make_events, make_curve, name):
     algorithm = TrimDirectBeamTof()
     algorithm.initialize()
     algorithm.setProperty("InputWorkspace", make_events())
-    algorithm.setProperty("CorrectionWorkspace", make_curve())
+    algorithm.setProperty("DeadTimeCorrectionWorkspace", make_curve())
     for threshold in {"DeadTimeThreshold", "IntensityThreshold"} - {name}:
         algorithm.setProperty(threshold, 1.25)
     algorithm.setProperty("OutputWorkspace", OUTPUT_WORKSPACE)

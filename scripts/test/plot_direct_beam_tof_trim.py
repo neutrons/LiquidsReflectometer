@@ -79,7 +79,7 @@ def main():
     )
     _, tof_min, tof_max, chopper_cut, dead_time_cut, intensity_cut = TrimDirectBeamTof(
         InputWorkspace="roi_dead_time",
-        CorrectionWorkspace="dead_time_curve",
+        DeadTimeCorrectionWorkspace="dead_time_curve",
         DeadTimeThreshold=args.dead_time_threshold,
         IntensityThreshold=args.intensity_threshold,
         OutputWorkspace="trimmed",

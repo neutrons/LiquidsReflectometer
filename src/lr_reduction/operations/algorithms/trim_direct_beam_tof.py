@@ -113,8 +113,9 @@ class TrimDirectBeamTof(PythonAlgorithm):
             "ROI-extracted, dead-time-corrected direct-beam event workspace in TOF",
         )
         self.declareProperty(
-            MatrixWorkspaceProperty("CorrectionWorkspace", "", Direction.Input),
-            "Single-spectrum DTC(TOF) curve from SingleReadoutDeadTimeCorrection, computed from the full detector",
+            MatrixWorkspaceProperty("DeadTimeCorrectionWorkspace", "", Direction.Input),
+            "Single-spectrum DTC(TOF) curve from SingleReadoutDeadTimeCorrection, computed from the full detector "
+            "with UseDeadTimeThreshold=False",
         )
         self.declareProperty(
             "DeadTimeThreshold",
@@ -155,7 +156,7 @@ class TrimDirectBeamTof(PythonAlgorithm):
     def validateInputs(self):  # noqa: N802
         issues = {}
         input_ws = self.getProperty("InputWorkspace").value
-        curve_ws = self.getProperty("CorrectionWorkspace").value
+        curve_ws = self.getProperty("DeadTimeCorrectionWorkspace").value
         run = input_ws.getRunNumber()
 
         input_issues = []
@@ -176,8 +177,16 @@ class TrimDirectBeamTof(PythonAlgorithm):
             issues["InputWorkspace"] = f"Run {run}: invalid input workspace: " + "; ".join(input_issues)
 
         curve_issues = dead_time_curve_issues(curve_ws, tof_range)
+        # A genuine factor is at least 1; the clamp zeroes over-threshold bins, which hides them from the cut.
+        if curve_ws.getNumberHistograms() == 1 and np.any(curve_ws.readY(0) < 1):
+            curve_issues.append(
+                "it contains factors below 1, as a curve clamped by SingleReadoutDeadTimeCorrection does; "
+                "compute it with UseDeadTimeThreshold=False"
+            )
         if curve_issues:
-            issues["CorrectionWorkspace"] = f"Run {run}: invalid dead time correction curve: " + "; ".join(curve_issues)
+            issues["DeadTimeCorrectionWorkspace"] = (
+                f"Run {run}: invalid dead time correction curve: " + "; ".join(curve_issues)
+            )
 
         return issues
 
@@ -191,7 +200,7 @@ class TrimDirectBeamTof(PythonAlgorithm):
         4. Crop the events to ``[max(chopper_cut, dead_time_cut), intensity_cut)``.
         """
         input_ws = self.getProperty("InputWorkspace").value
-        curve_ws = self.getProperty("CorrectionWorkspace").value
+        curve_ws = self.getProperty("DeadTimeCorrectionWorkspace").value
         run = input_ws.getRunNumber()
 
         phase = SampleLogs(input_ws).time_average(CHOPPER2_PHASE_LOG)
