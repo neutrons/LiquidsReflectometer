@@ -14,8 +14,11 @@ from mantid.simpleapi import ConvertToHistogram, CreateWorkspace, Divide, Filter
 
 from lr_reduction.exceptions import LogNotFoundError, LrValidationError, SampleLogsError
 from lr_reduction.types import MantidWorkspace, MantidWorkspaceName
+from lr_reduction.utils import get_logger
 from lr_reduction.utils.sample_logs import SampleLogs
 from lr_reduction.utils.workspace import workspace_exists, workspace_handle
+
+logger = get_logger(__name__)
 
 #######################################################################################
 ### Constants
@@ -273,5 +276,12 @@ def apply_correction(
     if (isinstance(ws, IEventWorkspace) and ws.getNumberEvents() > 0) and (
         (cutoff := _overflow_cutoff_wavelength(ws, cd_thickness, bin_edges)) is not None
     ):
+        n_events = ws.getNumberEvents()
         ws = FilterByXValue(InputWorkspace=ws, XMax=cutoff, OutputWorkspace=output_workspace)
+        n_dropped = n_events - ws.getNumberEvents()
+        logger.warning(
+            f"Run {ws.getRunNumber()}: dropped {n_dropped} of {n_events} events above {cutoff:.3f} Angstrom. "
+            f"The transmission through {cd_thickness * 1e4:.1f} microns Cd is below "
+            f"{np.exp(-_MAX_ATTENUATION_EXPONENT):.0e}, so correcting them would overflow the float32 event weights."
+        )
     return Divide(LHSWorkspace=ws, RHSWorkspace=transmission, OutputWorkspace=output_workspace)
