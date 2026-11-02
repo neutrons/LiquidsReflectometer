@@ -1,17 +1,31 @@
 """Unit tests for the Cd attenuation transmission correction functions."""
 
+import os
+
 import numpy as np
 import pytest
 from mantid.api import IEventWorkspace
-from mantid.simpleapi import ConvertUnits, CreateSampleWorkspace, CreateWorkspace, DeleteWorkspace, Rebin, mtd
+from mantid.kernel import Int32TimeSeriesProperty
+from mantid.simpleapi import (
+    ConvertUnits,
+    CreateSampleWorkspace,
+    CreateWorkspace,
+    DeleteWorkspace,
+    LoadEventNexus,
+    Rebin,
+    mtd,
+)
 
-from lr_reduction.exceptions import LrValidationError, SampleLogsError
+from lr_reduction.exceptions import LogNotFoundError, LrValidationError, SampleLogsError
 from lr_reduction.properties import cd_attenuation
 from lr_reduction.properties.cd_attenuation import (
+    _MAX_ATTENUATION_EXPONENT,
     CD_FOILS,
     _load_cd_attenuation_data,
+    _overflow_cutoff_wavelength,
     apply_correction,
     compute_cd_thickness,
+    get_attenuator_log,
     get_transmission_workspace,
 )
 
@@ -21,6 +35,9 @@ RTOL = 1e-6
 # Stages 1 and 3 in the beam: 57.5 + 249.5 microns.
 MODERATE_THICKNESS = 0.0307
 FULL_STACK_THICKNESS = sum(CD_FOILS) * 1e-4
+
+MENU_LOG = "BL4B:Actuator:Menu"
+STAGE_LOGS = [f"BL4B:Actuator:{stage}MRb" for stage in ("50", "100", "200", "400")]
 
 
 def _delete_transmission_workspaces():
@@ -140,13 +157,121 @@ def test_table_is_read_once():
 @pytest.mark.usefixtures("loader_cache")
 def test_missing_table_raises_and_is_not_cached(monkeypatch, tmp_path):
     """A failed read propagates numpy's error, and the next call reads the file again."""
-    monkeypatch.setattr(cd_attenuation, "cd_attenuation_file", tmp_path / "missing.csv")
+    monkeypatch.setattr(cd_attenuation, "CD_ATTENUATION_FILE", tmp_path / "missing.csv")
     with pytest.raises(FileNotFoundError):
         _load_cd_attenuation_data()
 
     monkeypatch.undo()
     wavelength, _ = _load_cd_attenuation_data()
     assert len(wavelength) == 1000
+
+
+######################
+### Attenuator log ###
+######################
+
+
+def add_int_series(ws, name, values):
+    """Record `values` as a time series log, as the DAS writes the actuator logs."""
+    series = Int32TimeSeriesProperty(name)
+    for second, value in enumerate(values):
+        series.addValue(f"2020-01-01T00:00:0{second}", value)
+    mtd[ws].getRun().addProperty(name, series, True)
+
+
+def add_stage_logs(ws, stages):
+    """Record one per-stage actuator log per flag, as older files without the Menu log do."""
+    for name, state in zip(STAGE_LOGS, stages, strict=True):
+        add_int_series(ws, name, [state])
+
+
+@pytest.mark.parametrize(
+    ("code", "atten"),
+    [
+        (0, [0, 0, 0, 0]),
+        (1, [1, 0, 0, 0]),
+        (3, [1, 1, 0, 0]),
+        (10, [0, 1, 0, 1]),
+        (15, [1, 1, 1, 1]),
+    ],
+)
+def test_menu_code_is_decoded_least_significant_bit_first(make_events, code, atten):
+    """Bit i of the Menu code is stage i of `CD_FOILS`; 10 is asymmetric, so the order is pinned."""
+    ws = make_events()
+    add_int_series(ws, MENU_LOG, [code])
+
+    assert get_attenuator_log(ws) == atten
+
+
+@pytest.mark.parametrize("stages", [[0, 0, 0, 0], [1, 0, 1, 0], [0, 1, 1, 1]])
+def test_stage_logs_are_read_without_a_menu_log(make_events, stages):
+    ws = make_events()
+    add_stage_logs(ws, stages)
+
+    assert get_attenuator_log(ws) == stages
+
+
+def test_menu_log_takes_precedence_over_stage_logs(make_events):
+    ws = make_events()
+    add_int_series(ws, MENU_LOG, [1])
+    add_stage_logs(ws, [0, 1, 1, 1])
+
+    assert get_attenuator_log(ws) == [1, 0, 0, 0]
+
+
+@pytest.mark.parametrize("code", [-1, 16])
+def test_out_of_range_menu_code_raises(make_events, code):
+    ws = make_events()
+    add_int_series(ws, MENU_LOG, [code])
+
+    with pytest.raises(SampleLogsError, match="0-15"):
+        get_attenuator_log(ws)
+
+
+def test_missing_attenuator_logs_raise(make_events):
+    with pytest.raises(LogNotFoundError, match="50MRb"):
+        get_attenuator_log(make_events())
+
+
+def test_missing_stage_log_raises(make_events):
+    """Without the Menu log, every stage needs its own log."""
+    ws = make_events()
+    for name in STAGE_LOGS[:-1]:
+        add_int_series(ws, name, [1])
+
+    with pytest.raises(LogNotFoundError, match="400MRb"):
+        get_attenuator_log(ws)
+
+
+@pytest.fixture
+def load_run_logs(nexus_dir):
+    """Factory loading only a REF_L run's logs; deletes each workspace on teardown."""
+    names = []
+
+    def load(run_number):
+        name = mtd.unique_hidden_name()
+        LoadEventNexus(
+            Filename=os.path.join(nexus_dir, f"REF_L_{run_number}.nxs.h5"), MetaDataOnly=True, OutputWorkspace=name
+        )
+        names.append(name)
+        return name
+
+    yield load
+    for name in names:
+        if mtd.doesExist(name):
+            DeleteWorkspace(name)
+
+
+@pytest.mark.datarepo
+@pytest.mark.parametrize(
+    ("run_number", "atten"),
+    [
+        (234266, [1, 1, 0, 0]),  # Menu code 3; its per-stage _RBV logs are known to read 0
+        (220063, [1, 1, 1, 1]),  # predates the Menu log, so read from the *MRb logs
+    ],
+)
+def test_attenuator_log_of_a_measured_run(load_run_logs, run_number, atten):
+    assert get_attenuator_log(load_run_logs(run_number)) == atten
 
 
 ####################
@@ -181,14 +306,9 @@ def test_thickness_accepts_any_flat_numeric_sequence(atten):
     assert compute_cd_thickness(atten) == pytest.approx(MODERATE_THICKNESS)
 
 
-def test_entries_beyond_the_stages_are_ignored():
-    assert compute_cd_thickness([1, 0, 1, 0, 1]) == pytest.approx(MODERATE_THICKNESS)
-
-
 def test_short_log_raises_sample_logs_error():
-    with pytest.raises(SampleLogsError, match="fewer than the 4") as excinfo:
+    with pytest.raises(SampleLogsError, match="must be a 1D array of length 4") as excinfo:
         compute_cd_thickness([1, 0, 1])
-
     assert type(excinfo.value) is SampleLogsError
 
 
@@ -345,11 +465,48 @@ def test_correction_rejects_events_beyond_the_table(make_events, output_name, to
         apply_correction(events, MODERATE_THICKNESS, output_name)
 
 
-def test_correction_rejects_a_transmission_that_would_overflow_float32(make_events, output_name):
-    """The full stack at ~15 Angstrom scales squared errors past the float32 range."""
+def test_no_cutoff_when_every_event_is_safe(make_events):
     events = make_events()
+    bin_edges = get_transmission_workspace(MODERATE_THICKNESS).readX(0)
 
-    with pytest.raises(LrValidationError, match="float32"):
+    assert _overflow_cutoff_wavelength(mtd[events], MODERATE_THICKNESS, bin_edges) is None
+
+
+def test_cutoff_sits_just_below_the_first_overflowing_bin(make_events):
+    """The full stack overflows from ~7.9 Angstrom, inside the events' ~2.1-14.8 Angstrom span."""
+    events = make_events()
+    bin_edges = get_transmission_workspace(FULL_STACK_THICKNESS).readX(0)
+    _, mu = _load_cd_attenuation_data()
+    first_overflow = np.argmax(mu * FULL_STACK_THICKNESS > _MAX_ATTENUATION_EXPONENT)
+
+    cutoff = _overflow_cutoff_wavelength(mtd[events], FULL_STACK_THICKNESS, bin_edges)
+
+    assert cutoff < bin_edges[first_overflow]
+    assert np.nextafter(cutoff, np.inf) == bin_edges[first_overflow]
+
+
+def test_correction_drops_events_that_would_overflow_float32(make_events, output_name):
+    """Events past the cutoff are filtered out; the rest are corrected with finite weights."""
+    events = make_events()
+    bin_edges = get_transmission_workspace(FULL_STACK_THICKNESS).readX(0)
+    cutoff = _overflow_cutoff_wavelength(mtd[events], FULL_STACK_THICKNESS, bin_edges)
+
+    corrected = apply_correction(events, FULL_STACK_THICKNESS, output_name)
+
+    assert 0 < corrected.getNumberEvents() < mtd[events].getNumberEvents()
+    for index in range(corrected.getNumberHistograms()):
+        event_list = corrected.getSpectrum(index)
+        assert np.all(event_list.getTofs() <= cutoff)
+        scale = expected_scale(event_list.getTofs(), FULL_STACK_THICKNESS)
+        np.testing.assert_allclose(event_list.getWeights(), scale, rtol=RTOL)
+        np.testing.assert_allclose(event_list.getWeightErrors(), scale, rtol=RTOL)
+
+
+def test_correction_rejects_events_that_would_all_overflow_float32(make_events, output_name):
+    """With every event above ~8.4 Angstrom, the full stack leaves nothing that can be corrected."""
+    events = make_events(tof_min=32000.0)
+
+    with pytest.raises(LrValidationError, match="All events would overflow"):
         apply_correction(events, FULL_STACK_THICKNESS, output_name)
 
 

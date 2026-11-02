@@ -15,15 +15,21 @@ from mantid.simpleapi import (
     mtd,
 )
 
-from lr_reduction.exceptions import LogNotFoundError, LogTypeError, SampleLogsError
 from lr_reduction.operations.algorithms.cd_attenuation_correction import CdAttenuationCorrection
-from lr_reduction.properties.cd_attenuation import _load_cd_attenuation_data, get_transmission_workspace
-from lr_reduction.utils.sample_logs import SampleLogs
+from lr_reduction.properties.cd_attenuation import (
+    CD_FOILS,
+    MENU_LOG,
+    STAGE_LOGS,
+    _load_cd_attenuation_data,
+    get_transmission_workspace,
+)
 
 # Event weights are stored as float32.
 RTOL = 1e-6
 
 OUTPUT_WORKSPACE = "cd_attenuation_corrected"
+
+FULL_STACK_THICKNESS = sum(CD_FOILS) * 1e-4
 
 
 def _delete_transmission_workspaces():
@@ -42,16 +48,24 @@ def clean_workspaces():
         DeleteWorkspace(OUTPUT_WORKSPACE)
 
 
+def add_int_series(ws, name, values):
+    """Record `values` as a time series log, as the DAS writes the actuator logs."""
+    series = Int32TimeSeriesProperty(name)
+    for second, value in enumerate(values):
+        series.addValue(f"2020-01-01T00:00:0{second}", value)
+    mtd[ws].getRun().addProperty(name, series, True)
+
+
 @pytest.fixture
 def make_direct_beam():
     """Factory for a small four-pixel event workspace in wavelength (~2.1-14.8 Angstrom).
 
-    ``atten`` is recorded as the vector ``Atten`` log unless it is None; deletes each workspace
-    on teardown.
+    ``menu`` is recorded as the Menu log and ``stages`` as the older per-stage logs, each unless
+    it is None; deletes each workspace on teardown.
     """
     names = []
 
-    def make(atten=None):
+    def make(menu=None, stages=None):
         name = mtd.unique_hidden_name()
         CreateSampleWorkspace(
             WorkspaceType="Event",
@@ -64,8 +78,11 @@ def make_direct_beam():
             OutputWorkspace=name,
         )
         ConvertUnits(InputWorkspace=name, Target="Wavelength", OutputWorkspace=name)
-        if atten is not None:
-            SampleLogs(name).insert("Atten", atten)
+        if menu is not None:
+            add_int_series(name, MENU_LOG, [menu])
+        if stages is not None:
+            for log, state in zip(STAGE_LOGS, stages, strict=True):
+                add_int_series(name, log, [state])
         names.append(name)
         return name
 
@@ -112,9 +129,10 @@ def test_algorithm_metadata():
     assert algorithm.version() == 1
 
 
-def test_correction_uses_the_stages_flagged_in_the_atten_log(make_direct_beam):
+@pytest.mark.parametrize("logs", [{"menu": 5}, {"stages": [1, 0, 1, 0]}], ids=["menu", "stage_logs"])
+def test_correction_uses_the_stages_in_the_beam(make_direct_beam, logs):
     """Stages 1 and 3 in the beam put 57.5 + 249.5 microns of Cd in its path."""
-    direct_beam = make_direct_beam(atten=[1, 0, 1, 0])
+    direct_beam = make_direct_beam(**logs)
 
     corrected = run_algorithm(direct_beam)
 
@@ -124,39 +142,10 @@ def test_correction_uses_the_stages_flagged_in_the_atten_log(make_direct_beam):
 
 
 def test_flip_atten_reads_zero_as_in_the_beam(make_direct_beam):
-    corrected = run_algorithm(make_direct_beam(atten=[0, 1, 1, 1]), FlipAtten=True)
+    """Menu code 14 flags stages 2-4, so with inverted polarity only stage 1 is in the beam."""
+    corrected = run_algorithm(make_direct_beam(menu=14), FlipAtten=True)
 
     assert_corrected(corrected, 57.5e-4)
-
-
-def test_missing_atten_log_raises(make_direct_beam):
-    with pytest.raises(LogNotFoundError, match="Atten"):
-        run_algorithm(make_direct_beam())
-
-
-@pytest.mark.parametrize(
-    ("atten", "match"),
-    [
-        ([1, 0, 1], "fewer than the 4"),
-        ([1, 0, 2, 0], "0 or 1"),
-        (5, "one flag per attenuator stage"),
-    ],
-)
-def test_malformed_atten_log_raises(make_direct_beam, atten, match):
-    with pytest.raises(SampleLogsError, match=match):
-        run_algorithm(make_direct_beam(atten=atten))
-
-
-def test_time_series_atten_log_raises(make_direct_beam):
-    """A series' value is its list of entries over time, not one flag per stage."""
-    direct_beam = make_direct_beam()
-    series = Int32TimeSeriesProperty("Atten")
-    for second, state in enumerate([1, 0, 1, 0]):
-        series.addValue(f"2020-01-01T00:00:0{second}", state)
-    mtd[direct_beam].getRun().addProperty("Atten", series, True)
-
-    with pytest.raises(LogTypeError, match="time series"):
-        run_algorithm(direct_beam)
 
 
 def test_histogram_input_is_rejected():
@@ -172,21 +161,43 @@ def test_histogram_input_is_rejected():
         DeleteWorkspace(histogram)
 
 
-@pytest.fixture(scope="module")
-def event_workspace(nexus_dir):
-    """A REF_L run in wavelength (12.9-17.1 Angstrom, inside the table), loaded once for this module."""
-    name = "cd_attenuation_input"
-    LoadEventNexus(Filename=os.path.join(nexus_dir, "REF_L_198409.nxs.h5"), OutputWorkspace=name)
+def _load_in_wavelength(nexus_dir, run_number):
+    name = f"cd_attenuation_input_{run_number}"
+    LoadEventNexus(Filename=os.path.join(nexus_dir, f"REF_L_{run_number}.nxs.h5"), OutputWorkspace=name)
     ConvertUnits(InputWorkspace=name, Target="Wavelength", OutputWorkspace=name)
-    SampleLogs(name).insert("Atten", [1, 0, 1, 0])
+    return name
+
+
+@pytest.fixture(scope="module")
+def menu_run(nexus_dir):
+    """A REF_L run in wavelength (2.5-10.6 Angstrom) whose Menu log is code 3: stages 1 and 2 in the beam."""
+    name = _load_in_wavelength(nexus_dir, 234266)
+    yield name
+    DeleteWorkspace(name)
+
+
+@pytest.fixture(scope="module")
+def full_stack_run(nexus_dir):
+    """A REF_L run in wavelength (2.1-10.7 Angstrom) that predates the Menu log, with all four stages in the beam."""
+    name = _load_in_wavelength(nexus_dir, 220063)
     yield name
     DeleteWorkspace(name)
 
 
 @pytest.mark.datarepo
-def test_correction_on_a_measured_run(event_workspace):
-    corrected = run_algorithm(event_workspace)
+def test_correction_on_a_measured_run(menu_run):
+    corrected = run_algorithm(menu_run)
 
     assert isinstance(corrected, IEventWorkspace)
-    assert corrected.getNumberEvents() == mtd[event_workspace].getNumberEvents()
-    assert_corrected(corrected, (57.5 + 249.5) * 1e-4)
+    assert corrected.getNumberEvents() == mtd[menu_run].getNumberEvents()
+    assert_corrected(corrected, (57.5 + 126.5) * 1e-4)
+
+
+@pytest.mark.datarepo
+def test_full_stack_on_a_measured_run_drops_overflowing_events(full_stack_run):
+    """932.5 microns of Cd attenuates the longest wavelengths past what float32 weights can undo,
+    so those events are dropped and the rest corrected."""
+    corrected = run_algorithm(full_stack_run)
+
+    assert 0 < corrected.getNumberEvents() < mtd[full_stack_run].getNumberEvents()
+    assert_corrected(corrected, FULL_STACK_THICKNESS)
