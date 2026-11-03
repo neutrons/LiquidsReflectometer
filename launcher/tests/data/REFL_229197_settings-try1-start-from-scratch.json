@@ -1,0 +1,80 @@
+{
+  "method_per_run": [],
+  "DBname": [
+    "A1_div5_Cd.txt",
+    "A1_div5_Cd.txt",
+    "A1_div5_Cd.txt"
+  ],
+  "RBnum": [
+    229197,
+    229198,
+    229199
+  ],
+  "RB_Ymin": [
+    null,
+    null,
+    null
+  ],
+  "RB_Ymax": [
+    null,
+    null,
+    null
+  ],
+  "Sname": "reduction_output",
+  "experiment_id": "",
+  "data_x_range": [
+    50,
+    200
+  ],
+  "subname": null,
+  "_Spath_override": null,
+  "_NEXUSpathRB_override": null,
+  "_DBpath_override": null,
+  "_BINpath_override": null,
+  "DTCsubname": "_DTC",
+  "BINsubname": "_DTC",
+  "errBINsubname": "_err_DTC",
+  "Normalize": false,
+  "AutoScale": false,
+  "useCalcTheta": false,
+  "plotON": true,
+  "plotQ4": false,
+  "save8col": false,
+  "BkgROI": [
+    null,
+    null,
+    null
+  ],
+  "useBS": [],
+  "useGravity": true,
+  "qmin": 0.001,
+  "qmax": 0.5,
+  "dqbin": 0.005,
+  "Qline_threshold": 1.0,
+  "LambdaMin": null,
+  "LambdaMax": null,
+  "tof_max": [],
+  "tof_min": [],
+  "tof_bin": 50,
+  "ThetaShift": [],
+  "ScaleFactor": [],
+  "Qnorm": 0.015,
+  "mmpix": null,
+  "dSampDet": null,
+  "ny": null,
+  "nx": null,
+  "dMod": null,
+  "xi_ref": null,
+  "dS1Samp": null,
+  "IncidentTheta": null,
+  "emission_coefficients": null,
+  "use_emission_time": true,
+  "dead_time": 4.2,
+  "dead_time_tof_step": 50,
+  "DetResFn": "gaussian",
+  "DetSigma": 1.0,
+  "peak_pad": 1,
+  "peak_type": "supergauss",
+  "LambdaMinUse": null,
+  "LambdaMaxUse": null
+}
