@@ -1,4 +1,4 @@
-"""The ROI pop-out (roi-popout-dialog): #197's dialog re-seated on ``lr_reduction.roi_estimate``.
+"""The ROI pop-out (roi-popout-dialog): #197's dialog re-seated on ``launcher.model.roi_estimate``.
 
 Events are built in memory through the real ``RunEvents``, never a mock, and no test reads the data submodule (A4).
 Gestures go through QTest: clicks, typed values, and a press-move-release on the canvas at coordinates taken from
@@ -16,8 +16,8 @@ from qtpy.QtTest import QTest
 
 from launcher.apps import roi_dialog
 from launcher.apps.roi_dialog import ROISelectionDialog
-from lr_reduction import roi_estimate
-from lr_reduction.roi_estimate import RunEvents
+from launcher.model import roi_estimate
+from launcher.model.roi_estimate import RunEvents
 
 pytestmark = pytest.mark.usefixtures("isolated_qapp", "no_qmessagebox")
 
@@ -576,7 +576,7 @@ def test_four_bounds_are_drawn_before_a_peak_is_set():
 def empty_column_use_bs():
     """What the dialog is given for a row of a document whose useBS column is [] (the reducer's default, on): the
     reachable route to None."""
-    from lr_reduction.settings_document import SettingsDocument
+    from launcher.model.settings_document import SettingsDocument
 
     doc = SettingsDocument()
     doc.add_angle(RB_Ymin=PEAK[0], RB_Ymax=PEAK[1], BkgROI=[133, 149, 0, 0])

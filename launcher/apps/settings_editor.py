@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 """Settings-editor tab: author a reduction settings JSON with guidance.
 
-A thin view over :class:`~lr_reduction.settings_document.SettingsDocument`.
-Every widget here is built from :mod:`lr_reduction.field_spec`, so the fields
+A thin view over :class:`~launcher.model.settings_document.SettingsDocument`.
+Every widget here is built from :mod:`launcher.model.field_spec`, so the fields
 the editor offers, the prompts it shows and the values it accepts all come from
 one table rather than from hand-written widget code that drifts from the config
 class.
@@ -40,9 +40,9 @@ from qtpy import QtCore, QtGui, QtWidgets
 from launcher.app_identity import ensure_identity
 from launcher.apps import roi_dialog
 from launcher.apps.roi_dialog import ROISelectionDialog
-from lr_reduction import field_spec as fs
-from lr_reduction import roi_estimate
-from lr_reduction.settings_document import (
+from launcher.model import field_spec as fs
+from launcher.model import roi_estimate
+from launcher.model.settings_document import (
     SettingsDocument,
     file_spelling,
     load_start_folder,

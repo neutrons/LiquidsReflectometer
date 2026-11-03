@@ -2,7 +2,7 @@
 
 Thin on purpose: nearly all of the editor's behaviour lives in
 `SettingsDocument` and is tested without Qt in
-`tests/unit/lr_reduction/test_settings_document.py`. What remains here is the
+`launcher/tests/test_settings_document.py`. What remains here is the
 wiring — that a real user gesture reaches the document, and that the table
 edits the row it was told to edit rather than the row that happens to be
 selected.
@@ -23,10 +23,10 @@ from qtpy.QtTest import QTest
 
 from launcher.app_identity import APP_NAME, ORG_NAME
 from launcher.apps.settings_editor import SettingsEditorTab
-from lr_reduction import field_spec as fs
+from launcher.model import field_spec as fs
+from launcher.model.settings_document import SettingsDocument
 from lr_reduction.new_reduction_from_file import save_config_json
 from lr_reduction.nr_reduction_config import NRReductionConfig
-from lr_reduction.settings_document import SettingsDocument
 
 pytestmark = pytest.mark.usefixtures("isolated_qapp", "no_qmessagebox")
 
@@ -36,7 +36,7 @@ def _no_facility_lookup(tmp_path_factory, monkeypatch):
     """editor-ipts-inference: every Load in this module looks its runs up under an empty folder, never the facility
     tree. /SNS is mounted on the analysis nodes and not here, and no test may depend on which. A test that wants
     runs to resolve fabricates a tree and points the lookup at it (_facility)."""
-    from lr_reduction import settings_document
+    from launcher.model import settings_document
 
     monkeypatch.setattr(settings_document, "IPTS_LOOKUP_ROOT", str(tmp_path_factory.mktemp("no-facility")),
                         raising=False)
@@ -460,7 +460,7 @@ def _reducer_written_settings(directory):
     """A settings file shaped and written by the reduction itself.
 
     Twin of `_reducer_shaped_config` in
-    tests/unit/lr_reduction/test_settings_document.py — copied, not imported:
+    launcher/tests/test_settings_document.py — copied, not imported:
     `test-launcher` runs from the repository root and `test-reduction` from
     tests/, so a cross-suite import would be the fragile part. `useBS` is ints
     (`nr_reduction_calc.py:103`, `new_reduction_from_template.py:182`); the
@@ -1193,7 +1193,7 @@ def test_a_choice_in_a_surplus_row_is_a_surplus_value(tmp_path, monkeypatch):
 def test_a_capped_direct_beam_list_says_so(tmp_path, monkeypatch):
     """Added at GREEN, for a branch the RED set did not construct: a folder holding more names than the
     cap offers the first MAX_CANDIDATES, and the drop-down's tooltip says how many there were."""
-    from lr_reduction.settings_document import MAX_CANDIDATES
+    from launcher.model.settings_document import MAX_CANDIDATES
 
     names = [f"db_{k:05d}.dat" for k in range(MAX_CANDIDATES + 1)]
     path, _ = _direct_beam_settings(tmp_path, names)
@@ -1258,7 +1258,7 @@ def test_a_drop_down_does_not_take_focus_from_the_wheel():
 
 def test_a_direct_beam_list_at_the_cap_does_not_say_it_was_cut(tmp_path, monkeypatch):
     """F16: exactly MAX_CANDIDATES names is the whole folder."""
-    from lr_reduction.settings_document import MAX_CANDIDATES
+    from launcher.model.settings_document import MAX_CANDIDATES
 
     path, _ = _direct_beam_settings(tmp_path, [f"db_{k:05d}.dat" for k in range(MAX_CANDIDATES)])
     tab = SettingsEditorTab()
@@ -2906,7 +2906,7 @@ def events():
     """A run in memory, through the real RunEvents: a peak at rows 136-146 over x 100-159 (A4: no data submodule)."""
     import numpy as np
 
-    from lr_reduction.roi_estimate import RunEvents
+    from launcher.model.roi_estimate import RunEvents
 
     rng = np.random.default_rng(0)
     y = np.r_[rng.integers(136, 147, 20000), rng.integers(0, 304, 5000)]
@@ -2953,13 +2953,13 @@ def _document_state(doc):
 
 
 def _nexus_builder():
-    """The data layer's own NeXus test builder (_write_nexus in tests/unit/lr_reduction/test_roi_estimate.py): one
+    """The data layer's own NeXus test builder (_write_nexus in launcher/tests/test_roi_estimate.py): one
     builder, one definition of the file. Its module is found from this file's path, not from sys.path, and is loaded
     under a name of its own (I-56, A-4)."""
     import importlib.util
     from pathlib import Path
 
-    path = Path(__file__).resolve().parents[2] / "tests" / "unit" / "lr_reduction" / "test_roi_estimate.py"
+    path = Path(__file__).resolve().parent / "test_roi_estimate.py"
     spec = importlib.util.spec_from_file_location("roi_estimate_tests_for_the_builder", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -3451,7 +3451,7 @@ def test_an_x_range_change_updates_the_scalar_and_its_editor(monkeypatch, events
 def _facility(tmp_path, monkeypatch, layout, folders=()):
     """A fabricated facility tree under tmp_path/SNS: ``{IPTS: [runs]}`` as <IPTS>/nexus/REF_L_<run>.nxs.h5, plus
     `folders` (relative paths) made empty. The IPTS lookup is pointed at it."""
-    from lr_reduction import settings_document
+    from launcher.model import settings_document
 
     root = tmp_path / "SNS"
     for ipts, runs in layout.items():
@@ -3528,7 +3528,7 @@ def test_a_load_takes_the_runs_ipts_over_the_one_the_header_held(tmp_path, monke
 def test_an_injected_document_is_not_resolved(tmp_path, monkeypatch):
     """V2 (v2, design A3): resolution runs at load_settings only. A document given to the tab, or adopted again,
     is shown as it holds: no facility lookup at construction, and nothing inferred over a cleared field (I6)."""
-    from lr_reduction import settings_document
+    from launcher.model import settings_document
 
     _facility(tmp_path, monkeypatch, {"IPTS-36119": [229197]})
     calls = []
@@ -3560,7 +3560,7 @@ def test_an_empty_ipts_with_runs_is_a_problem_until_one_is_typed(monkeypatch):
 def test_typing_an_ipts_runs_no_lookup_and_stands(tmp_path, monkeypatch):
     """V4 (I6): the Load inferred IPTS-36119. A typed IPTS is the user's: no lookup runs on it, and it stands
     through later refreshes."""
-    from lr_reduction import settings_document
+    from launcher.model import settings_document
 
     _facility(tmp_path, monkeypatch, {"IPTS-36119": [229197, 229198, 229199]})
     tab = _shown_tab(SettingsEditorTab())

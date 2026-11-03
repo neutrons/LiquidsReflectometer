@@ -8,10 +8,10 @@ dialog only by 65c83d9's ``parse_math=False`` title): ``_move_span`` (:396-406) 
 file. b041aa2's body also names welbournR (3f74d41) in error: that commit wrote none of the lifted lines. The lift is
 commit b041aa2, verbatim; the changes since are this slug's.
 
-The dialog is a view over one run's events (``lr_reduction.roi_estimate.RunEvents``) and one Angles row's values.
+The dialog is a view over one run's events (``launcher.model.roi_estimate.RunEvents``) and one Angles row's values.
 It reads no file and writes no document (E4, and acceptance 4's literal check): the tab's slot resolves the run,
 loads its events once and applies what :meth:`ROISelectionDialog.changes` reports. Every number it draws comes from
-``lr_reduction.roi_estimate``: the images, the profiles, the background bands the reducer averages, the estimate and
+``launcher.model.roi_estimate``: the images, the profiles, the background bands the reducer averages, the estimate and
 the default background (V2, V3, V10, ``test_each_plot_is_the_data_layers_for_the_ranges_shown``). No detector
 geometry, distance or band arithmetic lives here (V12).
 """
@@ -37,7 +37,7 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from lr_reduction import roi_estimate
+from launcher.model import roi_estimate
 
 try:
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas

@@ -3,10 +3,10 @@
 Wraps one :class:`~lr_reduction.nr_reduction_config.NRReductionConfig` and the
 operations an editor needs: seed it from a JSON settings file, a pre-reduced
 ``.dat`` header, or defaults; add and remove angles; validate against
-:mod:`lr_reduction.field_spec`; report what changed; and normalize for handing
+:mod:`launcher.model.field_spec`; report what changed; and normalize for handing
 back to the reduction.
 
-**Qt-free on purpose** — see the note in :mod:`lr_reduction.field_spec`. The
+**Qt-free on purpose** — see the note in :mod:`launcher.model.field_spec`. The
 view is a thin layer over this class, so nearly all of the editor's behaviour
 is testable without a display.
 
@@ -41,7 +41,7 @@ import re
 import tempfile
 from pathlib import Path
 
-from lr_reduction import field_spec as fs
+from launcher.model import field_spec as fs
 from lr_reduction.new_reduction_from_file import json_to_config, load_from_file
 from lr_reduction.nr_reduction_config import NRReductionConfig
 from lr_reduction.save_reduced_data import make_json_safe
@@ -356,7 +356,7 @@ class SettingsDocument:
         """Hold the entries of every integer-encoded list as ``bool``, whatever spelling the file used.
 
         The reducer writes ``useBS`` as ``1``/``0`` and reads it by truthiness or
-        ``== 1`` (see :func:`~lr_reduction.field_spec.as_boolean`), so a loaded
+        ``== 1`` (see :func:`~launcher.model.field_spec.as_boolean`), so a loaded
         integer there is a boolean in all but spelling. Converting it on load
         gives the panel one spelling to show and gives the view a real ``bool``
         to bind. Anything that is not a boolean spelling is left exactly as

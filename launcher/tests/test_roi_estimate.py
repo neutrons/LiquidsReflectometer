@@ -15,7 +15,7 @@ import h5py
 import numpy as np
 import pytest
 
-from lr_reduction import roi_estimate as re_mod
+from launcher.model import roi_estimate as re_mod
 
 N_Y = 304
 N_X = 256
@@ -105,6 +105,13 @@ def _write_nexus(
 @pytest.fixture
 def nexus(tmp_path):
     return _write_nexus(tmp_path / "REF_L_213628.nxs.h5")
+
+
+@pytest.fixture(scope="session")
+def nexus_dir() -> str:
+    r"""Absolute path to the event nexus files: tests/conftest.py's fixture of the same name, which does not reach
+    this module's home under launcher/tests/."""
+    return str(Path(__file__).resolve().parents[2] / "tests/data/liquidsreflectometer-data/nexus")
 
 
 # -- metadata ---------------------------------------------------------------
@@ -313,15 +320,15 @@ def test_the_module_imports_without_any_gui_package():
     program = textwrap.dedent(
         """
         import sys
-        import lr_reduction.roi_estimate
+        import launcher.model.roi_estimate
         bindings = ("qtpy", "PyQt5", "PyQt6", "PySide2", "PySide6")
-        print(lr_reduction.roi_estimate.__file__)
+        print(launcher.model.roi_estimate.__file__)
         print(sorted(m for m in sys.modules if m.split(".")[0] in bindings))
         """
     )
     # roi-popout-data v2, K6 (A1): the child imports this checkout's module, not whichever lr_reduction the
     # environment's editable install points at (from another checkout that would test another tree).
-    source = os.path.dirname(os.path.dirname(os.path.abspath(re_mod.__file__)))
+    source = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(re_mod.__file__))))
     env = {**os.environ, "PYTHONPATH": os.pathsep.join(filter(None, [source, os.environ.get("PYTHONPATH")]))}
     proc = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=120, env=env)
     assert proc.returncode == 0, proc.stderr
@@ -475,7 +482,7 @@ def test_counts_vs_y_refuses_an_inverted_band(nexus):
 # [low, high], as the reducer's lowres and peak masks are.
 # ===========================================================================
 
-_BINDINGS_ROOT = Path(__file__).resolve().parents[3]
+_BINDINGS_ROOT = Path(__file__).resolve().parents[2]
 _BATTERY = _BINDINGS_ROOT / "scripts" / "test" / "roi_estimate_mutations.py"
 
 
@@ -579,12 +586,12 @@ def _battery_copy(tmp_path, slow_test=None):
     import subprocess
 
     repo = tmp_path / "repo"
-    (repo / "src" / "lr_reduction").mkdir(parents=True)
+    (repo / "launcher" / "model").mkdir(parents=True)
     (repo / "scripts" / "test").mkdir(parents=True)
-    (repo / "tests" / "unit" / "lr_reduction").mkdir(parents=True)
-    shutil.copy(re_mod.__file__, repo / "src" / "lr_reduction" / "roi_estimate.py")
+    (repo / "launcher" / "tests").mkdir(parents=True)
+    shutil.copy(re_mod.__file__, repo / "launcher" / "model" / "roi_estimate.py")
     shutil.copy(_BATTERY, repo / "scripts" / "test" / "roi_estimate_mutations.py")
-    (repo / "tests" / "unit" / "lr_reduction" / "test_roi_estimate.py").write_text(
+    (repo / "launcher" / "tests" / "test_roi_estimate.py").write_text(
         slow_test or "def test_nothing():\n    pass\n")
     git = ["git", "-c", "user.name=test", "-c", "user.email=test@example.invalid"]
     subprocess.run([*git, "init", "-q"], cwd=repo, check=True)
@@ -601,7 +608,7 @@ def test_the_mutation_battery_refuses_a_dirty_baseline(tmp_path, monkeypatch):
     mtime = os.stat(tracked).st_mtime_ns
     repo = _battery_copy(tmp_path)
     batt = _load_battery()
-    module = repo / "src" / "lr_reduction" / "roi_estimate.py"
+    module = repo / "launcher" / "model" / "roi_estimate.py"
     monkeypatch.setattr(batt, "REPO", str(repo))
     monkeypatch.setattr(batt, "MOD", str(module))
     batt.verify_baseline_matches_head()  # matches HEAD: accepted
@@ -621,7 +628,7 @@ def test_a_sigterm_during_the_battery_leaves_the_module_restored(tmp_path):
     import time
 
     repo = _battery_copy(tmp_path, slow_test="import time\n\n\ndef test_slow():\n    time.sleep(60)\n")
-    module = repo / "src" / "lr_reduction" / "roi_estimate.py"
+    module = repo / "launcher" / "model" / "roi_estimate.py"
     original = module.read_text(encoding="utf-8")
     proc = subprocess.Popen([sys.executable, str(repo / "scripts" / "test" / "roi_estimate_mutations.py")],
                             cwd=repo, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)

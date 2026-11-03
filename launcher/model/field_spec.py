@@ -5,7 +5,7 @@ validation messages, and the runtime-owned list used when normalizing a
 document for saving. Without it each of those grows its own copy of "what
 fields exist and what may they hold", and they drift.
 
-**Qt-free on purpose.** This module and :mod:`lr_reduction.settings_document`
+**Qt-free on purpose.** This module and :mod:`launcher.model.settings_document`
 import nothing from ``qtpy``/``PyQt``. That seam is what lets the settings
 model be tested in milliseconds without a display, and T3's resolution layer
 builds on it.
@@ -61,7 +61,7 @@ from lr_reduction.reduction_choices import (
 #     to derive them from. Adding a value to a domain here does NOT make the
 #     reducer able to compute it.
 #   * what closes that gap is the contents-equality pins in
-#     tests/unit/lr_reduction/test_settings_document.py, which assert each
+#     launcher/tests/test_settings_document.py, which assert each
 #     domain equals the exact set the dispatch handles, plus positive drivers
 #     that call the consumers with every offered value.
 #

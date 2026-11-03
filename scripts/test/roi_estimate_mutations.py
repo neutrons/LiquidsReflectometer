@@ -3,7 +3,7 @@
 
     pixi run python scripts/test/roi_estimate_mutations.py [--rows 1-25,32] [--with-slow]
 
-Each row applies one mutation to ``src/lr_reduction/roi_estimate.py``, runs the module's tests, and records
+Each row applies one mutation to ``launcher/model/roi_estimate.py``, runs the module's tests, and records
 which tests failed. ``--rows`` runs a subset, so a long battery can be run in chunks under the 600 s harness
 ceiling; every chunk ends with the same baseline run. ``SLOW`` tests (the T1b census, ~45 s a run) are
 deselected unless ``--with-slow``; the rows that need one say so.
@@ -34,8 +34,8 @@ import sys
 import tempfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-MOD = os.path.join(REPO, "src/lr_reduction/roi_estimate.py")
-T = "tests/unit/lr_reduction/test_roi_estimate.py"
+MOD = os.path.join(REPO, "launcher/model/roi_estimate.py")
+T = "launcher/tests/test_roi_estimate.py"
 
 # The battery's own tests (I5, I6, I7): deselected from every run, never counted as a kill.
 META = (
