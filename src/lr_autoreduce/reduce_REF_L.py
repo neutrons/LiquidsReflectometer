@@ -172,7 +172,7 @@ def confirm_data_availability(sample_logs: SampleLogValues) -> None:
         ipts_number = ipts.split("-")[1]
         cmd = ["/SNS/software/nses/bin/confirm-data", "-s", "Yes", "BL-4B", ipts_number, "1", "Auto"]
         subprocess.run(cmd, check=True, timeout=30)
-    except Exception:  # noqa: BLE001  # deliberately broad
+    except Exception:  # noqa: BLE001 -- deliberately broad: a failed confirmation is logged and must not fail the reduction before it
         logger.notice("Could not set data availability")
 
 

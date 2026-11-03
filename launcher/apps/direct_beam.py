@@ -391,7 +391,8 @@ class DirectBeamTab(QWidget):
                         a, b = t.split('-', 1)
                     else:
                         a, b = t.split(':', 1)
-                    a = int(a); b = int(b)
+                    a = int(a)
+                    b = int(b)
                     if b >= a:
                         runs.extend(list(range(a, b+1)))
                 except Exception:

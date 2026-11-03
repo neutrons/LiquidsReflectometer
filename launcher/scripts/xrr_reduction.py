@@ -89,7 +89,7 @@ def process_xrr(data_file, output_dir=None):
     print("saved")
     plt.figure(figsize=(10, 6))
     plt.plot(q, r)
-    plt.xlabel("q [$1/\AA$]")
+    plt.xlabel(r"q [$1/\AA$]")
     plt.ylabel("R(q)")
     plt.yscale("log")
     plt.xscale("linear")

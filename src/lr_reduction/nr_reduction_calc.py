@@ -14,11 +14,12 @@ from scipy.ndimage import gaussian_filter1d, uniform_filter1d
 
 import lr_reduction.binary_processing as BP
 import lr_reduction.nr_tools as tools
+import lr_reduction.reduction_choices as choices
 import lr_reduction.save_reduced_data as save_fn
 from lr_reduction.user_defined_function import UserDefinedFunction
 
 
-class NR_Reduction:
+class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported by callers)
     """
     Main calculation file for reflectivity reduction. It allows for different q conversion methods.
     NR_Reduction.reduce() is main function to call from a script to process multiple runs from an array.
@@ -81,15 +82,15 @@ class NR_Reduction:
         self.config.method_per_run = [method.lower() for method in self.config.method_per_run]  # Ensure methods are lowercase
 
         # Check method of valid format (meanTheta, constantQ, constantTOF)
-        valid_methods = ['meantheta', 'constantq', 'constanttof']
+        valid_methods = choices.lowered(choices.METHOD_CHOICES)
         for method in self.config.method_per_run:
             if method not in valid_methods:
                 raise ValueError(f"Invalid method: {method}. Use one of {valid_methods}")
 
         # Check method for useCalcTheta and deal with legacy use of "True"
-        valid_calc_theta = ['detector_angle', 'sample_angle']
+        valid_calc_theta = choices.lowered(choices.CALC_THETA_CHOICES)
         if self.config.useCalcTheta:
-            if self.config.useCalcTheta == True:
+            if self.config.useCalcTheta is True:
                 self.config.useCalcTheta = 'detector_angle'
             self.config.useCalcTheta = self.config.useCalcTheta.lower()
             if self.config.useCalcTheta not in valid_calc_theta:
@@ -346,7 +347,7 @@ class NR_Reduction:
             print(f"Binary data computed successfully for run {rb_num}")
             return tof_array, y_tof_corr, error_array_corr, log_values
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- boundary wrap: any failure becomes a RuntimeError naming the run
             raise RuntimeError(f"Failed to compute binary data for run {rb_num}: {str(e)}")
 
     def _load_and_extract_lambda(self, i, rb_num):
@@ -596,7 +597,8 @@ class NR_Reduction:
             self.fig_store.append(fig)
             if self.config.plotON:
                 plt.show()
-            else: plt.close()
+            else:
+                plt.close()
 
         return Yfit, Ifit, RBpixel, Icalc, ThCen, bkg
 
@@ -674,7 +676,14 @@ class NR_Reduction:
             dTheta_val = np.degrees(np.arctan((sigma_y/self.settings['sample_detector_distance'])))
             dTheta = np.full(len(Theta), dTheta_val)
         else:
-            raise ValueError("Theta calculation only defined for config.method 'constantQ' or 'meanTheta'")
+            # Message derived, dispatch above deliberately left literal: each
+            # branch computes something different, so there is nothing to
+            # derive it from. The contents-equality pin in the settings tests is
+            # what catches a set of choices that grows past what this handles.
+            raise ValueError(
+                "Theta calculation only defined for config.method %s"
+                % " or ".join(repr(c) for c in choices.THETA_DISPATCH_CHOICES)
+            )
 
         # Store theta bins for next calculation.
         ThetaBinSize = abs(np.diff(Theta))
@@ -952,7 +961,7 @@ class NR_Reduction:
 
         return theta, mode
 
-    def _reduce_single_run(self, i, rb_num, save=True):
+    def _reduce_single_run(self, i, rb_num, save=True):  # noqa: ARG002 -- save kept for API compatibility (callers pass it)
         """
         Reduce a single run setting using the pre-defined config.
 
@@ -1081,7 +1090,7 @@ class NR_Reduction:
 
         for T in range(Rarr.shape[0]):
             # Apply gravity correction
-            if self.config.useGravity == True: # TODO: Implementation needs checking/deciding whether to keep!
+            if self.config.useGravity is True: # TODO: Implementation needs checking/deciding whether to keep!
                 Thv = abs(Theta[T] + ThetaGC)
             else:
                 ThetaGC.fill(0)

@@ -86,8 +86,7 @@ class PixelData:
             fd.write(str(self))
             fd.write("# pixel\t wavelength\t signal\t error\n")
             for i in np.arange(p_vs_t.shape[0]):
-                for i_wl in range(len(wl)):
-                    fd.write("%8g %8g %8g %8g\n" % (i, wl[i_wl], p_vs_t[i][i_wl], err[i][i_wl]))
+                fd.writelines("%8g %8g %8g %8g\n" % (i, wl[i_wl], p_vs_t[i][i_wl], err[i][i_wl]) for i_wl in range(len(wl)))
 
         plot_data(p_vs_t, wl, "run %s" % self.run_number, os.path.join(output_dir, "r%s-counts.png" % self.run_number))
 
@@ -110,7 +109,7 @@ def plot_data(counts, wl, title, file_path, show=True):
     plt.plot(wl, counts_vs_wl)
 
     plt.title("Total counts vs wavelength - %s" % title)
-    plt.xlabel("Wavelength [$\AA$]")
+    plt.xlabel(r"Wavelength [$\AA$]")
     plt.ylabel("Counts")
     ax[1].set_yscale("log")
 

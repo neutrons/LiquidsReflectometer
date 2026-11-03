@@ -200,12 +200,12 @@ def generate_report_sections(
 
     try:
         sequence_number = sample_logs["sequence_number"]
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 -- a run without the sequence log is reported as sequence 1
         sequence_number = 1
 
     try:
         number_events = workspace.getNumberEvents()
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 -- the event count only labels a log line
         number_events = 0
 
     plots = []
@@ -241,7 +241,7 @@ def generate_report_sections(
     try:
         # Can except template or config to be None but needs one to be present.
         plots = generate_report_plots(workspace, data_type, template_data=template_data, config_settings=config, sequence_number=sequence_number)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 -- a report without plots is still written; the error is logged with its traceback
         logger.notice(f"Could not generate plots: {e}")
         logger.error("Could not generate plots", exc_info=True)
 
@@ -359,7 +359,7 @@ def generate_report_section_reduction_parameters(workspace: MantidWorkspace, tem
     meta += "</table>\n"
 
     meta += "<table style='width:100%'>"
-    meta += "<tr><th>Wavelength</th><th>Q</th><th>Thi</th><th>Ths</th><th>Offset</th><th>Theta used</th></tr>"  # noqa E501
+    meta += "<tr><th>Wavelength</th><th>Q</th><th>Thi</th><th>Ths</th><th>Offset</th><th>Theta used</th></tr>"
     meta += "<tr><td>%6.4g - %6.4g</td><td>%6.4g - %6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td></tr>\n" % (
         meta_data["wl_min"],
         meta_data["wl_max"],
@@ -444,7 +444,7 @@ def generate_report_section_reduction_parameters_new(config, workspace: MantidWo
 
     # TODO: add pull through from output of theta values.
     meta += "<table style='width:100%'>"
-    meta += "<tr><th>Wavelength</th><th>Q</th><th>dqbin</th><th>Thi</th><th>Ths</th><th>Offset</th><th>tthd</th></tr>"  # noqa E501
+    meta += "<tr><th>Wavelength</th><th>Q</th><th>dqbin</th><th>Thi</th><th>Ths</th><th>Offset</th><th>tthd</th></tr>"
     meta += "<tr><td>%6.4g - %6.4g</td><td>%6.4g - %6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td><td>%6.4g</td></tr>\n" % (
         config.LambdaMinUse,
         config.LambdaMaxUse,
@@ -589,7 +589,7 @@ def generate_report_plots(workspace: MantidWorkspace, data_type: DataType, templ
             x_zoom_range=XY_PLOT_ZOOM_X_RANGE,
             y_zoom_range=XY_PLOT_ZOOM_Y_RANGE,
         )
-    except Exception:  # noqa E722
+    except Exception:  # noqa: BLE001 -- a plot that fails becomes a text placeholder; the report is still written
         logger.warning("  - Could not generate XY plot")
         xy_plot = _plotText("Could not generate XY plot")
 
@@ -627,7 +627,7 @@ def generate_report_plots(workspace: MantidWorkspace, data_type: DataType, templ
             x_zoom_range=YTOF_PLOT_ZOOM_X_RANGE,
             y_zoom_range=tof_zoom_range,
         )
-    except Exception:  # noqa E722
+    except Exception:  # noqa: BLE001 -- a plot that fails becomes a text placeholder; the report is still written
         logger.warning("  - Could not generate X-TOF plot")
         y_tof_plot = _plotText("Could not generate X-TOF plot")
 
@@ -655,7 +655,7 @@ def generate_report_plots(workspace: MantidWorkspace, data_type: DataType, templ
             x_label="Y pixel",
             y_label="Counts",
         )
-    except Exception:  # noqa E722
+    except Exception:  # noqa: BLE001 -- a plot that fails becomes a text placeholder; the report is still written
         logger.warning("  - Could not generate Y count distribution")
         peak_pixels = _plotText(
             "Could not generate Y count distribution"
@@ -684,7 +684,7 @@ def generate_report_plots(workspace: MantidWorkspace, data_type: DataType, templ
             x_label="X pixel",
             y_label="Counts",
         )
-    except Exception:  # noqa E722
+    except Exception:  # noqa: BLE001 -- a plot that fails becomes a text placeholder; the report is still written
         logger.warning("  - Could not generate X count distribution")
         low_res_profile = _plotText("Could not generate X count distribution")
 
@@ -702,7 +702,7 @@ def generate_report_plots(workspace: MantidWorkspace, data_type: DataType, templ
             x_label="TOF (ms)",
             y_label="Counts",
         )
-    except Exception:  # noqa E722
+    except Exception:  # noqa: BLE001 -- a plot that fails becomes a text placeholder; the report is still written
         logger.warning("  - Could not generate TOF distribution")
         tof_dist = _plotText(
             "Could not generate TOF distribution"

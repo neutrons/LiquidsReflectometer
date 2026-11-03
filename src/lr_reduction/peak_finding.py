@@ -104,8 +104,9 @@ def fit_signal_flat_bck(x, y, x_min=110, x_max=170, center=None, sigma=None, bac
     pars["g_center"].min = _center - 2
     pars["g_center"].max = _center + 2
 
-    weights = 1 / np.sqrt(y)
-    weights[y < 1] = 1
+    # 1 where there is less than one count, 1/sqrt(y) elsewhere. Substituting before the root, rather than
+    # overwriting after it, never computes 1/0 (nor the root of a negative).
+    weights = 1 / np.sqrt(np.where(y < 1, 1, y))
 
     fit = gauss.fit(
         y[x_min:x_max] - background, pars, method="leastsq", x=x[x_min:x_max], weights=1 / weights[x_min:x_max]

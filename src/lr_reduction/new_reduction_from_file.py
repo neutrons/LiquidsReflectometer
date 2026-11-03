@@ -153,8 +153,6 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
                     indent=2
                     )
 
-    num_figures = len(all_figures)
-
     # Might need to come back to which figures are output.
     return all_results, output_figures, sorted_run_nums, config_final
 

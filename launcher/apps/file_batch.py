@@ -655,7 +655,7 @@ class FileBatchTab(QWidget):
                     # pop external windows; we'll embed returned Figure objects
                     # into the Canvas ourselves.
                     try:
-                        plt.show = lambda *a, **kw: None
+                        plt.show = lambda *_a, **_kw: None
                     except Exception:
                         orig_show = None
 
@@ -709,10 +709,8 @@ class FileBatchTab(QWidget):
                         # - list of lists (per-group lists of Figure objects)
                         # - list of Figure objects where each Figure has attributes
                         #   `._reduction_group` and/or `._reduction_is_final`
-                        grouped = False
                         # detect list-of-lists
                         if any(isinstance(x, (list, tuple)) for x in reducer_figures):
-                            grouped = True
                             groups = reducer_figures
                         else:
                             # flat list: maybe Figures with metadata

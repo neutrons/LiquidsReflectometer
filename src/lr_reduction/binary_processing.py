@@ -8,7 +8,7 @@ from scipy.special import lambertw
 
 # TODO: link up the parts that are self. from copying across.
 
-def convert_to_binary(fname, lowres, collapse_x = True, tofbin=50, tofmax=100000, tofmin=0, deadtime=4.2, tof_step=100, n_y=304, n_x=256):
+def convert_to_binary(fname, lowres, collapse_x = True, tofbin=50, tofmax=100000, tofmin=0, deadtime=4.2, tof_step=100, n_y=304, n_x=256):  # noqa: ARG001 -- collapse_x documented as planned/not implemented; callers pass it
     '''
     Main function for converting to load the file, apply the dead-time correction and obtain y vs tof data (non-event).
 
@@ -60,7 +60,7 @@ def load_and_extract(fname):
     return e_offset, event_id, error_event_offset, pcharge, cPC, log_values
 
 
-def get_deadtime_correction(error_event_offset, e_offset, pcharge, tofbin=50, tofmax=50000, tofmin=0, use_bad_counts=True, deadtime=4.2, tof_step=100):
+def get_deadtime_correction(error_event_offset, e_offset, pcharge, tofbin=50, tofmax=50000, tofmin=0, use_bad_counts=True, deadtime=4.2, tof_step=100):  # noqa: ARG001 -- tof_step kept for API compatibility (callers pass it)
     '''
     Gets and applies the dead-time correction.
 
@@ -100,7 +100,7 @@ def get_deadtime_correction(error_event_offset, e_offset, pcharge, tofbin=50, to
 
     return tof_array, DTC, error_counts
 
-def get_y_tof(tof_array, event_id, e_offset, lowres, pcharge, n_y = 304, n_x = 256):
+def get_y_tof(tof_array, event_id, e_offset, lowres, pcharge, n_y = 304, n_x = 256):  # noqa: ARG001 -- n_x kept for API compatibility (callers pass it)
     '''
     Collapses the event data into y vs tof histogram.
 
@@ -157,7 +157,7 @@ def get_log_values(fname):
         log_values["scale_multiplier"] = f['entry/DASlogs/BL4B:CS:Autoreduce:ScaleMultiplier/value'][0]
         #log_values["distance_sample_detector"] = f['entry/DASlogs/BL4B:CS:Autoreduce:Sequence:DistanceSampleDetector/value'][0]
         #log_values["template_id"] = f['entry/DASlogs/BL4B:CS:Autoreduce:Sequence:TemplateId/value'][0]
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- tolerate any missing/odd DASlog entry; partial log_values is the intended behavior
         print(f'Cannot process {fname} b/c {e} fails to extract')
         pass
     # Get slit gap openings.

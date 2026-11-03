@@ -9,14 +9,14 @@ from lr_reduction import time_resolved
 from lr_reduction.utils import amend_config
 
 
-def test_reduce_workflow(nexus_dir):
+def test_reduce_workflow(nexus_dir, template_dir, tmp_path):
     """
     Test the time-resolved reduction that uses a measured reference.
     It is generally used at 30 Hz but it also works at 60 Hz.
     """
-    template_path = "data/template.xml"
-    output_dir = "data/"
-    reduced_path = "data/reference_rq_avg_overlap.txt"
+    template_path = os.path.join(template_dir, "template.xml")
+    output_dir = str(tmp_path)
+    reduced_path = os.path.join(template_dir, "reference_rq_avg_overlap.txt")
     ref_data = np.loadtxt(reduced_path).T
     with amend_config(data_dir=nexus_dir):
         reduced = time_resolved.reduce_30Hz_slices(
@@ -47,13 +47,13 @@ def test_reduce_workflow(nexus_dir):
     time_resolved.plot_slices(reduced, "Test", 300, os.path.join(output_dir, "reduced.png"), show=False)
 
 
-def test_reduce_template_workflow(nexus_dir):
+def test_reduce_template_workflow(nexus_dir, template_dir, tmp_path):
     """
     Test the time-resolved reduction that uses a template.
     """
-    template_path = "data/template.xml"
-    output_dir = "data/"
-    reduced_path = "data/reference_rq_avg_overlap.txt"
+    template_path = os.path.join(template_dir, "template.xml")
+    output_dir = str(tmp_path)
+    reduced_path = os.path.join(template_dir, "reference_rq_avg_overlap.txt")
     ref_data = np.loadtxt(reduced_path).T
     with amend_config(data_dir=nexus_dir):
         reduced = time_resolved.reduce_slices(
