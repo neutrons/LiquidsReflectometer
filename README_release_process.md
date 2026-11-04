@@ -22,8 +22,8 @@ Tags are named `exp<version>`; versioningit strips the `exp` prefix to get the p
 
 | tag            | package version | conda label |
 |----------------|-----------------|-------------|
-| `exp3.0.0rc1`  | `3.0.0rc1`      | `exp-qa`    |
-| `exp3.0.0`     | `3.0.0`         | `exp`       |
+| `exp3.1.0rc1`  | `3.1.0rc1`      | `exp-qa`    |
+| `exp3.1.0`     | `3.1.0`         | `exp`       |
 
 - Use the full three-component form, `exp<major>.<minor>.<patch>` and `exp<major>.<minor>.<patch>rc<n>`.
 - The exp line starts at 3.x so its versions sort above the `2.10.0.dev` builds already on the `exp` label.
@@ -41,7 +41,7 @@ before the tag.
 ```bash
 git fetch -p -P -t --all
 git checkout exp-next
-git rebase -v origin/exp-next
+git pull  # expect no local changes, but will prompt for merge if there are
 ```
 
 ### 2. Make sure `exp-qa` and `exp` are already in `exp-next`
@@ -49,16 +49,16 @@ git rebase -v origin/exp-next
 ```bash
 git merge --no-edit origin/exp-qa
 git merge --no-edit origin/exp
-git diff origin/exp-next   # expect no output
+git diff origin/exp-next   # expect no output, unless hotfix on exp-qa or exp was pushed
 ```
 
-Both merges should answer `Already up to date`. If they did not, push `exp-next`.
+Both merges should answer `Already up to date`. If they did not, push `exp-next`: `git push -u`
 
 ### 3. Fast-forward `exp-qa` to `exp-next` and push
 
 ```bash
 git checkout exp-qa
-git rebase -v origin/exp-qa
+git pull
 git merge --ff-only origin/exp-next
 git push origin exp-qa
 ```
@@ -68,15 +68,15 @@ git push origin exp-qa
 Either let the GitHub release create the tag:
 
 ```bash
-gh release create exp3.0.0rc1 --title "exp3.0.0rc1" \
+gh release create exp3.1.0rc1 --title "exp3.1.0rc1" \
   --target exp-qa --generate-notes --prerelease
 ```
 
 or tag manually and push the tag:
 
 ```bash
-git tag exp3.0.0rc1
-git push origin exp3.0.0rc1
+git tag exp3.1.0rc1
+git push origin exp3.1.0rc1
 ```
 
 In the GitHub UI: Releases → Draft a new release → tag `exp3.0.0rc1`, target `exp-qa`,
@@ -93,34 +93,34 @@ Only promote a tagged release candidate. Changes present in `exp-next` but not i
 ```bash
 git fetch -p -P -t --all
 git checkout exp
-git rebase -v origin/exp
+git pull
 ```
 
 ### 2. Fast-forward `exp` to the release candidate and push
 
 ```bash
-git merge --ff-only exp3.0.0rc1
+git merge --ff-only exp3.1.0rc1
 git push origin exp
 ```
 
 ### 3. Tag and create the release
 
 ```bash
-gh release create exp3.0.0 --title "exp3.0.0" \
+gh release create exp3.1.0 --title "exp3.1.0" \
   --target exp --generate-notes --latest=false
 ```
 
 or manually:
 
 ```bash
-git tag exp3.0.0
-git push origin exp3.0.0
+git tag exp3.1.0
+git push origin exp3.1.0
 ```
 
 In the GitHub UI, target `exp` and leave **Set as the latest release** unchecked so the production
 line's release stays the repository's "Latest".
 
-The tag push builds `lr_reduction 3.0.0` and publishes it under the `exp` label.
+The tag push builds `lr_reduction 3.1.0` and publishes it under the `exp` label.
 
 ## Anaconda labels
 
@@ -139,7 +139,7 @@ default-tag = "0.0.1"
 match = ["exp[0-9]*"]      # only exp<version> tags; v* and exp-review-* tags are ignored
 
 [tool.versioningit.tag2version]
-rmprefix = "exp"           # exp3.0.0rc1 -> 3.0.0rc1
+rmprefix = "exp"           # exp3.1.0rc1 -> 3.1.0rc1
 
 [tool.versioningit.next-version]
 method = "minor"
