@@ -718,6 +718,7 @@ def _differing(image, report):
     return {(int(y), int(x)): int(difference[y, x]) for y, x in zip(*np.nonzero(difference))}
 
 
+@pytest.mark.realdata
 def test_xy_image_is_the_web_reports_array_but_for_the_extreme_tof_events(nexus_dir):
     """T1 (F4, corrected at v2: N-1). The report's array is the event image less the event(s) at the run's minimum
     and/or maximum TOF, which Mantid's Integration drops when its default range excludes them. 201288 agrees
@@ -735,6 +736,7 @@ def test_xy_image_is_the_web_reports_array_but_for_the_extreme_tof_events(nexus_
     assert image.sum() - report.sum() == sum(extreme.values())
 
 
+@pytest.mark.realdata
 def test_xy_image_against_the_web_report_over_every_fixture_run(nexus_dir):
     """T1b (v2, the census v1 lacked; F4's population claim, not one sample). Over every REF_L run in the fixture
     data, xy_image minus the report's array is non-negative, non-zero only at the extreme-TOF events' pixels, and
@@ -818,6 +820,7 @@ def test_y_tof_image_keeps_the_event_at_the_last_edge(tmp_path):
 # -- B5: the three profiles --------------------------------------------------
 
 
+@pytest.mark.realdata
 def test_profile_y_agrees_with_the_library_histogrammer(nexus_dir):
     """T6 (F8): profile_y over the run's proton charge equals counts_vs_y, through get_y_tof."""
     path = os.path.join(nexus_dir, "REF_L_201288.nxs.h5")
@@ -999,6 +1002,7 @@ def test_default_bkg_roi_takes_a_one_row_peak_and_refuses_what_is_not_a_whole_ro
 # -- B9, T10-T12: refusals, sparse and empty runs, sampling -------------------
 
 
+@pytest.mark.realdata
 def test_a_sparse_real_run_gives_images_and_a_refused_estimate(nexus_dir):
     """T10 (F8): 201284 has ~6 000 events. The images and profiles are returned, and the estimator refuses."""
     events = re_mod.load_event_pixels(os.path.join(nexus_dir, "REF_L_201284.nxs.h5"))
