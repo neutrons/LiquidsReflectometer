@@ -10,7 +10,8 @@ on its line, whatever code it names. These tests are the guard:
 - the pre-commit `ruff-check` hook, where this repository runs ruff, adds RUF100 to the selection, so the hook fails when
   a tag goes dead. pyproject.toml's selection is left alone: that file is also pixi's self-package manifest, and any
   edit to it leaves pixi.lock out of date;
-- no tag is a blanket: each names its codes after a colon (`# noqa: BLE001 -- the reason`).
+- no tag is a blanket: each names its codes after a colon (`# noqa: BLE001 -- the reason`);
+- the top-level pre-commit `exclude` is anchored, so it keeps from every hook only the top-level trees it names.
 """
 
 import io
@@ -20,6 +21,7 @@ import subprocess
 import tokenize
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +30,8 @@ TREES = ("src", "launcher", "tests", "scripts")
 #: exemption), then a colon, whitespace or the end. Prose that mentions noqa is not one.
 DIRECTIVE = re.compile(r"#\s*(?:(?:ruff|flake8)\s*:\s*)?noqa(?=[\s:]|$)(?P<rest>.*)", re.IGNORECASE)
 SCOPED = re.compile(r"\s*:\s*[A-Z]+[0-9]+(?:\s*,\s*[A-Z]+[0-9]+)*")
+#: The top-level trees the global pre-commit `exclude` keeps from every hook, as paths from the repository's root.
+GLOBALLY_EXCLUDED = ("reduction/data/", "reduction/notebooks/", "scripts/", "scans/")
 
 
 def ruff(*args, stdin=None):
@@ -39,9 +43,14 @@ def ruff(*args, stdin=None):
                           input=stdin, capture_output=True, text=True, check=False, timeout=300)
 
 
+def pre_commit_config():
+    """The parsed `.pre-commit-config.yaml`."""
+    return yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
+
+
 def hook_args():
     """The args of the pre-commit `ruff-check` hook, the one place this repository runs ruff."""
-    config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
+    config = pre_commit_config()
     hooks = [hook for repo in config["repos"] for hook in repo.get("hooks", []) if hook.get("id") == "ruff-check"]
     assert len(hooks) == 1, hooks
     return [str(arg) for arg in hooks[0].get("args", [])]
@@ -103,3 +112,17 @@ def test_every_noqa_tag_names_its_codes():
     blankets = [f"{path.relative_to(ROOT)}:{line}: {comment}" for path in python_files()
                 for line, comment, rest in noqa_directives(path) if not SCOPED.match(rest)]
     assert blankets == [], "\n".join(blankets)
+
+
+def test_the_global_exclude_hides_only_its_top_level_trees():
+    """The top-level `exclude` keeps a path from every hook (ruff, end-of-file, trailing whitespace), and pre-commit
+    matches it with `re.search`: unanchored, `scripts/.*` also hid launcher/scripts/. So it is anchored (`^`), and,
+    compiled, it matches no tracked file outside the top-level trees it names."""
+    if not (ROOT / ".git").exists():
+        pytest.skip("not a git checkout: the tracked files cannot be listed")
+    pattern = str(pre_commit_config().get("exclude", ""))
+    assert re.match(r"(?:\(\?[a-z]+\))?\s*\^", pattern), pattern
+    excluded = re.compile(pattern or r"(?!)")
+    tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True, timeout=60)
+    hidden = [path for path in tracked.stdout.splitlines() if excluded.search(path) and not path.startswith(GLOBALLY_EXCLUDED)]
+    assert hidden == [], hidden
