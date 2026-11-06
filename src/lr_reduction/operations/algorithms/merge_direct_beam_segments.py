@@ -209,6 +209,8 @@ class MergeDirectBeamSegments(PythonAlgorithm):
             spectra = [ws.getSpectrum(i) for i in range(ws.getNumberHistograms())]
             if any(spectrum.getEventType() == EventType.WEIGHTED_NOTIME for spectrum in spectra):
                 issues.append(f"{label}: holds compressed events; the event weight needs one event per neutron")
+            if any(not np.all(np.isfinite(spectrum.getWeights())) for spectrum in spectra):
+                issues.append(f"{label}: holds events with NaN or infinite weight; event weights must be finite")
             if any(np.any(spectrum.getWeights() <= 0) for spectrum in spectra):
                 issues.append(
                     f"{label}: holds events of zero or negative weight; the event weight needs every correction "
