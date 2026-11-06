@@ -86,6 +86,25 @@ def test_event_weight_interpolates_inverse_across_empty_bins_and_is_infinite_out
     assert result[3] == np.inf
 
 
+def test_event_weight_is_infinite_on_zero_weight_bins_and_empty_bins_next_to_them():
+    # Bin 1 is empty between valid bins; bin 3 holds only zero-weight events; bin 4 is empty beside it.
+    y = np.array([2.0, 0.0, 3.0, 0.0, 0.0, 1.0])
+    n = np.array([2, 0, 3, 4, 0, 1])
+    in_band = np.ones(6, dtype=bool)
+    result = event_weight(y, n, in_band, np.arange(6.0))
+    np.testing.assert_allclose(result[[0, 1, 2, 5]], 1.0)
+    assert np.all(result[[3, 4]] == np.inf)
+
+
+def test_overlap_weights_finite_where_one_segment_has_zero_weight_events():
+    in_band = np.ones(3, dtype=bool)
+    centers = np.arange(3.0)
+    a = event_weight(np.array([1.0, 0.0, 1.0]), np.array([1, 5, 1]), in_band, centers)
+    b = event_weight(np.array([1.0, 1.0, 1.0]), np.array([1, 1, 1]), in_band, centers)
+    weights = overlap_weights([a, b])
+    np.testing.assert_allclose(weights, [[0.5, 0.0, 0.5], [0.5, 1.0, 0.5]])
+
+
 def test_overlap_weights_sum_to_one_where_covered():
     event_weights = np.array([[0.5, 0.5, np.inf, np.inf], [np.inf, 1 / 6, 1.0, np.inf]])
     weights = overlap_weights(event_weights)
@@ -125,11 +144,12 @@ def make_segment(workspaces):
     `[low, high]`, so each segment is an unbiased estimate of the same flux `density`.
     """
 
-    def make(low, high, c, density=2.0e4, seed=0, run_number=1):
+    def make(low, high, c, density=2.0e4, seed=0, run_number=1, zero=None, name=None):
+        """`zero`, a ``(min, max)`` range, gives its events weight 0, as the dead time threshold does."""
         rng = np.random.default_rng(seed)
         count = rng.poisson(density / c * (high - low))
         wavelengths = np.sort(rng.uniform(low, high, count))
-        name = mtd.unique_hidden_name()
+        name = name or mtd.unique_hidden_name()
         CreateSampleWorkspace(
             WorkspaceType="Event",
             NumBanks=1,
@@ -147,7 +167,8 @@ def make_segment(workspaces):
         for spectrum in spectra:
             spectrum.switchTo(EventType.WEIGHTED)
         for index, wavelength in enumerate(wavelengths):
-            spectra[index % len(spectra)].addWeightedEventQuickly(wavelength, c, c**2, DateAndTime(0))
+            weight = 0.0 if zero is not None and zero[0] <= wavelength <= zero[1] else c
+            spectra[index % len(spectra)].addWeightedEventQuickly(wavelength, weight, weight**2, DateAndTime(0))
         workspaces.append(name)
         return name
 
@@ -237,6 +258,45 @@ def _weights_at(name, wavelength):
         spectrum = workspace.getSpectrum(index)
         tofs, weights = spectrum.getTofs(), spectrum.getWeights()
         yield from weights[tofs == wavelength]
+
+
+def _all_weights(name):
+    workspace = mtd[name]
+    return np.concatenate([workspace.getSpectrum(i).getWeights() for i in range(workspace.getNumberHistograms())])
+
+
+def test_zero_weight_events_in_overlap_leave_other_segment_at_full_weight(make_segment):
+    density = 2.0e4
+    a = make_segment(2.0, 6.0, c=1.0, density=density, seed=16, zero=(4.5, 5.0))
+    b = make_segment(4.0, 8.0, c=1.0, density=density, seed=17)
+    run_merge([a, b])
+
+    assert np.all(np.isfinite(_all_weights(OUTPUT_WORKSPACE)))
+    assert np.all(np.isfinite(mtd[WEIGHTS_WORKSPACE].extractY()))
+    edges, y, e = histogram(OUTPUT_WORKSPACE, [4.6, 0.3, 4.9])
+    flux, sigma = y / np.diff(edges), e / np.diff(edges)
+    assert np.all(np.abs(flux - density) < 5 * sigma), flux
+
+
+def test_zero_weight_events_where_one_segment_is_alone_give_zero_flux(make_segment):
+    a = make_segment(2.0, 6.0, c=1.0, seed=18, zero=(2.5, 3.0))
+    b = make_segment(4.0, 8.0, c=1.0, seed=19)
+    run_merge([a, b])
+
+    assert np.all(np.isfinite(_all_weights(OUTPUT_WORKSPACE)))
+    assert np.all(np.isfinite(mtd[WEIGHTS_WORKSPACE].extractY()))
+    _, y, _ = histogram(OUTPUT_WORKSPACE, [2.6, 0.3, 2.9])
+    assert y[0] == 0.0
+
+
+def test_input_named_like_a_former_temporary_is_kept(make_segment):
+    a = make_segment(2.0, 6.0, c=0.5, seed=20)
+    b = make_segment(4.0, 8.0, c=2.0, seed=21, name=f"__{OUTPUT_WORKSPACE}_weighted_0")
+    events = mtd[b].getNumberEvents()
+    run_merge([a, b])
+    assert mtd.doesExist(b)
+    assert mtd[b].getNumberEvents() == events
+    assert mtd[OUTPUT_WORKSPACE].getNumberEvents() == mtd[a].getNumberEvents() + events
 
 
 def test_one_segment_is_cloned(make_segment):

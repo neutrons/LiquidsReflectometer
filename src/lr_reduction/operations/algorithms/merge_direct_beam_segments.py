@@ -102,7 +102,9 @@ def event_weight(y, n, in_band, centers):
 
     In-band bins without events take a ``1 / c`` interpolated linearly in wavelength from the
     neighboring bins. Outside the band the event weight is infinite: the segment contributes
-    ``1 / c = 0`` there.
+    ``1 / c = 0`` there. Bins whose events all carry weight 0, as the dead time correction's
+    threshold leaves them, hold no valid data and are treated like bins outside the band, as are
+    empty bins next to them.
 
     Parameters
     ----------
@@ -115,12 +117,17 @@ def event_weight(y, n, in_band, centers):
     """
     y = np.asarray(y, dtype=float)
     n = np.asarray(n, dtype=float)
-    measured = in_band & (n > 0)
+    has_events = in_band & (n > 0)
+    measured = has_events & (y > 0)
+    empty = in_band & ~has_events
     inverse = np.zeros_like(y)
     if measured.any():
         inverse[measured] = n[measured] / y[measured]
-        empty = in_band & ~measured
-        inverse[empty] = np.interp(centers[empty], centers[measured], inverse[measured])
+        discarded = has_events & ~measured
+        next_to_discarded = np.interp(centers[empty], centers[has_events], discarded[has_events]) > 0
+        interpolated = empty.copy()
+        interpolated[empty] = ~next_to_discarded
+        inverse[interpolated] = np.interp(centers[interpolated], centers[measured], inverse[measured])
     weights = np.full_like(y, np.inf)
     np.divide(1.0, inverse, out=weights, where=inverse > 0)
     return weights
@@ -139,6 +146,19 @@ def overlap_weights(event_weights):
     weights = np.zeros_like(inverse)
     np.divide(inverse, total, out=weights, where=total > 0)
     return weights
+
+
+def zero_weight_ranges(edges, masks, weights):
+    """Ranges inside some band where no segment holds valid data, so every overlap weight is 0.
+
+    Returns
+    -------
+        ``(lambda_min, lambda_max)`` per contiguous run of such bins of `edges`, in increasing
+        wavelength.
+    """
+    lost = np.any(masks, axis=0) & ~(np.asarray(weights).sum(axis=0) > 0)
+    changes = np.flatnonzero(np.diff(np.concatenate([[0], lost.astype(int), [0]])))
+    return [(edges[start], edges[stop]) for start, stop in zip(changes[::2], changes[1::2], strict=True)]
 
 
 class MergeDirectBeamSegments(PythonAlgorithm):
@@ -215,7 +235,6 @@ class MergeDirectBeamSegments(PythonAlgorithm):
 
     def PyExec(self):  # noqa: N802
         names = list(self.getProperty("InputWorkspaces").value)
-        output_name = self.getPropertyValue("OutputWorkspace")
         step = self.getProperty("WeightingBinWidth").value
         segments = [AnalysisDataService.retrieve(name) for name in names]
         runs = [ws.getRunNumber() for ws in segments]
@@ -248,6 +267,13 @@ class MergeDirectBeamSegments(PythonAlgorithm):
 
         # 5. Overlap weights.
         weights = overlap_weights(event_weights)
+        for low, high in zero_weight_ranges(edges, masks, weights):
+            first = np.searchsorted(edges, low)
+            covering = [str(run) for run, mask in zip(runs, masks, strict=True) if mask[first]]
+            logger.warning(
+                f"Every event of run {', '.join(covering)} in {low:.4f}-{high:.4f} Å has weight 0; "
+                "the composite flux is zero there"
+            )
         if not self.getProperty("OutputWeightsWorkspace").isDefault:
             weights_ws = CreateWorkspace(
                 DataX=np.tile(edges, len(segments)),
@@ -264,14 +290,14 @@ class MergeDirectBeamSegments(PythonAlgorithm):
         if len(segments) == 1:
             merged = CloneWorkspace(InputWorkspace=segments[0], StoreInADS=False)
         else:
-            merged = self._apply_and_merge(names, segments, masks, edges, weights, output_name)
+            merged = self._apply_and_merge(names, segments, masks, edges, weights)
 
         # 8. Axis: the single placeholder bin spanning every band.
         low, high = edges[0], edges[-1]
         output_ws = Rebin(InputWorkspace=merged, Params=[low, high - low, high], PreserveEvents=True, StoreInADS=False)
         self.setProperty("OutputWorkspace", output_ws)
 
-    def _apply_and_merge(self, names, segments, masks, edges, weights, output_name):
+    def _apply_and_merge(self, names, segments, masks, edges, weights):
         """Steps 6 and 7: scale each segment's events by its weights and append the segments."""
         registered = []
         try:
@@ -292,7 +318,7 @@ class MergeDirectBeamSegments(PythonAlgorithm):
                     WorkspaceToRebin=ws, WorkspaceToMatch=factors, PreserveEvents=True, StoreInADS=False
                 )
                 weighted = Multiply(LHSWorkspace=aligned, RHSWorkspace=factors, StoreInADS=False)
-                weighted_name = f"__{output_name}_weighted_{index}"
+                weighted_name = AnalysisDataService.unique_hidden_name()
                 RebinToWorkspace(
                     WorkspaceToRebin=weighted, WorkspaceToMatch=ws, PreserveEvents=True, OutputWorkspace=weighted_name
                 )
