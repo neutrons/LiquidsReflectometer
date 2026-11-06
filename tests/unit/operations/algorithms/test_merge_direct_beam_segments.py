@@ -88,25 +88,6 @@ def test_event_weight_interpolates_inverse_across_empty_bins_and_is_infinite_out
     assert result[3] == np.inf
 
 
-def test_event_weight_is_infinite_on_zero_weight_bins_and_empty_bins_next_to_them():
-    # Bin 1 is empty between valid bins; bin 3 holds only zero-weight events; bin 4 is empty beside it.
-    y = np.array([2.0, 0.0, 3.0, 0.0, 0.0, 1.0])
-    n = np.array([2, 0, 3, 4, 0, 1])
-    in_band = np.ones(6, dtype=bool)
-    result = event_weight(y, n, in_band, np.arange(6.0))
-    np.testing.assert_allclose(result[[0, 1, 2, 5]], 1.0)
-    assert np.all(result[[3, 4]] == np.inf)
-
-
-def test_overlap_weights_finite_where_one_segment_has_zero_weight_events():
-    in_band = np.ones(3, dtype=bool)
-    centers = np.arange(3.0)
-    a = event_weight(np.array([1.0, 0.0, 1.0]), np.array([1, 5, 1]), in_band, centers)
-    b = event_weight(np.array([1.0, 1.0, 1.0]), np.array([1, 1, 1]), in_band, centers)
-    weights = overlap_weights([a, b])
-    np.testing.assert_allclose(weights, [[0.5, 0.0, 0.5], [0.5, 1.0, 0.5]])
-
-
 def test_overlap_weights_sum_to_one_where_covered():
     event_weights = np.array([[0.5, 0.5, np.inf, np.inf], [np.inf, 1 / 6, 1.0, np.inf]])
     weights = overlap_weights(event_weights)
@@ -271,35 +252,6 @@ def _weights_at(name: str, wavelength: float) -> Iterator[float]:
         yield from weights[tofs == wavelength]
 
 
-def _all_weights(name: str) -> np.ndarray:
-    workspace = mtd[name]
-    return np.concatenate([workspace.getSpectrum(i).getWeights() for i in range(workspace.getNumberHistograms())])
-
-
-def test_zero_weight_events_in_overlap_leave_other_segment_at_full_weight(make_segment):
-    density = 2.0e4
-    a = make_segment(2.0, 6.0, c=1.0, density=density, seed=16, zero=(4.5, 5.0))
-    b = make_segment(4.0, 8.0, c=1.0, density=density, seed=17)
-    run_merge([a, b])
-
-    assert np.all(np.isfinite(_all_weights(OUTPUT_WORKSPACE)))
-    assert np.all(np.isfinite(mtd[WEIGHTS_WORKSPACE].extractY()))
-    edges, y, e = histogram(OUTPUT_WORKSPACE, [4.6, 0.3, 4.9])
-    flux, sigma = y / np.diff(edges), e / np.diff(edges)
-    assert np.all(np.abs(flux - density) < 5 * sigma), flux
-
-
-def test_zero_weight_events_where_one_segment_is_alone_give_zero_flux(make_segment):
-    a = make_segment(2.0, 6.0, c=1.0, seed=18, zero=(2.5, 3.0))
-    b = make_segment(4.0, 8.0, c=1.0, seed=19)
-    run_merge([a, b])
-
-    assert np.all(np.isfinite(_all_weights(OUTPUT_WORKSPACE)))
-    assert np.all(np.isfinite(mtd[WEIGHTS_WORKSPACE].extractY()))
-    _, y, _ = histogram(OUTPUT_WORKSPACE, [2.6, 0.3, 2.9])
-    assert y[0] == 0.0
-
-
 def test_input_named_like_a_former_temporary_is_kept(make_segment):
     a = make_segment(2.0, 6.0, c=0.5, seed=20)
     b = make_segment(4.0, 8.0, c=2.0, seed=21, name=f"__{OUTPUT_WORKSPACE}_weighted_0")
@@ -341,6 +293,13 @@ def test_rejects_compressed_events(make_segment):
     CompressEvents(InputWorkspace=name, Tolerance=0.01, OutputWorkspace=name)
     with pytest.raises(RuntimeError, match="compressed"):
         run_merge([name])
+
+
+def test_rejects_zero_weight_events(make_segment):
+    a = make_segment(2.0, 6.0, c=1.0, seed=16)
+    b = make_segment(4.0, 8.0, c=1.0, seed=17, zero=(4.5, 5.0))
+    with pytest.raises(RuntimeError, match="zero or negative weight"):
+        run_merge([a, b])
 
 
 def test_rejects_tof_input(workspaces):
