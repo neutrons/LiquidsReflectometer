@@ -10,6 +10,8 @@ mean weight of a bin's events, ``c_i = Y / N`` on the segment's ROI-summed spect
 where ``c_i`` is constant across a bin.
 """
 
+from collections.abc import Sequence
+
 import numpy as np
 from mantid.api import (
     AlgorithmFactory,
@@ -33,9 +35,10 @@ from mantid.simpleapi import (
     SumSpectra,
     logger,
 )
+from numpy.typing import ArrayLike
 
 
-def coverage_gaps(bands):
+def coverage_gaps(bands: Sequence[tuple[float, float]]) -> list[tuple[float, float, int, int]]:
     """Ranges between the union's minimum and maximum that no band contains.
 
     Parameters
@@ -61,7 +64,7 @@ def coverage_gaps(bands):
     return gaps
 
 
-def weighting_grid(bands, step):
+def weighting_grid(bands: Sequence[tuple[float, float]], step: float) -> np.ndarray:
     """Bin edges of step `step` that also contain every band edge.
 
     Each upper band edge is moved to the next float up, so the band's last event falls inside a
@@ -74,13 +77,13 @@ def weighting_grid(bands, step):
     return np.unique(np.concatenate([regular, lows, highs]))
 
 
-def in_band_mask(edges, band):
+def in_band_mask(edges: np.ndarray, band: tuple[float, float]) -> np.ndarray:
     """Bins of `edges` that lie inside `band`, whose upper edge is inclusive (see `weighting_grid`)."""
     low, high = band[0], np.nextafter(band[1], np.inf)
     return (edges[:-1] >= low) & (edges[1:] <= high)
 
 
-def summed_weights_and_counts(ws, edges):
+def summed_weights_and_counts(ws: IEventWorkspace, edges: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Summed event weight ``Y`` and number of events ``N`` per bin of `edges`, over all spectra of `ws`.
 
     The spectra are summed on events into one spectrum, whose events are then histogrammed onto
@@ -97,7 +100,7 @@ def summed_weights_and_counts(ws, edges):
     return summed, counts
 
 
-def event_weight(y, n, in_band, centers):
+def event_weight(y: ArrayLike, n: ArrayLike, in_band: np.ndarray, centers: np.ndarray) -> np.ndarray:
     """Event weight ``Y / N``, the mean weight of a bin's events, per bin of a segment's band.
 
     In-band bins without events take a ``1 / c`` interpolated linearly in wavelength from the
@@ -133,7 +136,7 @@ def event_weight(y, n, in_band, centers):
     return weights
 
 
-def overlap_weights(event_weights):
+def overlap_weights(event_weights: ArrayLike) -> np.ndarray:
     """Overlap weights ``(1 / c_i) / sum_k (1 / c_k)`` per bin; 0 where no segment covers the bin.
 
     Parameters
@@ -148,7 +151,9 @@ def overlap_weights(event_weights):
     return weights
 
 
-def zero_weight_ranges(edges, masks, weights):
+def zero_weight_ranges(
+    edges: np.ndarray, masks: Sequence[np.ndarray], weights: np.ndarray
+) -> list[tuple[float, float]]:
     """Ranges inside some band where no segment holds valid data, so every overlap weight is 0.
 
     Returns
@@ -162,22 +167,22 @@ def zero_weight_ranges(edges, masks, weights):
 
 
 class MergeDirectBeamSegments(PythonAlgorithm):
-    def category(self):
+    def category(self) -> str:
         return "Reflectometry\\SNS"
 
-    def name(self):
+    def name(self) -> str:
         return "MergeDirectBeamSegments"
 
-    def version(self):
+    def version(self) -> int:
         return 1
 
-    def summary(self):
+    def summary(self) -> str:
         return "Merge corrected direct-beam segments into one event workspace, weighting overlaps by event weight."
 
-    def seeAlso(self):  # noqa: N802
+    def seeAlso(self) -> list[str]:  # noqa: N802
         return ["MergeRuns"]
 
-    def PyInit(self):  # noqa: N802
+    def PyInit(self) -> None:  # noqa: N802
         self.declareProperty(
             StringArrayProperty("InputWorkspaces", direction=Direction.Input),
             "Corrected direct-beam event workspaces in wavelength, one per segment; not modified",
@@ -203,7 +208,7 @@ class MergeDirectBeamSegments(PythonAlgorithm):
         ):
             self.declareProperty(FloatArrayProperty(name, [], direction=Direction.Output), doc)
 
-    def validateInputs(self):  # noqa: N802
+    def validateInputs(self) -> dict[str, str]:  # noqa: N802
         names = self.getProperty("InputWorkspaces").value
         if len(names) == 0:
             return {"InputWorkspaces": "At least one segment is required"}
@@ -233,7 +238,7 @@ class MergeDirectBeamSegments(PythonAlgorithm):
                 issues.append(f"{label}: spectra or detector IDs differ from {reference[0]}")
         return {"InputWorkspaces": "; ".join(issues)} if issues else {}
 
-    def PyExec(self):  # noqa: N802
+    def PyExec(self) -> None:  # noqa: N802
         names = list(self.getProperty("InputWorkspaces").value)
         step = self.getProperty("WeightingBinWidth").value
         segments = [AnalysisDataService.retrieve(name) for name in names]
@@ -297,7 +302,14 @@ class MergeDirectBeamSegments(PythonAlgorithm):
         output_ws = Rebin(InputWorkspace=merged, Params=[low, high - low, high], PreserveEvents=True, StoreInADS=False)
         self.setProperty("OutputWorkspace", output_ws)
 
-    def _apply_and_merge(self, names, segments, masks, edges, weights):
+    def _apply_and_merge(
+        self,
+        names: list[str],
+        segments: list[IEventWorkspace],
+        masks: list[np.ndarray],
+        edges: np.ndarray,
+        weights: np.ndarray,
+    ) -> IEventWorkspace:
         """Steps 6 and 7: scale each segment's events by its weights and append the segments."""
         registered = []
         try:

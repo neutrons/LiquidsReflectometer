@@ -1,5 +1,7 @@
 """Unit tests for the MergeDirectBeamSegments Mantid algorithm and its kernels."""
 
+from collections.abc import Callable, Iterator
+
 import numpy as np
 import pytest
 from mantid.api import EventType
@@ -127,7 +129,7 @@ def test_summed_weights_and_counts_over_all_spectra(make_segment):
 
 
 @pytest.fixture
-def workspaces():
+def workspaces() -> Iterator[list[str]]:
     """Collects workspace names to delete on teardown, starting with the outputs."""
     names = [OUTPUT_WORKSPACE, WEIGHTS_WORKSPACE]
     yield names
@@ -137,14 +139,23 @@ def workspaces():
 
 
 @pytest.fixture
-def make_segment(workspaces):
+def make_segment(workspaces: list[str]) -> Callable[..., str]:
     """Factory for a four-pixel event workspace in wavelength with events of weight `c`.
 
     Events are drawn from a flat flux: the expected raw count density is `density / c` per Å over
     `[low, high]`, so each segment is an unbiased estimate of the same flux `density`.
     """
 
-    def make(low, high, c, density=2.0e4, seed=0, run_number=1, zero=None, name=None):
+    def make(
+        low: float,
+        high: float,
+        c: float,
+        density: float = 2.0e4,
+        seed: int = 0,
+        run_number: int = 1,
+        zero: tuple[float, float] | None = None,
+        name: str | None = None,
+    ) -> str:
         """`zero`, a ``(min, max)`` range, gives its events weight 0, as the dead time threshold does."""
         rng = np.random.default_rng(seed)
         count = rng.poisson(density / c * (high - low))
@@ -175,7 +186,7 @@ def make_segment(workspaces):
     return make
 
 
-def run_merge(names, **properties):
+def run_merge(names: list[str], **properties: object) -> MergeDirectBeamSegments:
     algorithm = MergeDirectBeamSegments()
     algorithm.initialize()
     algorithm.setRethrows(True)
@@ -188,7 +199,7 @@ def run_merge(names, **properties):
     return algorithm
 
 
-def histogram(name, params):
+def histogram(name: str, params: list[float]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     aligned = Rebin(InputWorkspace=name, Params=params, PreserveEvents=True, StoreInADS=False)
     summed = SumSpectra(InputWorkspace=aligned, StoreInADS=False)
     rebinned = Rebin(InputWorkspace=summed, Params=params, PreserveEvents=False, StoreInADS=False)
@@ -252,7 +263,7 @@ def test_band_edge_events_are_weighted(make_segment):
     np.testing.assert_allclose(weights, 0.5, rtol=0.05)
 
 
-def _weights_at(name, wavelength):
+def _weights_at(name: str, wavelength: float) -> Iterator[float]:
     workspace = mtd[name]
     for index in range(workspace.getNumberHistograms()):
         spectrum = workspace.getSpectrum(index)
@@ -260,7 +271,7 @@ def _weights_at(name, wavelength):
         yield from weights[tofs == wavelength]
 
 
-def _all_weights(name):
+def _all_weights(name: str) -> np.ndarray:
     workspace = mtd[name]
     return np.concatenate([workspace.getSpectrum(i).getWeights() for i in range(workspace.getNumberHistograms())])
 
