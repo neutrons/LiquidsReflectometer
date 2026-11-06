@@ -198,10 +198,10 @@ class MergeDirectBeamSegments(PythonAlgorithm):
                 issues.append(f"{name}: no such workspace")
                 continue
             ws = AnalysisDataService.retrieve(name)
-            label = f"{name} (run {ws.getRunNumber()})"
             if not isinstance(ws, IEventWorkspace):
-                issues.append(f"{label}: not an event workspace")
+                issues.append(f"{name}: not an event workspace")
                 continue
+            label = f"{name} (run {ws.getRunNumber()})"
             if ws.getAxis(0).getUnit().unitID() != "Wavelength":
                 issues.append(f"{label}: X axis must be in Wavelength, not {ws.getAxis(0).getUnit().unitID()!r}")
             if ws.getNumberEvents() == 0:
