@@ -54,3 +54,11 @@ lr_reduction.operations.algorithms.trim_direct_beam_tof
    :members:
    :undoc-members:
    :show-inheritance:
+
+lr_reduction.operations.algorithms.merge_direct_beam_segments
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. automodule:: lr_reduction.operations.algorithms.merge_direct_beam_segments
+   :members:
+   :undoc-members:
+   :show-inheritance:
