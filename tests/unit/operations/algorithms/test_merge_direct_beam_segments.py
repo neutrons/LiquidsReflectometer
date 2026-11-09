@@ -5,17 +5,20 @@ from collections.abc import Callable, Iterator
 import numpy as np
 import pytest
 from mantid.api import EventType
-from mantid.kernel import DateAndTime
+from mantid.kernel import DateAndTime, config
 from mantid.simpleapi import (
     CompressEvents,
     ConvertUnits,
+    CreateEmptyTableWorkspace,
     CreateSampleWorkspace,
     DeleteWorkspace,
     Rebin,
     SumSpectra,
     mtd,
 )
+from mantid.utils.logging import capture_logs
 
+from lr_reduction.operations.algorithms import merge_direct_beam_segments
 from lr_reduction.operations.algorithms.merge_direct_beam_segments import (
     MergeDirectBeamSegments,
     coverage_gaps,
@@ -120,8 +123,18 @@ def workspaces() -> Iterator[list[str]]:
 
 
 @pytest.fixture
+def ads_lists_hidden_workspaces() -> Iterator[None]:
+    """Makes `mtd.getObjectNames()` include the hidden (``__``-prefixed) names the merge's temporaries use."""
+    option = "MantidOptions.InvisibleWorkspaces"
+    previous = config[option]
+    config[option] = "1"
+    yield
+    config[option] = previous
+
+
+@pytest.fixture
 def make_segment(workspaces: list[str]) -> Callable[..., str]:
-    """Factory for a four-pixel event workspace in wavelength with events of weight `c`.
+    """Factory for a square-pixel event workspace in wavelength with events of weight `c`.
 
     Events are drawn from a flat flux: the expected raw count density is `density / c` per Å over
     `[low, high]`, so each segment is an unbiased estimate of the same flux `density`.
@@ -134,10 +147,12 @@ def make_segment(workspaces: list[str]) -> Callable[..., str]:
         density: float = 2.0e4,
         seed: int = 0,
         run_number: int = 1,
-        zero: tuple[float, float] | None = None,
+        reweight: tuple[float, float, float] | None = None,
+        pixel_width: int = 2,
         name: str | None = None,
     ) -> str:
-        """`zero`, a ``(min, max)`` range, gives its events weight 0, as the dead time threshold does."""
+        """`reweight`, a ``(min, max, weight)`` triple, gives the events in ``[min, max]`` that weight
+        instead of `c`; weight 0 is what the dead time threshold does."""
         rng = np.random.default_rng(seed)
         count = rng.poisson(density / c * (high - low))
         wavelengths = np.sort(rng.uniform(low, high, count))
@@ -145,7 +160,7 @@ def make_segment(workspaces: list[str]) -> Callable[..., str]:
         CreateSampleWorkspace(
             WorkspaceType="Event",
             NumBanks=1,
-            BankPixelWidth=2,
+            BankPixelWidth=pixel_width,
             NumEvents=0,
             XMin=0.0,
             XMax=20000.0,
@@ -159,7 +174,7 @@ def make_segment(workspaces: list[str]) -> Callable[..., str]:
         for spectrum in spectra:
             spectrum.switchTo(EventType.WEIGHTED)
         for index, wavelength in enumerate(wavelengths):
-            weight = 0.0 if zero is not None and zero[0] <= wavelength <= zero[1] else c
+            weight = reweight[2] if reweight is not None and reweight[0] <= wavelength <= reweight[1] else c
             spectra[index % len(spectra)].addWeightedEventQuickly(wavelength, weight, weight**2, DateAndTime(0))
         workspaces.append(name)
         return name
@@ -218,18 +233,23 @@ def test_overlap_bin_is_pooled_counts_with_combined_event_weight(make_segment):
 
 
 def test_gap_is_reported_and_holds_no_flux(make_segment):
-    a = make_segment(2.0, 4.0, c=1.0, seed=5)
-    b = make_segment(5.0, 7.0, c=1.0, seed=6)
-    algorithm = run_merge([a, b])
+    a = make_segment(2.0, 4.0, c=1.0, seed=5, run_number=11)
+    b = make_segment(5.0, 7.0, c=1.0, seed=6, run_number=12)
+    with capture_logs(level="warning") as logs:
+        algorithm = run_merge([a, b])
+        log_text = logs.getvalue()
 
     gap_min, gap_max = algorithm.getProperty("GapMin").value, algorithm.getProperty("GapMax").value
     assert len(gap_min) == 1
     assert gap_min[0] == pytest.approx(4.0, abs=1e-3)
     assert gap_max[0] == pytest.approx(5.0, abs=1e-3)
+    assert "between run 11 and run 12" in log_text
     _, y, _ = histogram(OUTPUT_WORKSPACE, [4.1, 0.8, 4.9])
     assert y[0] == 0.0
-    # Alone everywhere, so neither segment is scaled.
+    # Alone everywhere, so neither segment is scaled and each side matches its segment.
     np.testing.assert_array_equal(np.unique(mtd[WEIGHTS_WORKSPACE].extractY()), [0.0, 1.0])
+    for segment, params in ((a, [2.0, 0.1, 4.0]), (b, [5.0, 0.1, 7.0])):
+        np.testing.assert_array_equal(histogram(OUTPUT_WORKSPACE, params)[1], histogram(segment, params)[1])
 
 
 def test_band_edge_events_are_weighted(make_segment):
@@ -262,12 +282,33 @@ def test_input_named_like_a_former_temporary_is_kept(make_segment):
     assert mtd[OUTPUT_WORKSPACE].getNumberEvents() == mtd[a].getNumberEvents() + events
 
 
-def test_one_segment_is_cloned(make_segment):
+def test_one_segment_equals_the_input_event_for_event(make_segment):
     a = make_segment(2.0, 6.0, c=0.5, seed=9)
     run_merge([a])
-    np.testing.assert_array_equal(histogram(OUTPUT_WORKSPACE, [2.0, 0.1, 6.0])[1], histogram(a, [2.0, 0.1, 6.0])[1])
+    output, segment = mtd[OUTPUT_WORKSPACE], mtd[a]
+    assert output.getNumberHistograms() == segment.getNumberHistograms()
+    for index in range(segment.getNumberHistograms()):
+        merged, original = output.getSpectrum(index), segment.getSpectrum(index)
+        assert tuple(merged.getDetectorIDs()) == tuple(original.getDetectorIDs())
+        np.testing.assert_array_equal(merged.getTofs(), original.getTofs())
+        np.testing.assert_array_equal(merged.getWeights(), original.getWeights())
+        np.testing.assert_array_equal(merged.getWeightErrors(), original.getWeightErrors())
 
 
+def test_events_are_preserved_pixel_by_pixel(make_segment):
+    a = make_segment(2.0, 6.0, c=0.5, seed=22)
+    b = make_segment(4.0, 8.0, c=2.0, seed=23)
+    run_merge([a, b])
+    output = mtd[OUTPUT_WORKSPACE]
+    assert output.getNumberHistograms() == mtd[a].getNumberHistograms()
+    for index in range(output.getNumberHistograms()):
+        merged = output.getSpectrum(index)
+        assert tuple(merged.getDetectorIDs()) == tuple(mtd[a].getSpectrum(index).getDetectorIDs())
+        expected = mtd[a].getSpectrum(index).getNumberEvents() + mtd[b].getSpectrum(index).getNumberEvents()
+        assert merged.getNumberEvents() == expected
+
+
+@pytest.mark.usefixtures("ads_lists_hidden_workspaces")
 def test_inputs_unchanged_and_no_intermediates_left(make_segment):
     a = make_segment(2.0, 6.0, c=0.5, seed=10)
     b = make_segment(4.0, 8.0, c=2.0, seed=11)
@@ -276,6 +317,25 @@ def test_inputs_unchanged_and_no_intermediates_left(make_segment):
     run_merge([a, b])
     np.testing.assert_array_equal(histogram(a, [2.0, 0.1, 8.0])[1], before)
     assert set(mtd.getObjectNames()) - names_before == {OUTPUT_WORKSPACE, WEIGHTS_WORKSPACE}
+
+
+@pytest.mark.usefixtures("ads_lists_hidden_workspaces")
+def test_no_intermediates_left_when_the_merge_fails(make_segment, monkeypatch):
+    a = make_segment(2.0, 6.0, c=0.5, seed=24)
+    b = make_segment(4.0, 8.0, c=2.0, seed=25)
+    names_before = set(mtd.getObjectNames())
+    registered = []
+
+    def failing_merge_runs(InputWorkspaces: list[str], **_: object) -> None:  # noqa: N803
+        registered.extend(name for name in InputWorkspaces if name not in (a, b) and mtd.doesExist(name))
+        raise RuntimeError("MergeRuns failed")
+
+    monkeypatch.setattr(merge_direct_beam_segments, "MergeRuns", failing_merge_runs)
+    with pytest.raises(RuntimeError, match="MergeRuns failed"):
+        run_merge([a, b])
+    # The failure came after the weighted segments were registered, and they are gone.
+    assert registered
+    assert set(mtd.getObjectNames()) == names_before
 
 
 def test_output_axis_is_single_bin(make_segment):
@@ -288,6 +348,62 @@ def test_output_axis_is_single_bin(make_segment):
     assert x[1] == np.nextafter(mtd[b].getTofMax(), np.inf)
 
 
+def test_history_records_the_algorithm_and_its_inputs(make_segment):
+    a = make_segment(2.0, 6.0, c=0.5, seed=26)
+    b = make_segment(4.0, 8.0, c=2.0, seed=27)
+    run_merge([a, b], WeightingBinWidth=0.02)
+    history = mtd[OUTPUT_WORKSPACE].getHistory()
+    last = history.getAlgorithmHistory(history.size() - 1)
+    assert last.name() == "MergeDirectBeamSegments"
+    assert last.getPropertyValue("InputWorkspaces") == f"{a},{b}"
+    assert float(last.getPropertyValue("WeightingBinWidth")) == 0.02
+
+
+# --------------------------------------------------------------------------------------------
+# Validation and errors
+
+
+def test_rejects_empty_input_list():
+    with pytest.raises(RuntimeError, match="At least one segment is required"):
+        run_merge([])
+
+
+def test_rejects_missing_workspace():
+    with pytest.raises(RuntimeError, match="no_such_segment: no such workspace"):
+        run_merge(["no_such_segment"])
+
+
+def test_rejects_table_workspace(workspaces):
+    # A table workspace has no run number, so the type check must come before the run label.
+    name = mtd.unique_hidden_name()
+    CreateEmptyTableWorkspace(OutputWorkspace=name)
+    workspaces.append(name)
+    with pytest.raises(RuntimeError, match=f"{name}: not an event workspace"):
+        run_merge([name])
+
+
+def test_rejects_histogram_workspace(workspaces):
+    name = mtd.unique_hidden_name()
+    CreateSampleWorkspace(WorkspaceType="Histogram", NumBanks=1, BankPixelWidth=2, OutputWorkspace=name)
+    ConvertUnits(InputWorkspace=name, Target="Wavelength", OutputWorkspace=name)
+    workspaces.append(name)
+    with pytest.raises(RuntimeError, match=f"{name}: not an event workspace"):
+        run_merge([name])
+
+
+def test_rejects_workspace_without_events(make_segment):
+    name = make_segment(2.0, 6.0, c=1.0, density=0.0, run_number=7)
+    with pytest.raises(RuntimeError, match=r"\(run 7\): contains no events"):
+        run_merge([name])
+
+
+def test_rejects_mismatched_detectors(make_segment):
+    a = make_segment(2.0, 6.0, c=1.0, seed=28, run_number=7)
+    b = make_segment(4.0, 8.0, c=1.0, seed=29, run_number=8, pixel_width=3)
+    with pytest.raises(RuntimeError, match=rf"\(run 8\): spectra or detector IDs differ from {a} \(run 7\)"):
+        run_merge([a, b])
+
+
 def test_rejects_compressed_events(make_segment):
     name = make_segment(2.0, 6.0, c=0.5, seed=15)
     CompressEvents(InputWorkspace=name, Tolerance=0.01, OutputWorkspace=name)
@@ -295,11 +411,28 @@ def test_rejects_compressed_events(make_segment):
         run_merge([name])
 
 
-def test_rejects_zero_weight_events(make_segment):
+@pytest.mark.parametrize("weight", [0.0, -1.0], ids=["zero", "negative"])
+def test_rejects_non_positive_weight_events(make_segment, weight):
     a = make_segment(2.0, 6.0, c=1.0, seed=16)
-    b = make_segment(4.0, 8.0, c=1.0, seed=17, zero=(4.5, 5.0))
+    b = make_segment(4.0, 8.0, c=1.0, seed=17, reweight=(4.5, 5.0, weight))
     with pytest.raises(RuntimeError, match="zero or negative weight"):
         run_merge([a, b])
+
+
+@pytest.mark.parametrize("weight", [np.nan, np.inf], ids=["nan", "inf"])
+def test_rejects_non_finite_weight_events(make_segment, weight):
+    a = make_segment(2.0, 6.0, c=1.0, seed=18)
+    b = make_segment(4.0, 8.0, c=1.0, seed=19, reweight=(4.5, 5.0, weight))
+    with pytest.raises(RuntimeError, match="NaN or infinite weight"):
+        run_merge([a, b])
+
+
+@pytest.mark.parametrize("width", [0.0, -0.01])
+def test_rejects_non_positive_weighting_bin_width(width):
+    algorithm = MergeDirectBeamSegments()
+    algorithm.initialize()
+    with pytest.raises(ValueError, match="WeightingBinWidth"):
+        algorithm.setProperty("WeightingBinWidth", width)
 
 
 def test_rejects_tof_input(workspaces):
