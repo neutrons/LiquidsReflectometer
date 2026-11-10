@@ -62,3 +62,11 @@ lr_reduction.operations.algorithms.slit_scan_correction
    :members:
    :undoc-members:
    :show-inheritance:
+
+lr_reduction.operations.algorithms.merge_direct_beam_segments
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. automodule:: lr_reduction.operations.algorithms.merge_direct_beam_segments
+   :members:
+   :undoc-members:
+   :show-inheritance:
