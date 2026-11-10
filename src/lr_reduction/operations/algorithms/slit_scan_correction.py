@@ -9,7 +9,7 @@ import math
 
 from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, PythonAlgorithm
 from mantid.kernel import Direction
-from mantid.simpleapi import CloneWorkspace, Scale, logger
+from mantid.simpleapi import CloneWorkspace, Scale, logger, mtd
 
 from lr_reduction.exceptions import AmbiguousLogError, LrValidationError
 from lr_reduction.utils.sample_logs import SampleLogs
@@ -62,26 +62,37 @@ class SlitScanCorrection(PythonAlgorithm):
     def PyInit(self):  # noqa: N802
         self.declareProperty(
             IEventWorkspaceProperty("InputWorkspace", "", Direction.Input),
-            f"Direct-beam event workspace carrying a {SCALE_MULTIPLIER_LOG} log; never modified",
+            f"Direct-beam event workspace carrying a {SCALE_MULTIPLIER_LOG} log; "
+            "modified only when OutputWorkspace has the same name",
         )
         self.declareProperty(
             IEventWorkspaceProperty("OutputWorkspace", "", Direction.Output),
             f"Event workspace with weights multiplied by N squared, carrying a {FACTOR_LOG} log",
         )
 
+    def validateInputs(self):  # noqa: N802
+        issues = {}
+        input_workspace = self.getProperty("InputWorkspace").value
+        if input_workspace is not None and input_workspace.getRun().hasProperty(FACTOR_LOG):
+            issues["InputWorkspace"] = (
+                f"Run {input_workspace.getRunNumber()} already has a {FACTOR_LOG} log; "
+                "the slit-scan correction was already applied"
+            )
+        return issues
+
     def PyExec(self):  # noqa: N802
         input_workspace = self.getProperty("InputWorkspace").value
+        input_name = self.getPropertyValue("InputWorkspace")
         output_name = self.getPropertyValue("OutputWorkspace")
 
         factor = get_scale_multiplier(input_workspace) ** 2
-        if factor == 1.0:
-            # Scale by 1 would still turn plain events into weighted ones, costing memory for nothing.
-            output = CloneWorkspace(InputWorkspace=input_workspace, OutputWorkspace=output_name)
-        else:
+        if factor != 1.0:
             logger.notice(f"Slit-scan factor for run {input_workspace.getRunNumber()}: {factor:g}")
-            output = Scale(
-                InputWorkspace=input_workspace, Factor=factor, Operation="Multiply", OutputWorkspace=output_name
-            )
+            Scale(InputWorkspace=input_name, Factor=factor, Operation="Multiply", OutputWorkspace=output_name)
+        elif output_name != input_name:
+            # Scale by 1 would still turn plain events into weighted ones, costing memory for nothing.
+            CloneWorkspace(InputWorkspace=input_name, OutputWorkspace=output_name)
+        output = mtd[output_name]
         SampleLogs(output).insert(FACTOR_LOG, factor)
         self.setProperty("OutputWorkspace", output)
 

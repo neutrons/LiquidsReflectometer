@@ -114,6 +114,34 @@ def test_unit_factor_leaves_events_unweighted(make_direct_beam, n):
     assert not mtd[direct_beam].getRun().hasProperty(FACTOR_LOG)
 
 
+@pytest.mark.parametrize("n, factor, event_type", [(7.0, 49, "WEIGHTED"), (1.0, 1, "TOF")], ids=["n_is_7", "n_is_one"])
+def test_in_place_correction(make_direct_beam, n, factor, event_type):
+    direct_beam = make_direct_beam(n)
+    before = weights(mtd[direct_beam])
+    n_events = mtd[direct_beam].getNumberEvents()
+
+    corrected = run_algorithm(SlitScanCorrection, direct_beam, direct_beam)
+
+    assert corrected.name() == direct_beam
+    assert mtd[direct_beam].getNumberEvents() == n_events
+    assert mtd[direct_beam].getSpectrum(0).getEventType().name == event_type
+    np.testing.assert_allclose(weights(mtd[direct_beam]), factor * before, rtol=RTOL)
+    assert mtd[direct_beam].getRun().getProperty(FACTOR_LOG).value == factor
+
+
+def test_already_corrected_input_is_rejected(make_direct_beam):
+    direct_beam = make_direct_beam(3.0)
+    algorithm = SlitScanCorrection()
+    algorithm.initialize()
+    algorithm.setProperty("InputWorkspace", direct_beam)
+    assert algorithm.validateInputs() == {}
+
+    corrected = run_algorithm(SlitScanCorrection, direct_beam)
+    algorithm.setProperty("InputWorkspace", corrected.name())
+
+    assert "already" in algorithm.validateInputs()["InputWorkspace"]
+
+
 @pytest.mark.parametrize(
     "n, message",
     [((7.0, 5.0), "varies"), ((0.0,), "positive"), ((-2.0,), "positive"), ((float("nan"),), "NaN")],
