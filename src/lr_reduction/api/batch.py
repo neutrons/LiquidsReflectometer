@@ -6,12 +6,12 @@ as prototyped in scripts/shared/batch_reduce.py."""
 from __future__ import annotations
 
 import argparse
+import logging
 from pathlib import Path
 
 from lr_reduction.api.autoreduce import reduce_auto
-from lr_reduction.utils import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def reduce_batch(experiment_id: str, first_run: int, last_run: int, output_dir: str | Path, **overrides) -> None:

@@ -5,6 +5,7 @@ Dividing each event's weight by the stack's transmission, following the Beer-Lam
 T(λ) = exp(-μ(λ)·d), recovers the unattenuated incident flux the sample would see.
 """
 
+import logging
 from functools import lru_cache
 from pathlib import Path
 
@@ -14,11 +15,10 @@ from mantid.simpleapi import ConvertToHistogram, CreateWorkspace, Divide, Filter
 
 from lr_reduction.exceptions import LogNotFoundError, LrValidationError, SampleLogsError
 from lr_reduction.types import MantidWorkspace, MantidWorkspaceName
-from lr_reduction.utils import get_logger
 from lr_reduction.utils.sample_logs import SampleLogs
 from lr_reduction.utils.workspace import workspace_exists, workspace_handle
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 #######################################################################################
 ### Constants

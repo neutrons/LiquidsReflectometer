@@ -8,15 +8,15 @@ duplicating stub logic across manual.py/live.py/autoreduce.py.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from lr_reduction.io import RunLoader
 from lr_reduction.models.config import DirectBeamConfig, ReductionConfig
 from lr_reduction.models.run_data import RunData
 from lr_reduction.types import ID
-from lr_reduction.utils import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def get_direct_beam_config(sequence_number: ID, config: ReductionConfig) -> DirectBeamConfig:

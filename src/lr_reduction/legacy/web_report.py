@@ -4,6 +4,7 @@ Report class used to populate the web monitor
 
 import math
 import time
+import traceback
 from typing import NamedTuple, Optional, Union
 
 import numpy as np
@@ -219,7 +220,7 @@ def generate_report_sections(
         report = generate_report_section_direct_beam_parameters(workspace)
         template_data = None
     else:
-        logger.error("Invalid data type for report: %s", data_type.name)
+        logger.error(f"Invalid data type for report: {data_type.name}")
         return ReportSections("", [], "")
 
     run_meta_data = generate_report_section_run_meta_data(workspace)
@@ -227,8 +228,7 @@ def generate_report_sections(
     try:
         plots = generate_report_plots(workspace, template_data, data_type)
     except Exception as e:  # noqa: BLE001
-        logger.notice(f"Could not generate plots: {e}")
-        logger.error("Could not generate plots", exc_info=True)
+        logger.error(f"Could not generate plots: {e}\n{traceback.format_exc()}")
 
     logger.notice(f"  - report: {len(report)} {len(plots)}")
 
@@ -794,7 +794,7 @@ def _plot2d(
     )
     fig = go.Figure(data=plotly_objects, layout=layout)
 
-    div_html = pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
+    div_html = pyo.plot(fig, output_type="div", include_plotlyjs=False)
 
     return div_html
 
@@ -935,7 +935,7 @@ def _plot1d(
     )
 
     fig = go.Figure(data=data, layout=layout)
-    return pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
+    return pyo.plot(fig, output_type="div", include_plotlyjs=False)
 
 
 def _plot_text(text, title=""):
@@ -975,6 +975,6 @@ def _plot_text(text, title=""):
     )
 
     fig = go.Figure(layout=layout)
-    plot = pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
+    plot = pyo.plot(fig, output_type="div", include_plotlyjs=False)
 
     return plot

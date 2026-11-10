@@ -7,6 +7,7 @@ Re-grows the sequence's on-disk assembly (§6.4.4, §2.4.1.a).
 from __future__ import annotations
 
 import argparse
+import logging
 from pathlib import Path
 
 from lr_reduction.api._shared import get_direct_beam_config, get_direct_beams, locate_configuration_relative_to
@@ -19,9 +20,8 @@ from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 from lr_reduction.operations import CombineResultsOperation
 from lr_reduction.types import SingleReductionInput
-from lr_reduction.utils import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class AutoreduceSingleRun(SingleRunReduction):

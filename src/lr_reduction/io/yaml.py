@@ -1,12 +1,13 @@
 """YAML I/O module. YAML is the native configuration format."""
 
+import logging
+
 import yaml
 
 from lr_reduction.exceptions.config import ConfigParseError
 from lr_reduction.models.config import ReductionConfig
-from lr_reduction.utils import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def read_config(filepath: str) -> ReductionConfig:
