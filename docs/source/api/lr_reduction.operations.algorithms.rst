@@ -55,6 +55,14 @@ lr_reduction.operations.algorithms.trim_direct_beam_tof
    :undoc-members:
    :show-inheritance:
 
+lr_reduction.operations.algorithms.slit_scan_correction
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. automodule:: lr_reduction.operations.algorithms.slit_scan_correction
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 lr_reduction.operations.algorithms.merge_direct_beam_segments
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
