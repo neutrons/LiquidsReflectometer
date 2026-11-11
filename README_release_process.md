@@ -79,10 +79,10 @@ git tag exp3.1.0rc1
 git push origin exp3.1.0rc1
 ```
 
-In the GitHub UI: Releases → Draft a new release → tag `exp3.0.0rc1`, target `exp-qa`,
+In the GitHub UI: Releases → Draft a new release → tag `exp3.1.0rc1`, target `exp-qa`,
 Generate release notes, check **Set as a pre-release**, Publish.
 
-The tag push runs the workflow, builds `lr_reduction 3.0.0rc1`, and publishes it to Anaconda under the `exp-qa` label.
+The tag push runs the workflow, builds `lr_reduction 3.1.0rc1`, and publishes it to Anaconda under the `exp-qa` label.
 
 ## Marking a release
 
@@ -118,7 +118,7 @@ git push origin exp3.1.0
 ```
 
 In the GitHub UI, target `exp` and leave **Set as the latest release** unchecked so the production
-line's release stays the repository's "Latest".
+line's release stays the repository's "Latest". This is important since `exp` is the **Experimental** deployment set.
 
 The tag push builds `lr_reduction 3.1.0` and publishes it under the `exp` label.
 
