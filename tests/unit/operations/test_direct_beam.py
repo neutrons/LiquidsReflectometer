@@ -1,10 +1,13 @@
 import pytest
 from mantid.simpleapi import AddSampleLog, CreateSampleWorkspace, DeleteWorkspace, mtd
 
-from lr_reduction.exceptions import ConfigError, SampleLogsError
+from lr_reduction.exceptions import ConfigError, OperationInputError, SampleLogsError
 from lr_reduction.models.config import ReductionConfig, RunParameters
 from lr_reduction.models.run_data import RunData
+from lr_reduction.operations.algorithms.convert_tof_to_wavelength import MULTIPLIER_LOG, OFFSET_LOG
+from lr_reduction.operations.algorithms.trim_direct_beam_tof import CHOPPER2_PHASE_LOG
 from lr_reduction.operations.direct_beam import DirectBeamCompositionOperation, cd_order, direct_beam_roi
+from lr_reduction.properties.cd_attenuation import STAGE_LOGS
 
 MENU_LOG = "BL4B:Actuator:Menu"
 
@@ -19,17 +22,22 @@ def make_run():
     """Factory for direct-beam runs carrying an attenuator menu log, deleted afterwards."""
     names = []
 
-    def _make(run_number, menu_code=None):
+    def _make(run_number, menu_code=None, logs=(), workspace_type="Event", unit="TOF"):
         name = mtd.unique_hidden_name()
-        CreateSampleWorkspace(WorkspaceType="Event", NumBanks=1, BankPixelWidth=1, NumEvents=1, OutputWorkspace=name)
+        CreateSampleWorkspace(
+            WorkspaceType=workspace_type, XUnit=unit, NumBanks=1, BankPixelWidth=1, NumEvents=1, OutputWorkspace=name
+        )
         if menu_code is not None:
             AddSampleLog(Workspace=name, LogName=MENU_LOG, LogText=str(menu_code), LogType="Number")
+        for log in logs:
+            AddSampleLog(Workspace=name, LogName=log, LogText="1.0", LogType="Number")
         names.append(name)
         return RunData(workspace=name, run_numbers=(run_number,))
 
     yield _make
     for name in names:
-        DeleteWorkspace(name)
+        if mtd.doesExist(name):
+            DeleteWorkspace(name)
 
 
 # --- cd_order ----------------------------------------------------------------------------
@@ -109,3 +117,130 @@ def test_operation_keeps_full_config_and_direct_beam_name(make_run):
     assert operation.data == runs
     assert operation.config is config
     assert operation.direct_beam_name == "db_8mm"
+
+
+# --- DirectBeamCompositionOperation.validate_input -----------------------------------------
+
+#: The logs the default configuration's steps read beyond the attenuator log: the trim's
+#: chopper-2 phase and the emission-time chopper offset and multiplier.
+STEP_LOGS = (CHOPPER2_PHASE_LOG, OFFSET_LOG, MULTIPLIER_LOG)
+
+
+def _config(run_numbers=(1, 2), corrections=None, **direct_beam):
+    return ReductionConfig(
+        direct_beams={"db_8mm": {"direct_beam_run_numbers": list(run_numbers), **direct_beam}},
+        corrections=corrections or {},
+    )
+
+
+@pytest.fixture
+def complete_run(make_run):
+    """Factory for a direct-beam run carrying every log the default configuration reads."""
+
+    def _make(run_number, **kwargs):
+        kwargs.setdefault("menu_code", THIN_CD[0])
+        kwargs.setdefault("logs", STEP_LOGS)
+        return make_run(run_number, **kwargs)
+
+    return _make
+
+
+def _validate(runs, config=None, name="db_8mm"):
+    DirectBeamCompositionOperation(runs, config or _config(), name).validate_input()
+
+
+def test_validate_input_accepts_complete_runs(complete_run):
+    _validate([complete_run(1), complete_run(2)])
+
+
+def test_validate_input_rejects_unknown_direct_beam_name(complete_run):
+    with pytest.raises(OperationInputError, match="No direct beam named 'db_20mm'.*db_8mm"):
+        _validate([complete_run(1), complete_run(2)], name="db_20mm")
+
+
+def test_validate_input_rejects_empty_data():
+    with pytest.raises(OperationInputError, match="no direct-beam runs"):
+        _validate([])
+
+
+@pytest.mark.parametrize(
+    "given",
+    [(1,), (1, 2, 3), (1, 3), (1, 1, 2)],
+    ids=["missing", "extra", "different", "duplicate"],
+)
+def test_validate_input_rejects_runs_differing_from_configuration(complete_run, given):
+    with pytest.raises(OperationInputError, match=r"runs \[.*\] were given, but the configuration lists \[1, 2\]"):
+        _validate([complete_run(run_number) for run_number in given])
+
+
+def test_validate_input_rejects_workspace_in_wavelength(complete_run):
+    with pytest.raises(OperationInputError, match="run 2: .* is in Wavelength, not TOF"):
+        _validate([complete_run(1), complete_run(2, unit="Wavelength")])
+
+
+def test_validate_input_rejects_histogram_workspace(complete_run):
+    with pytest.raises(OperationInputError, match="run 2: .* is not an event workspace"):
+        _validate([complete_run(1), complete_run(2, workspace_type="Histogram")])
+
+
+def test_validate_input_rejects_deleted_workspace(complete_run):
+    deleted = complete_run(2)
+    DeleteWorkspace(deleted.workspace)
+    with pytest.raises(OperationInputError, match="run 2: no workspace named"):
+        _validate([complete_run(1), deleted])
+
+
+def test_validate_input_rejects_run_without_attenuator_log(complete_run):
+    with pytest.raises(OperationInputError, match="run 2: no attenuator log"):
+        _validate([complete_run(1), complete_run(2, menu_code=None)])
+
+
+def test_validate_input_accepts_per_stage_attenuator_logs(complete_run):
+    _validate([complete_run(1), complete_run(2, menu_code=None, logs=STEP_LOGS + tuple(STAGE_LOGS))])
+
+
+def test_validate_input_requires_chopper2_phase_log_only_when_trimming(complete_run):
+    without_phase = (OFFSET_LOG, MULTIPLIER_LOG)
+    with pytest.raises(OperationInputError, match=f"run 2: no {CHOPPER2_PHASE_LOG} log, which the TOF trim"):
+        _validate([complete_run(1), complete_run(2, logs=without_phase)])
+    _validate(
+        [complete_run(1), complete_run(2, logs=without_phase)],
+        _config(tof_trim={"apply": False}),
+    )
+
+
+@pytest.mark.parametrize("missing", [OFFSET_LOG, MULTIPLIER_LOG])
+def test_validate_input_requires_chopper_emission_logs_without_coefficients(complete_run, missing):
+    logs = tuple(log for log in STEP_LOGS if log != missing)
+    with pytest.raises(OperationInputError, match=f"run 2: no {missing} log, which the emission-time correction"):
+        _validate([complete_run(1), complete_run(2, logs=logs)])
+
+
+@pytest.mark.parametrize(
+    "emission_time",
+    [{"coefficients": [100.0, 20.0]}, {"apply": False}],
+    ids=["coefficients configured", "correction disabled"],
+)
+def test_validate_input_does_not_need_chopper_emission_logs(complete_run, emission_time):
+    runs = [complete_run(1), complete_run(2, logs=(CHOPPER2_PHASE_LOG,))]
+    _validate(runs, _config(corrections={"emission_time": emission_time}))
+
+
+def test_validate_input_reports_every_issue_together(complete_run):
+    with pytest.raises(OperationInputError) as raised:
+        _validate([complete_run(1, unit="Wavelength"), complete_run(2, menu_code=None)])
+    message = str(raised.value)
+    assert "run 1: " in message and "not TOF" in message
+    assert "run 2: no attenuator log" in message
+
+
+@pytest.mark.parametrize(("apply", "warned"), [(True, True), (False, False)])
+def test_validate_input_warns_about_missing_error_events_when_correcting_dead_time(
+    complete_run, monkeypatch, apply, warned
+):
+    warnings = []
+    monkeypatch.setattr("lr_reduction.operations.direct_beam.logger.warning", warnings.append)
+    _validate([complete_run(1), complete_run(2)], _config(corrections={"dead_time": {"apply": apply}}))
+    assert bool(warnings) is warned
+    if warned:
+        assert [message.split(" has ")[0] for message in warnings] == ["run 1", "run 2"]

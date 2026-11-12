@@ -12,6 +12,10 @@ from lr_reduction.exceptions.config import (
     ConfigParseError,
     ConfigValidationError,
 )
+from lr_reduction.exceptions.operations import (
+    OperationError,
+    OperationInputError,
+)
 from lr_reduction.exceptions.results import (
     IncompleteDataError,
     MalformedDataError,
@@ -54,6 +58,8 @@ __all__ = [
     "LrValidationError",
     "MalformedDataError",
     "NotFoundError",
+    "OperationError",
+    "OperationInputError",
     "ParseError",
     "ResultError",
     "RunDataError",
