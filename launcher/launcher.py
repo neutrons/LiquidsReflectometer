@@ -9,6 +9,7 @@ from qtpy.QtWidgets import QApplication, QGridLayout, QTabWidget, QWidget
 # nsd-conda-wrap.sh lr_reduction_exp --classic <path-to-launcher.py>
 # NB: would like this to be (and use the <path-to-launcher.py> deployed with the environment
 # nsd-conda-wrap.sh lr_reduction_exp launcher
+from launcher.app_identity import ensure_identity, migrate_legacy_settings
 from launcher.apps.dynamic_30Hz import Dynamic30Hz
 from launcher.apps.dynamic_60Hz import Dynamic60Hz
 from launcher.apps.off_spec import OffSpec
@@ -99,6 +100,10 @@ class ReductionInterface(QTabWidget):
 
 # referenced by pyproject.toml, part of the GUI system
 def main():
+    # The second shipped gui-script. Without this the SLD tab (and anything
+    # else shared) splits its store between the two binaries.
+    ensure_identity()
+    migrate_legacy_settings()
     app = QApplication([])
     window = ReductionInterface()
     window.show()
