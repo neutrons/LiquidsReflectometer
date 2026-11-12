@@ -172,11 +172,40 @@ class Corrections(BaseModel):
 
 
 class PeakFitConfig(BaseModel):
-    """Specular-peak fitting parameters."""
+    """Beam-peak fitting parameters for the reflected and the direct beam alike."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
-    type: Literal["gauss", "supergauss"] = Field("supergauss")
-    pad: int = Field(1, ge=0)
+    type: Literal["gauss", "supergauss"] = Field("supergauss", description="Peak model")
+    background: Literal["linear", "flat", "none"] = Field("linear", description="Background model under the peak")
+    pad: int = Field(1, ge=0, description="Pixels added on both sides of the peak range for the fit window")
+
+
+class ChopperCutConfig(BaseModel):
+    """Chopper-2 frame-overlap cut: ``t_cut [ms] = (a1 * phase - a0) / 1000 + offset_ms``."""
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+    coefficients: tuple[float, float] = Field((2.077, 16818.0), description="(a1, a0) of the linear fit to the phase")
+    offset_ms: float = Field(1.0, description="Offset added to the fitted cut time, in ms")
+
+
+class DirectBeamTrimConfig(BaseModel):
+    """TOF trimming of each direct-beam run before the composite is merged."""
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+    apply: bool = Field(True, description="Enable direct-beam TOF trimming")
+    chopper_cut: ChopperCutConfig = Field(default_factory=ChopperCutConfig)
+    intensity_threshold: float = Field(
+        0.36,
+        ge=0,
+        description="Smallest reliable intensity per `intensity_tof_step` bin, in counts per µA·h",
+    )
+    intensity_tof_step: float = Field(50.0, gt=0, description="Bin width of the intensity histogram, µs")
+    dead_time_threshold: float = Field(1.25, ge=1, description="Largest reliable dead-time correction factor")
+    dead_time_threshold_lowest_wavelength: float = Field(
+        1.5,
+        ge=1,
+        description="`dead_time_threshold` for the thickest-Cd run, which covers the shortest wavelengths",
+    )
 
 
 class ResolutionConfig(BaseModel):
@@ -238,6 +267,7 @@ class RunParameters(BaseModel):
     peak: PixelRange | None = None
     background: BackgroundConfig | None = None
     low_res: PixelRange | None = None  # low-resolution-direction pixel range
+    peak_fit: PeakFitConfig | None = None
 
 
 class ReflectedRunParameters(RunParameters):
@@ -252,7 +282,6 @@ class ReflectedRunParameters(RunParameters):
     acceptance: AcceptanceWindow | None = Field(None)
     q_binning: QBinning | None = Field(None)
     angle: AngleConfig | None = Field(None)
-    peak_fit: PeakFitConfig | None = Field(None)
     resolution: ResolutionConfig | None = Field(None)
     geometry: GeometryOverride | None = Field(None)
     scale_factor: float | None = Field(None, description="Manual stitch scale override")
@@ -279,6 +308,11 @@ class DirectBeamConfig(RunParameters):
     """
 
     direct_beam_run_numbers: list[ID] = Field(min_length=1)
+    flip_atten: bool = Field(
+        False,
+        description="The runs' attenuator logs were recorded with inverted polarity, 0 meaning in the beam",
+    )
+    tof_trim: DirectBeamTrimConfig = Field(default_factory=DirectBeamTrimConfig)
     # TODO:
     #   Not explicitly specified for DB runs; included for symmetry with reflected runs
     #   Determine whether this is actually needed.
