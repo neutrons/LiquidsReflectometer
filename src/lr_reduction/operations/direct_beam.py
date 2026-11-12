@@ -1,7 +1,74 @@
-from lr_reduction.models.config import DirectBeamConfig
+from lr_reduction.exceptions import ConfigError
+from lr_reduction.models.config import DirectBeamConfig, PeakFitConfig, RunParameters
 from lr_reduction.models.results import CompositeDirectBeam
 from lr_reduction.models.run_data import RunData
 from lr_reduction.operations.interfaces import OperationInterface
+from lr_reduction.properties.cd_attenuation import compute_cd_thickness, get_attenuator_log
+
+
+def cd_order(runs: list[RunData], flip_atten: bool) -> list[tuple[RunData, float]]:
+    """The direct-beam runs in ascending order of the Cd thickness in their beam.
+
+    The composite uses this one order everywhere: the thickest-Cd run, last, gets the
+    lowest-wavelength dead-time threshold, and the segments are merged and logged in this order.
+
+    Parameters
+    ----------
+    runs
+        The composite's direct-beam runs.
+    flip_atten
+        Whether the runs' attenuator logs were recorded with inverted polarity.
+
+    Returns
+    -------
+    list[tuple[RunData, float]]
+        Each run with its Cd thickness in centimeters, thinnest first. Runs of equal
+        thickness keep their input order.
+
+    Raises
+    ------
+    SampleLogsError
+        A run has no usable attenuator log.
+    """
+    thicknesses = [compute_cd_thickness(get_attenuator_log(run.workspace), flip_atten=flip_atten) for run in runs]
+    return sorted(zip(runs, thicknesses, strict=True), key=lambda pair: pair[1])
+
+
+def direct_beam_roi(params: RunParameters) -> tuple[tuple[int, int], tuple[int, int]]:
+    """The detector box each direct-beam run is cut to before it is corrected.
+
+    The box is the direct beam's own characterization window, with the peak range widened by
+    `peak_fit.pad` on both sides so the beam-peak fit sees the peak's shoulders. A direct beam
+    has no background subtraction, so no background strips are included.
+
+    Parameters
+    ----------
+    params
+        The direct beam's effective parameters, its own overrides merged with the defaults.
+
+    Returns
+    -------
+    tuple[tuple[int, int], tuple[int, int]]
+        ``(x_range, y_range)``, each an inclusive ``(min, max)`` pixel range: x from `low_res`,
+        y from the padded `peak`.
+
+    Raises
+    ------
+    ConfigError
+        `peak` or `low_res` is unset, or the padded peak range starts below pixel 0.
+    """
+    if params.peak is None:
+        raise ConfigError("the direct beam has no `peak` range, in its own block or in `defaults`")
+    if params.low_res is None:
+        raise ConfigError("the direct beam has no `low_res` range, in its own block or in `defaults`")
+    pad = (params.peak_fit or PeakFitConfig()).pad
+    y_min = params.peak.min - pad
+    if y_min < 0:
+        raise ConfigError(
+            f"the direct beam's `peak` range starts at pixel {params.peak.min}, so padding it by "
+            f"`peak_fit.pad` = {pad} would start the box at pixel {y_min}"
+        )
+    return (params.low_res.min, params.low_res.max), (y_min, params.peak.max + pad)
 
 
 class DirectBeamCompositionOperation(OperationInterface[list[RunData], DirectBeamConfig, CompositeDirectBeam]):
