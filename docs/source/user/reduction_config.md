@@ -1,3 +1,5 @@
+(reduction_config)=
+
 # Configuration of Reduction Workflow
 
 This describes the new, configuration-driven reduction workflow, which is separate from the
