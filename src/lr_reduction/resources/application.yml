@@ -1,0 +1,10 @@
+application:
+  name: lr_reduction
+
+diagnostic_plots: true
+rq4: false
+
+logging:
+  level: INFO
+  rotating_log_files: true
+  num_backups: 15

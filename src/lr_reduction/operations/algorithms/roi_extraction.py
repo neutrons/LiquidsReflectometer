@@ -11,7 +11,6 @@ from mantid.kernel import (
     IntArrayOrderedPairsValidator,
     IntArrayProperty,
 )
-from mantid.simpleapi import logger
 
 
 def detector_shape(workspace):
@@ -106,7 +105,7 @@ class ExtractDetectorROI(PythonAlgorithm):
         # Get the detector shape and compute the workspace indices of the ROI pixels
         _, n_y = detector_shape(input_workspace)
         indices = roi_workspace_indices(x_range, y_range, n_y)
-        logger.information(f"Extracting a ROI of {len(indices)} pixels: x {list(x_range)}, y {list(y_range)}")
+        self.log().information(f"Extracting a ROI of {len(indices)} pixels: x {x_range.tolist()}, y {y_range.tolist()}")
 
         # Run ExtractSpectra as a child algorithm to keep only the spectra of the pixels in the ROI
         extract = self.createChildAlgorithm("ExtractSpectra")

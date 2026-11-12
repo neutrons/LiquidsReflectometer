@@ -6,7 +6,7 @@ in order to correct for the effects of dead time in the measurement system.
 import numpy as np
 from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, MatrixWorkspaceProperty, PythonAlgorithm
 from mantid.kernel import Direction
-from mantid.simpleapi import Multiply, RebinToWorkspace, logger
+from mantid.simpleapi import Multiply, RebinToWorkspace
 
 
 def dead_time_curve_issues(curve_ws, tof_range=None):
@@ -120,7 +120,7 @@ class ApplyDeadTimeCorrection(PythonAlgorithm):
 
         self.setProperty("OutputWorkspace", output_ws)
         output_ws_name = self.getPropertyValue("OutputWorkspace")
-        logger.information(f"Applied dead time correction to {input_ws.name()} and saved as {output_ws_name}.")
+        self.log().notice(f"Applied dead time correction to {input_ws.name()} and saved as {output_ws_name}.")
 
 
 AlgorithmFactory.subscribe(ApplyDeadTimeCorrection)

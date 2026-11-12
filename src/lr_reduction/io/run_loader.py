@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from secrets import token_hex
 
@@ -10,10 +11,9 @@ from lr_reduction.exceptions import RunNotFoundError
 from lr_reduction.io.interfaces import RunLoaderInterface
 from lr_reduction.models.run_data import RunData
 from lr_reduction.types import ID, MantidWorkspaceName
-from lr_reduction.utils.logging import get_logger
 from lr_reduction.utils.workspace import workspace_handle
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 #: The NeXus entry holding rejected events; `LoadErrorEventsNexus` names it when a file has none.
 _ERROR_EVENTS_ENTRY = "bank_error_events"

@@ -1,10 +1,11 @@
 """Legacy XML I/O module. Reads legacy RefRed XML templates as configuration input."""
 
+import logging
+
 from lr_reduction.models.config import DirectBeamConfig, ReductionConfig, ReflectedRunConfig
-from lr_reduction.utils import get_logger
 from lr_reduction.utils.files import get_sequence_id_from_path
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def read_config(filepath: str) -> ReductionConfig:
