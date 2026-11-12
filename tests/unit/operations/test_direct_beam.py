@@ -2,9 +2,9 @@ import pytest
 from mantid.simpleapi import AddSampleLog, CreateSampleWorkspace, DeleteWorkspace, mtd
 
 from lr_reduction.exceptions import ConfigError, SampleLogsError
-from lr_reduction.models.config import RunParameters
+from lr_reduction.models.config import ReductionConfig, RunParameters
 from lr_reduction.models.run_data import RunData
-from lr_reduction.operations.direct_beam import cd_order, direct_beam_roi
+from lr_reduction.operations.direct_beam import DirectBeamCompositionOperation, cd_order, direct_beam_roi
 
 MENU_LOG = "BL4B:Actuator:Menu"
 
@@ -95,3 +95,17 @@ def test_direct_beam_roi_default_pad_without_peak_fit():
 def test_direct_beam_roi_rejects_incomplete_or_out_of_range_box(params, match):
     with pytest.raises(ConfigError, match=match):
         direct_beam_roi(params)
+
+
+# --- DirectBeamCompositionOperation --------------------------------------------------------
+
+
+def test_operation_keeps_full_config_and_direct_beam_name(make_run):
+    config = ReductionConfig(direct_beams={"db_8mm": {"direct_beam_run_numbers": [1]}})
+    runs = [make_run(1, THIN_CD[0])]
+
+    operation = DirectBeamCompositionOperation(runs, config, "db_8mm")
+
+    assert operation.data == runs
+    assert operation.config is config
+    assert operation.direct_beam_name == "db_8mm"

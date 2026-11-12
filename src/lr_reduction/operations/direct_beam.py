@@ -1,5 +1,5 @@
 from lr_reduction.exceptions import ConfigError
-from lr_reduction.models.config import DirectBeamConfig, PeakFitConfig, RunParameters
+from lr_reduction.models.config import PeakFitConfig, ReductionConfig, RunParameters
 from lr_reduction.models.results import CompositeDirectBeam
 from lr_reduction.models.run_data import RunData
 from lr_reduction.operations.interfaces import OperationInterface
@@ -71,21 +71,24 @@ def direct_beam_roi(params: RunParameters) -> tuple[tuple[int, int], tuple[int, 
     return (params.low_res.min, params.low_res.max), (y_min, params.peak.max + pad)
 
 
-class DirectBeamCompositionOperation(OperationInterface[list[RunData], DirectBeamConfig, CompositeDirectBeam]):
+class DirectBeamCompositionOperation(OperationInterface[list[RunData], ReductionConfig, CompositeDirectBeam]):
     """Combine multiple direct beam runs into a single composite direct beam result.
 
     Attributes
     ----------
-
     data : list[RunData]
-        The list of direct beam runs to be combined.
-
-    config : DirectBeamConfig
-        The configuration for the direct beam composition.
+        The direct-beam runs to be combined.
+    config : ReductionConfig
+        The full reduction configuration. Besides the direct beam's own block, the composition
+        reads the correction settings under `corrections` and the instrument settings under
+        `defaults`.
+    direct_beam_name : str
+        Name of the composite to build, selecting `config.direct_beams[direct_beam_name]`.
     """
 
-    def __init__(self, data: list[RunData], config: DirectBeamConfig):
+    def __init__(self, data: list[RunData], config: ReductionConfig, direct_beam_name: str):
         super().__init__(data, config)
+        self.direct_beam_name = direct_beam_name
 
     def validate_input(self) -> None:
         """
