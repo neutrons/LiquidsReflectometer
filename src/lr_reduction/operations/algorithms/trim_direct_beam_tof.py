@@ -22,7 +22,7 @@ from mantid.kernel import (
     FloatMandatoryValidator,
     Property,
 )
-from mantid.simpleapi import CropWorkspace, Rebin, SumSpectra, logger
+from mantid.simpleapi import CropWorkspace, Rebin, SumSpectra
 
 from lr_reduction.operations.algorithms.apply_dead_time_correction import dead_time_curve_issues
 from lr_reduction.utils.sample_logs import SampleLogs
@@ -226,7 +226,7 @@ class TrimDirectBeamTof(PythonAlgorithm):
         self.setProperty("ChopperCut", t_chop)
         self.setProperty("DeadTimeCut", 0.0 if t_dtc is None else t_dtc)
         self.setProperty("IntensityCut", t_floor)
-        logger.notice(f"Trimmed run {run} to TOF [{tof_min}, {tof_max}) µs ({bounds})")
+        self.log().notice(f"Trimmed run {run} to TOF [{tof_min}, {tof_max}) µs ({bounds})")
 
     def _intensity_cut(self, input_ws, run):
         """Judge the intensity floor on a transient histogram of the summed events."""
