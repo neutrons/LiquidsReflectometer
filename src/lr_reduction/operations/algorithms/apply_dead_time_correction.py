@@ -120,7 +120,7 @@ class ApplyDeadTimeCorrection(PythonAlgorithm):
 
         self.setProperty("OutputWorkspace", output_ws)
         output_ws_name = self.getPropertyValue("OutputWorkspace")
-        self.log().information(f"Applied dead time correction to {input_ws.name()} and saved as {output_ws_name}.")
+        self.log().notice(f"Applied dead time correction to {input_ws.name()} and saved as {output_ws_name}.")
 
 
 AlgorithmFactory.subscribe(ApplyDeadTimeCorrection)
