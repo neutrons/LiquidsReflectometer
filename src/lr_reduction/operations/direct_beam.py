@@ -1,7 +1,7 @@
 from lr_reduction.models.config import DirectBeamConfig
+from lr_reduction.models.results import CompositeDirectBeam
 from lr_reduction.models.run_data import RunData
 from lr_reduction.operations.interfaces import OperationInterface
-from lr_reduction.types import CompositeDirectBeam
 
 
 class DirectBeamCompositionOperation(OperationInterface[list[RunData], DirectBeamConfig, CompositeDirectBeam]):

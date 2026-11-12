@@ -6,7 +6,7 @@ from orsopy.fileio import Software
 
 from lr_reduction import __version__ as lr_reduction_version
 from lr_reduction.models.config import ReductionConfig
-from lr_reduction.models.results import ReductionResult, ReflectivityCurve
+from lr_reduction.models.results import CompositeDirectBeam, ReductionResult, ReflectivityCurve
 from lr_reduction.models.run_data import RunData
 from lr_reduction.operations.interfaces import OperationInterface
 from lr_reduction.types import ID, CompositeDirectBeam
