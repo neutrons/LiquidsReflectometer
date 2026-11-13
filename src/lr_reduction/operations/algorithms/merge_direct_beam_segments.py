@@ -15,7 +15,6 @@ from collections.abc import Sequence
 import numpy as np
 from mantid.api import (
     ADSValidator,
-    AlgorithmFactory,
     AnalysisDataService,
     EventType,
     IEventWorkspace,
@@ -37,6 +36,8 @@ from mantid.simpleapi import (
     logger,
 )
 from numpy.typing import ArrayLike
+
+from lr_reduction.utils.registration import register
 
 
 def coverage_gaps(bands: Sequence[tuple[float, float]]) -> list[tuple[float, float, int, int]]:
@@ -316,4 +317,4 @@ class MergeDirectBeamSegments(PythonAlgorithm):
                     DeleteWorkspace(Workspace=name, EnableLogging=False)
 
 
-AlgorithmFactory.subscribe(MergeDirectBeamSegments)
+register(MergeDirectBeamSegments)
