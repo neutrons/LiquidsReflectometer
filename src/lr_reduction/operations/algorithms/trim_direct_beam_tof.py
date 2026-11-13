@@ -12,7 +12,7 @@ The events are cropped once, to ``[max(chopper_cut, dead_time_cut), intensity_cu
 """
 
 import numpy as np
-from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, MatrixWorkspaceProperty, PythonAlgorithm
+from mantid.api import IEventWorkspaceProperty, MatrixWorkspaceProperty, PythonAlgorithm
 from mantid.kernel import (
     CompositeValidator,
     Direction,
@@ -25,6 +25,7 @@ from mantid.kernel import (
 from mantid.simpleapi import CropWorkspace, Rebin, SumSpectra, logger
 
 from lr_reduction.operations.algorithms.apply_dead_time_correction import dead_time_curve_issues
+from lr_reduction.utils.registration import register
 from lr_reduction.utils.sample_logs import SampleLogs
 
 #: Sample log holding the chopper-2 phase, averaged over the run for the frame-overlap cut.
@@ -270,4 +271,4 @@ class TrimDirectBeamTof(PythonAlgorithm):
         )
 
 
-AlgorithmFactory.subscribe(TrimDirectBeamTof)
+register(TrimDirectBeamTof)

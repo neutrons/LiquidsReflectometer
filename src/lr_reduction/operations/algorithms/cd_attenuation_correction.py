@@ -2,11 +2,12 @@
 Cd attenuator transmission correction for direct-beam runs.
 """
 
-from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, PythonAlgorithm
+from mantid.api import IEventWorkspaceProperty, PythonAlgorithm
 from mantid.kernel import Direction
 from mantid.simpleapi import logger
 
 from lr_reduction.properties.cd_attenuation import apply_correction, compute_cd_thickness, get_attenuator_log
+from lr_reduction.utils.registration import register
 
 
 class CdAttenuationCorrection(PythonAlgorithm):
@@ -54,4 +55,4 @@ class CdAttenuationCorrection(PythonAlgorithm):
         self.setProperty("OutputWorkspace", corrected)
 
 
-AlgorithmFactory.subscribe(CdAttenuationCorrection)
+register(CdAttenuationCorrection)

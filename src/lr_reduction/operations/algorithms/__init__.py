@@ -1,4 +1,4 @@
-"""Mantid algorithms of the reduction, registered with the AlgorithmFactory on import."""
+"""Mantid algorithms of the reduction, each registered by `lr_reduction.utils.registration.register` on import."""
 
 from lr_reduction.operations.algorithms import (
     merge_direct_beam_segments,  # noqa: F401

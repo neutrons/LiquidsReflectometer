@@ -27,9 +27,10 @@ $t_{\mathrm{bin}}$ = TOF bin width
 $\mathrm{rate}$ = measured count rate
 $\mathrm{W}$ = [Lambert W function](https://en.wikipedia.org/wiki/Lambert_W_function)
 
-The class `SingleReadoutDeadTimeCorrection` is a Mantid-style algorithm for computing the
-dead-time correction for an event workspace. One can optionally include error events in the
-dead-time computation.
+The Mantid algorithm `SingleReadoutDeadTimeCorrection` computes the dead-time correction for an
+event workspace. One can optionally include error events in the dead-time computation. Importing
+its module registers it, after which it is called through `mantid.simpleapi` like any Mantid
+algorithm.
 
 ## Properties
 
@@ -49,32 +50,16 @@ dead-time computation.
 .. testcode::
 
     import mantid.simpleapi as mtd_api
-    from lr_reduction import template
-    from lr_reduction.DeadTimeCorrection import SingleReadoutDeadTimeCorrection
-    from lr_reduction.utils import amend_config
+
+    # Importing the module registers the algorithm with mantid.simpleapi.
+    import lr_reduction.operations.algorithms.calculate_dead_time_correction  # noqa: F401
 
     mtd_api.config["default.facility"] = "SNS"
     mtd_api.config["default.instrument"] = "REF_L"
 
-
-    def test_deadtime(nexus_dir):
-    """
-    Test the time-resolved reduction that uses a measured reference.
-    It is generally used at 30 Hz but it also works at 60 Hz.
-    """
-    with amend_config(data_dir=nexus_dir):
-        ws = mtd_api.Load("REF_L_198409")
-
-    algo = SingleReadoutDeadTimeCorrection()
-    algo.PyInit()
-    algo.setProperty("InputWorkspace", ws)
-    algo.setProperty("OutputWorkspace", "dead_time_corr")
-    algo.setProperty("UseDeadTimeThreshold", True)
-    algo.setProperty("DeadTimeThreshold", 1.1)
-
-    algo.PyExec()
-    corr_ws = algo.getProperty("OutputWorkspace").value
-    corr = corr_ws.readY(0)
-    for c in corr:
-        assert c <= 1.1
+    ws = mtd_api.Load("REF_L_198409")
+    corr_ws = mtd_api.SingleReadoutDeadTimeCorrection(
+        InputWorkspace=ws, UseDeadTimeThreshold=True, DeadTimeThreshold=1.1
+    )
+    assert max(corr_ws.readY(0)) <= 1.1
 ```
