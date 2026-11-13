@@ -10,6 +10,8 @@ from mantid.simpleapi import Rebin, SumSpectra
 
 from lr_reduction.utils.registration import register
 
+from lr_reduction.utils.registration import register
+
 
 class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
     def category(self):

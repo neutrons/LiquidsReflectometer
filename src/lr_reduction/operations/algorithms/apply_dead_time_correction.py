@@ -15,6 +15,8 @@ from mantid.simpleapi import Multiply, RebinToWorkspace
 
 from lr_reduction.utils.registration import register
 
+from lr_reduction.utils.registration import register
+
 
 def dead_time_curve_issues(curve_ws, tof_range=None):
     """Return what is wrong with a ``DTC(TOF)`` curve from SingleReadoutDeadTimeCorrection.

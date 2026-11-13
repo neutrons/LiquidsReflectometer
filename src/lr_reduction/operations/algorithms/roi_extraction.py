@@ -14,6 +14,8 @@ from mantid.kernel import (
 
 from lr_reduction.utils.registration import register
 
+from lr_reduction.utils.registration import register
+
 
 def detector_shape(workspace):
     """Return ``(n_x, n_y)``, the detector's pixel counts from its instrument parameters.
