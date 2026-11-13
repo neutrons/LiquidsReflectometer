@@ -4,9 +4,11 @@ Dead time correction algorithm for single-readout detectors.
 
 import numpy as np
 import scipy
-from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, MatrixWorkspaceProperty, PropertyMode, PythonAlgorithm
+from mantid.api import IEventWorkspaceProperty, MatrixWorkspaceProperty, PropertyMode, PythonAlgorithm
 from mantid.kernel import Direction, FloatArrayLengthValidator, FloatArrayProperty, FloatBoundedValidator
 from mantid.simpleapi import Rebin, SumSpectra, logger
+
+from lr_reduction.utils.registration import register
 
 
 class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
@@ -128,4 +130,4 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         self.setProperty("OutputWorkspace", counts_ws)
 
 
-AlgorithmFactory.subscribe(SingleReadoutDeadTimeCorrection)
+register(SingleReadoutDeadTimeCorrection)

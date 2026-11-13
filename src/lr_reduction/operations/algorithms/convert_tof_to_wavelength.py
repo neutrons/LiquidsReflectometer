@@ -7,11 +7,12 @@ folded into one step.
 
 import math
 
-from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, PythonAlgorithm
+from mantid.api import IEventWorkspaceProperty, PythonAlgorithm
 from mantid.kernel import Direction, PhysicalConstants, Property
 from mantid.simpleapi import CloneWorkspace, ConvertUnits, ModeratorTzero, SetInstrumentParameter
 
 from lr_reduction.exceptions import SampleLogsError
+from lr_reduction.utils.registration import register
 from lr_reduction.utils.sample_logs import SampleLogs
 
 #: Chopper PV holding the emission-time offset t0, in microseconds. Default for `T0`.
@@ -234,4 +235,4 @@ class ConvertTofToWavelength(PythonAlgorithm):
         return float(value)
 
 
-AlgorithmFactory.subscribe(ConvertTofToWavelength)
+register(ConvertTofToWavelength)

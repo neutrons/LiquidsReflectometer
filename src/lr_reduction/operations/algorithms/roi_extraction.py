@@ -2,7 +2,7 @@
 Detector region-of-interest extraction for the BL4B area detector.
 """
 
-from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, PythonAlgorithm
+from mantid.api import IEventWorkspaceProperty, PythonAlgorithm
 from mantid.kernel import (
     CompositeValidator,
     Direction,
@@ -12,6 +12,8 @@ from mantid.kernel import (
     IntArrayProperty,
 )
 from mantid.simpleapi import logger
+
+from lr_reduction.utils.registration import register
 
 
 def detector_shape(workspace):
@@ -116,4 +118,4 @@ class ExtractDetectorROI(PythonAlgorithm):
         self.setProperty("OutputWorkspace", extract.getProperty("OutputWorkspace").value)
 
 
-AlgorithmFactory.subscribe(ExtractDetectorROI)
+register(ExtractDetectorROI)
