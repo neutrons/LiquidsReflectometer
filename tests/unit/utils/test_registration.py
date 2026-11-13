@@ -53,22 +53,28 @@ def test_simpleapi_call_raises_on_a_failure_inside_pyexec(registered):
         getattr(simpleapi, registered)(Value=-1.0)
 
 
-def test_every_algorithm_module_registers_with_simpleapi():
-    """Import each module in a fresh interpreter without plugin directories, as on a machine whose
-    Mantid configuration does not point at this package, then check `simpleapi` for its algorithms."""
+def test_importing_the_package_registers_every_algorithm_with_simpleapi():
+    """Import the package in a fresh interpreter without plugin directories, as on a machine whose
+    Mantid configuration does not point at this package, then check that it loaded every module in
+    the directory and that each module's algorithms are in `simpleapi`."""
     modules = sorted(path.stem for path in ALGORITHMS_DIR.glob("*.py") if path.stem != "__init__")
     script = textwrap.dedent(
         f"""
         from mantid.kernel import config
         config["user.python.plugins.directories"] = ""
-        import importlib
         import inspect
+        import sys
         import mantid.simpleapi as simpleapi
         from mantid.api import PythonAlgorithm
 
+        import lr_reduction.operations.algorithms
+
         missing = []
         for module_name in {modules!r}:
-            module = importlib.import_module(f"lr_reduction.operations.algorithms.{{module_name}}")
+            module = sys.modules.get(f"lr_reduction.operations.algorithms.{{module_name}}")
+            if module is None:
+                missing.append(f"{{module_name}} (not imported by the package)")
+                continue
             for name, member in inspect.getmembers(module, inspect.isclass):
                 if issubclass(member, PythonAlgorithm) and member.__module__ == module.__name__:
                     if not hasattr(simpleapi, member().name()):
