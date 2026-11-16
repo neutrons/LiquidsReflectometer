@@ -21,7 +21,7 @@ def run_folders(settings_file, experiment_id, datapath=None, savepath=None):
     reduce_from_file builds out of the settings file. NEXUSpathRB is datapath, else the settings' own, else the
     experiment's nexus folder; Spath is savepath, else the settings' own, else the experiment's reduced folder.
     '''
-    config = reduction.json_to_config(reduction.load_from_file(settings_file)["config"])
+    config = reduction.json_to_config(reduction.load_from_file(settings_file)["config"], source=settings_file)
     config.experiment_id = experiment_id
     if datapath:
         config.NEXUSpathRB = datapath

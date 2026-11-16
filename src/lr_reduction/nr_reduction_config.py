@@ -106,8 +106,6 @@ class NRReductionConfig:
         # TODO: check how to include these on init.
         self.LambdaMinUse = None
         self.LambdaMaxUse = None
-        self.start_times = None
-        self.end_times = None
 
     # Path configuration - Defaults assume IPTS specified and saved into that folder.
     @property

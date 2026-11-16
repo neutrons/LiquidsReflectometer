@@ -1,5 +1,6 @@
 import ast
 import json
+import logging
 import os
 import re
 from pathlib import Path
@@ -14,6 +15,14 @@ import lr_reduction.save_reduced_data as save_fn
 #import template
 from lr_reduction.nr_reduction_calc import NR_Reduction  # TODO: Fix names of files!!
 from lr_reduction.nr_reduction_config import NRReductionConfig
+
+logger = logging.getLogger(__name__)
+
+# The time window a reduction read, as the add-time-slicing branch (upstream PR #205) recorded it in the files it wrote:
+# two config attributes, so two keys of every "# Config:" line and settings JSON, null for a run reduced whole. The
+# window is no config attribute here (reduce_from_file's start_times/end_times; the header's "Time resolved:" line),
+# and nothing on that branch read the keys back either. json_to_config knows them, to say the right thing.
+WINDOW_RECORD_KEYS = ("start_times", "end_times")
 
 # Per-run logs recorded in the output headers ("Run Title" and "Angles")
 LOG_KEYS = ("title", "ths", "thi", "ThCen")
@@ -58,7 +67,7 @@ def reduce_from_file(run_array, setting_file, experiment_id, datapath: Path = No
 
         # reset config
         file_load = load_from_file(setting_file) # moving here to try fix scale factor issue
-        config_new = json_to_config(file_load["config"])
+        config_new = json_to_config(file_load["config"], source=setting_file)
 
         # TODO: Sort out the sequence num part to make sure it runs the right indices of the config
         # This assumes want to process in increasing seq order
@@ -598,15 +607,53 @@ def find_combine_priors(updated_config, run_nums, results, group_output_sorted, 
         # TODO: fix this...
         return {}, {}, [], [], [], [], [], {}
 
-def json_to_config(json_input):
+def json_to_config(json_input, source=None, unused=None):
+    """
+    The config a settings file describes: a fresh NRReductionConfig with each of the file's keys set.
+
+    json_input: the settings, as load_from_file returns them under "config" (a settings JSON, or the "# Config:" line
+        of a reduced .dat)
+    source: the file they were read from, for the messages
+    unused: a dict that receives each key of the file this version did not use, with its value (for a caller that
+        shows the settings to someone and has to say what it is not showing)
+
+    A file written by any version of the code loads. Both kinds of file are written from the config's own attributes,
+    so a file holds a key for every attribute its writer's config had, and another version's config may not have them
+    all. A key this version's config cannot take is skipped, with one warning naming the key, its value and the file;
+    every other key is set. (A caller's override_params are not read here: reduce_from_file refuses an unknown one.)
+
+    The time window a file recorded (WINDOW_RECORD_KEYS) is not a setting. Null, as in every file of a run reduced
+    whole, it is passed over without a word, as if the keys were absent. A window is named in one warning: the reader
+    probably expects it to be applied, and the whole run is reduced, as it was by the code that wrote the file.
+    """
     config_init = NRReductionConfig()
+    origin = "the settings" if source is None else str(source)
+    if not isinstance(json_input, dict):
+        # a .dat without a "# Config:" line (None), a JSON file that is not an object: no version wrote this as settings
+        raise ValueError(f"{origin} holds no reduction settings")
+
+    recorded = {key: json_input[key] for key in WINDOW_RECORD_KEYS if key in json_input and not hasattr(config_init, key)}
+    if any(value is not None for value in recorded.values()):
+        logger.warning("%s records the time window it was reduced with (start_times = %r, end_times = %r). A recorded "
+                       "window is not a setting: the whole run is reduced. To reduce a window, pass start_times= and "
+                       "end_times= to reduce_from_file, or use reduce_time_list / reduce_time_slices.",
+                       origin, recorded.get("start_times"), recorded.get("end_times"))
+        if unused is not None:
+            unused.update(recorded)
 
     # override provided json input
     for key, value in json_input.items():
-        if hasattr(config_init, key):
-            setattr(config_init, key, value)
-        else:
-            raise AttributeError(f"{key} is not a valid config parameter")
+        if key in recorded:
+            continue
+        try:
+            if not hasattr(config_init, key):
+                raise AttributeError(key)
+            setattr(config_init, key, value)  # a property without a setter (base_path) raises here
+        except AttributeError:
+            logger.warning("%s: '%s' = %r is not a setting of this version of lr_reduction; it is not used",
+                           origin, key, value)
+            if unused is not None:
+                unused[key] = value
 
     return config_init
 
