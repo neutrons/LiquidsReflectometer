@@ -1,4 +1,5 @@
 from itertools import groupby
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -10,11 +11,13 @@ from mantid.simpleapi import (
     AddTimeSeriesLog,
     CreateSampleWorkspace,
     DeleteWorkspace,
+    Rebin,
     SetInstrumentParameter,
     mtd,
 )
 
 from lr_reduction.exceptions import ConfigError, OperationInputError, SampleLogsError
+from lr_reduction.io.run_loader import RunLoader
 from lr_reduction.models.config import ReductionConfig, RunParameters
 from lr_reduction.models.run_data import RunData
 from lr_reduction.operations.algorithms.convert_tof_to_wavelength import MULTIPLIER_LOG, OFFSET_LOG, T0_LOG, T1_LOG
@@ -604,3 +607,79 @@ def test_cleanup_keeps_the_results_and_can_be_repeated(compose):
     operation.cleanup()
     assert mtd.doesExist(result.workspace)
     assert mtd.doesExist(result.weights_workspace)
+
+
+# --- datarepo: the composite of three of the direct beams 232721-232726 -------------------------
+
+#: Three direct beams taken with the same slits, each through a different Cd thickness (µm), thinnest
+#: first; their bands overlap without gaps.
+REAL_CD_UM = {232726: 57.5, 232724: 184.0, 232721: 376.0}
+#: The beam spans x 63-185 and y 136-165.
+REAL_PEAK = {"min": 136, "max": 165}
+REAL_LOW_RES = {"min": 63, "max": 185}
+
+
+@pytest.fixture(scope="module")
+def real_composite(nexus_dir):
+    """The `CompositeDirectBeam` of runs 232721, 232724 and 232726, built once for these tests.
+
+    Deletes the runs and the results on teardown.
+    """
+    before = set(mtd.getObjectNames())
+    try:
+        loader = RunLoader()
+        runs = [loader.load_from_path(Path(nexus_dir) / f"REF_L_{run}.nxs.h5") for run in sorted(REAL_CD_UM)]
+        config = ReductionConfig(
+            diagnostics={"plots": True},
+            direct_beams={
+                "db": {"direct_beam_run_numbers": sorted(REAL_CD_UM), "peak": REAL_PEAK, "low_res": REAL_LOW_RES}
+            },
+        )
+        yield _RecordingComposition(runs, config, "db").execute()
+    finally:
+        for name in _created_names(before):
+            DeleteWorkspace(name)
+
+
+@pytest.mark.datarepo
+def test_real_composite_orders_the_runs_by_cd_thickness(real_composite):
+    run = mtd[real_composite.workspace].getRun()
+
+    assert real_composite.run_numbers == tuple(REAL_CD_UM)
+    assert [segment.cd_thickness_um for segment in real_composite.segments] == pytest.approx(list(REAL_CD_UM.values()))
+    np.testing.assert_allclose(run.getLogData("Cd_attenuator").value, list(REAL_CD_UM.values()))
+
+
+@pytest.mark.datarepo
+def test_real_composite_covers_its_wavelength_range_without_gaps(real_composite):
+    lows = [segment.wavelength_band[0] for segment in real_composite.segments]
+    highs = [segment.wavelength_band[1] for segment in real_composite.segments]
+
+    assert real_composite.gaps == ()
+    # Each thicker Cd foil lets the beam be measured to shorter wavelengths.
+    assert lows == sorted(lows, reverse=True)
+    histogram = Rebin(
+        InputWorkspace=real_composite.workspace,
+        Params=[min(lows), 0.05, max(highs)],
+        PreserveEvents=False,
+        StoreInADS=False,
+    )
+    summed = histogram.extractY().sum(axis=0)
+    assert np.all(np.isfinite(summed))
+    assert np.all(summed > 0)
+
+
+@pytest.mark.datarepo
+def test_real_composite_overlap_weights_sum_to_one(real_composite):
+    weights = mtd[real_composite.weights_workspace]
+
+    assert weights.getNumberHistograms() == len(REAL_CD_UM)
+    np.testing.assert_allclose(weights.extractY().sum(axis=0), 1.0)
+
+
+@pytest.mark.datarepo
+def test_real_composite_keeps_the_box(real_composite):
+    pad = 1  # the default peak-fit pad
+    x_pixels = REAL_LOW_RES["max"] - REAL_LOW_RES["min"] + 1
+    y_pixels = REAL_PEAK["max"] - REAL_PEAK["min"] + 1 + 2 * pad
+    assert mtd[real_composite.workspace].getNumberHistograms() == x_pixels * y_pixels
