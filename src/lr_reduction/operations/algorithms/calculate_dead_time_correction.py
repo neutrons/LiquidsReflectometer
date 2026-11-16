@@ -57,6 +57,18 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         )
         self.declareProperty(MatrixWorkspaceProperty("OutputWorkspace", "", Direction.Output), "Output workspace")
 
+    def validateInputs(self):  # noqa: N802
+        # The correction is binned with `TOFStep` and `TOFRange`, in microseconds.
+        issues = {}
+        for name in ("InputWorkspace", "InputErrorEventsWorkspace"):
+            workspace = self.getProperty(name).value
+            if workspace is None:
+                continue
+            unit = workspace.getAxis(0).getUnit().unitID()
+            if unit != "TOF":
+                issues[name] = f"The X axis must be in TOF, not {unit!r}"
+        return issues
+
     def PyExec(self):  # noqa: N802
         # Event data must include error events (all triggers on the detector)
         ws_event_data = self.getProperty("InputWorkspace").value

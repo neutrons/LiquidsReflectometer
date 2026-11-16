@@ -1,15 +1,12 @@
 from mantid.api import IEventWorkspace
 
-from lr_reduction.exceptions import ConfigError, OperationInputError
+from lr_reduction.exceptions import ConfigError, OperationInputError, SampleLogsError
 from lr_reduction.models.config import PeakFitConfig, ReductionConfig, RunParameters
 from lr_reduction.models.results import CompositeDirectBeam
 from lr_reduction.models.run_data import RunData
-from lr_reduction.operations.algorithms.convert_tof_to_wavelength import MULTIPLIER_LOG, OFFSET_LOG
-from lr_reduction.operations.algorithms.trim_direct_beam_tof import CHOPPER2_PHASE_LOG
 from lr_reduction.operations.interfaces import OperationInterface
-from lr_reduction.properties.cd_attenuation import MENU_LOG, STAGE_LOGS, compute_cd_thickness, get_attenuator_log
+from lr_reduction.properties.cd_attenuation import compute_cd_thickness, get_attenuator_log
 from lr_reduction.utils import get_logger
-from lr_reduction.utils.sample_logs import SampleLogs
 from lr_reduction.utils.workspace import workspace_exists, workspace_handle
 
 logger = get_logger(__name__)
@@ -91,9 +88,6 @@ def _workspace_issues(name: str) -> list[str]:
     workspace = workspace_handle(name)
     if not isinstance(workspace, IEventWorkspace):
         return [f"workspace {name!r} is not an event workspace"]
-    unit = workspace.getAxis(0).getUnit().unitID()
-    if unit != "TOF":
-        return [f"workspace {name!r} is in {unit}, not TOF"]
     return []
 
 
@@ -117,16 +111,19 @@ class DirectBeamCompositionOperation(OperationInterface[list[RunData], Reduction
         self.direct_beam_name = direct_beam_name
 
     def validate_input(self) -> None:
-        """Check that every run has what the composition steps read, before any of them runs.
+        """Check what the operation itself reads before the first algorithm runs.
 
-        Every problem found is reported together, each naming its run.
+        That is the configuration, the run set, each run's workspace and its attenuator log, which
+        orders the runs. Each algorithm validates its own inputs, the unit and the logs it reads
+        included, when the composition calls it. Every problem found here is reported together,
+        each naming its run.
 
         Raises
         ------
         OperationInputError
             `direct_beam_name` is not configured; `data` is empty or its runs differ from the
-            configured ones; or a run's workspace is missing, not an event workspace, not in
-            TOF, or lacks a log a step needs.
+            configured ones; or a run's workspace is missing or not an event workspace, or its
+            attenuator log cannot be read.
         """
         if self.direct_beam_name not in self.config.direct_beams:
             raise OperationInputError(
@@ -145,15 +142,6 @@ class DirectBeamCompositionOperation(OperationInterface[list[RunData], Reduction
                 f"{sorted(direct_beam.direct_beam_run_numbers)}"
             )
 
-        emission_time = self.config.corrections.emission_time
-        required_logs = {}
-        if direct_beam.tof_trim.apply:
-            required_logs[CHOPPER2_PHASE_LOG] = "the TOF trim reads it"
-        if emission_time.apply and emission_time.coefficients is None:
-            reason = "the emission-time correction reads it when no `coefficients` are configured"
-            required_logs[OFFSET_LOG] = reason
-            required_logs[MULTIPLIER_LOG] = reason
-
         issues = []
         for run in self.data:
             label = _run_label(run)
@@ -161,12 +149,10 @@ class DirectBeamCompositionOperation(OperationInterface[list[RunData], Reduction
             if run_issues:
                 issues.extend(f"{label}: {issue}" for issue in run_issues)
                 continue
-            logs = SampleLogs(run.workspace)
-            if MENU_LOG not in logs and not all(log in logs for log in STAGE_LOGS):
-                issues.append(f"{label}: no attenuator log ({MENU_LOG} or the four {STAGE_LOGS[0]}-style stage logs)")
-            issues.extend(
-                f"{label}: no {log} log, which {reason}" for log, reason in required_logs.items() if log not in logs
-            )
+            try:
+                get_attenuator_log(run.workspace)
+            except SampleLogsError as error:
+                issues.append(f"{label}: cannot read the attenuator log: {error}")
             if self.config.corrections.dead_time.apply and run.error_events_workspace is None:
                 logger.warning(
                     f"{label} has no error-events workspace, so its dead-time correction is computed without "

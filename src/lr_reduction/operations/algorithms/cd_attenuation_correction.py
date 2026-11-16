@@ -5,6 +5,7 @@ Cd attenuator transmission correction for direct-beam runs.
 from mantid.api import IEventWorkspaceProperty, PythonAlgorithm
 from mantid.kernel import Direction
 
+from lr_reduction.exceptions import SampleLogsError
 from lr_reduction.properties.cd_attenuation import apply_correction, compute_cd_thickness, get_attenuator_log
 from lr_reduction.utils.registration import register
 
@@ -41,6 +42,17 @@ class CdAttenuationCorrection(PythonAlgorithm):
         self.declareProperty(
             IEventWorkspaceProperty("OutputWorkspace", "", Direction.Output), "Corrected event workspace"
         )
+
+    def validateInputs(self):  # noqa: N802
+        issues = {}
+        input_workspace = self.getProperty("InputWorkspace").value
+        if input_workspace is None:
+            return issues
+        try:
+            get_attenuator_log(input_workspace)
+        except SampleLogsError as error:
+            issues["InputWorkspace"] = f"Run {input_workspace.getRunNumber()}: cannot read the attenuator log: {error}"
+        return issues
 
     def PyExec(self):  # noqa: N802
         input_workspace = self.getProperty("InputWorkspace").value
