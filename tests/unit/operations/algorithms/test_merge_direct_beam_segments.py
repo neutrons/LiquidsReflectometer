@@ -364,12 +364,12 @@ def test_history_records_the_algorithm_and_its_inputs(make_segment):
 
 
 def test_rejects_empty_input_list():
-    with pytest.raises(RuntimeError, match="At least one segment is required"):
+    with pytest.raises(ValueError, match="InputWorkspaces.*Select a value"):
         run_merge([])
 
 
 def test_rejects_missing_workspace():
-    with pytest.raises(RuntimeError, match="no_such_segment: no such workspace"):
+    with pytest.raises(ValueError, match='"no_such_segment" is not in the workspace list'):
         run_merge(["no_such_segment"])
 
 

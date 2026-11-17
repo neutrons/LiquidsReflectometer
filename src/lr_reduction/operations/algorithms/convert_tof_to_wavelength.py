@@ -7,7 +7,7 @@ folded into one step.
 
 import math
 
-from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, PythonAlgorithm
+from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, PythonAlgorithm, WorkspaceUnitValidator
 from mantid.kernel import Direction, PhysicalConstants, Property
 from mantid.simpleapi import CloneWorkspace, ConvertUnits, ModeratorTzero, SetInstrumentParameter
 
@@ -111,7 +111,7 @@ class ConvertTofToWavelength(PythonAlgorithm):
 
     def PyInit(self):  # noqa: N802
         self.declareProperty(
-            IEventWorkspaceProperty("InputWorkspace", "", Direction.Input),
+            IEventWorkspaceProperty("InputWorkspace", "", Direction.Input, WorkspaceUnitValidator("TOF")),
             "Event workspace in TOF, carrying the instrument geometry in force. Not modified",
         )
         self.declareProperty(
@@ -141,15 +141,11 @@ class ConvertTofToWavelength(PythonAlgorithm):
         if workspace is None:
             return issues
 
-        unit = workspace.getAxis(0).getUnit().unitID()
-        if unit != "TOF":
-            issues["InputWorkspace"] = f"X axis must be in TOF, not {unit!r}"
-        else:
-            instrument = workspace.getInstrument()
-            if instrument.getSource() is None or instrument.getSample() is None:
-                issues["InputWorkspace"] = (
-                    "instrument has no source or sample position, so the flight path cannot be computed"
-                )
+        instrument = workspace.getInstrument()
+        if instrument.getSource() is None or instrument.getSample() is None:
+            issues["InputWorkspace"] = (
+                "instrument has no source or sample position, so the flight path cannot be computed"
+            )
 
         if not self.getProperty("ApplyEmissionTimeCorrection").value:
             return issues

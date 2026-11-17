@@ -14,6 +14,7 @@ from collections.abc import Sequence
 
 import numpy as np
 from mantid.api import (
+    ADSValidator,
     AlgorithmFactory,
     AnalysisDataService,
     EventType,
@@ -162,7 +163,7 @@ class MergeDirectBeamSegments(PythonAlgorithm):
 
     def PyInit(self) -> None:  # noqa: N802
         self.declareProperty(
-            StringArrayProperty("InputWorkspaces", direction=Direction.Input),
+            StringArrayProperty("InputWorkspaces", direction=Direction.Input, validator=ADSValidator(True, False)),
             "Corrected direct-beam event workspaces in wavelength, one per segment; not modified",
         )
         self.declareProperty(
@@ -188,15 +189,9 @@ class MergeDirectBeamSegments(PythonAlgorithm):
 
     def validateInputs(self) -> dict[str, str]:  # noqa: N802
         names = self.getProperty("InputWorkspaces").value
-        if len(names) == 0:
-            return {"InputWorkspaces": "At least one segment is required"}
-
         issues = []
         reference = None
         for name in names:
-            if not AnalysisDataService.doesExist(name):
-                issues.append(f"{name}: no such workspace")
-                continue
             ws = AnalysisDataService.retrieve(name)
             if not isinstance(ws, IEventWorkspace):
                 issues.append(f"{name}: not an event workspace")

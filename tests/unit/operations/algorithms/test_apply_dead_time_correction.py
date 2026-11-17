@@ -113,13 +113,6 @@ def test_curve_edges_equal_to_the_events_range_cover_it(make_curve):
     assert curve_issues(make_curve(x_min=TOF_MIN, x_max=TOF_MAX)) == []
 
 
-def test_curve_not_in_tof_is_an_issue(make_curve):
-    issues = curve_issues(make_curve(unit="Wavelength"))
-
-    assert len(issues) == 1
-    assert "TOF" in issues[0]
-
-
 def test_several_spectra_skip_the_per_spectrum_checks(make_curve):
     """Which spectrum to check is undefined, so the NaN and the short coverage go unreported."""
     issues = curve_issues(make_curve(factors=(1.0, np.nan, 1.2, 1.3), x_min=TOF_MIN + 1000.0, spectra=2))
@@ -149,12 +142,12 @@ def test_invalid_factor_is_an_issue(make_curve, bad, reason):
 
 
 def test_every_issue_of_a_curve_is_reported_in_check_order(make_curve):
-    curve = make_curve(factors=(1.0, np.nan, -0.1, 1.3), x_min=TOF_MIN + 1000.0, unit="Wavelength")
+    curve = make_curve(factors=(1.0, np.nan, -0.1, 1.3), x_min=TOF_MIN + 1000.0)
 
     issues = curve_issues(curve)
 
-    assert len(issues) == 4
-    for issue, reason in zip(issues, ["TOF", "does not cover", "undefined", "negative"], strict=True):
+    assert len(issues) == 3
+    for issue, reason in zip(issues, ["does not cover", "undefined", "negative"], strict=True):
         assert reason in issue
 
 
@@ -173,15 +166,13 @@ def test_zero_factors_are_allowed(events, make_curve):
 def test_input_not_in_tof_is_rejected(events, make_curve):
     ConvertUnits(InputWorkspace=events, Target="Wavelength", OutputWorkspace=events)
 
-    issues = validate(events, make_curve())
-
-    assert "TOF" in issues["InputWorkspace"]
+    with pytest.raises(ValueError, match="InputWorkspace .* must have units of TOF"):
+        make_algorithm(events, make_curve())
 
 
 def test_curve_not_in_tof_is_rejected(events, make_curve):
-    issues = validate(events, make_curve(unit="Wavelength"))
-
-    assert "TOF" in issues["DeadTimeCorrectionWorkspace"]
+    with pytest.raises(ValueError, match="DeadTimeCorrectionWorkspace .* must have units of TOF"):
+        make_algorithm(events, make_curve(unit="Wavelength"))
 
 
 def test_curve_with_several_spectra_is_rejected(events, make_curve):

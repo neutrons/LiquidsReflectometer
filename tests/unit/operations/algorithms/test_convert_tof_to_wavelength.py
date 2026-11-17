@@ -341,7 +341,7 @@ def test_rejects_input_not_in_tof(real_run, workspaces):
     name = mtd.unique_hidden_name()
     workspaces.append(name)
     in_wavelength = ConvertUnits(InputWorkspace=real_run, Target="Wavelength", OutputWorkspace=name)
-    with pytest.raises(RuntimeError, match="InputWorkspace: X axis must be in TOF"):
+    with pytest.raises(ValueError, match="InputWorkspace.* must have units of TOF"):
         run(in_wavelength)
 
 

@@ -4,7 +4,13 @@ in order to correct for the effects of dead time in the measurement system.
 """
 
 import numpy as np
-from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, MatrixWorkspaceProperty, PythonAlgorithm
+from mantid.api import (
+    AlgorithmFactory,
+    IEventWorkspaceProperty,
+    MatrixWorkspaceProperty,
+    PythonAlgorithm,
+    WorkspaceUnitValidator,
+)
 from mantid.kernel import Direction
 from mantid.simpleapi import Multiply, RebinToWorkspace, logger
 
@@ -27,8 +33,6 @@ def dead_time_curve_issues(curve_ws, tof_range=None):
         The problems found, empty when the curve is valid.
     """
     issues = []
-    if curve_ws.getAxis(0).getUnit().unitID() != "TOF":
-        issues.append("the X axis must be in TOF")
     if curve_ws.getNumberHistograms() != 1:
         issues.append(f"it must have exactly one spectrum, found {curve_ws.getNumberHistograms()}")
         return issues
@@ -64,11 +68,11 @@ class ApplyDeadTimeCorrection(PythonAlgorithm):
 
     def PyInit(self):  # noqa: N802
         self.declareProperty(
-            IEventWorkspaceProperty("InputWorkspace", "", Direction.Input),
+            IEventWorkspaceProperty("InputWorkspace", "", Direction.Input, WorkspaceUnitValidator("TOF")),
             "Input workspace to which the dead time correction will be applied",
         )
         self.declareProperty(
-            MatrixWorkspaceProperty("DeadTimeCorrectionWorkspace", "", Direction.Input),
+            MatrixWorkspaceProperty("DeadTimeCorrectionWorkspace", "", Direction.Input, WorkspaceUnitValidator("TOF")),
             "Workspace containing the dead time correction factors from the SingleReadoutDeadTimeCorrection algorithm",
         )
         self.declareProperty(
@@ -80,11 +84,8 @@ class ApplyDeadTimeCorrection(PythonAlgorithm):
         input_ws = self.getProperty("InputWorkspace").value
         curve_ws = self.getProperty("DeadTimeCorrectionWorkspace").value
 
-        if input_ws.getAxis(0).getUnit().unitID() != "TOF":
-            issues["InputWorkspace"] = "The X axis must be in TOF"
-
         tof_range = None
-        if "InputWorkspace" not in issues and input_ws.getNumberEvents() > 0:
+        if input_ws.getNumberEvents() > 0:
             tof_range = (input_ws.getTofMin(), input_ws.getTofMax())
         curve_issues = dead_time_curve_issues(curve_ws, tof_range)
         if curve_issues:
