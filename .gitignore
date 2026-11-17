@@ -155,3 +155,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# output of the examples when LR_REDUCTION_EXAMPLE_OUTPUT is unset
+lr_reduction_example_output/

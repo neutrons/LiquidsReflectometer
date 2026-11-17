@@ -17,6 +17,16 @@ from lr_reduction.nr_reduction_config import NRReductionConfig
 from lr_reduction.template import _resolve_scaling_factor_file
 
 
+def partial_name(config):
+    """Name (without ending) of the file one run of a sequence is saved in: assemble_results looks for it."""
+    return f"{config.Sname}{config.subname or ''}_partial"
+
+
+def combined_name(seq_id, config):
+    """Name (without ending) of the file the runs of a sequence are saved in together."""
+    return f"REFL_{seq_id}{config.subname or ''}_combined_data"
+
+
 def reduce_from_template(runno, template_file, experiment_id, datapath: Path = None, template_path: Path = None, override_params: dict = None, plot=True, eight_col=None, save_pdf_summary=False):  # noqa: ARG001 -- save_pdf_summary is public API (TODO in save_reduced_data); kept
     """
     Wrapper function to reduce a single run with reading of parameters from an xml template of the lr_reduction format.
@@ -98,14 +108,9 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
         result = {'Q': results['q'], 'R': results['r'], 'dR': results['dr'], 'dQ': results['dq']}
 
     # Save data
-    if config.subname:
-        partial_name = f"{config.subname}_partial"
-    else:
-        partial_name = "partial"
-
-    save_fn.save_results(result, config_out, log_values, sname=f"{config.Sname}{partial_name}")
+    save_fn.save_results(result, config_out, log_values, sname=partial_name(config))
     if eight_col: #TODO: decide whether this is instead of prior save
-        save_fn.save_results(result, config_out, log_values, sname=f"{config.Sname}{partial_name}", eight_column=True)
+        save_fn.save_results(result, config_out, log_values, sname=partial_name(config), eight_column=True)
 
     # Collect "like" runs together
     seq_list, run_list, combined_results, scaling_factors, config_array = assemble_results(seq_id, config.Spath, autoscale=config.AutoScale, plot=plot, RQ4=config.plotQ4, eight_col=eight_col)
@@ -114,14 +119,9 @@ def reduce_from_template(runno, template_file, experiment_id, datapath: Path = N
     config.ScaleFactor *= scale_list
 
     # Save combined data
-    if config.subname:
-        combined_name = f"{config.subname}_combined_data"
-    else:
-        combined_name = "combined_data"
-
-    save_fn.save_results(combined_results, config_out, log_values, sname=f"REFL_{seq_id}{combined_name}", full=True)
+    save_fn.save_results(combined_results, config_out, log_values, sname=combined_name(seq_id, config), full=True)
     if eight_col: #TODO: decide whether this is instead of prior save
-        reduce_calc.save_results(combined_results, config_out, log_values, sname=f"REFL_{seq_id}{combined_name}", full=False, eight_column=True)
+        reduce_calc.save_results(combined_results, config_out, log_values, sname=combined_name(seq_id, config), full=False, eight_column=True)
 
     # plot
     if plot:

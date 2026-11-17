@@ -38,6 +38,10 @@ class NR_Reduction:  # noqa: N801 -- public API name; rename deferred (imported 
             Configuration object
         """
         self.config = config
+        # reduce() sets these for each call. A caller that reduces one run directly (reduce_from_template) has not
+        # called it: figures are then drawn when the config asks for plots, as before they were kept for the PDF.
+        self.create_figures = bool(self.config.plotON)
+        self.fig_store = []
         # If method not supplied, set to default meanTheta
         if not self.config.method_per_run:
             self.config.method_per_run = ['meantheta'] * len(self.config.RBnum)
