@@ -1,6 +1,8 @@
+(app_config)=
+
 # Application Configuration
 
-The `lr_reduction` application uses a YAML-based configuration system with environment layering, deep merging, and user configuration support. This page describes the application-level configuration, which is separate from the reduction workflow configuration described in {ref}`reduction_config`.
+`lr_reduction` uses [Neutrons Standard](https://pythoncommons.readthedocs.io/en/latest/config.html) to manage application configuration via a YAML-based system. This page describes the application-level configuration, which is separate from the reduction workflow configuration described in {ref}`reduction_config`.
 
 ## Default Configuration
 
@@ -16,26 +18,25 @@ rq4: false
 logging:
   level: INFO
   rotating_log_files: true
+  log_file: ~/lr_reduction.log
   num_backups: 15
+  mantid_log_level: NOTICE
 ```
 
 This file includes:
 
-- **`application.name`** — the application identifier
-- **`diagnostic_plots`** — enable or disable diagnostic plot generation (default: `true`)
-- **`rq4`** — enable or disable RQ4-specific behavior (default: `false`)
-- **`logging.level`** — the logging level for the application (default: `INFO`)
-- **`logging.rotating_log_files`** — whether to use rotating log files (default: `true`)
-- **`logging.num_backups`** — the number of backup log files to keep (default: `15`)
-
-## Environment-Specific Configurations
-
-In addition to the base `application.yml`, you can provide environment-specific configuration files (e.g., `production.yml`, `qa.yml`, `development.yml`). When an environment is specified, the base configuration and environment overrides are merged recursively, with environment values taking precedence over base values.
-
-Specify the environment via:
-- The `env` environment variable (e.g., `env=production`)
-- The `environment` property in YAML
-- User configuration (see below)
+- **`application.name`** — the application identifier (do not change)
+- **`diagnostic_plots`**: bool — enable or disable diagnostic plot generation (default: `true`)
+- **`rq4`**: bool — enable or disable RQ4-specific behavior (default: `false`)
+- **`logging`**: dict — logging configuration
+  - **`level`** — the logging level for the application (default: `INFO`)
+    Accepted values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
+  - **`rotating_log_files`** — whether to use rotating log files (default: `true`)
+  - **`num_backups`** — the number of backup log files to keep (default: `15`)
+  - **`log_file`** — the path to the log file (default: `~/lr_reduction.log`)
+    Only applies if `rotating_log_files` is `true`.
+  - **`mantid_log_level`** — the logging level for Mantid (default: `NOTICE`)
+    Accepted values: `DEBUG`, `INFORMATION`, `NOTICE`, `WARNING`, `ERROR`, `CRITICAL`
 
 ## User Application Configuration
 
@@ -46,6 +47,7 @@ You can override the default application configuration by creating a user-specif
 ```
 
 The user configuration file:
+
 - **Auto-loads** if present and no explicit environment is specified
 - **Deep merges** with the base `application.yml`, recursively combining dictionaries while replacing scalar values
 - **Is archived and regenerated** if the `application.version` in your user config doesn't match the installed version
@@ -72,5 +74,6 @@ Nested values can be referenced using dot notation, and token substitution (e.g.
 ## Configuration Backups
 
 The system automatically maintains backups:
+
 - **Latest backup:** `~/.config/lr_reduction/application.yml.bak` — updated on every config reload
 - **User config archives:** Versioned backups of outdated user configs, with the newest `application.user_yml_archive_limit` kept

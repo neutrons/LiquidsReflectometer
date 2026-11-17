@@ -72,6 +72,7 @@ def test_main_run_subcommand_parses_and_dispatches(monkeypatch):
         "lr_reduction.api.manual.reduce_run",
         lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs),
     )
+    monkeypatch.setattr("lr_reduction.api.manual.setup_logging", lambda: None)
 
     main(["run", "12345", "--configuration", "config.yaml"])
 
@@ -84,7 +85,7 @@ def test_main_sequence_subcommand_parses_and_dispatches(monkeypatch):
         "lr_reduction.api.manual.reduce_and_combine_runs",
         lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs),
     )
-
+    monkeypatch.setattr("lr_reduction.api.manual.setup_logging", lambda: None)
     main(
         [
             "sequence",
@@ -109,6 +110,7 @@ def test_main_sequence_subcommand_sequence_numbers_is_optional(monkeypatch):
         "lr_reduction.api.manual.reduce_and_combine_runs",
         lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs),
     )
+    monkeypatch.setattr("lr_reduction.api.manual.setup_logging", lambda: None)
 
     main(["sequence", "--run-numbers", "111", "112", "--configuration", "config.yaml"])
 

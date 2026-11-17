@@ -24,7 +24,9 @@ def isolate_root_logger(monkeypatch, tmp_path):
     saved_level = root.level
     saved_level_names = {lvl: logging.getLevelName(lvl) for lvl in _LEVELS}
 
-    # Keep setup_logging(rotate=True) from writing to the real ~/lr_reduction.log
+    # Backstop for anything that expands `~` at call time. It does NOT redirect setup_logging's default
+    # log file: that default is read from app_config (and `~` expanded) at import, before this fixture runs.
+    # Tests that enable rotation must pass `log_file=` explicitly.
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
 
@@ -84,14 +86,37 @@ def test_setup_logging_without_reset_keeps_existing_handlers():
 
 
 def test_setup_logging_rotate_adds_timed_rotating_handler(tmp_path):
-    setup_logging(rotate=True, num_backups=3)
+    logfile = tmp_path / "lr_reduction.log"
+    setup_logging(rotate=True, num_backups=3, log_file=logfile)
 
     rotating = [h for h in logging.getLogger().handlers if isinstance(h, logging.handlers.TimedRotatingFileHandler)]
     assert len(rotating) == 1
     handler = rotating[0]
     assert handler.backupCount == 3
     assert handler.when == "MIDNIGHT"
-    assert os.path.abspath(handler.baseFilename) == os.path.abspath(tmp_path / "lr_reduction.log")
+    assert os.path.abspath(handler.baseFilename) == os.path.abspath(logfile)
+
+    logging.getLogger("rotating_test").info("written to the rotating log")
+    handler.flush()
+
+    assert logfile.is_file()
+    assert "written to the rotating log" in logfile.read_text()
+
+
+def test_setup_logging_unwritable_log_file_falls_back_to_stdout(tmp_path, capsys):
+    logfile = tmp_path / "missing_dir" / "lr_reduction.log"  # parent doesn't exist, so the open fails
+
+    setup_logging(rotate=True, log_file=logfile)
+
+    root = logging.getLogger()
+    assert not [h for h in root.handlers if isinstance(h, logging.FileHandler)]
+    assert len(_stream_handlers()) == 1
+    assert not logfile.exists()
+
+    root.info("still reaches stdout")
+    out = capsys.readouterr().out
+    assert f"Cannot write log file {logfile}" in out
+    assert "still reaches stdout" in out
 
 
 def test_setup_logging_level_filters_output(capsys):

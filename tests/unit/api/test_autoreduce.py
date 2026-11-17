@@ -14,6 +14,7 @@ def _config() -> ReductionConfig:
 def test_reduce_auto_executes_end_to_end(tmp_path, monkeypatch):
     """Runs the single-run leaf then FromDiskSequence, proving the incremental on-disk path (§6.4.4) works today."""
     monkeypatch.setattr("lr_reduction.io.config_loader.ConfigLoader.load", lambda _self, _path: _config())
+
     nexus_file = tmp_path / "REF_L_178200.nxs.h5"
     nexus_file.touch()
 

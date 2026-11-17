@@ -20,6 +20,7 @@ from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 from lr_reduction.operations import CombineResultsOperation
 from lr_reduction.types import SingleReductionInput
+from lr_reduction.utils.logging import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("nexus_file_path", type=Path)
     parser.add_argument("output_directory_path", type=Path)
     args = parser.parse_args(argv)
+    setup_logging()
     reduce_auto(args.nexus_file_path, args.output_directory_path)
 
 
