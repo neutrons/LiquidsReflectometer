@@ -141,9 +141,9 @@ def time_resolved():
     data_names = []
     ws = mtd_api.SumSpectra(LIVE_DATA_WS)
     tof = mtd_api.Rebin(ws, [ws.getTofMin(), 300, ws.getTofMax()], OutputWorkspace='tof_')
-    x = tof.readX(0)
+    x = tof.x(0)
     x = (x[1:]+x[:-1])/2.0
-    y = tof.readY(0)
+    y = tof.y(0)
 
     time_data = get_live_data(run_number)
     # If we changed run, we should not use the previous data
@@ -163,9 +163,9 @@ def time_resolved():
                                           [ws.getTofMin(), 300, ws.getTofMax()],
                                           OutputWorkspace='tof_previous_data_')
 
-        x_prev = tof_previous_data.readX(0)
+        x_prev = tof_previous_data.x(0)
         x_prev = (x_prev[1:]+x_prev[:-1])/2.0
-        y_prev = tof_previous_data.readY(0)
+        y_prev = tof_previous_data.y(0)
         _nevts = int(np.sum(y-y_prev))
         signal = (y-y_prev) / (charge - _previous_charge)
         plot_data.append([x_prev, signal])

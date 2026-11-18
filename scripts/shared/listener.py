@@ -48,9 +48,9 @@ def thread_function():
 
                 ws = SumSpectra(LIVE_DATA_WS)
                 tof = Rebin(ws, [ws.getTofMin(), 300, ws.getTofMax()], OutputWorkspace='tof_')
-                x = tof.readX(0)
+                x = tof.x(0)
                 x = (x[1:]+x[:-1])/2.0
-                y = tof.readY(0)
+                y = tof.y(0)
                 
                 ax.clear()
                 total = np.sum(y)
@@ -60,9 +60,9 @@ def thread_function():
                     tof_previous_data = Rebin(previous_data, [ws.getTofMin(), 300, ws.getTofMax()],
                                               OutputWorkspace='tof_previous_data_')
 
-                    x_prev = tof_previous_data.readX(0)
+                    x_prev = tof_previous_data.x(0)
                     x_prev = (x_prev[1:]+x_prev[:-1])/2.0
-                    y_prev = tof_previous_data.readY(0)
+                    y_prev = tof_previous_data.y(0)
                
                     total = np.sum(y_prev)
                     ax.step(x_prev, y_prev/total, where='mid')

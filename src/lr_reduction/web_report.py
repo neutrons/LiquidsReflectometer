@@ -518,7 +518,7 @@ def generate_report_plots(workspace: MantidWorkspace,
         )
         integrated = Integration(direct_summed)
         integrated = Transpose(integrated)
-        signal_y = integrated.readY(0)
+        signal_y = integrated.y(0)
         signal_x = np.arange(len(signal_y))
         peak_pixels = _plot1d(
             signal_x,
@@ -547,7 +547,7 @@ def generate_report_plots(workspace: MantidWorkspace,
         )
         integrated = Integration(direct_summed)
         integrated = Transpose(integrated)
-        signal_y = integrated.readY(0)
+        signal_y = integrated.y(0)
         signal_x = list(range(len(signal_y)))
         low_res_profile = _plot1d(
             signal_x,
@@ -565,8 +565,8 @@ def generate_report_plots(workspace: MantidWorkspace,
     tof_dist = None
     try:
         workspace = SumSpectra(workspace)
-        signal_x = workspace.readX(0) / 1000.0
-        signal_y = workspace.readY(0)
+        signal_x = workspace.x(0) / 1000.0
+        signal_y = workspace.y(0)
         tof_dist = _plot1d(
             signal_x,
             signal_y,

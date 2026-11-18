@@ -26,7 +26,7 @@ def test_deadtime(nexus_dir):
     algo.setProperty("OutputWorkspace", "dead_time_corr")
     algo.PyExec()
     corr_ws = algo.getProperty("OutputWorkspace").value
-    corr = corr_ws.readY(0)
+    corr = corr_ws.y(0)
     for c in corr:
         assert c > 0
         assert c < 1.001
@@ -48,7 +48,7 @@ def test_deadtime_paralyzable(nexus_dir):
     algo.setProperty("OutputWorkspace", "dead_time_corr")
     algo.PyExec()
     corr_ws = algo.getProperty("OutputWorkspace").value
-    corr = corr_ws.readY(0)
+    corr = corr_ws.y(0)
     for c in corr:
         assert c > 0
         assert c < 1.001
@@ -75,7 +75,7 @@ def test_deadtime_threshold(nexus_dir):
 
     algo.PyExec()
     corr_ws = algo.getProperty("OutputWorkspace").value
-    corr = corr_ws.readY(0)
+    corr = corr_ws.y(0)
 
     # manual inspection showed 88 corrections were above the threshold
     assert len(corr[corr == 0]) == 88
