@@ -199,7 +199,7 @@ def histogram(name: str, params: list[float]) -> tuple[np.ndarray, np.ndarray, n
     aligned = Rebin(InputWorkspace=name, Params=params, PreserveEvents=True, StoreInADS=False)
     summed = SumSpectra(InputWorkspace=aligned, StoreInADS=False)
     rebinned = Rebin(InputWorkspace=summed, Params=params, PreserveEvents=False, StoreInADS=False)
-    return rebinned.readX(0), rebinned.readY(0), rebinned.readE(0)
+    return rebinned.x(0), rebinned.y(0), rebinned.e(0)
 
 
 def test_overlap_is_averaged_not_summed(make_segment):
@@ -342,7 +342,7 @@ def test_output_axis_is_single_bin(make_segment):
     a = make_segment(2.0, 6.0, c=0.5, seed=12)
     b = make_segment(4.0, 8.0, c=2.0, seed=13)
     run_merge([a, b])
-    x = mtd[OUTPUT_WORKSPACE].readX(0)
+    x = mtd[OUTPUT_WORKSPACE].x(0)
     assert len(x) == 2
     assert x[0] == mtd[a].getTofMin()
     assert x[1] == np.nextafter(mtd[b].getTofMax(), np.inf)

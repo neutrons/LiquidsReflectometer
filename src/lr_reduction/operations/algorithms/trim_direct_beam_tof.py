@@ -182,7 +182,7 @@ class TrimDirectBeamTof(PythonAlgorithm):
 
         curve_issues = dead_time_curve_issues(curve_ws, tof_range)
         # A genuine factor is at least 1; the clamp zeroes over-threshold bins, which hides them from the cut.
-        if curve_ws.getNumberHistograms() == 1 and np.any(curve_ws.readY(0) < 1):
+        if curve_ws.getNumberHistograms() == 1 and np.any(curve_ws.y(0) < 1):
             curve_issues.append(
                 "it contains factors below 1, as a curve clamped by SingleReadoutDeadTimeCorrection does; "
                 "compute it with UseDeadTimeThreshold=False"
@@ -211,7 +211,7 @@ class TrimDirectBeamTof(PythonAlgorithm):
         t_chop = chopper_cut(
             phase, self.getProperty("ChopperCutCoefficients").value, self.getProperty("ChopperCutOffset").value
         )
-        t_dtc = dead_time_cut(curve_ws.readX(0), curve_ws.readY(0), self.getProperty("DeadTimeThreshold").value)
+        t_dtc = dead_time_cut(curve_ws.x(0), curve_ws.y(0), self.getProperty("DeadTimeThreshold").value)
         t_floor = self._intensity_cut(input_ws, run)
 
         tof_min = t_chop if t_dtc is None else max(t_chop, t_dtc)
@@ -245,11 +245,11 @@ class TrimDirectBeamTof(PythonAlgorithm):
             PreserveEvents=False,
             StoreInADS=False,
         )
-        cut = intensity_cut(histogram.readX(0), histogram.readY(0), threshold)
+        cut = intensity_cut(histogram.x(0), histogram.y(0), threshold)
         if cut is None:
             raise RuntimeError(
                 f"Run {run}: intensity floor: no {step} µs bin reaches IntensityThreshold={threshold} "
-                f"(histogram maximum {histogram.readY(0).max()})"
+                f"(histogram maximum {histogram.y(0).max()})"
             )
         return cut
 
