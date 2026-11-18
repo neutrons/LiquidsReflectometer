@@ -177,6 +177,7 @@ class PeakFitConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
     type: Literal["gauss", "supergauss"] = Field("supergauss")
     pad: int = Field(1, ge=0)
+    background: Literal["linear", "constant", "none"] = Field("linear")
 
 
 class ResolutionConfig(BaseModel):
@@ -238,6 +239,7 @@ class RunParameters(BaseModel):
     peak: PixelRange | None = None
     background: BackgroundConfig | None = None
     low_res: PixelRange | None = None  # low-resolution-direction pixel range
+    peak_fit: PeakFitConfig | None = None
 
 
 class ReflectedRunParameters(RunParameters):
@@ -252,7 +254,6 @@ class ReflectedRunParameters(RunParameters):
     acceptance: AcceptanceWindow | None = Field(None)
     q_binning: QBinning | None = Field(None)
     angle: AngleConfig | None = Field(None)
-    peak_fit: PeakFitConfig | None = Field(None)
     resolution: ResolutionConfig | None = Field(None)
     geometry: GeometryOverride | None = Field(None)
     scale_factor: float | None = Field(None, description="Manual stitch scale override")
