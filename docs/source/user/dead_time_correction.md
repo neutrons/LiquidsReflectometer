@@ -74,7 +74,7 @@ dead-time computation.
 
     algo.PyExec()
     corr_ws = algo.getProperty("OutputWorkspace").value
-    corr = corr_ws.readY(0)
+    corr = corr_ws.y(0)
     for c in corr:
         assert c <= 1.1
 ```

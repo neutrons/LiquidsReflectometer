@@ -93,7 +93,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         t_series = np.asarray(ws_event_data.getRun()["proton_charge"].value)
         n_pulses = np.count_nonzero(t_series)
 
-        rate = counts_ws.readY(0) / n_pulses
+        rate = counts_ws.y(0) / n_pulses
 
         # Compute the dead time correction for each TOF bin
         if paralyzing:
@@ -120,10 +120,10 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
             error = f"Corrupted dead time correction:\n  Reflected: {corr}\n"
             logger.error(error)
 
-        counts_ws.setY(0, corr)
+        counts_ws.setSharedY(0, corr)
 
         # We don't compute an error on the dead time correction, so set it to zero
-        counts_ws.setE(0, 0 * corr)
+        counts_ws.setSharedE(0, 0 * corr)
         counts_ws.setDistribution(True)
         self.setProperty("OutputWorkspace", counts_ws)
 

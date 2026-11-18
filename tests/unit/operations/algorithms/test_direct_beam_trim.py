@@ -278,7 +278,7 @@ def test_output_is_an_event_workspace_on_the_single_bin_range(make_events, make_
     assert isinstance(trimmed, IEventWorkspace)
     expected = [algorithm.getProperty("TOFMin").value, algorithm.getProperty("TOFMax").value]
     for index in range(trimmed.getNumberHistograms()):
-        np.testing.assert_array_equal(trimmed.readX(index), expected)
+        np.testing.assert_array_equal(trimmed.x(index), expected)
 
 
 def test_intensity_floor_sums_event_weights(make_events, make_curve):
@@ -291,16 +291,16 @@ def test_intensity_floor_sums_event_weights(make_events, make_curve):
 
 def test_inputs_are_unchanged(make_events, make_curve):
     events, curve = make_events(weights=DEFAULT_WEIGHTS), make_curve(over=(3,))
-    tofs_before, weights_before, x_before = all_tofs(mtd[events]), all_weights(mtd[events]), mtd[events].readX(0).copy()
-    curve_x_before, curve_y_before = mtd[curve].readX(0).copy(), mtd[curve].readY(0).copy()
+    tofs_before, weights_before, x_before = all_tofs(mtd[events]), all_weights(mtd[events]), mtd[events].x(0).copy()
+    curve_x_before, curve_y_before = mtd[curve].x(0).copy(), mtd[curve].y(0).copy()
 
     run_algorithm(events, curve)
 
     np.testing.assert_array_equal(all_tofs(mtd[events]), tofs_before)
     np.testing.assert_array_equal(all_weights(mtd[events]), weights_before)
-    np.testing.assert_array_equal(mtd[events].readX(0), x_before)
-    np.testing.assert_array_equal(mtd[curve].readX(0), curve_x_before)
-    np.testing.assert_array_equal(mtd[curve].readY(0), curve_y_before)
+    np.testing.assert_array_equal(mtd[events].x(0), x_before)
+    np.testing.assert_array_equal(mtd[curve].x(0), curve_x_before)
+    np.testing.assert_array_equal(mtd[curve].y(0), curve_y_before)
 
 
 def test_no_intermediate_workspace_is_left_in_the_ads(make_events, make_curve):

@@ -107,7 +107,7 @@ def run_algorithm(input_workspace, **properties):
 def expected_scale(wavelengths, cd_thickness):
     """1 / T for each wavelength, read off the transmission histogram's bins."""
     _, mu = _load_cd_attenuation_data()
-    bin_edges = get_transmission_workspace(cd_thickness).readX(0)
+    bin_edges = get_transmission_workspace(cd_thickness).x(0)
     bins = np.searchsorted(bin_edges, wavelengths, side="right") - 1
     return np.exp(mu[bins] * cd_thickness)
 

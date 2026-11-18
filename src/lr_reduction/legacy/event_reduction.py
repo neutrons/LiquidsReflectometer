@@ -1479,7 +1479,7 @@ def compute_wavelength_resolution(ws):
         Function=settings.wavelength_resolution_function, InputWorkspace=ws, OutputWorkspace="out"
     )
 
-    wavelength = out.readX(1)
-    d_lambda = out.readY(1)
+    wavelength = out.x(1)
+    d_lambda = out.y(1)
 
     return np.array(wavelength), np.array(d_lambda)

@@ -63,7 +63,9 @@ class GravityDirection(IntEnum):
         try:
             ws = workspace_handle(workspace)
             run = ws.getRun()
-            assert ws.getInstrument().getName() == "REF_L", "Gravity direction can only be determined for REF_L"
+            component_info = ws.componentInfo()
+            instrument_name = component_info.name(component_info.root())
+            assert instrument_name == "REF_L", "Gravity direction can only be determined for REF_L"
             # Determine whether reflect up or down based on the sign of sample angle (ths)
             # as don't have other flag for this.
             # For theta-theta geometry ths=0.0 and is reflect up so include 0.0 as if positive value of ths.
