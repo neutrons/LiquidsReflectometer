@@ -331,8 +331,17 @@ def test_input_not_in_tof_is_rejected(make_events, make_curve):
     events = make_events()
     ConvertUnits(InputWorkspace=events, Target="Wavelength", OutputWorkspace=events)
 
-    with pytest.raises(RuntimeError, match=f"Run {RUN_NUMBER}.*TOF"):
-        run_algorithm(events, make_curve())
+    with pytest.raises(ValueError, match="InputWorkspace .* must have units of TOF"):
+        make_algorithm(events, make_curve())
+
+
+def test_curve_not_in_tof_is_rejected(make_events, workspaces):
+    curve = mtd.unique_hidden_name()
+    CreateWorkspace(DataX=CURVE_EDGES, DataY=np.ones(len(CURVE_EDGES) - 1), UnitX="Wavelength", OutputWorkspace=curve)
+    workspaces.append(curve)
+
+    with pytest.raises(ValueError, match="DeadTimeCorrectionWorkspace .* must have units of TOF"):
+        make_algorithm(make_events(), curve)
 
 
 def test_input_without_events_is_rejected(make_events, make_curve):

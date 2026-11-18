@@ -12,7 +12,13 @@ The events are cropped once, to ``[max(chopper_cut, dead_time_cut), intensity_cu
 """
 
 import numpy as np
-from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, MatrixWorkspaceProperty, PythonAlgorithm
+from mantid.api import (
+    AlgorithmFactory,
+    IEventWorkspaceProperty,
+    MatrixWorkspaceProperty,
+    PythonAlgorithm,
+    WorkspaceUnitValidator,
+)
 from mantid.kernel import (
     CompositeValidator,
     Direction,
@@ -109,11 +115,11 @@ class TrimDirectBeamTof(PythonAlgorithm):
 
     def PyInit(self):  # noqa: N802
         self.declareProperty(
-            IEventWorkspaceProperty("InputWorkspace", "", Direction.Input),
+            IEventWorkspaceProperty("InputWorkspace", "", Direction.Input, WorkspaceUnitValidator("TOF")),
             "ROI-extracted, dead-time-corrected direct-beam event workspace in TOF",
         )
         self.declareProperty(
-            MatrixWorkspaceProperty("DeadTimeCorrectionWorkspace", "", Direction.Input),
+            MatrixWorkspaceProperty("DeadTimeCorrectionWorkspace", "", Direction.Input, WorkspaceUnitValidator("TOF")),
             "Single-spectrum DTC(TOF) curve from SingleReadoutDeadTimeCorrection, computed from the full detector "
             "with UseDeadTimeThreshold=False",
         )
@@ -161,9 +167,7 @@ class TrimDirectBeamTof(PythonAlgorithm):
 
         input_issues = []
         tof_range = None
-        if input_ws.getAxis(0).getUnit().unitID() != "TOF":
-            input_issues.append("the X axis must be in TOF")
-        elif input_ws.getNumberEvents() == 0:
+        if input_ws.getNumberEvents() == 0:
             input_issues.append("it contains no events")
         else:
             tof_range = (input_ws.getTofMin(), input_ws.getTofMax())
@@ -184,8 +188,8 @@ class TrimDirectBeamTof(PythonAlgorithm):
                 "compute it with UseDeadTimeThreshold=False"
             )
         if curve_issues:
-            issues["DeadTimeCorrectionWorkspace"] = (
-                f"Run {run}: invalid dead time correction curve: " + "; ".join(curve_issues)
+            issues["DeadTimeCorrectionWorkspace"] = f"Run {run}: invalid dead time correction curve: " + "; ".join(
+                curve_issues
             )
 
         return issues
