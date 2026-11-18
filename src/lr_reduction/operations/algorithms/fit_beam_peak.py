@@ -26,16 +26,10 @@ from lr_reduction.operations.algorithms.roi_extraction import detector_shape
 #: Mantid peak function for each `PeakFunction` choice.
 PEAK_FUNCTIONS = {"supergauss": "SuperGaussian", "gauss": "Gaussian"}
 
-#: Mantid background function for each `BackgroundFunction` choice, and its number of parameters.
-BACKGROUND_FUNCTIONS = {"linear": ("LinearBackground", 2), "flat": ("FlatBackground", 1), "none": (None, 0)}
-
-#: Number of parameters of each peak function.
-PEAK_PARAMETERS = {"supergauss": 4, "gauss": 3}
+#: Mantid background function for each `BackgroundFunction` choice.
+BACKGROUND_FUNCTIONS = {"linear": "LinearBackground", "flat": "FlatBackground", "none": None}
 
 EXPONENT_BOUNDS = (2.0, 10.0)
-
-#: Penalty factor that makes Mantid's (penalty-based) boundary constraints effectively hard.
-CONSTRAINT_PENALTY = 1e10
 
 #: Fit statuses of the Levenberg-Marquardt minimizer that mean it converged.
 CONVERGED = ("success", "Changes in function value are too small", "Changes in parameter value are too small")
@@ -58,9 +52,6 @@ class SuperGaussian(IFunction1D):
         self.declareParameter("Exponent", 2.0, "Shape exponent; 2 is a Gaussian, larger is flatter-topped")
         self.addConstraints(f"{EXPONENT_BOUNDS[0]} < Exponent < {EXPONENT_BOUNDS[1]}")
         self.addConstraints("0 < Sigma")
-        # Constraints are penalties; at the default factor a measured peak fitted Exponent 1.70.
-        self.setConstraintPenaltyFactor("Exponent", CONSTRAINT_PENALTY)
-        self.setConstraintPenaltyFactor("Sigma", CONSTRAINT_PENALTY)
 
     def function1D(self, xvals):  # noqa: N802
         height = self.getParameterValue("Height")
@@ -73,8 +64,9 @@ class SuperGaussian(IFunction1D):
 def y_profile(detector_ids, counts, errors, n_y):
     """Sum per-pixel counts over x into a y-profile, errors in quadrature.
 
-    Pixels map to ``y = detector_id mod n_y``. A y pixel with no counts gets an error of 1, so it
-    neither dominates nor drops out of a weighted fit.
+    Pixels map to ``y = detector_id mod n_y``. A y pixel with no counts gets the error of one event,
+    so it neither dominates nor drops out of a weighted fit: 1 for raw counts, and the mean event
+    weight ``Σ E² / Σ Y`` once the events are weighted (by proton-charge normalization, for one).
 
     Returns
     -------
@@ -83,7 +75,8 @@ def y_profile(detector_ids, counts, errors, n_y):
     y_pixels, inverse = np.unique(np.asarray(detector_ids) % n_y, return_inverse=True)
     summed = np.bincount(inverse, weights=counts, minlength=y_pixels.size)
     summed_errors = np.sqrt(np.bincount(inverse, weights=np.square(errors), minlength=y_pixels.size))
-    summed_errors[summed == 0] = 1.0
+    if summed.any():
+        summed_errors[summed == 0] = np.sum(np.square(errors)) / np.sum(counts)
     return y_pixels.astype(float), summed, summed_errors
 
 
@@ -102,7 +95,7 @@ def starting_function(y_pixels, counts, peak_function, background_function):
         peak += ",Exponent=3"
     peak += f",constraints=({y_pixels[0]}<PeakCentre<{y_pixels[-1]},0<Height)"
 
-    background, _ = BACKGROUND_FUNCTIONS[background_function]
+    background = BACKGROUND_FUNCTIONS[background_function]
     if background == "LinearBackground":
         return f"{peak};name=LinearBackground,A0={floor},A1=0"
     if background == "FlatBackground":
@@ -137,7 +130,7 @@ class FitBeamPeak(PythonAlgorithm):
         )
         for name, doc in (
             ("PeakCentre", "Fitted centroid, in y pixels"),
-            ("PeakCentreError", "Fit uncertainty of PeakCentre"),
+            ("PeakCentreError", "Fit uncertainty of PeakCentre, not scaled by ChiSquaredOverDoF"),
             ("PeakWidth", "Fitted Sigma of the peak function"),
             ("ChiSquaredOverDoF", "Goodness of fit"),
         ):
@@ -166,7 +159,11 @@ class FitBeamPeak(PythonAlgorithm):
 
         peak = self.getProperty("PeakFunction").value
         background = self.getProperty("BackgroundFunction").value
-        n_parameters = PEAK_PARAMETERS[peak] + BACKGROUND_FUNCTIONS[background][1]
+        n_parameters = sum(
+            FunctionFactory.createFunction(name).nParams()
+            for name in (PEAK_FUNCTIONS[peak], BACKGROUND_FUNCTIONS[background])
+            if name is not None
+        )
         n_pixels = np.unique(detector_ids % n_y).size
         if n_pixels < n_parameters + 2:
             issues["InputWorkspace"] = (
@@ -181,10 +178,9 @@ class FitBeamPeak(PythonAlgorithm):
         background = self.getProperty("BackgroundFunction").value
         _, n_y = detector_shape(input_ws)
         detector_ids = self._detector_ids(input_ws)
-        no_counts = f"no counts in the {np.unique(detector_ids % n_y).size} y pixels of InputWorkspace"
         # Integration cannot bin an event workspace without events.
         if isinstance(input_ws, IEventWorkspace) and input_ws.getNumberEvents() == 0:
-            raise RuntimeError(no_counts)
+            raise RuntimeError("no events in InputWorkspace")
 
         # Transient histogram: one bin per pixel over the whole X range; the input is untouched.
         integration = self.createChildAlgorithm("Integration")
@@ -199,7 +195,7 @@ class FitBeamPeak(PythonAlgorithm):
             detector_ids, integrated.extractY()[:, 0], integrated.extractE()[:, 0], n_y
         )
         if not np.any(counts):
-            raise RuntimeError(no_counts)
+            raise RuntimeError(f"no counts in the {y_pixels.size} y pixels of InputWorkspace")
 
         create = self.createChildAlgorithm("CreateWorkspace")
         create.setProperty("DataX", y_pixels)
@@ -210,19 +206,17 @@ class FitBeamPeak(PythonAlgorithm):
         profile = create.getProperty("OutputWorkspace").value
 
         start = starting_function(y_pixels, counts, peak, background)
-        fit = self.createChildAlgorithm("Fit")
-        fit.setProperty("Function", start)
-        fit.setProperty("InputWorkspace", profile)
-        fit.setProperty("Minimizer", "Levenberg-Marquardt")
-        fit.setProperty("CreateOutput", True)
-        fit.setProperty("Output", "beam_peak_fit")
-        fit.execute()
-        status = fit.getProperty("OutputStatus").value
-        if status not in CONVERGED:
-            raise RuntimeError(f"The beam-peak fit failed: {status}. Starting function: {start}")
-
-        function = fit.getProperty("Function").value
-        peak_function = function.getFunction(0) if isinstance(function, CompositeFunction) else function
+        fit, function, peak_function = self._fit(start, profile, start)
+        if peak == "supergauss":
+            # Mantid constraints are only penalties: a peak with heavier tails than a Gaussian fitted
+            # Exponent 1.70. The bounded optimum is then on the bound, so refit with Exponent fixed there;
+            # a penalty strong enough to hold the bound stalls the minimizer instead.
+            exponent = peak_function.getParameterValue("Exponent")
+            bounded = float(np.clip(exponent, *EXPONENT_BOUNDS))
+            if bounded != exponent:
+                peak_function.setParameter("Exponent", bounded)
+                peak_function.fixParameter("Exponent")
+                fit, function, peak_function = self._fit(function, profile, start)
         centre = peak_function.getParameterValue("PeakCentre")
         self.setProperty("PeakCentre", centre)
         self.setProperty("PeakCentreError", peak_function.getError("PeakCentre"))
@@ -234,7 +228,6 @@ class FitBeamPeak(PythonAlgorithm):
 
         if peak == "supergauss":
             exponent = peak_function.getParameterValue("Exponent")
-            # Mantid constraints are penalties, so a fit can end slightly outside the bounds.
             if not EXPONENT_BOUNDS[0] + 1e-3 < exponent < EXPONENT_BOUNDS[1] - 1e-3:
                 logger.warning(f"FitBeamPeak: the fitted Exponent {exponent} is at a bound of {EXPONENT_BOUNDS}")
         if centre - y_pixels[0] < 1 or y_pixels[-1] - centre < 1:
@@ -243,6 +236,21 @@ class FitBeamPeak(PythonAlgorithm):
                 f"[{y_pixels[0]}, {y_pixels[-1]}]"
             )
         logger.information(f"FitBeamPeak: centre {centre}, function {function}")
+
+    def _fit(self, function, profile, start):
+        """Run Fit on the profile; return the algorithm, the fitted function and its peak component."""
+        fit = self.createChildAlgorithm("Fit")
+        fit.setProperty("Function", function)
+        fit.setProperty("InputWorkspace", profile)
+        fit.setProperty("Minimizer", "Levenberg-Marquardt")
+        fit.setProperty("CreateOutput", True)
+        fit.setProperty("Output", "beam_peak_fit")
+        fit.execute()
+        status = fit.getProperty("OutputStatus").value
+        if status not in CONVERGED:
+            raise RuntimeError(f"The beam-peak fit failed: {status}. Starting function: {start}")
+        fitted = fit.getProperty("Function").value
+        return fit, fitted, fitted.getFunction(0) if isinstance(fitted, CompositeFunction) else fitted
 
     @staticmethod
     def _detector_ids(workspace):

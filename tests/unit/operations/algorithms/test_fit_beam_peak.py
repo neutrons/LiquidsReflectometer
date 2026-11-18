@@ -15,12 +15,13 @@ from mantid.simpleapi import (
     ExtractSpectra,
     LoadEventNexus,
     Rebin,
+    Scale,
     SetInstrumentParameter,
     mtd,
 )
 
 from lr_reduction.legacy.peak_finding import fit_signal_flat_bck
-from lr_reduction.operations.algorithms.fit_beam_peak import FitBeamPeak, SuperGaussian, y_profile
+from lr_reduction.operations.algorithms.fit_beam_peak import CONVERGED, FitBeamPeak, SuperGaussian, y_profile
 
 # A non-square detector, so that swapping x and y in the pixel rule cannot go unnoticed.
 N_X = 2
@@ -121,13 +122,18 @@ def test_algorithm_metadata():
     assert algorithm.version() == 1
 
 
-def test_y_profile_sums_over_x_in_quadrature_and_gives_empty_pixels_unit_error():
-    """IDs 1, 5 and 9 are y = 1 on a 4-pixel-high detector; y = 2 has no counts."""
-    y_pixels, counts, errors = y_profile([1, 5, 9, 2, 3], [1.0, 2.0, 3.0, 0.0, 4.0], [1.0, 2.0, 2.0, 0.0, 2.0], 4)
+@pytest.mark.parametrize("weight", [1.0, 1e-3], ids=["counts", "normalized"])
+def test_y_profile_sums_over_x_in_quadrature_and_gives_empty_pixels_one_event_error(weight):
+    """IDs 1, 5 and 9 are y = 1 on a 4-pixel-high detector; y = 2 has no counts.
+
+    Every event weighs `weight`, so a pixel of n events has counts ``n w`` and error ``√n w``.
+    """
+    n_events = np.array([1.0, 2.0, 3.0, 0.0, 4.0])
+    y_pixels, counts, errors = y_profile([1, 5, 9, 2, 3], weight * n_events, weight * np.sqrt(n_events), 4)
 
     np.testing.assert_array_equal(y_pixels, [1, 2, 3])
-    np.testing.assert_array_equal(counts, [6.0, 0.0, 4.0])
-    np.testing.assert_allclose(errors, [3.0, 1.0, 2.0])
+    np.testing.assert_allclose(counts, weight * np.array([6.0, 0.0, 4.0]))
+    np.testing.assert_allclose(errors, weight * np.array([np.sqrt(6.0), 1.0, 2.0]))
 
 
 @pytest.mark.parametrize("weighted", [False, True], ids=["unweighted", "weighted"])
@@ -199,7 +205,7 @@ def test_super_gaussian_sigma_is_root_two_gaussian_sigma_at_exponent_two():
 
 
 def test_exponent_bound_is_enforced(make_detector):
-    """A cusp-like peak would fit below Exponent 2 if Mantid's penalty constraint were left soft."""
+    """A cusp-like peak fits below Exponent 2 unless the bound is enforced."""
 
     def cusp(y):
         return HEIGHT * np.exp(-(np.abs((y - CENTRE) / SIGMA) ** 1.2)) + 30.0
@@ -207,7 +213,7 @@ def test_exponent_bound_is_enforced(make_detector):
     algorithm = run_algorithm(make_detector(profile=cusp))
     function = FunctionFactory.createInitialized(algorithm.getProperty("Function").value)
 
-    assert function.getFunction(0).getParameterValue("Exponent") == pytest.approx(2.0, abs=0.01)
+    assert function.getFunction(0).getParameterValue("Exponent") == 2.0
 
 
 def test_function_string_reproduces_the_fitted_profile(make_detector):
@@ -230,6 +236,20 @@ def test_empty_y_pixel_has_unit_error(make_detector):
     index = list(data.readX(0)).index(5.0)
     assert data.readY(0)[index] == 0.0
     assert data.readE(0)[index] == 1.0
+
+
+def test_centroid_does_not_depend_on_the_weight_scale(make_detector):
+    """Proton-charge normalization rescales every weight; empty pixels must not change the fit then."""
+    # No background: the tails are empty pixels.
+    sparse = make_detector(profile=lambda y: HEIGHT / 20 * np.exp(-(np.abs((y - CENTRE) / SIGMA) ** EXPONENT)))
+    assert 0.0 in mtd[sparse].extractY()
+    centres = [
+        centre(run_algorithm(Scale(InputWorkspace=sparse, Factor=factor, StoreInADS=False)))
+        for factor in (1.0, 1e-3, 1e3)
+    ]
+
+    # Scaled weights are float32, and the minimizer stops within its tolerance.
+    assert centres == pytest.approx([centres[0]] * 3, abs=1e-4)
 
 
 def test_history_records_the_function_choices(make_detector):
@@ -280,9 +300,35 @@ def test_grouped_spectrum(make_detector):
         run_algorithm(input_workspace)
 
 
-def test_all_zero_profile(make_detector):
-    with pytest.raises(RuntimeError, match="no counts in the 40 y pixels of InputWorkspace"):
+def test_no_events(make_detector):
+    with pytest.raises(RuntimeError, match="no events in InputWorkspace"):
         run_algorithm(make_detector(profile=lambda _: 0.0))
+
+
+def test_all_zero_profile(make_detector):
+    """Events whose weights cancel: a histogram with no counts."""
+    histogram = Rebin(
+        InputWorkspace=make_detector(), Params=[0.0, 1000.0, 1000.0], PreserveEvents=False, StoreInADS=False
+    )
+    for index in range(histogram.getNumberHistograms()):
+        histogram.dataY(index)[:] = 0.0
+
+    with pytest.raises(RuntimeError, match="no counts in the 40 y pixels of InputWorkspace"):
+        run_algorithm(histogram)
+
+
+@pytest.mark.parametrize(
+    ("status", "converged"),
+    [
+        ("success", True),
+        ("Changes in function value are too small", True),
+        ("Changes in parameter value are too small", True),  # what the measured direct beam 198403 ends with
+        ("Failed to converge after 500 iterations", False),
+        ("Failed to converge, maximum mu reached.", False),
+    ],
+)
+def test_converged_statuses(status, converged):
+    assert (status in CONVERGED) == converged
 
 
 # Template sequence 7 of tests/data/template.xml: (peak y range, background y range, low-resolution x range).
