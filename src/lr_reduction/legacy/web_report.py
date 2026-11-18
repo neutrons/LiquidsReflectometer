@@ -512,7 +512,7 @@ def generate_report_plots(
         )
         integrated = Integration(direct_summed)
         integrated = Transpose(integrated)
-        signal_y = integrated.readY(0)
+        signal_y = integrated.y(0)
         signal_x = np.arange(len(signal_y))
         peak_pixels = _plot1d(
             signal_x,
@@ -539,7 +539,7 @@ def generate_report_plots(
         )
         integrated = Integration(direct_summed)
         integrated = Transpose(integrated)
-        signal_y = integrated.readY(0)
+        signal_y = integrated.y(0)
         signal_x = list(range(len(signal_y)))
         low_res_profile = _plot1d(
             signal_x,
@@ -557,8 +557,8 @@ def generate_report_plots(
     tof_dist = None
     try:
         workspace = SumSpectra(workspace)
-        signal_x = workspace.readX(0) / 1000.0
-        signal_y = workspace.readY(0)
+        signal_x = workspace.x(0) / 1000.0
+        signal_y = workspace.y(0)
         tof_dist = _plot1d(
             signal_x,
             signal_y,
@@ -794,7 +794,7 @@ def _plot2d(
     )
     fig = go.Figure(data=plotly_objects, layout=layout)
 
-    div_html = pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
+    div_html = pyo.plot(fig, output_type="div", include_plotlyjs=False)#, show_link=False)
 
     return div_html
 
@@ -935,7 +935,7 @@ def _plot1d(
     )
 
     fig = go.Figure(data=data, layout=layout)
-    return pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
+    return pyo.plot(fig, output_type="div", include_plotlyjs=False)#, show_link=False)
 
 
 def _plot_text(text, title=""):
@@ -975,6 +975,6 @@ def _plot_text(text, title=""):
     )
 
     fig = go.Figure(layout=layout)
-    plot = pyo.plot(fig, output_type="div", include_plotlyjs=False, show_link=False)
+    plot = pyo.plot(fig, output_type="div", include_plotlyjs=False)#, show_link=False)
 
     return plot
