@@ -177,7 +177,7 @@ class PeakFitConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
     type: Literal["gauss", "supergauss"] = Field("supergauss")
     pad: int = Field(1, ge=0)
-    background: Literal["linear", "flat", "none"] = Field("linear")
+    background: Literal["linear", "constant", "none"] = Field("linear")
 
 
 class ResolutionConfig(BaseModel):

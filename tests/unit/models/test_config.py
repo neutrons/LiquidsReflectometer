@@ -120,14 +120,14 @@ def test_effective_merges_defaults_with_run_overrides():
 def test_direct_beam_inherits_and_overrides_peak_fit():
     """Beam-peak localisation runs on both sides, so the direct beam has its own peak-fit settings."""
     config = _minimal_config(
-        defaults={"peak_fit": {"type": "gauss", "background": "flat"}},
+        defaults={"peak_fit": {"type": "gauss", "background": "constant"}},
         direct_beams={
             "db_8mm": {"direct_beam_run_numbers": [12345]},
             "db_4mm": {"direct_beam_run_numbers": [12346], "peak_fit": {"background": "none"}},
         },
     )
     inherited = config.effective(config.direct_beams["db_8mm"]).peak_fit
-    assert (inherited.type, inherited.background) == ("gauss", "flat")
+    assert (inherited.type, inherited.background) == ("gauss", "constant")
     assert config.effective(config.direct_beams["db_4mm"]).peak_fit.background == "none"
 
 

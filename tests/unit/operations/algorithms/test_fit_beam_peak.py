@@ -182,7 +182,9 @@ def test_profile_counts_every_event(make_detector):
     assert mtd[PROFILE_WORKSPACE].readY(0).sum() == mtd[input_workspace].getNumberEvents()
 
 
-@pytest.mark.parametrize(("peak", "background"), itertools.product(["supergauss", "gauss"], ["linear", "flat", "none"]))
+@pytest.mark.parametrize(
+    ("peak", "background"), itertools.product(["supergauss", "gauss"], ["linear", "constant", "none"])
+)
 def test_every_function_choice_fits(make_detector, peak, background):
     algorithm = run_algorithm(make_detector(), peak, background)
 
@@ -253,12 +255,12 @@ def test_centroid_does_not_depend_on_the_weight_scale(make_detector):
 
 
 def test_history_records_the_function_choices(make_detector):
-    run_algorithm(make_detector(), "gauss", "flat", output_workspace=PROFILE_WORKSPACE)
+    run_algorithm(make_detector(), "gauss", "constant", output_workspace=PROFILE_WORKSPACE)
 
     history = mtd[PROFILE_WORKSPACE].getHistory().lastAlgorithm()
     assert history.name() == "FitBeamPeak"
     assert history.getPropertyValue("PeakFunction") == "gauss"
-    assert history.getPropertyValue("BackgroundFunction") == "flat"
+    assert history.getPropertyValue("BackgroundFunction") == "constant"
 
 
 def test_nothing_is_registered_without_an_output_workspace(make_detector):

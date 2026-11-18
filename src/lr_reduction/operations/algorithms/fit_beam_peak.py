@@ -3,7 +3,7 @@ Beam-peak localisation: the fitted y-pixel centroid of a beam on the BL4B area d
 
 The ROI-extracted events are collapsed into a transient y-profile, summed over x and over the
 whole X range, and the profile is fitted with Mantid's ``Fit``: a super-Gaussian (or Gaussian)
-peak plus a linear (or flat, or no) background. The super-Gaussian is not in Mantid's function
+peak plus a linear (or constant, or no) background. The super-Gaussian is not in Mantid's function
 library, so this module also registers it, as `SuperGaussian`.
 """
 
@@ -27,7 +27,7 @@ from lr_reduction.operations.algorithms.roi_extraction import detector_shape
 PEAK_FUNCTIONS = {"supergauss": "SuperGaussian", "gauss": "Gaussian"}
 
 #: Mantid background function for each `BackgroundFunction` choice.
-BACKGROUND_FUNCTIONS = {"linear": "LinearBackground", "flat": "FlatBackground", "none": None}
+BACKGROUND_FUNCTIONS = {"linear": "LinearBackground", "constant": "FlatBackground", "none": None}
 
 EXPONENT_BOUNDS = (2.0, 10.0)
 
@@ -51,7 +51,7 @@ class SuperGaussian(IFunction1D):
         self.declareParameter("Sigma", 1.0, "Peak width")
         self.declareParameter("Exponent", 2.0, "Shape exponent; 2 is a Gaussian, larger is flatter-topped")
         self.addConstraints(f"{EXPONENT_BOUNDS[0]} < Exponent < {EXPONENT_BOUNDS[1]}")
-        self.addConstraints("0 < Sigma")
+        self.addConstraints("1e-6 < Sigma")
 
     def function1D(self, xvals):  # noqa: N802
         height = self.getParameterValue("Height")
@@ -81,25 +81,32 @@ def y_profile(detector_ids, counts, errors, n_y):
 
 
 def starting_function(y_pixels, counts, peak_function, background_function):
-    """Mantid function string for the fit, with its starting values estimated from the profile."""
-    floor = counts.min()
-    centre = y_pixels[np.argmax(counts)]
-    above = counts - floor
-    sigma = 0.5
-    if above.any():
-        mean = np.average(y_pixels, weights=above)
-        sigma = max(np.sqrt(np.average((y_pixels - mean) ** 2, weights=above)), 0.5)
+    """Mantid function string for the fit: the starting values and bounds of the prototype's
+    ``nr_tools.fit_peak`` (``exp`` branch).
 
-    peak = f"name={PEAK_FUNCTIONS[peak_function]},Height={counts.max() - floor},PeakCentre={centre},Sigma={sigma}"
+    The peak starts at the profile's maximum, centred on its count-weighted mean with its standard
+    deviation as width, and the background at zero. The super-Gaussian holds ``Height`` within a
+    factor of 10 of its start; the Gaussian is unconstrained.
+
+    One departure: the prototype starts ``Exponent`` at its lower bound, 2, which is safe with the hard
+    bounds of ``curve_fit``. Mantid's bounds are only penalties, and from 2 the minimizer can cross
+    below the bound into a false minimum (a synthetic Exponent-4 peak then fitted Exponent 2), so the
+    fit starts inside the range, at 3.
+    """
+    height = counts.max()
+    mean = np.average(y_pixels, weights=counts)
+    # The floor only matters for a single lit pixel, where the width would otherwise start at zero.
+    sigma = max(np.sqrt(np.average((y_pixels - mean) ** 2, weights=counts)), 0.5)
+
+    peak = f"name={PEAK_FUNCTIONS[peak_function]},Height={height},PeakCentre={mean},Sigma={sigma}"
     if peak_function == "supergauss":
-        peak += ",Exponent=3"
-    peak += f",constraints=({y_pixels[0]}<PeakCentre<{y_pixels[-1]},0<Height)"
+        peak += f",Exponent=3,constraints=({height / 10}<Height<{height * 10})"
 
     background = BACKGROUND_FUNCTIONS[background_function]
     if background == "LinearBackground":
-        return f"{peak};name=LinearBackground,A0={floor},A1=0"
+        return f"{peak};name=LinearBackground,A0=0,A1=0"
     if background == "FlatBackground":
-        return f"{peak};name=FlatBackground,A0={floor}"
+        return f"{peak};name=FlatBackground,A0=0"
     return peak
 
 
