@@ -9,7 +9,7 @@ from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CompositeDirectBeam, ReductionResult, ReflectivityCurve
 from lr_reduction.models.run_data import RunData
 from lr_reduction.operations.interfaces import OperationInterface
-from lr_reduction.types import ID, CompositeDirectBeam
+from lr_reduction.types import ID
 
 logger = logging.getLogger(__name__)
 
