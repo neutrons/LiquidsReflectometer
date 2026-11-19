@@ -6,7 +6,7 @@ import numpy as np
 import scipy
 from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, MatrixWorkspaceProperty, PropertyMode, PythonAlgorithm
 from mantid.kernel import Direction, FloatArrayLengthValidator, FloatArrayProperty, FloatBoundedValidator
-from mantid.simpleapi import Rebin, SumSpectra, logger
+from mantid.simpleapi import Rebin, SumSpectra
 
 
 class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
@@ -69,7 +69,7 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         if tof_min == 0 and tof_max == 0:
             tof_min = ws_event_data.getTofMin()
             tof_max = ws_event_data.getTofMax()
-        logger.notice(f"TOF range: {tof_min} {tof_max}")
+        self.log().notice(f"TOF range: {tof_min} {tof_max}")
 
         # Get the total number of counts on the detector for each TOF bin per pulse.
         # The event lists are summed before they are binned rather than after: binning every pixel
@@ -107,18 +107,18 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
 
         # apply the dead time threshold if passed
         if use_dead_time_threshold:
-            logger.notice(
+            self.log().notice(
                 f"DeadTimeThreshold applied for run {ws_event_data.getRunNumber()}. "
                 f"{np.sum(corr > dead_time_threshold)} of {len(corr)} "
                 f"TOF bins above threshold {dead_time_threshold}"
             )
             corr[corr > dead_time_threshold] = 0
         else:
-            logger.notice("DeadTimeThreshold not used")
+            self.log().notice("DeadTimeThreshold not used")
 
         if np.min(corr) < 0:
             error = f"Corrupted dead time correction:\n  Reflected: {corr}\n"
-            logger.error(error)
+            self.log().error(error)
 
         counts_ws.setY(0, corr)
 

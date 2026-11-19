@@ -1,0 +1,12 @@
+application:
+  name: lr_reduction
+
+diagnostic_plots: true
+rq4: false
+
+logging:
+  level: INFO
+  rotating_log_files: true
+  num_backups: 15
+  log_file: ~/lr_reduction.log
+  mantid_log_level: NOTICE

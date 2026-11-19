@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from mantid import __version__ as mantid_version
@@ -9,9 +10,8 @@ from lr_reduction.models.results import ReductionResult, ReflectivityCurve
 from lr_reduction.models.run_data import RunData
 from lr_reduction.operations.interfaces import OperationInterface
 from lr_reduction.types import ID, CompositeDirectBeam
-from lr_reduction.utils import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 _LR_REDUCTION_SOFTWARE = Software(name="lr_reduction", version=lr_reduction_version)
 _MANTID_SOFTWARE = Software(name="mantid", version=mantid_version)

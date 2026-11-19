@@ -1,6 +1,7 @@
 """ORSO format I/O module."""
 
 import datetime
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -23,9 +24,8 @@ from orsopy.fileio.orso import OrsoDataset, save_orso
 from lr_reduction import __version__ as lr_reduction_version
 from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
-from lr_reduction.utils.logging import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def read_config(filepath: str) -> ReductionConfig:

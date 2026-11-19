@@ -334,12 +334,6 @@ class OutputConfig(BaseModel):
     eight_column: bool = Field(False, description="Use legacy 8-column output format (T, L, dT, dL)")
 
 
-class DiagnosticsConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid", validate_assignment=True)
-    plots: bool = Field(True, description="Generate diagnostic plots")
-    rq4: bool = Field(False, description="R*Q^4 view")
-
-
 class AssemblyConfig(BaseModel):
     """Sequence-assembly parameters (§2.4) — apply to the combined curve, not one run.
 
@@ -382,7 +376,6 @@ class ReductionConfig(BaseModel):
     # global settings
     instrument: str = Field("BL4B")
     output: OutputConfig = Field(default_factory=OutputConfig)
-    diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
     assembly: AssemblyConfig = Field(default_factory=AssemblyConfig)
     corrections: Corrections = Field(default_factory=Corrections)
 

@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -12,9 +13,9 @@ from lr_reduction.io.orso import read_config as read_orso_config
 from lr_reduction.io.xml import read_config as read_xml_config
 from lr_reduction.io.yaml import read_config as read_yaml_config
 from lr_reduction.models.config import ReductionConfig
-from lr_reduction.utils import deprecated, get_logger
+from lr_reduction.utils import deprecated
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def _validation_error_fields(exc: ValidationError) -> str:

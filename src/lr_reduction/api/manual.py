@@ -16,6 +16,7 @@ from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 from lr_reduction.operations import CombineResultsOperation
 from lr_reduction.types import ID, SingleReductionInput
+from lr_reduction.utils.logging import setup_logging
 
 
 class ManualSingleRun(SingleRunReduction):
@@ -133,6 +134,8 @@ def main(argv: list[str] | None = None) -> None:
     sequence_parser.add_argument("--sequence-numbers", type=int, nargs="*", default=None)
 
     args = parser.parse_args(argv)
+
+    setup_logging()
     if args.command == "run":
         reduce_run(args.run_number, args.configuration)
     else:

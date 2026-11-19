@@ -15,6 +15,7 @@ from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.results import CombinedReductionResult, ReductionResult
 from lr_reduction.models.run_data import RunData
 from lr_reduction.types import SingleReductionInput
+from lr_reduction.utils.logging import setup_logging
 from lr_reduction.utils.sample_logs import SampleLogs
 
 
@@ -81,6 +82,7 @@ def main(argv: list[str] | None = None) -> None:
         description="Live reduction is driven by the live-data service and cannot be invoked from the command line."
     )
     parser.parse_args(argv)
+    setup_logging()
     raise SystemExit("reduce_live requires an in-memory EventWorkspace supplied by the live-data service.")
 
 
