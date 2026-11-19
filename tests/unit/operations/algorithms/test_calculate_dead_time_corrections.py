@@ -165,3 +165,38 @@ def test_output_workspace_is_a_distribution_without_errors(event_workspace):
     assert output_workspace.getNumberHistograms() == 1
     assert output_workspace.isDistribution()
     np.testing.assert_array_equal(output_workspace.readE(0), 0.0)
+
+
+def _sample_events(name, unit):
+    return mtd_api.CreateSampleWorkspace(
+        WorkspaceType="Event", XUnit=unit, NumBanks=1, BankPixelWidth=1, NumEvents=10, OutputWorkspace=name
+    )
+
+
+@pytest.mark.parametrize(
+    ("data_unit", "error_events_unit", "rejected"),
+    [
+        ("TOF", "TOF", set()),
+        ("Wavelength", "TOF", {"InputWorkspace"}),
+        ("TOF", "Wavelength", {"InputErrorEventsWorkspace"}),
+    ],
+    ids=["both in TOF", "data in wavelength", "error events in wavelength"],
+)
+def test_validation_requires_tof_input(data_unit, error_events_unit, rejected):
+    """The correction is binned in microseconds, so both inputs must be in TOF."""
+    data = _sample_events("dead_time_data", data_unit)
+    error_events = _sample_events("dead_time_error_events", error_events_unit)
+    try:
+        algorithm = SingleReadoutDeadTimeCorrection()
+        algorithm.initialize()
+        algorithm.setProperty("InputWorkspace", data)
+        algorithm.setProperty("InputErrorEventsWorkspace", error_events)
+
+        issues = algorithm.validateInputs()
+
+        assert set(issues) == rejected
+        for message in issues.values():
+            assert message == "The X axis must be in TOF, not 'Wavelength'"
+    finally:
+        mtd_api.DeleteWorkspace(data)
+        mtd_api.DeleteWorkspace(error_events)

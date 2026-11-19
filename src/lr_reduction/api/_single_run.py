@@ -20,7 +20,7 @@ from lr_reduction.types import ID, SingleReductionInput
 
 def reduce_one(data: SingleReductionInput, config: ReductionConfig, sequence_number: ID) -> ReductionResult:
     """Perform a single-run reduction."""
-    db_op = DirectBeamCompositionOperation(data=data.direct_beams, config=data.direct_beam_config)
+    db_op = DirectBeamCompositionOperation(data.direct_beams, config, data.direct_beam_name)
     comp_db = db_op.execute()
     op = SingleRunReductionOperation(data.run_data, config, comp_db, sequence_number)
     result = op.execute()

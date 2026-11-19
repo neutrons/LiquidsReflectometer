@@ -348,13 +348,14 @@ def test_output_axis_is_single_bin(make_segment):
     assert x[1] == np.nextafter(mtd[b].getTofMax(), np.inf)
 
 
-def test_history_records_the_algorithm_and_its_inputs(make_segment):
+def test_history_records_the_inputs_histories_and_the_algorithm(make_segment):
     a = make_segment(2.0, 6.0, c=0.5, seed=26)
     b = make_segment(4.0, 8.0, c=2.0, seed=27)
     run_merge([a, b], WeightingBinWidth=0.02)
     history = mtd[OUTPUT_WORKSPACE].getHistory()
+    names = [entry.name() for entry in history.getAlgorithmHistories()]
+    assert names == ["CreateSampleWorkspace", "ConvertUnits"] * 2 + ["MergeDirectBeamSegments"]
     last = history.getAlgorithmHistory(history.size() - 1)
-    assert last.name() == "MergeDirectBeamSegments"
     assert last.getPropertyValue("InputWorkspaces") == f"{a},{b}"
     assert float(last.getPropertyValue("WeightingBinWidth")) == 0.02
 

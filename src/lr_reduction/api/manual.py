@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from lr_reduction.api._shared import get_direct_beam_config, get_direct_beams
+from lr_reduction.api._shared import get_direct_beam_name, get_direct_beams
 from lr_reduction.api._single_run import SingleRunReduction, reduce_one
 from lr_reduction.api.interfaces import Entrypoint
 from lr_reduction.exceptions import LrValidationError
@@ -41,9 +41,9 @@ class ManualSingleRun(SingleRunReduction):
             #       stub, so the log it reads is the loader's placeholder rather than this
             #       run's recorded value.
             self.sequence_number = run.sequence_number
-        db_config = get_direct_beam_config(self.sequence_number, config)
-        direct_beams = get_direct_beams(self._run_loader, db_config)
-        return SingleReductionInput(run_data=run, direct_beams=direct_beams, direct_beam_config=db_config)
+        db_name = get_direct_beam_name(self.sequence_number, config)
+        direct_beams = get_direct_beams(self._run_loader, config, db_name)
+        return SingleReductionInput(run_data=run, direct_beams=direct_beams, direct_beam_name=db_name)
 
 
 class ManualRunSequence(Entrypoint[list[SingleReductionInput], CombinedReductionResult]):
@@ -77,12 +77,12 @@ class ManualRunSequence(Entrypoint[list[SingleReductionInput], CombinedReduction
         run_data = []
         for run_number in self.run_numbers:
             run = self._run_loader.load(run_number)
-            db_config = get_direct_beam_config(run.sequence_number, config)
+            db_name = get_direct_beam_name(run.sequence_number, config)
             run_data.append(
                 SingleReductionInput(
                     run_data=run,
-                    direct_beams=[self._run_loader.load(db) for db in db_config.direct_beam_run_numbers],
-                    direct_beam_config=db_config,
+                    direct_beams=get_direct_beams(self._run_loader, config, db_name),
+                    direct_beam_name=db_name,
                 )
             )
         return run_data

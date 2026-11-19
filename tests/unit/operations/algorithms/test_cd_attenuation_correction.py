@@ -148,6 +148,25 @@ def test_flip_atten_reads_zero_as_in_the_beam(make_direct_beam):
     assert_corrected(corrected, 57.5e-4)
 
 
+@pytest.mark.parametrize(
+    ("logs", "match"),
+    [({}, f"neither {MENU_LOG}"), ({"stages": [1, 0, 1, 0]}, None), ({"menu": 16}, "0-15")],
+    ids=["no attenuator log", "stage logs", "out-of-range menu code"],
+)
+def test_validation_requires_a_readable_attenuator_log(make_direct_beam, logs, match):
+    algorithm = CdAttenuationCorrection()
+    algorithm.initialize()
+    algorithm.setProperty("InputWorkspace", make_direct_beam(**logs))
+
+    issues = algorithm.validateInputs()
+
+    if match is None:
+        assert issues == {}
+    else:
+        assert "cannot read the attenuator log" in issues["InputWorkspace"]
+        assert match in issues["InputWorkspace"]
+
+
 def test_histogram_input_is_rejected():
     """The correction is applied per event, so the input must be an event workspace."""
     histogram = CreateWorkspace(DataX=[1.0, 2.0], DataY=[1.0], UnitX="Wavelength", OutputWorkspace="cd_histogram")

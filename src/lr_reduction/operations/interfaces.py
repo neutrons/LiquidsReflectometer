@@ -26,12 +26,17 @@ class OperationInterface[T, S, U](ABC):
 
     @abstractmethod
     def cleanup(self) -> None:
-        """Perform any necessary cleanup after processing."""
+        """Release what `process` created and did not return; called after `process` succeeds or fails."""
         pass
 
     def execute(self) -> U:
-        """Execute the operation and return the result."""
+        """Validate the input, process it, and clean up, also when processing fails.
+
+        `cleanup` runs in a `finally`, so it must not raise: an exception from it would replace
+        the one `process` raised.
+        """
         self.validate_input()
-        result = self.process()
-        self.cleanup()
-        return result
+        try:
+            return self.process()
+        finally:
+            self.cleanup()
