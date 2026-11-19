@@ -1,3 +1,5 @@
+import logging
+
 from mantid.api import IEventWorkspace
 
 from lr_reduction.exceptions import ConfigError, OperationInputError, SampleLogsError
@@ -6,10 +8,9 @@ from lr_reduction.models.results import CompositeDirectBeam
 from lr_reduction.models.run_data import RunData
 from lr_reduction.operations.interfaces import OperationInterface
 from lr_reduction.properties.cd_attenuation import compute_cd_thickness, get_attenuator_log
-from lr_reduction.utils import get_logger
 from lr_reduction.utils.workspace import workspace_exists, workspace_handle
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def cd_order(runs: list[RunData], flip_atten: bool) -> list[tuple[RunData, float]]:
