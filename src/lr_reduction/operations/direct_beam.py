@@ -7,6 +7,7 @@ from mantid.api import IEventWorkspace
 
 # Importing the algorithms package registers every reduction algorithm with `mantid.simpleapi`.
 import lr_reduction.operations.algorithms  # noqa: F401
+from lr_reduction import app_config
 from lr_reduction.exceptions import ConfigError, OperationInputError, SampleLogsError
 from lr_reduction.models.config import DirectBeamConfig, PeakFitConfig, ReductionConfig, RunParameters
 from lr_reduction.models.results import CompositeDirectBeam, DirectBeamSegment
@@ -226,7 +227,7 @@ class DirectBeamCompositionOperation(OperationInterface[list[RunData], Reduction
 
         identifier = f"REF_L_{_run_number(ordered[0][0])}"
         composite = self._new_name(identifier, "db")
-        weights = self._new_name(identifier, "db_weights") if self.config.diagnostics.plots else None
+        weights = self._new_name(identifier, "db_weights") if app_config["diagnostic_plots"] else None
 
         working_copies = []
         per_run = []

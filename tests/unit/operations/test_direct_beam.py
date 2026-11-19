@@ -16,6 +16,7 @@ from mantid.simpleapi import (
     mtd,
 )
 
+from lr_reduction import app_config
 from lr_reduction.exceptions import ConfigError, OperationInputError, SampleLogsError
 from lr_reduction.io.run_loader import RunLoader
 from lr_reduction.models.config import ReductionConfig, RunParameters
@@ -291,10 +292,15 @@ def synthetic_runs(ads_lists_hidden_workspaces):  # noqa: ARG001
             DeleteWorkspace(name)
 
 
-def _composition_config(run_numbers=(11, 12, 13), plots=True, corrections=None, **direct_beam):
+@pytest.fixture(autouse=True)
+def diagnostic_plots(monkeypatch):
+    """Turn on the ``diagnostic_plots`` app setting, so the composition keeps its weights workspace."""
+    monkeypatch.setitem(app_config._config, "diagnostic_plots", True)
+
+
+def _composition_config(run_numbers=(11, 12, 13), corrections=None, **direct_beam):
     tof_trim = {"chopper_cut": {"coefficients": [1.0, 0.0], "offset_ms": 0.0}, "intensity_threshold": 0.0}
     return ReductionConfig(
-        diagnostics={"plots": plots},
         corrections=corrections or {},
         direct_beams={
             "db": {
@@ -516,8 +522,9 @@ def test_gaps_follow_the_merge(compose):
 
 
 @pytest.mark.parametrize("plots", [True, False])
-def test_weights_workspace_only_in_diagnostic_mode(compose, plots):
-    result, _ = compose(plots=plots)
+def test_weights_workspace_only_in_diagnostic_mode(compose, monkeypatch, plots):
+    monkeypatch.setitem(app_config._config, "diagnostic_plots", plots)
+    result, _ = compose()
     if plots:
         assert result.weights_workspace.endswith("_db_weights") and mtd.doesExist(result.weights_workspace)
     else:
@@ -630,12 +637,14 @@ def real_composite(nexus_dir):
         loader = RunLoader()
         runs = [loader.load_from_path(Path(nexus_dir) / f"REF_L_{run}.nxs.h5") for run in sorted(REAL_CD_UM)]
         config = ReductionConfig(
-            diagnostics={"plots": True},
             direct_beams={
                 "db": {"direct_beam_run_numbers": sorted(REAL_CD_UM), "peak": REAL_PEAK, "low_res": REAL_LOW_RES}
             },
         )
-        yield _RecordingComposition(runs, config, "db").execute()
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            monkeypatch.setitem(app_config._config, "diagnostic_plots", True)
+            composite = _RecordingComposition(runs, config, "db").execute()
+        yield composite
     finally:
         for name in _created_names(before):
             DeleteWorkspace(name)
