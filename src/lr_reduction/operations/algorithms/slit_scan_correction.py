@@ -7,11 +7,12 @@ A slit-scan direct beam is measured in ``N`` smaller sub-openings, so its intens
 
 import math
 
-from mantid.api import AlgorithmFactory, IEventWorkspaceProperty, PythonAlgorithm
+from mantid.api import IEventWorkspaceProperty, PythonAlgorithm
 from mantid.kernel import Direction
 from mantid.simpleapi import CloneWorkspace, Scale, logger, mtd
 
 from lr_reduction.exceptions import AmbiguousLogError, LrValidationError
+from lr_reduction.utils.registration import register
 from lr_reduction.utils.sample_logs import SampleLogs
 
 #: Sample log holding the number of slit-scan sub-openings, ``N``.
@@ -97,4 +98,4 @@ class SlitScanCorrection(PythonAlgorithm):
         self.setProperty("OutputWorkspace", output)
 
 
-AlgorithmFactory.subscribe(SlitScanCorrection)
+register(SlitScanCorrection)

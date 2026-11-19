@@ -16,17 +16,12 @@ import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from mantid.kernel import config
 
-REPOSITORY = Path(__file__).resolve().parents[2]
+# Importing the package registers the reduction algorithms with mantid.simpleapi, so it comes first.
+import lr_reduction.operations.algorithms  # noqa: F401
 
-# mantid.simpleapi only wraps the algorithms it finds in the plugin directories when first imported,
-# so the repository's algorithms are added for this session (not saved to the user's properties).
-_PLUGINS = "user.python.plugins.directories"
-config[_PLUGINS] = ";".join(filter(None, [config[_PLUGINS], str(REPOSITORY / "src/lr_reduction/operations/algorithms")]))
-
-from mantid.simpleapi import (  # noqa: E402
-
+# isort: split
+from mantid.simpleapi import (
     ApplyDeadTimeCorrection,
     ExtractDetectorROI,
     LoadErrorEventsNexus,
@@ -38,6 +33,7 @@ from mantid.simpleapi import (  # noqa: E402
     TrimDirectBeamTof,
 )
 
+REPOSITORY = Path(__file__).resolve().parents[2]
 DEFAULT_RUN = REPOSITORY / "tests/data/liquidsreflectometer-data/nexus/REF_L_234266.nxs.h5"
 PLOT_BINS = "8000,100,56000"  # tof_min, step, tof_max in µs
 
