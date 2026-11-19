@@ -663,7 +663,7 @@ class NR_Reduction:
         # calculate the mean theta from slits
         if method == 'meantheta':
             # Calculate mean theta from slits
-            MeanTheta, dTheta = self.calc_mean_theta(ymmRB, self.log_values['s1Y'], self.log_values['siY'],
+            MeanTheta, dTheta = self.calc_mean_theta(ymmRB, self.log_values['siY'], self.log_values['s1Y'],
                                                     self.settings['sample_detector_distance'], self.settings['si_sample_distance'],
                                                     self.settings['interslit_distance'], self.config.DetSigma,
                                                     self.config.DetResFn, self.create_figures, self.config.plotON)
