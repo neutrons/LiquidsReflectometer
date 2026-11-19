@@ -1,5 +1,4 @@
 import logging
-
 from secrets import token_hex
 
 import numpy as np
