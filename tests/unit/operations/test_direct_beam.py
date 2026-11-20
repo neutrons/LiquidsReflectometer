@@ -486,9 +486,9 @@ def test_metadata_logs_summarize_the_segments(compose):
     pixels = [100.0 + run_number / 10 for run_number in CD_ORDER]
     tthds = [SYNTHETIC_RUNS[run_number]["tthd"] for run_number in CD_ORDER]
     assert run.getLogData("db_pixel").value == pytest.approx(np.mean(pixels))
-    assert run.getLogData("db_pixel_err").value == pytest.approx(np.std(pixels, ddof=1))
+    assert run.getLogData("db_pixel_err").value == pytest.approx(np.std(pixels))
     assert run.getLogData("tthd").value == pytest.approx(np.mean(tthds))
-    assert run.getLogData("tthd_err").value == pytest.approx(np.std(tthds, ddof=1))
+    assert run.getLogData("tthd_err").value == pytest.approx(np.std(tthds))
     np.testing.assert_allclose(
         run.getLogData("Cd_attenuator").value, [THICKNESS_UM[run_number] for run_number in CD_ORDER]
     )
