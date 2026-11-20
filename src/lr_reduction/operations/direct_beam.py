@@ -109,9 +109,8 @@ def _release(*names: MantidWorkspaceName) -> None:
 
 
 def _mean_and_spread(values: list[float]) -> tuple[float, float]:
-    """The mean and sample standard deviation of `values`; the deviation of one value is 0."""
-    spread = float(np.std(values, ddof=1)) if len(values) > 1 else 0.0
-    return float(np.mean(values)), spread
+    """The mean and population standard deviation of `values`."""
+    return float(np.mean(values)), float(np.std(values))
 
 
 def _run_number(run: RunData) -> ID:
