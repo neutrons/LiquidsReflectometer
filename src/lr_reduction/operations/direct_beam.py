@@ -5,8 +5,6 @@ import numpy as np
 from mantid import simpleapi as api
 from mantid.api import IEventWorkspace
 
-# Importing the algorithms package registers every reduction algorithm with `mantid.simpleapi`.
-import lr_reduction.operations.algorithms  # noqa: F401
 from lr_reduction import app_config
 from lr_reduction.exceptions import ConfigError, OperationInputError, SampleLogsError
 from lr_reduction.models.config import DirectBeamConfig, PeakFitConfig, ReductionConfig, RunParameters
