@@ -177,7 +177,7 @@ def test_output_stays_an_event_workspace_with_the_placeholder_axis(make_detector
     assert isinstance(output, IEventWorkspace)
     assert output.blocksize() == 1
     for index in range(output.getNumberHistograms()):
-        np.testing.assert_array_equal(output.readX(index), mtd[input_workspace].readX(0))
+        np.testing.assert_array_equal(output.x(index), mtd[input_workspace].x(0))
 
 
 @pytest.mark.parametrize(
