@@ -7,7 +7,7 @@ import argparse
 
 from mantid.dataobjects import EventWorkspace
 
-from lr_reduction.api._shared import get_direct_beam_config, get_direct_beams, locate_standard_configuration
+from lr_reduction.api._shared import get_direct_beam_name, get_direct_beams, locate_standard_configuration
 from lr_reduction.api._single_run import SingleRunReduction
 from lr_reduction.api.autoreduce import FromDiskSequence
 from lr_reduction.io import RunLoader, diagnostic_plot
@@ -46,15 +46,15 @@ class LiveEntrypoint(SingleRunReduction):
         # double: a float would key `ReductionConfig.runs` by 1.0 and reach ORSO output as
         # "REF_L_<run>_1.0".
         self.sequence_number = int(SampleLogs(self.reflected_run)["sequence_number"])
-        db_config = get_direct_beam_config(self.sequence_number, config)
-        direct_beams = get_direct_beams(self._run_loader, db_config)
+        db_name = get_direct_beam_name(self.sequence_number, config)
+        direct_beams = get_direct_beams(self._run_loader, config, db_name)
         # `.name()` because RunData addresses its workspace by name (§11.1.6); the live-data
         # service hands this entrypoint the workspace object itself.
         run_data = RunData(workspace=self.reflected_run.name(), run_numbers=(self.run_number,))
         return SingleReductionInput(
             run_data=run_data,
             direct_beams=direct_beams,
-            direct_beam_config=db_config,
+            direct_beam_name=db_name,
         )
 
     def publish(self, _result: ReductionResult) -> None:

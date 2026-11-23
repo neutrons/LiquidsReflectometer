@@ -55,6 +55,18 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         )
         self.declareProperty(MatrixWorkspaceProperty("OutputWorkspace", "", Direction.Output), "Output workspace")
 
+    def validateInputs(self):  # noqa: N802
+        # The correction is binned with `TOFStep` and `TOFRange`, in microseconds.
+        issues = {}
+        for name in ("InputWorkspace", "InputErrorEventsWorkspace"):
+            workspace = self.getProperty(name).value
+            if workspace is None:
+                continue
+            unit = workspace.getAxis(0).getUnit().unitID()
+            if unit != "TOF":
+                issues[name] = f"The X axis must be in TOF, not {unit!r}"
+        return issues
+
     def PyExec(self):  # noqa: N802
         # Event data must include error events (all triggers on the detector)
         ws_event_data = self.getProperty("InputWorkspace").value
@@ -77,9 +89,9 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         # The event lists are summed before they are binned rather than after: binning every pixel
         # and then summing the histograms costs an order of magnitude more, and the counts are the
         # same either way, since each bin holds a whole number of events.
-        _ws_sc = SumSpectra(ws_event_data)
+        summed = SumSpectra(InputWorkspace=ws_event_data, StoreInADS=False)
         counts_ws = Rebin(
-            InputWorkspace=_ws_sc,
+            InputWorkspace=summed,
             Params=(tof_min, tof_step, tof_max),
             PreserveEvents=False,
             OutputWorkspace=output_workspace,
@@ -87,8 +99,13 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
 
         # If we have error events, add them since those are also detector triggers
         if ws_error_events is not None:
-            _errors = Rebin(InputWorkspace=ws_error_events, Params=(tof_min, tof_step, tof_max), PreserveEvents=False)
-            counts_ws += _errors
+            errors = Rebin(
+                InputWorkspace=ws_error_events,
+                Params=(tof_min, tof_step, tof_max),
+                PreserveEvents=False,
+                StoreInADS=False,
+            )
+            counts_ws += errors
 
         # When operating at a given frequency, the proton charge of the blocked
         # pulsed is zero in the data file, so we don't have to adjust the number of pulses.

@@ -229,7 +229,7 @@ def test_out_of_range_menu_code_raises(make_events, code):
 
 
 def test_missing_attenuator_logs_raise(make_events):
-    with pytest.raises(LogNotFoundError, match="50MRb"):
+    with pytest.raises(LogNotFoundError, match=f"neither {MENU_LOG} nor the stage logs {STAGE_LOGS[0]}"):
         get_attenuator_log(make_events())
 
 

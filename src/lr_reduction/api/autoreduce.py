@@ -10,7 +10,7 @@ import argparse
 import logging
 from pathlib import Path
 
-from lr_reduction.api._shared import get_direct_beam_config, get_direct_beams, locate_configuration_relative_to
+from lr_reduction.api._shared import get_direct_beam_name, get_direct_beams, locate_configuration_relative_to
 from lr_reduction.api._single_run import SingleRunReduction
 from lr_reduction.api.interfaces import Entrypoint
 from lr_reduction.io import ConfigLoader, RunLoader
@@ -44,9 +44,9 @@ class AutoreduceSingleRun(SingleRunReduction):
         #       still a stub, so the log it reads is the loader's placeholder rather than
         #       this run's recorded value.
         self.sequence_number = run.sequence_number
-        db_config = get_direct_beam_config(run.sequence_number, config)
-        direct_beams = get_direct_beams(self._run_loader, db_config)
-        return SingleReductionInput(run_data=run, direct_beams=direct_beams, direct_beam_config=db_config)
+        db_name = get_direct_beam_name(run.sequence_number, config)
+        direct_beams = get_direct_beams(self._run_loader, config, db_name)
+        return SingleReductionInput(run_data=run, direct_beams=direct_beams, direct_beam_name=db_name)
 
     @property
     def output_directory(self) -> Path:

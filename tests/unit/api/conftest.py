@@ -26,3 +26,19 @@ def _synthetic_run_loader(monkeypatch):
         "lr_reduction.io.run_loader.RunLoader.load_from_path",
         lambda _self, nexus_file_path: _synthetic_run(0, (Path(nexus_file_path),)),
     )
+
+
+class _StubComposition:
+    """Stands in for `DirectBeamCompositionOperation`, whose steps need real REF_L runs."""
+
+    def __init__(self, data, config, direct_beam_name):
+        self.data, self.config, self.direct_beam_name = data, config, direct_beam_name
+
+    def execute(self):
+        return None
+
+
+@pytest.fixture(autouse=True)
+def _stub_direct_beam_composition(monkeypatch):
+    """Entrypoint tests check the plumbing around the operations; the composition is tested on its own."""
+    monkeypatch.setattr("lr_reduction.api._single_run.DirectBeamCompositionOperation", _StubComposition)
