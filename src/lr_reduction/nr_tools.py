@@ -627,6 +627,10 @@ def maybe_index(value, idx=None):
         return value
 
 def clean_log_value(x):
+    # None marks a sequence position without a run; keep it (JSON null) so positions stay aligned
+    if isinstance(x, (list, tuple)) and any(v is None for v in x):
+        return [None if v is None else float(np.asarray(v).squeeze()) for v in x]
+
     arr = np.asarray(x)
 
     if arr.size == 1:

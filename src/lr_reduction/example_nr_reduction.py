@@ -4,12 +4,11 @@ Example usage of the unified NR reduction class
 
 Demonstrates how to configure and run reductions using both constantQ, constantTOF and MeanTheta methods
 """
-import json
 from pathlib import Path
 
 import numpy as np
 
-import lr_reduction.save_reduced_data as save_fn
+from lr_reduction.new_reduction_from_file import save_config_json
 from lr_reduction.nr_reduction_calc import NR_Reduction
 from lr_reduction.nr_reduction_config import NRReductionConfig
 
@@ -218,12 +217,7 @@ def example_mean_theta_reduction_8col():
     save_json = True
     if save_json:
         filepath_out = Path(config.Spath / f"{config.Sname}_settings.json")
-        with open(filepath_out, "w") as f:
-            json.dump(
-                save_fn.make_json_safe(config.__dict__),
-                f,
-                indent=2
-            )
+        save_config_json(filepath_out, config)
     return results
 
 def example_mean_theta_reduction_savepdf():
@@ -288,12 +282,7 @@ def example_mean_theta_reduction_savepdf():
     save_json = True
     if save_json:
         filepath_out = Path(config.Spath / f"{config.Sname}_settings.json")
-        with open(filepath_out, "w") as f:
-            json.dump(
-                save_fn.make_json_safe(config.__dict__),
-                f,
-                indent=2
-            )
+        save_config_json(filepath_out, config)
     return results
 
 def example_mean_theta_reduction_savepdf_noshow():
