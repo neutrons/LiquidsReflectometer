@@ -276,7 +276,7 @@ def apply_correction(
     if unit.lower() != "wavelength":
         raise LrValidationError(f"Cd attenuation correction needs a workspace in Wavelength, got {unit!r}")
     transmission = get_transmission_workspace(cd_thickness)
-    bin_edges = transmission.readX(0)
+    bin_edges = transmission.x(0)
     if (isinstance(ws, IEventWorkspace) and ws.getNumberEvents() > 0) and (
         (cutoff := _overflow_cutoff_wavelength(ws, cd_thickness, bin_edges)) is not None
     ):

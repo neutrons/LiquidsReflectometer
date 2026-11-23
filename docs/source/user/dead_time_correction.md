@@ -61,5 +61,5 @@ algorithm.
     corr_ws = mtd_api.SingleReadoutDeadTimeCorrection(
         InputWorkspace=ws, UseDeadTimeThreshold=True, DeadTimeThreshold=1.1
     )
-    assert max(corr_ws.readY(0)) <= 1.1
+    assert max(corr_ws.y(0)) <= 1.1
 ```
