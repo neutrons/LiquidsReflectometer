@@ -88,7 +88,7 @@ def evaluate_strip_background(fit, y):
     y = np.asarray(y, dtype=float)[:, np.newaxis]
     bkg = a * y + c
     var = y**2 * cov[:, 0, 0] + 2 * y * cov[:, 0, 1] + cov[:, 1, 1]
-    return bkg, var
+    return bkg, np.maximum(var, 0.0)  # cancellation can leave about -1e-17 where the variance is zero
 
 
 def spectrum_rows(workspace, n_y):

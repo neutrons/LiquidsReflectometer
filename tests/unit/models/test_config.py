@@ -298,3 +298,16 @@ def test_peak_fit_defaults():
 def test_direct_beam_inherits_peak_fit_from_defaults():
     config = _minimal_config(defaults={"peak_fit": {"type": "gauss", "pad": 3}})
     assert config.effective(config.direct_beams["db_8mm"]).peak_fit == PeakFitConfig(type="gauss", pad=3)
+
+
+def test_edits_to_default_created_blocks_survive_for_run_and_apply_overrides():
+    config = _minimal_config()
+    config.assembly.q_norm = 0.02
+    config.corrections.dead_time.apply = not config.corrections.dead_time.apply
+    config.direct_beams["db_8mm"].tof_trim.chopper_cut.offset_ms = 2.5
+    config.defaults.peak = PixelRange(min=140, max=150)
+    for derived in (config.for_run(1), apply_overrides(config, {})):
+        assert derived.assembly.q_norm == 0.02
+        assert derived.corrections.dead_time.apply == config.corrections.dead_time.apply
+        assert derived.direct_beams["db_8mm"].tof_trim.chopper_cut.offset_ms == 2.5
+        assert derived.defaults.peak == PixelRange(min=140, max=150)

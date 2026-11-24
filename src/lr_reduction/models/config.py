@@ -465,9 +465,9 @@ class ReductionConfig(BaseModel):
             run = self.runs[sequence_number]
         except KeyError:
             raise ValueError(f"No run with sequence_number={sequence_number}") from None
-        data = self.model_dump(exclude_unset=True)
-        data["runs"] = {sequence_number: run.model_dump(exclude_unset=True)}
-        data["direct_beams"] = {run.direct_beam: self.direct_beams[run.direct_beam].model_dump(exclude_unset=True)}
+        data = self._dump()
+        data["runs"] = {sequence_number: data["runs"][sequence_number]}
+        data["direct_beams"] = {run.direct_beam: data["direct_beams"][run.direct_beam]}
         return ReductionConfig(**data)
 
     def effective(self, run: ReflectedRunConfig | DirectBeamConfig) -> RunParameters:
@@ -476,12 +476,30 @@ class ReductionConfig(BaseModel):
         A `DirectBeamConfig` only draws on the shared `RunParameters` fields; a
         `ReflectedRunConfig` draws on the full `ReflectedRunParameters` set.
         """
-        param_cls = ReflectedRunParameters if isinstance(run, ReflectedRunConfig) else RunParameters
+        param_cls = _parameters_class(run)
         fields = set(param_cls.model_fields)
         defaults = {k: v for k, v in self.defaults.model_dump(exclude_none=True).items() if k in fields}
         # exclude_unset: a field the run did not write inherits from defaults, even inside a nested block
         overrides = run.model_dump(include=fields, exclude_none=True, exclude_unset=True)
         return param_cls(**_deep_merge(defaults, overrides))
+
+    def _dump(self) -> dict:
+        """The config as a dict that rebuilds it: in full, except the fields each run inherits from `defaults`,
+        which hold only what the run set. A full dump of those would override `defaults` with class defaults;
+        `exclude_unset` everywhere would drop edits made to a block that was created by default."""
+        data = self.model_dump()
+        for key, runs in (("runs", self.runs), ("direct_beams", self.direct_beams)):
+            for name, run in runs.items():
+                inherited = set(_parameters_class(run).model_fields)
+                data[key][name] = run.model_dump(exclude=inherited) | run.model_dump(
+                    include=inherited, exclude_unset=True
+                )
+        return data
+
+
+def _parameters_class(run: ReflectedRunConfig | DirectBeamConfig) -> type[RunParameters]:
+    """The parameter set `run` inherits from `defaults`."""
+    return ReflectedRunParameters if isinstance(run, ReflectedRunConfig) else RunParameters
 
 
 def apply_overrides(config: ReductionConfig, overrides: dict) -> ReductionConfig:
@@ -498,10 +516,10 @@ def apply_overrides(config: ReductionConfig, overrides: dict) -> ReductionConfig
     *not* do is re-run a *different* model's validators — e.g. setting
     `config.runs[1].direct_beam = "..."` re-checks `ReflectedRunConfig`'s own fields but does not
     re-run `ReductionConfig._referential_integrity`, since that validator lives on the parent
-    model. Use `apply_overrides` (or `ReductionConfig.model_validate(config.model_dump(exclude_unset=True))` after
-    manual edits) when the override could affect cross-model checks.
+    model. Use `apply_overrides` (`apply_overrides(config, {})` after manual edits) when the
+    override could affect cross-model checks.
     """
-    merged = _deep_merge(config.model_dump(exclude_unset=True), overrides)
+    merged = _deep_merge(config._dump(), overrides)
     return ReductionConfig(**merged)
 
 

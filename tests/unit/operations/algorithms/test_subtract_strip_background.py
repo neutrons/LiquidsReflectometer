@@ -155,6 +155,11 @@ class TestFitFunctions:
         with pytest.raises(ValueError, match="'linear'"):
             fit_strip_background([1, 2], np.ones((2, 3)), np.ones((2, 3)), "linear")
 
+    def test_zero_variance_is_not_negative(self):
+        # the exact variance at row 7 is zero; unclamped round-off gives about -5.6e-17, and its square root NaN
+        fit = fit_strip_background([1, 2, 5], np.zeros((3, 1)), np.array([[0.0], [1.0], [0.0]]))
+        assert evaluate_strip_background(fit, [7])[1][0, 0] == 0.0
+
     def test_evaluate_includes_covariance(self):
         cov = np.array([[[0.04, -0.3], [-0.3, 4.0]]])
         bkg, var = evaluate_strip_background((np.array([2.0]), np.array([1.0]), cov), [0.0, 10.0])
