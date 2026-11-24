@@ -1,16 +1,22 @@
 """Unit tests for the SubtractStripBackground Mantid algorithm and its fit functions."""
 
+import os
+
 import numpy as np
 import pytest
 from mantid.api import AlgorithmManager
 from mantid.simpleapi import (
+    ConvertUnits,
     CreateSampleWorkspace,
     DeleteWorkspace,
     GroupDetectors,
+    LoadEventNexus,
+    Rebin,
     SetInstrumentParameter,
     mtd,
 )
 
+from lr_reduction.legacy.background import functional_background
 from lr_reduction.operations.algorithms.subtract_strip_background import (
     SubtractStripBackground,
     background_rows,
@@ -74,8 +80,8 @@ def make_rows():
         workspace.getAxis(0).setUnit(unit)
         position = {row: i for i, row in enumerate(rows)}
         for index, row in enumerate(spectrum_rows(workspace, n_y)):
-            workspace.setY(index, np.asarray(counts[position[row]], dtype=float))
-            workspace.setE(index, np.asarray(errors[position[row]], dtype=float))
+            workspace.setSharedY(index, np.asarray(counts[position[row]], dtype=float))
+            workspace.setSharedE(index, np.asarray(errors[position[row]], dtype=float))
         names.append(name)
         return name
 
@@ -144,6 +150,10 @@ class TestFitFunctions:
                 np.testing.assert_allclose(c[j], coefficients[0])
                 np.testing.assert_allclose(cov[j, 1, 1], expected_cov[0, 0])
                 np.testing.assert_allclose([cov[j, 0, 0], cov[j, 0, 1]], 0.0)
+
+    def test_unknown_model_rejected(self):
+        with pytest.raises(ValueError, match="'linear'"):
+            fit_strip_background([1, 2], np.ones((2, 3)), np.ones((2, 3)), "linear")
 
     def test_evaluate_includes_covariance(self):
         cov = np.array([[[0.04, -0.3], [-0.3, 4.0]]])
@@ -234,7 +244,7 @@ class TestSubtractStripBackground:
             assert list(output.getSpectrum(k).getDetectorIDs()) == list(
                 input_workspace.getSpectrum(index).getDetectorIDs()
             )
-            np.testing.assert_array_equal(output.readX(k), input_workspace.readX(index))
+            np.testing.assert_array_equal(output.x(k), input_workspace.x(index))
         assert output.getAxis(0).getUnit().unitID() == "Wavelength"
         assert list(output.getInstrument().getNumberParameter("number-of-y-pixels")) == [float(N_Y)]
 
@@ -276,6 +286,12 @@ class TestValidation:
         name = make_rows(counts, np.sqrt(counts), y_pixels=25)
         assert "single y row" in validation_issues(name, peak=[1, 2], strips=[3, 5])["InputWorkspace"]
 
+    def test_two_spectra_on_one_row(self, make_rows):
+        counts = linear_background(range(N_Y))
+        # a 15-row detector setting maps rows r and r + 15 of the 30-row detector to the same y
+        name = make_rows(counts, np.sqrt(counts), y_pixels=15)
+        assert "y rows [0, 1, 2" in validation_issues(name, peak=[1, 2], strips=[3, 5])["InputWorkspace"]
+
     def test_missing_rows(self, make_rows):
         rows = range(10, N_Y)
         counts = linear_background(rows)
@@ -308,3 +324,49 @@ class TestValidation:
             assert "event workspace" in algorithm.validateInputs()["InputWorkspace"]
         finally:
             DeleteWorkspace(name)
+
+
+class LegacyReflectivityStub:
+    """Stands in for the legacy ``EventReflectivity``: returns the per-row counts of a row range, per unit charge."""
+
+    theta = 0.0
+
+    def __init__(self, workspace, first_row):
+        self.charge = workspace.getRun().getProtonCharge()
+        self.counts, self.errors, self.first_row = workspace.extractY(), workspace.extractE(), first_row
+
+    def _reflectivity(self, _workspace, peak, **_kwargs):
+        rows = slice(peak[0] - self.first_row, peak[1] - self.first_row + 1)
+        return self.counts[rows] / self.charge, self.errors[rows] / self.charge
+
+
+@pytest.mark.datarepo
+def test_matches_legacy_functional_background(nexus_dir):
+    """On a measured run, the peak-summed background matches the legacy ``functional_background``
+    on the same λ bins, within the legacy fit's error, where the strips hold many counts per cell."""
+    peak, strip, x_range = (
+        [134, 148],
+        [131, 151],
+        (70, 182),
+    )  # REF_L_198388_auto_template.xml, one range spanning the peak
+    name = mtd.unique_hidden_name()
+    LoadEventNexus(Filename=os.path.join(nexus_dir, "REF_L_198388.nxs.h5"), OutputWorkspace=name)
+    try:
+        rows = range(strip[0], strip[1] + 1)
+        pattern = ",".join("+".join(str(x * 304 + y) for x in range(x_range[0], x_range[1] + 1)) for y in rows)
+        GroupDetectors(InputWorkspace=name, OutputWorkspace=name, GroupingPattern=pattern)
+        ConvertUnits(InputWorkspace=name, OutputWorkspace=name, Target="Wavelength")
+        Rebin(InputWorkspace=name, OutputWorkspace=name, Params="2.5,0.1,6.5", PreserveEvents=False)
+        run_algorithm(name, peak=peak, strips=strip, background=BACKGROUND_WORKSPACE)
+
+        stub = LegacyReflectivityStub(mtd[name], strip[0])
+        legacy, legacy_error = functional_background(mtd[name], stub, peak, [*strip, 0, 0], x_range)
+        legacy, legacy_error = legacy * stub.charge, legacy_error * stub.charge
+        summed = mtd[BACKGROUND_WORKSPACE].extractY().sum(axis=0)
+
+        strip_rows = [y - strip[0] for y in background_rows(peak, [strip])]
+        high_counts = stub.counts[strip_rows].min(axis=0) >= 20
+        assert high_counts.sum() >= 10
+        np.testing.assert_array_less(np.abs(summed - legacy)[high_counts], legacy_error[high_counts])
+    finally:
+        DeleteWorkspace(name)

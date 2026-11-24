@@ -6,6 +6,8 @@ the rows of the background strips, subtracted from every peak row, and its varia
 slope-intercept covariance, is added to each peak row's variance.
 """
 
+from collections import Counter
+
 import numpy as np
 from mantid.api import (
     CommonBinsValidator,
@@ -65,9 +67,11 @@ def fit_strip_background(y, r, sigma, model="Linear"):
         d = n * s_yy - s_y**2
         alpha = (n * y - s_y) / d
         gamma = (s_yy - s_y * y) / d
-    else:
+    elif model == "Constant":
         alpha = np.zeros(n)
         gamma = np.full(n, 1.0 / n)
+    else:
+        raise ValueError(f"model must be one of {MODELS}, got {model!r}")
     var = np.asarray(sigma, dtype=float) ** 2
     a = alpha @ r
     c = gamma @ r
@@ -177,8 +181,9 @@ class SubtractStripBackground(PythonAlgorithm):
             index = rows.index(None)
             issues["InputWorkspace"] = f"The detector IDs of workspace index {index} do not belong to a single y row"
             return issues
-        if len(set(rows)) != len(rows):
-            issues["InputWorkspace"] = "Two spectra map to the same y row"
+        shared = sorted(row for row, count in Counter(rows).items() if count > 1)
+        if shared:
+            issues["InputWorkspace"] = f"More than one spectrum maps to y rows {shared}"
             return issues
 
         peak = self.getProperty("PeakRange").value.tolist()
@@ -226,16 +231,16 @@ class SubtractStripBackground(PythonAlgorithm):
 
         output = self._extract(workspace, peak_indices)
         for k, index in enumerate(peak_indices):
-            output.setY(k, counts[index] - bkg[k])
-            output.setE(k, np.sqrt(errors[index] ** 2 + var[k]))
+            output.setSharedY(k, counts[index] - bkg[k])
+            output.setSharedE(k, np.sqrt(errors[index] ** 2 + var[k]))
         self.setProperty("OutputWorkspace", output)
         self.setProperty("BackgroundPixels", bkg_rows)
 
         if not self.getProperty("BackgroundWorkspace").isDefault:
             background = self._extract(workspace, peak_indices)
             for k in range(len(peak_indices)):
-                background.setY(k, bkg[k])
-                background.setE(k, np.sqrt(var[k]))
+                background.setSharedY(k, bkg[k])
+                background.setSharedE(k, np.sqrt(var[k]))
             self.setProperty("BackgroundWorkspace", background)
 
     def _extract(self, workspace, indices):

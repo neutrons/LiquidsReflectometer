@@ -241,6 +241,8 @@ def test_background_partial_override_survives_for_run_and_apply_overrides():
     config = _minimal_config(defaults=defaults, runs=runs)
     for derived in (config.for_run(1), apply_overrides(config, {})):
         assert derived.effective(derived.runs[1]).background.model == "constant"
+
+
 def test_direct_beam_tof_trim_defaults_match_algorithm_defaults():
     from lr_reduction.operations.algorithms.trim_direct_beam_tof import TrimDirectBeamTof
 
