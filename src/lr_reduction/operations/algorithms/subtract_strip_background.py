@@ -30,8 +30,8 @@ from mantid.kernel import (
 from lr_reduction.operations.algorithms.roi_extraction import detector_shape
 from lr_reduction.utils.registration import register
 
-MODELS = ("Linear", "Constant")
-MIN_BACKGROUND_ROWS = {"Linear": 2, "Constant": 1}
+MIN_BACKGROUND_ROWS = {"Linear": 2, "Constant": 1}  # distinct background rows each model needs
+MODELS = tuple(MIN_BACKGROUND_ROWS)
 
 
 def background_rows(peak_range, strips):
@@ -161,6 +161,10 @@ class SubtractStripBackground(PythonAlgorithm):
 
     def validateInputs(self):  # noqa: N802
         issues = {}
+        output_name = self.getPropertyValue("OutputWorkspace")
+        # workspace names are case-insensitive in the ADS
+        if output_name and self.getPropertyValue("BackgroundWorkspace").casefold() == output_name.casefold():
+            issues["BackgroundWorkspace"] = f"BackgroundWorkspace must differ from OutputWorkspace ({output_name})"
         workspace = self.getProperty("InputWorkspace").value
         if workspace is None:
             return issues
@@ -168,8 +172,13 @@ class SubtractStripBackground(PythonAlgorithm):
             issues["InputWorkspace"] = "InputWorkspace is an event workspace; rebin it to a histogram first"
             return issues
         counts, errors = workspace.extractY(), workspace.extractE()
-        if not (np.all(np.isfinite(counts)) and np.all(np.isfinite(errors)) and np.all(errors >= 0)):
-            issues["InputWorkspace"] = "InputWorkspace must hold finite values and finite, non-negative errors"
+        bad = ~np.isfinite(counts) | ~np.isfinite(errors) | (errors < 0)
+        if bad.any():
+            index = int(np.flatnonzero(bad.any(axis=1))[0])
+            issues["InputWorkspace"] = (
+                f"InputWorkspace must hold finite values and finite, non-negative errors; "
+                f"workspace index {index} does not"
+            )
             return issues
 
         _, n_y = detector_shape(workspace)
@@ -200,6 +209,22 @@ class SubtractStripBackground(PythonAlgorithm):
                 if missing:
                     issues[name] = f"{name} [{low}, {high}] includes rows absent from the input: {missing}"
         if issues:
+            return issues
+
+        # a masked pixel adds no counts to its row, whether masked before or after the x-sum,
+        # so the fit would take the row's low counts as data
+        detector_info = workspace.detectorInfo()
+        masked = sorted(
+            row
+            for index, row in enumerate(rows)
+            if any(low <= row <= high for low, high in [peak, *strips])
+            and any(
+                detector_info.isMasked(detector_info.indexOf(detector_id))
+                for detector_id in workspace.getSpectrum(index).getDetectorIDs()
+            )
+        )
+        if masked:
+            issues["InputWorkspace"] = f"Rows {masked} of the peak or background strips hold masked pixels"
             return issues
 
         model = self.getProperty("BackgroundModel").value

@@ -23,9 +23,35 @@ sequence — and distinguishes:
 
 Per-run parameters use an inheritance model: a global `defaults` block sets the values
 shared by every run, and each run may override any subset of those fields (`None` means "inherit
-from defaults"). A typical configuration is therefore short: most runs only override
-`direct_beam`, `peak`, and maybe `background`. `ReductionConfig.effective()` resolves the final,
-merged parameters for a given run.
+from defaults"). Inside a block, a run likewise sets only the keys it changes: a run with
+`background: { model: constant }` keeps the `strips` of `defaults.background`. The same holds
+for a block set from Python: a key counts as written when it was given or changed from its class
+default, so `BackgroundConfig(model="constant")` keeps the default strips. A typical
+configuration is therefore short: most runs only override `direct_beam`, `peak`, and maybe
+`background`. `ReductionConfig.effective()` resolves the final, merged parameters for a given run.
+
+## Background subtraction
+
+The `background` block sets the strips of detector rows (y pixels) from which the background
+under the specular peak of a reflected run is estimated:
+
+```yaml
+defaults:
+  background:
+    apply: true          # the default when the block is given
+    model: linear        # `linear` (a·y + c, the default) or `constant`
+    strips:              # one or two inclusive row ranges
+      - { min: 128, max: 137 }
+      - { min: 152, max: 161 }
+```
+
+In each wavelength bin, the background is fitted across the rows of the strips, without
+weights, and subtracted from every row of the peak; its uncertainty is added to theirs. Rows
+of the peak are never background: a strip may span the peak, and its peak rows are dropped,
+leaving one strip on each side. A single strip on one side of the peak is allowed.
+
+When `apply` is true, each reflected run must have strips, and they must leave at least two rows
+outside the run's `peak` for `linear` (one for `constant`). Both are checked at load.
 
 ## Composite direct beams
 

@@ -11,6 +11,8 @@ from mantid.simpleapi import (
     DeleteWorkspace,
     GroupDetectors,
     LoadEventNexus,
+    MaskDetectors,
+    MaskSpectra,
     Rebin,
     SetInstrumentParameter,
     mtd,
@@ -56,12 +58,12 @@ def make_rows():
     """
     names = []
 
-    def make(counts, errors, rows=None, unit="TOF", y_pixels=N_Y, n_y=N_Y):
-        rows = list(range(n_y)) if rows is None else list(rows)
+    def make(counts, errors, rows=None, unit="TOF", y_pixels=N_Y, masked_pixels=()):
+        rows = list(range(N_Y)) if rows is None else list(rows)
         name = mtd.unique_hidden_name()
         CreateSampleWorkspace(
             Function="Flat background",
-            NumBanks=N_X * n_y,
+            NumBanks=N_X * N_Y,
             BankPixelWidth=1,
             XMin=0.0,
             XMax=float(N_BINS),
@@ -69,8 +71,10 @@ def make_rows():
             OutputWorkspace=name,
         )
         # CreateSampleWorkspace numbers detector IDs from 1, at workspace index id - 1
-        ids = range(1, N_X * n_y + 1)
-        pattern = ",".join("+".join(str(d - 1) for d in ids if d % n_y == row) for row in rows)
+        ids = range(1, N_X * N_Y + 1)
+        pattern = ",".join("+".join(str(d - 1) for d in ids if d % N_Y == row) for row in rows)
+        if masked_pixels:
+            MaskDetectors(Workspace=name, DetectorList=list(masked_pixels))
         GroupDetectors(InputWorkspace=name, OutputWorkspace=name, GroupingPattern=pattern)
         if y_pixels is not None:
             SetInstrumentParameter(
@@ -79,7 +83,7 @@ def make_rows():
         workspace = mtd[name]
         workspace.getAxis(0).setUnit(unit)
         position = {row: i for i, row in enumerate(rows)}
-        for index, row in enumerate(spectrum_rows(workspace, n_y)):
+        for index, row in enumerate(spectrum_rows(workspace, N_Y)):
             workspace.setSharedY(index, np.asarray(counts[position[row]], dtype=float))
             workspace.setSharedE(index, np.asarray(errors[position[row]], dtype=float))
         names.append(name)
@@ -261,20 +265,27 @@ class TestSubtractStripBackground:
     def test_input_untouched_and_in_place(self, make_rows):
         counts = linear_background(range(N_Y)) + peak_signal(range(N_Y))
         name = make_rows(counts, np.sqrt(counts))
-        run_algorithm(name)
+        separate, _ = run_algorithm(name)
         rows = spectrum_rows(mtd[name], N_Y)
         np.testing.assert_array_equal(mtd[name].extractY(), counts[rows])
         np.testing.assert_array_equal(mtd[name].extractE(), np.sqrt(counts)[rows])
 
-        output, _ = run_algorithm(name, output=name)
-        assert output.getNumberHistograms() == PEAK[1] - PEAK[0] + 1
+        in_place, _ = run_algorithm(name, output=name)
+        assert in_place.getNumberHistograms() == PEAK[1] - PEAK[0] + 1
+        np.testing.assert_array_equal(in_place.extractY(), separate.extractY())
+        np.testing.assert_array_equal(in_place.extractE(), separate.extractE())
 
 
 class TestValidation:
     def test_non_finite_values(self, make_rows):
         counts = linear_background(range(N_Y))
         counts[3, 4] = np.nan
-        assert "finite" in validation_issues(make_rows(counts, np.ones_like(counts)))["InputWorkspace"]
+        name = make_rows(counts, np.ones_like(counts))
+        index = spectrum_rows(mtd[name], N_Y).index(3)
+        assert (
+            f"finite values and finite, non-negative errors; workspace index {index} "
+            in (validation_issues(name)["InputWorkspace"])
+        )
 
     def test_negative_errors(self, make_rows):
         counts = linear_background(range(N_Y))
@@ -302,6 +313,37 @@ class TestValidation:
         counts = linear_background(rows)
         issues = validation_issues(make_rows(counts, np.sqrt(counts), rows=rows))
         assert "absent" in issues["BackgroundRanges"] and "[3, 9]" in issues["BackgroundRanges"]
+
+    def test_missing_peak_rows(self, make_rows):
+        rows = [row for row in range(N_Y) if row != 14]
+        counts = linear_background(rows)
+        issues = validation_issues(make_rows(counts, np.sqrt(counts), rows=rows))
+        assert issues["PeakRange"].endswith("absent from the input: [14]")
+
+    def test_masked_rows(self, make_rows):
+        counts = linear_background(range(N_Y))
+        name = make_rows(counts, np.sqrt(counts))
+        indices = [i for i, row in enumerate(spectrum_rows(mtd[name], N_Y)) if row in (5, 14, 28)]
+        MaskSpectra(InputWorkspace=name, OutputWorkspace=name, InputWorkspaceIndexSet=indices)
+        # row 28 lies outside the peak and strips, so it may stay masked
+        assert "Rows [5, 14] of the peak or background strips hold masked" in validation_issues(name)["InputWorkspace"]
+
+    def test_pixel_masked_before_the_row_sum(self, make_rows):
+        counts = linear_background(range(N_Y))
+        # detector ID 2 * N_Y + 4 is pixel x = 2 of row 4; its row is not masked as a whole
+        name = make_rows(counts, np.sqrt(counts), masked_pixels=[2 * N_Y + 4])
+        assert "Rows [4] of the peak or background strips hold masked" in validation_issues(name)["InputWorkspace"]
+
+    def test_background_workspace_named_like_output(self, make_rows):
+        counts = linear_background(range(N_Y))
+        algorithm = SubtractStripBackground()
+        algorithm.initialize()
+        algorithm.setProperty("InputWorkspace", make_rows(counts, np.sqrt(counts)))
+        algorithm.setProperty("PeakRange", PEAK)
+        algorithm.setProperty("BackgroundRanges", STRIPS)
+        algorithm.setProperty("OutputWorkspace", OUTPUT_WORKSPACE)
+        algorithm.setProperty("BackgroundWorkspace", OUTPUT_WORKSPACE.upper())  # names ignore case
+        assert "must differ from OutputWorkspace" in algorithm.validateInputs()["BackgroundWorkspace"]
 
     def test_bad_strip_count(self, make_rows):
         counts = linear_background(range(N_Y))
