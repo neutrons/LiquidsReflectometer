@@ -1,7 +1,14 @@
 import pytest
 from pydantic import ValidationError
 
-from lr_reduction.models.config import EmissionTimeConfig, PixelRange, QBinning, ReductionConfig, apply_overrides
+from lr_reduction.models.config import (
+    BackgroundConfig,
+    EmissionTimeConfig,
+    PixelRange,
+    QBinning,
+    ReductionConfig,
+    apply_overrides,
+)
 
 
 def _minimal_config(**overrides):
@@ -164,3 +171,71 @@ def test_direct_attribute_assignment_does_not_recheck_other_models():
 
     with pytest.raises(ValidationError, match="unknown direct_beam"):
         apply_overrides(config, {})
+
+
+def test_background_requires_strips_when_applied():
+    with pytest.raises(ValidationError, match="sequence_number=1: background subtraction is on but no strips"):
+        _minimal_config(defaults={"background": {"apply": True}})
+    _minimal_config(defaults={"background": {"apply": False}})
+
+
+def test_background_partial_override_inherits_from_defaults():
+    defaults = {
+        "peak": {"min": 140, "max": 150},
+        "background": {"model": "constant", "strips": [{"min": 120, "max": 130}, {"min": 160, "max": 170}]},
+    }
+    runs = {
+        1: {"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 111, "background": {"model": "linear"}},
+        2: {
+            "sequence_number": 2,
+            "direct_beam": "db_8mm",
+            "run_number": 112,
+            "background": {"strips": [{"min": 120, "max": 130}]},
+        },
+    }
+    config = _minimal_config(defaults=defaults, runs=runs)
+    first, second = (config.effective(config.runs[n]).background for n in (1, 2))
+    assert (first.model, len(first.strips)) == ("linear", 2)
+    assert (second.model, len(second.strips)) == ("constant", 1)
+
+
+def test_background_accepts_at_most_two_strips():
+    strip = {"min": 1, "max": 2}
+    with pytest.raises(ValidationError):
+        BackgroundConfig(strips=[strip, strip, strip])
+
+
+def test_background_strips_must_leave_rows_outside_peak():
+    defaults = {"peak": {"min": 140, "max": 150}, "background": {"strips": [{"min": 128, "max": 137}]}}
+    assert _minimal_config(defaults=defaults).defaults.background.model == "linear"
+
+    # one row left outside the peak: enough for `constant`, too few for `linear`
+    defaults["background"] = {"model": "constant", "strips": [{"min": 139, "max": 150}]}
+    _minimal_config(defaults=defaults)
+    defaults["background"]["model"] = "linear"
+    with pytest.raises(ValidationError, match="sequence_number=1.*linear model needs at least 2"):
+        _minimal_config(defaults=defaults)
+
+    # a per-run override is checked against the run's effective peak
+    defaults["background"] = {"strips": [{"min": 128, "max": 137}]}
+    runs = {1: {"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 111, "peak": {"min": 120, "max": 140}}}
+    with pytest.raises(ValidationError, match="sequence_number=1"):
+        _minimal_config(defaults=defaults, runs=runs)
+
+
+def test_background_partial_override_survives_for_run_and_apply_overrides():
+    defaults = {
+        "peak": {"min": 140, "max": 150},
+        "background": {"model": "constant", "strips": [{"min": 120, "max": 130}, {"min": 160, "max": 170}]},
+    }
+    runs = {
+        1: {
+            "sequence_number": 1,
+            "direct_beam": "db_8mm",
+            "run_number": 111,
+            "background": {"strips": [{"min": 120, "max": 130}]},
+        },
+    }
+    config = _minimal_config(defaults=defaults, runs=runs)
+    for derived in (config.for_run(1), apply_overrides(config, {})):
+        assert derived.effective(derived.runs[1]).background.model == "constant"
