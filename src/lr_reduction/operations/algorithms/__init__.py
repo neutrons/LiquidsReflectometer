@@ -11,5 +11,6 @@ from lr_reduction.operations.algorithms import (
     merge_direct_beam_segments,  # noqa: F401
     roi_extraction,  # noqa: F401
     slit_scan_correction,  # noqa: F401
+    subtract_strip_background,  # noqa: F401
     trim_direct_beam_tof,  # noqa: F401
 )

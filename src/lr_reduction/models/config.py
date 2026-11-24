@@ -11,9 +11,17 @@ Composite direct beams live in their own named key space and are referenced by n
 from __future__ import annotations
 
 import math
-from typing import Literal
+from typing import ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    ValidationError,
+    model_serializer,
+    model_validator,
+)
 
 from lr_reduction.types import ID
 
@@ -83,18 +91,15 @@ class QBinning(BaseModel):
 
 
 class BackgroundConfig(BaseModel):
-    """Background subtraction settings.
-
-    TODO: §2.3.4 (Q3):
-        keep both side-region and functional background as options; legacy also
-        supports a second side-background window (`two_backgrounds`), carried here as `region2`.
-    """
+    """Background subtraction settings: a per-λ fit across y over one or two strips (`SubtractStripBackground`)."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
     apply: bool = Field(True, description="Enable background subtraction")
-    region: PixelRange | None = Field(None, description="Side-region background pixel range")
-    region2: PixelRange | None = Field(None, description="Secondary side-region background pixel range")
-    mode: Literal["side", "functional"] = Field("side", description="Background subtraction method")
+    model: Literal["linear", "constant"] = Field("linear", description="Background model across y")
+    strips: list[PixelRange] = Field(default_factory=list, max_length=2, description="Background strips")
+
+    # distinct rows outside the peak each model needs; a test keeps it equal to SubtractStripBackground's
+    MIN_ROWS: ClassVar[dict[str, int]] = {"linear": 2, "constant": 1}
 
 
 class AngleConfig(BaseModel):
@@ -168,7 +173,6 @@ class Corrections(BaseModel):
     # TODO: legacy `GravityDirection` supports UP/DOWN/OFF; §3.3.6 only asks for an enable flag.
     #       Confirm whether direction reversal is still operationally needed.
     gravity: bool = Field(False, description="Enable gravity correction")
-    background: BackgroundConfig = Field(default_factory=BackgroundConfig)
 
 
 class PeakFitConfig(BaseModel):
@@ -268,6 +272,35 @@ class RunParameters(BaseModel):
     background: BackgroundConfig | None = None
     low_res: PixelRange | None = None  # low-resolution-direction pixel range
     peak_fit: PeakFitConfig | None = None
+
+    # no return annotation: one would replace the fields in the serialization JSON schema
+    @model_serializer(mode="wrap")
+    def _written_parameters(self, handler: SerializerFunctionWrapHandler):
+        """Dump only the parameters this block wrote, so that a dump rebuilds a block that still inherits the rest.
+
+        A parameter counts as written when it was set; inside a parameter block, a key counts when it was set
+        or differs from its class default (an in-place edit such as `background.strips.append(...)`).
+        `effective()` reads the overrides through this, so dumps and effective parameters agree.
+
+        So a dump lists no unwritten parameter: read resolved values with `effective()`. Rebuild a config
+        from a plain `model_dump()`; `exclude_unset` drops in-place edits and `exclude_defaults` drops a
+        written key equal to its class default. `==` compares values only, so two configs that differ in
+        what a run wrote compare equal; compare their `model_dump()` instead.
+        """
+        data = handler(self)
+        for name in set(ReflectedRunParameters.model_fields) & data.keys():
+            value = getattr(self, name)
+            if name not in self.model_fields_set:
+                del data[name]
+            elif isinstance(value, BaseModel) and isinstance(data[name], dict):
+                fields = type(value).model_fields
+                data[name] = {
+                    key: item
+                    for key, item in data[name].items()
+                    if key in value.model_fields_set
+                    or getattr(value, key) != fields[key].get_default(call_default_factory=True)
+                }
+        return data
 
 
 class ReflectedRunParameters(RunParameters):
@@ -436,6 +469,33 @@ class ReductionConfig(BaseModel):
                 raise ValueError(f"`runs` key {seq_num} does not match its run's sequence_number={run.sequence_number}")
         return self
 
+    @model_validator(mode="after")
+    def _background_outside_peak(self) -> ReductionConfig:
+        """Each reflected run with background subtraction on must have strips, after merging with `defaults`,
+        and they must leave enough rows outside its peak for the background model."""
+        for seq_num, run in self.runs.items():
+            try:
+                params = self.effective(run)
+            except ValidationError as error:
+                raise ValueError(f"Run sequence_number={seq_num}, merged with `defaults`: {error}") from None
+            bkg = params.background
+            if bkg is None or not bkg.apply:
+                continue
+            if not bkg.strips:
+                raise ValueError(f"Run sequence_number={seq_num}: background subtraction is on but no strips are given")
+            if params.peak is None:
+                continue
+            rows = set().union(*(range(s.min, s.max + 1) for s in bkg.strips))
+            rows -= set(range(params.peak.min, params.peak.max + 1))
+            needed = BackgroundConfig.MIN_ROWS[bkg.model]
+            if len(rows) < needed:
+                raise ValueError(
+                    f"Run sequence_number={seq_num}: background strips {[(s.min, s.max) for s in bkg.strips]} "
+                    f"minus peak ({params.peak.min}, {params.peak.max}) leave {len(rows)} rows; "
+                    f"the {bkg.model} model needs at least {needed}"
+                )
+        return self
+
     # TODO (Glass): consider removing
     def for_run(self, sequence_number: int) -> ReductionConfig:
         """
@@ -449,8 +509,8 @@ class ReductionConfig(BaseModel):
         except KeyError:
             raise ValueError(f"No run with sequence_number={sequence_number}") from None
         data = self.model_dump()
-        data["runs"] = {sequence_number: run.model_dump()}
-        data["direct_beams"] = {run.direct_beam: self.direct_beams[run.direct_beam].model_dump()}
+        data["runs"] = {sequence_number: data["runs"][sequence_number]}
+        data["direct_beams"] = {run.direct_beam: data["direct_beams"][run.direct_beam]}
         return ReductionConfig(**data)
 
     def effective(self, run: ReflectedRunConfig | DirectBeamConfig) -> RunParameters:
@@ -462,6 +522,7 @@ class ReductionConfig(BaseModel):
         param_cls = ReflectedRunParameters if isinstance(run, ReflectedRunConfig) else RunParameters
         fields = set(param_cls.model_fields)
         defaults = {k: v for k, v in self.defaults.model_dump(exclude_none=True).items() if k in fields}
+        # the dump holds only what the run wrote (RunParameters._written_parameters), so the rest inherits
         overrides = run.model_dump(include=fields, exclude_none=True)
         return param_cls(**_deep_merge(defaults, overrides))
 
@@ -480,8 +541,8 @@ def apply_overrides(config: ReductionConfig, overrides: dict) -> ReductionConfig
     *not* do is re-run a *different* model's validators — e.g. setting
     `config.runs[1].direct_beam = "..."` re-checks `ReflectedRunConfig`'s own fields but does not
     re-run `ReductionConfig._referential_integrity`, since that validator lives on the parent
-    model. Use `apply_overrides` (or `ReductionConfig.model_validate(config.model_dump())` after
-    manual edits) when the override could affect cross-model checks.
+    model. Use `apply_overrides` (`apply_overrides(config, {})` after manual edits) when the
+    override could affect cross-model checks.
     """
     merged = _deep_merge(config.model_dump(), overrides)
     return ReductionConfig(**merged)

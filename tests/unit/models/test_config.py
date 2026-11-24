@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from lr_reduction.models.config import (
+    BackgroundConfig,
     DirectBeamTrimConfig,
     EmissionTimeConfig,
     PeakFitConfig,
@@ -174,6 +175,74 @@ def test_direct_attribute_assignment_does_not_recheck_other_models():
         apply_overrides(config, {})
 
 
+def test_background_requires_strips_when_applied():
+    with pytest.raises(ValidationError, match="sequence_number=1: background subtraction is on but no strips"):
+        _minimal_config(defaults={"background": {"apply": True}})
+    _minimal_config(defaults={"background": {"apply": False}})
+
+
+def test_background_partial_override_inherits_from_defaults():
+    defaults = {
+        "peak": {"min": 140, "max": 150},
+        "background": {"model": "constant", "strips": [{"min": 120, "max": 130}, {"min": 160, "max": 170}]},
+    }
+    runs = {
+        1: {"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 111, "background": {"model": "linear"}},
+        2: {
+            "sequence_number": 2,
+            "direct_beam": "db_8mm",
+            "run_number": 112,
+            "background": {"strips": [{"min": 120, "max": 130}]},
+        },
+    }
+    config = _minimal_config(defaults=defaults, runs=runs)
+    first, second = (config.effective(config.runs[n]).background for n in (1, 2))
+    assert (first.model, len(first.strips)) == ("linear", 2)
+    assert (second.model, len(second.strips)) == ("constant", 1)
+
+
+def test_background_accepts_at_most_two_strips():
+    strip = {"min": 1, "max": 2}
+    with pytest.raises(ValidationError):
+        BackgroundConfig(strips=[strip, strip, strip])
+
+
+def test_background_strips_must_leave_rows_outside_peak():
+    defaults = {"peak": {"min": 140, "max": 150}, "background": {"strips": [{"min": 128, "max": 137}]}}
+    assert _minimal_config(defaults=defaults).defaults.background.model == "linear"
+
+    # one row left outside the peak: enough for `constant`, too few for `linear`
+    defaults["background"] = {"model": "constant", "strips": [{"min": 139, "max": 150}]}
+    _minimal_config(defaults=defaults)
+    defaults["background"]["model"] = "linear"
+    with pytest.raises(ValidationError, match="sequence_number=1.*linear model needs at least 2"):
+        _minimal_config(defaults=defaults)
+
+    # a per-run override is checked against the run's effective peak
+    defaults["background"] = {"strips": [{"min": 128, "max": 137}]}
+    runs = {1: {"sequence_number": 1, "direct_beam": "db_8mm", "run_number": 111, "peak": {"min": 120, "max": 140}}}
+    with pytest.raises(ValidationError, match="sequence_number=1"):
+        _minimal_config(defaults=defaults, runs=runs)
+
+
+def test_background_partial_override_survives_for_run_and_apply_overrides():
+    defaults = {
+        "peak": {"min": 140, "max": 150},
+        "background": {"model": "constant", "strips": [{"min": 120, "max": 130}, {"min": 160, "max": 170}]},
+    }
+    runs = {
+        1: {
+            "sequence_number": 1,
+            "direct_beam": "db_8mm",
+            "run_number": 111,
+            "background": {"strips": [{"min": 120, "max": 130}]},
+        },
+    }
+    config = _minimal_config(defaults=defaults, runs=runs)
+    for derived in (config.for_run(1), apply_overrides(config, {})):
+        assert derived.effective(derived.runs[1]).background.model == "constant"
+
+
 def test_direct_beam_tof_trim_defaults_match_algorithm_defaults():
     from lr_reduction.operations.algorithms.trim_direct_beam_tof import TrimDirectBeamTof
 
@@ -229,3 +298,85 @@ def test_peak_fit_defaults():
 def test_direct_beam_inherits_peak_fit_from_defaults():
     config = _minimal_config(defaults={"peak_fit": {"type": "gauss", "pad": 3}})
     assert config.effective(config.direct_beams["db_8mm"]).peak_fit == PeakFitConfig(type="gauss", pad=3)
+
+
+def test_edits_to_default_created_blocks_survive_for_run_and_apply_overrides():
+    config = _minimal_config()
+    config.assembly.q_norm = 0.02
+    config.corrections.dead_time.apply = not config.corrections.dead_time.apply
+    config.direct_beams["db_8mm"].tof_trim.chopper_cut.offset_ms = 2.5
+    config.defaults.peak = PixelRange(min=140, max=150)
+    for derived in (config.for_run(1), apply_overrides(config, {})):
+        assert derived.assembly.q_norm == 0.02
+        assert derived.corrections.dead_time.apply == config.corrections.dead_time.apply
+        assert derived.direct_beams["db_8mm"].tof_trim.chopper_cut.offset_ms == 2.5
+        assert derived.defaults.peak == PixelRange(min=140, max=150)
+
+
+def test_background_min_rows_match_algorithm():
+    from lr_reduction.operations.algorithms.subtract_strip_background import MIN_BACKGROUND_ROWS
+
+    # the operation passes `model.capitalize()` as BackgroundModel
+    assert {model.capitalize(): rows for model, rows in BackgroundConfig.MIN_ROWS.items()} == MIN_BACKGROUND_ROWS
+    assert set(BackgroundConfig.MIN_ROWS) == set(BackgroundConfig.model_fields["model"].annotation.__args__)
+
+
+def test_invalid_merge_with_defaults_names_the_run():
+    runs = {3: {"sequence_number": 3, "direct_beam": "db_8mm", "run_number": 113, "q_binning": {"q_min": 0.3}}}
+    with pytest.raises(ValidationError, match=r"(?s)sequence_number=3, merged with `defaults`:.*q_max \(0.2\)"):
+        _minimal_config(defaults={"q_binning": {"q_min": 0.01, "q_max": 0.2}}, runs=runs)
+
+
+def _partial_override_config():
+    """Partial per-run blocks over `defaults`, in a background block and in two others."""
+    return _minimal_config(
+        defaults={
+            "peak": {"min": 140, "max": 150},
+            "peak_fit": {"type": "gauss"},
+            "q_binning": {"method": "constantTOF"},
+            "background": {"model": "constant", "strips": [{"min": 120, "max": 130}]},
+        },
+        direct_beams={"db_8mm": {"direct_beam_run_numbers": [12345], "peak_fit": {"pad": 3}}},
+        runs={
+            1: {
+                "sequence_number": 1,
+                "direct_beam": "db_8mm",
+                "run_number": 111,
+                "q_binning": {"q_step": 0.01},
+                "background": {"model": "linear"},
+            }
+        },
+    )
+
+
+def _resolved(config):
+    run, beam = config.runs[1], config.direct_beams["db_8mm"]
+    return config.effective(run), config.effective(beam)
+
+
+def test_partial_blocks_inherit_unwritten_keys():
+    run, beam = _resolved(_partial_override_config())
+    assert (beam.peak_fit.type, beam.peak_fit.pad) == ("gauss", 3)
+    assert (run.q_binning.method, run.q_binning.q_step) == ("constantTOF", 0.01)
+    assert (run.background.model, run.background.strips) == ("linear", [PixelRange(min=120, max=130)])
+
+
+@pytest.mark.parametrize("mode", ["python", "json"])
+def test_model_dump_round_trip_keeps_effective_parameters(mode):
+    config = _partial_override_config()
+    rebuilt = ReductionConfig.model_validate(config.model_dump(mode=mode))
+    assert _resolved(rebuilt) == _resolved(config)
+
+
+def test_in_place_edit_of_a_run_block_is_kept():
+    config = _partial_override_config()
+    config.runs[1].background.strips.append(PixelRange(min=160, max=170))
+    expected = [PixelRange(min=160, max=170)]
+    for derived in (config, config.for_run(1), apply_overrides(config, {})):
+        assert derived.effective(derived.runs[1]).background.strips == expected
+
+
+def test_serialization_schema_keeps_run_fields():
+    definitions = ReductionConfig.model_json_schema(mode="serialization")["$defs"]
+    for model in ("ReflectedRunConfig", "DirectBeamConfig", "ReflectedRunParameters"):
+        assert {"peak", "background"} <= set(definitions[model]["properties"])
