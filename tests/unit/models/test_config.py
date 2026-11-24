@@ -3,7 +3,9 @@ from pydantic import ValidationError
 
 from lr_reduction.models.config import (
     BackgroundConfig,
+    DirectBeamTrimConfig,
     EmissionTimeConfig,
+    PeakFitConfig,
     PixelRange,
     QBinning,
     ReductionConfig,
@@ -239,3 +241,58 @@ def test_background_partial_override_survives_for_run_and_apply_overrides():
     config = _minimal_config(defaults=defaults, runs=runs)
     for derived in (config.for_run(1), apply_overrides(config, {})):
         assert derived.effective(derived.runs[1]).background.model == "constant"
+def test_direct_beam_tof_trim_defaults_match_algorithm_defaults():
+    from lr_reduction.operations.algorithms.trim_direct_beam_tof import TrimDirectBeamTof
+
+    algorithm = TrimDirectBeamTof()
+    algorithm.initialize()
+    trim = DirectBeamTrimConfig()
+    assert list(trim.chopper_cut.coefficients) == list(algorithm.getProperty("ChopperCutCoefficients").value)
+    assert trim.chopper_cut.offset_ms == algorithm.getProperty("ChopperCutOffset").value
+    assert trim.intensity_tof_step == algorithm.getProperty("IntensityTOFStep").value
+
+
+def test_direct_beam_tof_trim_from_yaml_shaped_dict():
+    config = _minimal_config(
+        direct_beams={
+            "db_8mm": {
+                "direct_beam_run_numbers": [12345],
+                "flip_atten": True,
+                "tof_trim": {"apply": False, "chopper_cut": {"coefficients": [2.0, 16000.0], "offset_ms": 0.5}},
+            }
+        }
+    )
+    db = config.direct_beams["db_8mm"]
+    assert db.flip_atten is True
+    assert db.tof_trim.apply is False
+    assert db.tof_trim.chopper_cut.coefficients == (2.0, 16000.0)
+    assert db.tof_trim.chopper_cut.offset_ms == 0.5
+    # unspecified fields keep their defaults
+    assert db.tof_trim.intensity_tof_step == 50.0
+
+
+@pytest.mark.parametrize(
+    "tof_trim",
+    [
+        {"dead_time_threshold": 0.9},
+        {"dead_time_threshold_lowest_wavelength": 0.9},
+        {"intensity_threshold": -1.0},
+        {"intensity_tof_step": 0.0},
+        {"chopper_cut": {"coefficients": [1.0]}},
+    ],
+)
+def test_direct_beam_tof_trim_rejects_invalid_values(tof_trim):
+    with pytest.raises(ValidationError):
+        DirectBeamTrimConfig(**tof_trim)
+
+
+def test_peak_fit_defaults():
+    peak_fit = PeakFitConfig()
+    assert (peak_fit.type, peak_fit.background, peak_fit.pad) == ("supergauss", "linear", 1)
+    with pytest.raises(ValidationError):
+        PeakFitConfig(background="quadratic")
+
+
+def test_direct_beam_inherits_peak_fit_from_defaults():
+    config = _minimal_config(defaults={"peak_fit": {"type": "gauss", "pad": 3}})
+    assert config.effective(config.direct_beams["db_8mm"]).peak_fit == PeakFitConfig(type="gauss", pad=3)

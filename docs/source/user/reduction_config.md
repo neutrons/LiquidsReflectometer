@@ -15,8 +15,8 @@ sequence — and distinguishes:
   `assembly` stitching options, `output` settings, `corrections` such as dead-time and
   emission-time).
 - **Per-run parameters** — the scientific parameters that can vary per run. ROI-selection
-  parameters (peak/background pixel ranges) are shared by direct beam and reflected runs alike and
-  modeled by `RunParameters` ({class}`lr_reduction.models.config.RunParameters`); parameters that
+  parameters (peak/background pixel ranges) and the beam-peak fit settings (`peak_fit`) are shared
+  by direct beam and reflected runs alike and modeled by `RunParameters` ({class}`lr_reduction.models.config.RunParameters`); parameters that
   only make sense for a reflected run (Q binning, acceptance window, etc.) are modeled by
   `ReflectedRunParameters` ({class}`lr_reduction.models.config.ReflectedRunParameters`), which
   extends `RunParameters`.
@@ -66,6 +66,26 @@ runs:
 Referential integrity (every `direct_beam` reference resolves to a defined composite direct beam)
 and range checks (e.g. pixel ranges, Q ranges) are enforced by Pydantic at load time, with clear
 error messages.
+
+Each composite direct beam also carries two settings of its own: `flip_atten`, set when its runs'
+attenuator logs were recorded with inverted polarity, and a `tof_trim` block controlling the TOF
+trimming of each run before the composite is merged:
+
+```yaml
+direct_beams:
+  db_8mm:
+    direct_beam_run_numbers: [12345, 12346, 12347]
+    flip_atten: false
+    tof_trim:
+      apply: true
+      chopper_cut: { coefficients: [2.077, 16818.0], offset_ms: 1.0 }
+      intensity_threshold: 0.36          # counts per µA·h per intensity_tof_step bin
+      intensity_tof_step: 50.0           # µs
+      dead_time_threshold: 1.25
+      dead_time_threshold_lowest_wavelength: 1.5   # used for the thickest-Cd run
+```
+
+The values shown are the defaults, so both keys can be omitted.
 
 A reflected run's data source is either a single `run_number`, or a `source_runs` list naming
 multiple runs to sum (exactly one of the two must be set); an optional `filter` restricts the

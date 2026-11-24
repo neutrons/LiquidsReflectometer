@@ -55,6 +55,18 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         )
         self.declareProperty(MatrixWorkspaceProperty("OutputWorkspace", "", Direction.Output), "Output workspace")
 
+    def validateInputs(self):  # noqa: N802
+        # The correction is binned with `TOFStep` and `TOFRange`, in microseconds.
+        issues = {}
+        for name in ("InputWorkspace", "InputErrorEventsWorkspace"):
+            workspace = self.getProperty(name).value
+            if workspace is None:
+                continue
+            unit = workspace.getAxis(0).getUnit().unitID()
+            if unit != "TOF":
+                issues[name] = f"The X axis must be in TOF, not {unit!r}"
+        return issues
+
     def PyExec(self):  # noqa: N802
         # Event data must include error events (all triggers on the detector)
         ws_event_data = self.getProperty("InputWorkspace").value
@@ -77,9 +89,9 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
         # The event lists are summed before they are binned rather than after: binning every pixel
         # and then summing the histograms costs an order of magnitude more, and the counts are the
         # same either way, since each bin holds a whole number of events.
-        _ws_sc = SumSpectra(ws_event_data)
+        summed = SumSpectra(InputWorkspace=ws_event_data, StoreInADS=False)
         counts_ws = Rebin(
-            InputWorkspace=_ws_sc,
+            InputWorkspace=summed,
             Params=(tof_min, tof_step, tof_max),
             PreserveEvents=False,
             OutputWorkspace=output_workspace,
@@ -87,15 +99,20 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
 
         # If we have error events, add them since those are also detector triggers
         if ws_error_events is not None:
-            _errors = Rebin(InputWorkspace=ws_error_events, Params=(tof_min, tof_step, tof_max), PreserveEvents=False)
-            counts_ws += _errors
+            errors = Rebin(
+                InputWorkspace=ws_error_events,
+                Params=(tof_min, tof_step, tof_max),
+                PreserveEvents=False,
+                StoreInADS=False,
+            )
+            counts_ws += errors
 
         # When operating at a given frequency, the proton charge of the blocked
         # pulsed is zero in the data file, so we don't have to adjust the number of pulses.
         t_series = np.asarray(ws_event_data.getRun()["proton_charge"].value)
         n_pulses = np.count_nonzero(t_series)
 
-        rate = counts_ws.readY(0) / n_pulses
+        rate = counts_ws.y(0) / n_pulses
 
         # Compute the dead time correction for each TOF bin
         if paralyzing:
@@ -122,10 +139,10 @@ class SingleReadoutDeadTimeCorrection(PythonAlgorithm):
             error = f"Corrupted dead time correction:\n  Reflected: {corr}\n"
             self.log().error(error)
 
-        counts_ws.setY(0, corr)
+        counts_ws.setSharedY(0, corr)
 
         # We don't compute an error on the dead time correction, so set it to zero
-        counts_ws.setE(0, 0 * corr)
+        counts_ws.setSharedE(0, 0 * corr)
         counts_ws.setDistribution(True)
         self.setProperty("OutputWorkspace", counts_ws)
 

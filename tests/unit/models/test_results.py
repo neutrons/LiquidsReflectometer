@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from lr_reduction.exceptions import IncompleteDataError, MalformedDataError
-from lr_reduction.models.results import ReflectivityCurve
+from lr_reduction.models.results import CompositeDirectBeam, DirectBeamSegment, ReflectivityCurve
 
 
 def _four_columns():
@@ -64,3 +64,36 @@ def test_mismatched_column_length_rejected():
 def test_empty_curve():
     curve = ReflectivityCurve.empty()
     assert curve.to_array().shape == (0, 4)
+
+
+def _segment(run_number, cd_thickness_um=0.0):
+    return DirectBeamSegment(
+        run_number=run_number,
+        cd_thickness_um=cd_thickness_um,
+        slit_scan_factor=1.0,
+        dead_time_threshold=1.25,
+        tof_range=(12000.0, 45000.0),
+        chopper_cut=11000.0,
+        dead_time_cut=12000.0,
+        intensity_cut=45000.0,
+        wavelength_band=(2.5, 9.5),
+        db_pixel=141.3,
+        db_pixel_err=0.02,
+        tthd=0.0,
+    )
+
+
+@pytest.mark.parametrize(
+    "run_numbers",
+    [(12346, 12345), (12345,), (12345, 12346, 12347)],
+    ids=["reordered", "missing segment", "extra run"],
+)
+def test_composite_direct_beam_rejects_segments_not_matching_run_numbers(run_numbers):
+    with pytest.raises(MalformedDataError, match="segments are for runs"):
+        CompositeDirectBeam(
+            workspace="REF_L_12345_db",
+            run_numbers=run_numbers,
+            segments=(_segment(12345), _segment(12346)),
+            gaps=(),
+            weights_workspace=None,
+        )

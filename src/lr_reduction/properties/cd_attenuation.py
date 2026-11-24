@@ -146,6 +146,10 @@ def get_attenuator_log(ws) -> list[int]:
         return atten
     except LogNotFoundError:
         # Older data files lack the Actuator:Menu log, and used a different name for the attenuator flags.
+        if not any(name in SampleLogs(ws) for name in STAGE_LOGS):
+            raise LogNotFoundError(
+                f"No attenuator log: neither {MENU_LOG} nor the stage logs {', '.join(STAGE_LOGS)}"
+            ) from None
         logs = [
             SampleLogs(ws).single_value("BL4B:Actuator:50MRb", operation=np.max),
             SampleLogs(ws).single_value("BL4B:Actuator:100MRb", operation=np.max),
@@ -272,7 +276,7 @@ def apply_correction(
     if unit.lower() != "wavelength":
         raise LrValidationError(f"Cd attenuation correction needs a workspace in Wavelength, got {unit!r}")
     transmission = get_transmission_workspace(cd_thickness)
-    bin_edges = transmission.readX(0)
+    bin_edges = transmission.x(0)
     if (isinstance(ws, IEventWorkspace) and ws.getNumberEvents() > 0) and (
         (cutoff := _overflow_cutoff_wavelength(ws, cd_thickness, bin_edges)) is not None
     ):

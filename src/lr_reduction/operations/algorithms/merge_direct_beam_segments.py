@@ -189,10 +189,10 @@ class MergeDirectBeamSegments(PythonAlgorithm):
             self.declareProperty(FloatArrayProperty(name, [], direction=Direction.Output), doc)
 
     def validateInputs(self) -> dict[str, str]:  # noqa: N802
-        names = self.getProperty("InputWorkspaces").value
+        # ADSValidator has already required at least one name, each of an existing workspace.
         issues = []
         reference = None
-        for name in names:
+        for name in self.getProperty("InputWorkspaces").value:
             ws = AnalysisDataService.retrieve(name)
             if not isinstance(ws, IEventWorkspace):
                 issues.append(f"{name}: not an event workspace")

@@ -12,27 +12,26 @@ import logging
 from pathlib import Path
 
 from lr_reduction.io import RunLoader
-from lr_reduction.models.config import DirectBeamConfig, ReductionConfig
+from lr_reduction.models.config import ReductionConfig
 from lr_reduction.models.run_data import RunData
 from lr_reduction.types import ID
 
 logger = logging.getLogger(__name__)
 
 
-def get_direct_beam_config(sequence_number: ID, config: ReductionConfig) -> DirectBeamConfig:
-    """Get the direct beam configuration for a given run, according to the configuration.
+def get_direct_beam_name(sequence_number: ID, config: ReductionConfig) -> str:
+    """The name of the composite direct beam the reflected run `sequence_number` is normalized by.
 
-    `DirectBeamConfig.direct_beam_run_numbers` gives the run numbers to load; the object itself is
-    what `DirectBeamCompositionOperation` needs, so callers can carry a single resolved
-    value through `load_data` -> `call_operations` instead of re-deriving it from `config`.
+    The name selects the entry of `config.direct_beams` to load and is what
+    `DirectBeamCompositionOperation` takes, so callers carry it through `load_data` ->
+    `call_operations` instead of re-deriving it from `config`.
     """
-    db_name = config.runs[sequence_number].direct_beam
-    return config.direct_beams[db_name]
+    return config.runs[sequence_number].direct_beam
 
 
-def get_direct_beams(run_loader: RunLoader, db_config: DirectBeamConfig) -> list[RunData]:
-    """Load the direct beam runs for a given run, according to the configuration."""
-    return [run_loader.load(run_number) for run_number in db_config.direct_beam_run_numbers]
+def get_direct_beams(run_loader: RunLoader, config: ReductionConfig, direct_beam_name: str) -> list[RunData]:
+    """Load the runs of the composite direct beam `direct_beam_name`."""
+    return [run_loader.load(run_number) for run_number in config.direct_beams[direct_beam_name].direct_beam_run_numbers]
 
 
 def locate_standard_configuration(run_number: ID) -> Path:

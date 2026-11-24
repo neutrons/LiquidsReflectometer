@@ -7,7 +7,7 @@ from orsopy.fileio import Software
 
 from lr_reduction.exceptions import IncompleteDataError, MalformedDataError
 from lr_reduction.models.config import ReductionConfig
-from lr_reduction.types import ID
+from lr_reduction.types import ID, MantidWorkspaceName
 
 
 @dataclass
@@ -158,3 +158,87 @@ class CombinedReductionResult:
     partials: list[ReductionResult] = field(default_factory=list)
     scale_factors: list[float] = field(default_factory=list)
     html_report: str | None = None
+
+
+@dataclass(frozen=True)
+class DirectBeamSegment:
+    """What the composite direct-beam operation did to one of its runs.
+
+    A record of values, for the diagnostic report and the composite's sample logs; the run's
+    corrected events live only in the composite workspace.
+
+    Attributes
+    ----------
+    run_number
+        The direct-beam run this segment was built from
+    cd_thickness_um
+        Total Cd thickness in the beam [µm]
+    slit_scan_factor
+        Slit-scan intensity rescaling factor applied to the run
+    dead_time_threshold
+        Largest dead-time correction factor the run's TOF trim accepted
+    tof_range
+        TOF range [µs] the run was trimmed to, lower bound included, upper bound excluded
+    chopper_cut
+        Chopper-2 frame-overlap lower bound [µs]
+    dead_time_cut
+        Dead-time lower bound [µs]; 0 when no bin exceeded the threshold
+    intensity_cut
+        Intensity-floor upper bound [µs]
+
+        These five are None when the TOF trim is off.
+    wavelength_band
+        Wavelength range [Angstrom] the segment covers in the composite
+    db_pixel
+        Fitted beam-peak centroid [pixel]
+    db_pixel_err
+        Fit uncertainty of `db_pixel` [pixel]
+    tthd
+        Time average of the run's `tthd` log [deg]
+    """
+
+    run_number: ID
+    cd_thickness_um: float
+    slit_scan_factor: float
+    dead_time_threshold: float | None
+    tof_range: tuple[float, float] | None
+    chopper_cut: float | None
+    dead_time_cut: float | None
+    intensity_cut: float | None
+    wavelength_band: tuple[float, float]
+    db_pixel: float
+    db_pixel_err: float
+    tthd: float
+
+
+@dataclass(frozen=True)
+class CompositeDirectBeam:
+    """The composite direct beam a reflected run is normalized by.
+
+    Attributes
+    ----------
+    workspace
+        Name of the composite event workspace, in wavelength
+    run_numbers
+        The constituent direct-beam runs, in ascending Cd thickness
+    segments
+        One record per constituent run, in the same order as `run_numbers`
+    gaps
+        Wavelength intervals [Angstrom] between adjacent segments that no segment covers
+    weights_workspace
+        Name of the merge's overlap-weights workspace; set only in diagnostic mode
+    """
+
+    workspace: MantidWorkspaceName
+    run_numbers: tuple[ID, ...]
+    segments: tuple[DirectBeamSegment, ...]
+    gaps: tuple[tuple[float, float], ...]
+    weights_workspace: MantidWorkspaceName | None
+
+    def __post_init__(self):
+        segment_runs = tuple(segment.run_number for segment in self.segments)
+        if segment_runs != tuple(self.run_numbers):
+            raise MalformedDataError(
+                f"composite direct beam segments are for runs {list(segment_runs)}, "
+                f"expected one per run in {list(self.run_numbers)}, in the same order"
+            )

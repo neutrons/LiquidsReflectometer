@@ -229,7 +229,7 @@ def test_out_of_range_menu_code_raises(make_events, code):
 
 
 def test_missing_attenuator_logs_raise(make_events):
-    with pytest.raises(LogNotFoundError, match="50MRb"):
+    with pytest.raises(LogNotFoundError, match=f"neither {MENU_LOG} nor the stage logs {STAGE_LOGS[0]}"):
         get_attenuator_log(make_events())
 
 
@@ -336,27 +336,27 @@ def test_transmission_is_a_wavelength_histogram_centred_on_the_table():
     assert transmission.getAxis(0).getUnit().unitID() == "Wavelength"
     assert transmission.isHistogramData()
     assert transmission.getNumberHistograms() == 1
-    np.testing.assert_allclose(transmission.readX(0), expected_bin_edges(), rtol=1e-12)
+    np.testing.assert_allclose(transmission.x(0), expected_bin_edges(), rtol=1e-12)
 
 
 def test_transmission_follows_beer_lambert_without_uncertainty():
     _, mu = _load_cd_attenuation_data()
     transmission = get_transmission_workspace(MODERATE_THICKNESS)
 
-    np.testing.assert_allclose(transmission.readY(0), np.exp(-mu * MODERATE_THICKNESS), rtol=1e-12)
-    np.testing.assert_array_equal(transmission.readE(0), 0.0)
+    np.testing.assert_allclose(transmission.y(0), np.exp(-mu * MODERATE_THICKNESS), rtol=1e-12)
+    np.testing.assert_array_equal(transmission.e(0), 0.0)
 
 
 def test_zero_thickness_transmits_everything():
-    np.testing.assert_array_equal(get_transmission_workspace(0.0).readY(0), 1.0)
+    np.testing.assert_array_equal(get_transmission_workspace(0.0).y(0), 1.0)
 
 
 def test_transmission_is_reused_from_the_analysis_data_service():
     """A second call for the same thickness returns the stored workspace instead of rebuilding it."""
     transmission = get_transmission_workspace(MODERATE_THICKNESS)
-    transmission.setY(0, np.full(transmission.blocksize(), -1.0))
+    transmission.setSharedY(0, np.full(transmission.blocksize(), -1.0))
 
-    np.testing.assert_array_equal(get_transmission_workspace(MODERATE_THICKNESS).readY(0), -1.0)
+    np.testing.assert_array_equal(get_transmission_workspace(MODERATE_THICKNESS).y(0), -1.0)
 
 
 def test_transmission_is_named_by_its_thickness_in_microns():
@@ -368,7 +368,7 @@ def test_nearby_thicknesses_do_not_share_a_transmission():
     second = get_transmission_workspace(0.00575)
 
     assert (first.name(), second.name()) == ("transmission_57.4um", "transmission_57.5um")
-    assert not np.allclose(first.readY(0), second.readY(0), rtol=1e-6)
+    assert not np.allclose(first.y(0), second.y(0), rtol=1e-6)
 
 
 def test_thicknesses_sharing_a_rounded_name_each_get_their_own_transmission():
@@ -380,7 +380,7 @@ def test_thicknesses_sharing_a_rounded_name_each_get_their_own_transmission():
     transmission = get_transmission_workspace(nearby)
 
     assert transmission.name() == "transmission_307um"
-    np.testing.assert_allclose(transmission.readY(0), np.exp(-mu * nearby), rtol=1e-12)
+    np.testing.assert_allclose(transmission.y(0), np.exp(-mu * nearby), rtol=1e-12)
     assert transmission.getRun()["cd_thickness"].value == nearby
 
 
@@ -405,7 +405,7 @@ def test_unrelated_workspace_under_the_cached_name_is_replaced():
     transmission = get_transmission_workspace(MODERATE_THICKNESS)
 
     _, mu = _load_cd_attenuation_data()
-    np.testing.assert_allclose(transmission.readY(0), np.exp(-mu * MODERATE_THICKNESS), rtol=1e-12)
+    np.testing.assert_allclose(transmission.y(0), np.exp(-mu * MODERATE_THICKNESS), rtol=1e-12)
 
 
 @pytest.mark.parametrize("cd_thickness", [-0.001, np.nan, np.inf])
@@ -467,7 +467,7 @@ def test_correction_rejects_events_beyond_the_table(make_events, output_name, to
 
 def test_no_cutoff_when_every_event_is_safe(make_events):
     events = make_events()
-    bin_edges = get_transmission_workspace(MODERATE_THICKNESS).readX(0)
+    bin_edges = get_transmission_workspace(MODERATE_THICKNESS).x(0)
 
     assert _overflow_cutoff_wavelength(mtd[events], MODERATE_THICKNESS, bin_edges) is None
 
@@ -475,7 +475,7 @@ def test_no_cutoff_when_every_event_is_safe(make_events):
 def test_cutoff_sits_just_below_the_first_overflowing_bin(make_events):
     """The full stack overflows from ~7.9 Angstrom, inside the events' ~2.1-14.8 Angstrom span."""
     events = make_events()
-    bin_edges = get_transmission_workspace(FULL_STACK_THICKNESS).readX(0)
+    bin_edges = get_transmission_workspace(FULL_STACK_THICKNESS).x(0)
     _, mu = _load_cd_attenuation_data()
     first_overflow = np.argmax(mu * FULL_STACK_THICKNESS > _MAX_ATTENUATION_EXPONENT)
 
@@ -488,7 +488,7 @@ def test_cutoff_sits_just_below_the_first_overflowing_bin(make_events):
 def test_correction_drops_events_that_would_overflow_float32(make_events, output_name):
     """Events past the cutoff are filtered out; the rest are corrected with finite weights."""
     events = make_events()
-    bin_edges = get_transmission_workspace(FULL_STACK_THICKNESS).readX(0)
+    bin_edges = get_transmission_workspace(FULL_STACK_THICKNESS).x(0)
     cutoff = _overflow_cutoff_wavelength(mtd[events], FULL_STACK_THICKNESS, bin_edges)
 
     corrected = apply_correction(events, FULL_STACK_THICKNESS, output_name)

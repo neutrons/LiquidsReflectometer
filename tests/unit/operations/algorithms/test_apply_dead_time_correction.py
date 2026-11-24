@@ -209,8 +209,8 @@ def test_each_event_is_weighted_by_the_factor_of_its_curve_bin(events, make_curv
 
     assert isinstance(corrected, IEventWorkspace)
     assert corrected.getNumberEvents() == mtd[events].getNumberEvents()
-    np.testing.assert_array_equal(corrected.readX(0), mtd[events].readX(0))
-    edges = mtd[curve].readX(0)
+    np.testing.assert_array_equal(corrected.x(0), mtd[events].x(0))
+    edges = mtd[curve].x(0)
     for index in range(corrected.getNumberHistograms()):
         event_list = corrected.getSpectrum(index)
         expected = factors[np.searchsorted(edges, event_list.getTofs(), side="right") - 1]
@@ -233,7 +233,7 @@ def test_input_is_unchanged(events, make_curve):
         for index in range(workspace.getNumberHistograms()):
             spectrum = workspace.getSpectrum(index)
             order = np.argsort(spectrum.getTofs(), kind="stable")
-            result.append((spectrum.getTofs()[order], spectrum.getWeights()[order], workspace.readX(index).copy()))
+            result.append((spectrum.getTofs()[order], spectrum.getWeights()[order], workspace.x(index).copy()))
         return result
 
     before = snapshot(mtd[events])
@@ -254,7 +254,7 @@ def test_coarse_input_against_a_fine_curve(events, make_curve):
 
     assert corrected.getNumberHistograms() == 4
     assert corrected.blocksize() == 1
-    np.testing.assert_array_equal(corrected.readX(0), mtd[events].readX(0))
+    np.testing.assert_array_equal(corrected.x(0), mtd[events].x(0))
     assert corrected.getNumberEvents() == mtd[events].getNumberEvents()
 
 

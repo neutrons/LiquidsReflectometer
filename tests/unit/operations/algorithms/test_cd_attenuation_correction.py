@@ -107,7 +107,7 @@ def run_algorithm(input_workspace, **properties):
 def expected_scale(wavelengths, cd_thickness):
     """1 / T for each wavelength, read off the transmission histogram's bins."""
     _, mu = _load_cd_attenuation_data()
-    bin_edges = get_transmission_workspace(cd_thickness).readX(0)
+    bin_edges = get_transmission_workspace(cd_thickness).x(0)
     bins = np.searchsorted(bin_edges, wavelengths, side="right") - 1
     return np.exp(mu[bins] * cd_thickness)
 
@@ -146,6 +146,25 @@ def test_flip_atten_reads_zero_as_in_the_beam(make_direct_beam):
     corrected = run_algorithm(make_direct_beam(menu=14), FlipAtten=True)
 
     assert_corrected(corrected, 57.5e-4)
+
+
+@pytest.mark.parametrize(
+    ("logs", "match"),
+    [({}, f"neither {MENU_LOG}"), ({"stages": [1, 0, 1, 0]}, None), ({"menu": 16}, "0-15")],
+    ids=["no attenuator log", "stage logs", "out-of-range menu code"],
+)
+def test_validation_requires_a_readable_attenuator_log(make_direct_beam, logs, match):
+    algorithm = CdAttenuationCorrection()
+    algorithm.initialize()
+    algorithm.setProperty("InputWorkspace", make_direct_beam(**logs))
+
+    issues = algorithm.validateInputs()
+
+    if match is None:
+        assert issues == {}
+    else:
+        assert "cannot read the attenuator log" in issues["InputWorkspace"]
+        assert match in issues["InputWorkspace"]
 
 
 def test_histogram_input_is_rejected():

@@ -31,7 +31,7 @@ def run_algorithm(input_workspace, **properties):
 
 def compute_correction(input_workspace, **properties):
     """Run the algorithm on ``input_workspace`` and return the correction for each TOF bin."""
-    return run_algorithm(input_workspace, **properties).readY(0)
+    return run_algorithm(input_workspace, **properties).y(0)
 
 
 @pytest.mark.datarepo
@@ -138,21 +138,21 @@ def test_correction_values_with_explicit_tof_range(event_workspace):
     """An explicit TOFRange bins the correction over that range rather than the workspace range."""
     output_workspace = run_algorithm(event_workspace, TOFRange=[55000.0, 60000.0], TOFStep=1000.0)
 
-    np.testing.assert_allclose(output_workspace.readY(0), CORRECTION_TOF_RANGE_55000_60000, rtol=RTOL, atol=0)
-    np.testing.assert_allclose(output_workspace.readX(0), np.arange(55000.0, 60001.0, 1000.0), rtol=RTOL, atol=0)
+    np.testing.assert_allclose(output_workspace.y(0), CORRECTION_TOF_RANGE_55000_60000, rtol=RTOL, atol=0)
+    np.testing.assert_allclose(output_workspace.x(0), np.arange(55000.0, 60001.0, 1000.0), rtol=RTOL, atol=0)
 
 
 @pytest.mark.datarepo
 def test_default_binning_spans_the_workspace_tof_range(event_workspace):
     """Without a TOFRange, the correction is binned in 100 microsecond steps over the run's TOF range."""
     output_workspace = run_algorithm(event_workspace)
-    bin_edges = output_workspace.readX(0)
+    bin_edges = output_workspace.x(0)
 
     assert bin_edges[0] == event_workspace.getTofMin()
     assert bin_edges[-1] == event_workspace.getTofMax()
     np.testing.assert_allclose(np.diff(bin_edges[:-1]), 100.0, rtol=RTOL, atol=0)
 
-    correction = output_workspace.readY(0)
+    correction = output_workspace.y(0)
     assert len(correction) == 167
     np.testing.assert_allclose(correction[::20], CORRECTION_DEFAULT_EVERY_20TH_BIN, rtol=RTOL, atol=0)
 
@@ -164,4 +164,39 @@ def test_output_workspace_is_a_distribution_without_errors(event_workspace):
 
     assert output_workspace.getNumberHistograms() == 1
     assert output_workspace.isDistribution()
-    np.testing.assert_array_equal(output_workspace.readE(0), 0.0)
+    np.testing.assert_array_equal(output_workspace.e(0), 0.0)
+
+
+def _sample_events(name, unit):
+    return mtd_api.CreateSampleWorkspace(
+        WorkspaceType="Event", XUnit=unit, NumBanks=1, BankPixelWidth=1, NumEvents=10, OutputWorkspace=name
+    )
+
+
+@pytest.mark.parametrize(
+    ("data_unit", "error_events_unit", "rejected"),
+    [
+        ("TOF", "TOF", set()),
+        ("Wavelength", "TOF", {"InputWorkspace"}),
+        ("TOF", "Wavelength", {"InputErrorEventsWorkspace"}),
+    ],
+    ids=["both in TOF", "data in wavelength", "error events in wavelength"],
+)
+def test_validation_requires_tof_input(data_unit, error_events_unit, rejected):
+    """The correction is binned in microseconds, so both inputs must be in TOF."""
+    data = _sample_events("dead_time_data", data_unit)
+    error_events = _sample_events("dead_time_error_events", error_events_unit)
+    try:
+        algorithm = SingleReadoutDeadTimeCorrection()
+        algorithm.initialize()
+        algorithm.setProperty("InputWorkspace", data)
+        algorithm.setProperty("InputErrorEventsWorkspace", error_events)
+
+        issues = algorithm.validateInputs()
+
+        assert set(issues) == rejected
+        for message in issues.values():
+            assert message == "The X axis must be in TOF, not 'Wavelength'"
+    finally:
+        mtd_api.DeleteWorkspace(data)
+        mtd_api.DeleteWorkspace(error_events)

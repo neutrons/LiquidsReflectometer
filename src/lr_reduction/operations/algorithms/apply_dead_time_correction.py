@@ -38,7 +38,7 @@ def dead_time_curve_issues(curve_ws, tof_range=None):
         issues.append(f"it must have exactly one spectrum, found {curve_ws.getNumberHistograms()}")
         return issues
 
-    tof_edges = curve_ws.readX(0)
+    tof_edges = curve_ws.x(0)
     if tof_range is not None:
         tof_min, tof_max = tof_range
         if tof_edges[0] > tof_min or tof_edges[-1] < tof_max:
@@ -46,7 +46,7 @@ def dead_time_curve_issues(curve_ws, tof_range=None):
                 f"its TOF range [{tof_edges[0]}, {tof_edges[-1]}] does not cover "
                 f"the events' TOF range [{tof_min}, {tof_max}]"
             )
-    factors = curve_ws.readY(0)
+    factors = curve_ws.y(0)
     if not np.all(np.isfinite(factors)):
         issues.append("it contains undefined (NaN or infinite) values")
     if np.any(factors < 0):
