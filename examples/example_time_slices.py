@@ -5,12 +5,11 @@ Inputs are read below the example data folder and the direct beams are written t
 (see example_paths). Nothing runs on import.
 """
 
-import os
-import numpy as np
 
 import lr_reduction.new_reduction_time_resolved as reduction
 
 from example_paths import data_folder, output_folder, run_examples
+
 
 def settings_json():
     """The settings file most examples start from: the one example_from_dat writes."""
