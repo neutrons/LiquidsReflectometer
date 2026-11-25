@@ -3,6 +3,9 @@
 Example usage of the unified NR reduction class
 
 Demonstrates how to configure and run reductions using both constantQ, constantTOF and MeanTheta methods
+
+Inputs are read below the example data folder and results are written to the example output folder
+(see example_paths). Nothing runs on import.
 """
 import json
 from pathlib import Path
@@ -12,6 +15,8 @@ import numpy as np
 import lr_reduction.save_reduced_data as save_fn
 from lr_reduction.nr_reduction_calc import NR_Reduction
 from lr_reduction.nr_reduction_config import NRReductionConfig
+
+from example_paths import data_folder, output_folder, run_examples
 
 
 def example_mean_theta_reduction():
@@ -24,24 +29,12 @@ def example_mean_theta_reduction():
     config = NRReductionConfig()
     config.method_per_run = ['meanTheta']
 
-    # Path needs to be setup for these tests but should be able to turn off later.
-    config.Spath = '/SNS/REF_L/IPTS-36776/shared/EBW_reduced/'
-    #config.NEXUSpathRB = # Append path if required.
-    config.DBpath = '/SNS/REF_L/IPTS-36776/shared/transmission/'
+    # Where the raw data and the direct beams are read, and where the results are written.
+    config.Spath = output_folder()
+    config.NEXUSpathRB = data_folder() / "IPTS-36681" / "nexus"
+    config.DBpath = data_folder() / "IPTS-36681" / "shared" / "transmission"
 
-    config.experiment_id = "IPTS-36776"
-    # Set data
-    config.DBname = ['DB_A1_Cd.txt', 'DB_A2_Cd.txt', 'DB_A3_Cd.txt']
-    config.RBnum=[227147,227148,227149]
-    config.RB_Ymin=[143,142,138]
-    config.RB_Ymax=[157,157,159]
-
-    # Path needs to be setup for these tests but should be able to turn off later.
-    config.Spath = '/SNS/REF_L/IPTS-36681/shared/EBW_reduced/'
-    #config.NEXUSpathRB = # Append path if required.
-    config.DBpath = '/SNS/REF_L/IPTS-36681/shared/transmission/'
-
-    config.experiment_id = "IPTS-36861"
+    config.experiment_id = "IPTS-36681"
     # Set data
     config.DBname = ['DB_A1_Cd.txt', 'DB_A2_Cd.txt', 'DB_A3_Cd.txt']
     config.RBnum=[228220,228221,228222]
@@ -97,23 +90,10 @@ def example_constant_tof_reduction():
     config = NRReductionConfig()
     config.method_per_run = ['constantTOF']
 
-    # Path needs to be setup for these tests but should be able to turn off later.
-    config.Spath = '/SNS/REF_L/IPTS-36776/shared/EBW_reduced/'
-    #config.NEXUSpathRB = # Append path if required.
-    config.DBpath = '/SNS/REF_L/IPTS-36776/shared/transmission/'
-
-    config.experiment_id = "IPTS-36776"
-    # Set data
-    config.DBname = ['DB_A1_Cd.txt', 'DB_A2_Cd.txt', 'DB_A3_Cd.txt']
-    config.RBnum=[227147,227148,227149]
-    config.RB_Ymin=[143,142,138]
-    config.RB_Ymax=[157,157,159]
-
-
-    # Path needs to be setup for these tests but should be able to turn off later.
-    config.Spath = '/SNS/REF_L/IPTS-36681/shared/EBW_reduced/'
-    #config.NEXUSpathRB = # Append path if required.
-    config.DBpath = '/SNS/REF_L/IPTS-36681/shared/transmission/'
+    # Where the raw data and the direct beams are read, and where the results are written.
+    config.Spath = output_folder()
+    config.NEXUSpathRB = data_folder() / "IPTS-36681" / "nexus"
+    config.DBpath = data_folder() / "IPTS-36681" / "shared" / "transmission"
 
     config.experiment_id = "IPTS-36681"
     # Set data
@@ -168,10 +148,10 @@ def example_mean_theta_reduction_8col():
     config = NRReductionConfig()
     config.method_per_run = ['meanTheta']
 
-    # Path needs to be setup for these tests but should be able to turn off later.
-    config.Spath = '/SNS/REF_L/IPTS-36776/shared/EBW_reduced/'
-    #config.NEXUSpathRB = # Append path if required.
-    config.DBpath = '/SNS/REF_L/IPTS-36776/shared/transmission/'
+    # Where the raw data and the direct beams are read, and where the results are written.
+    config.Spath = output_folder()
+    config.NEXUSpathRB = data_folder() / "IPTS-36776" / "nexus"
+    config.DBpath = data_folder() / "IPTS-36776" / "shared" / "transmission"
 
     config.experiment_id = "IPTS-36776"
     # Set data
@@ -236,10 +216,10 @@ def example_mean_theta_reduction_savepdf():
     config = NRReductionConfig()
     config.method_per_run = ['meanTheta']
 
-    # Path needs to be setup for these tests but should be able to turn off later.
-    config.Spath = '/SNS/REF_L/IPTS-36776/shared/EBW_reduced/'
-    #config.NEXUSpathRB = # Append path if required.
-    config.DBpath = '/SNS/REF_L/IPTS-36776/shared/transmission/'
+    # Where the raw data and the direct beams are read, and where the results are written.
+    config.Spath = output_folder()
+    config.NEXUSpathRB = data_folder() / "IPTS-36776" / "nexus"
+    config.DBpath = data_folder() / "IPTS-36776" / "shared" / "transmission"
 
     config.experiment_id = "IPTS-36776"
     # Set data
@@ -306,10 +286,10 @@ def example_mean_theta_reduction_savepdf_noshow():
     config = NRReductionConfig()
     config.method_per_run = ['meanTheta']
 
-    # Path needs to be setup for these tests but should be able to turn off later.
-    config.Spath = '/SNS/REF_L/IPTS-36776/shared/EBW_reduced/'
-    #config.NEXUSpathRB = # Append path if required.
-    config.DBpath = '/SNS/REF_L/IPTS-36776/shared/transmission/'
+    # Where the raw data and the direct beams are read, and where the results are written.
+    config.Spath = output_folder()
+    config.NEXUSpathRB = data_folder() / "IPTS-36776" / "nexus"
+    config.DBpath = data_folder() / "IPTS-36776" / "shared" / "transmission"
 
     config.experiment_id = "IPTS-36776"
     # Set data
@@ -358,9 +338,10 @@ def example_mean_theta_reduction_savepdf_noshow():
     return results
 
 if __name__ == '__main__':
-    # Run examples
-    #example_mean_theta_reduction()
-    #example_constant_tof_reduction()
-    #example_mean_theta_reduction_8col()
-    example_mean_theta_reduction_savepdf()
-    example_mean_theta_reduction_savepdf_noshow()
+    run_examples([
+        example_mean_theta_reduction,
+        example_constant_tof_reduction,
+        example_mean_theta_reduction_8col,
+        example_mean_theta_reduction_savepdf,
+        example_mean_theta_reduction_savepdf_noshow,
+    ])

@@ -75,9 +75,26 @@ def log_qvector(qmin, qmax, dqbin):
     return qmin * (1 + dqbin) ** np.arange(n + 1)
 
 def weighted_mean(y1,y2,e1,e2, sigma_mask=3):
+    """
+    Weighted mean of the ratio y1/y2, with points further than sigma_mask standard deviations from it left out.
+
+    Points that hold no measurement are left out first: a bin that no neutron fell in has a value and an error of
+    zero, so its ratio or its weight is a division by zero, and one such point would make the mean NaN.
+
+    returns
+        mean, sigma_mean: (nan, inf) when no point is left to take the mean of.
+    """
+    y1, y2, e1, e2 = (np.asarray(values, dtype=float) for values in (y1, y2, e1, e2))
+    measured = np.isfinite(y1) & np.isfinite(y2) & np.isfinite(e1) & np.isfinite(e2) & (y2 != 0)
+    y1, y2, e1, e2 = y1[measured], y2[measured], e1[measured], e2[measured]
+
     #find the weighted average
     v=y1/y2
     sigma_v = np.sqrt((e1 / y2)**2 + (e2 * y1 / y2**2)**2)
+    weighable = sigma_v > 0
+    v, sigma_v = v[weighable], sigma_v[weighable]
+    if v.size == 0:
+        return np.nan, np.inf
     w=1/sigma_v**2
     # initial weighted mean
     mean=np.sum(v*w)/np.sum(w)
@@ -89,6 +106,8 @@ def weighted_mean(y1,y2,e1,e2, sigma_mask=3):
     mask = np.abs(resid) < sigma_mask * std
     v = v[mask]
     w = w[mask]
+    if v.size == 0:
+        return np.nan, np.inf
 
     # Recompute
     mean = np.sum(v * w) / np.sum(w)
