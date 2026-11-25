@@ -31,6 +31,7 @@ INPUTS = {
     "example_direct_beam": {
         "example_direct_beam": _CD_ATTENUATION + nexus("IPTS-36119", 225318, 225319, 225320, 225321),
         "example_direct_beam_pixel_offset": _CD_ATTENUATION + nexus("IPTS-36119", 235850),
+        "example_direct_beam_with_cd_list": nexus("IPTS-36119", 231187, 231189, 231191),
     },
     "example_nr_reduction": {
         "example_mean_theta_reduction": _DIRECT_CONFIG_36681,
@@ -63,6 +64,11 @@ INPUTS = {
         "example_template_reduction": files(_SHARED, "test_template.xml") + _TEMPLATE_DB[:1] + _TEMPLATE_RUNS[:1],
         "example_template_reduction_3ang": files(_SHARED, "test_template_3ang.xml") + _TEMPLATE_DB + _TEMPLATE_RUNS,
         "example_template_reduction_new": files(_SHARED, "REFL_211029_template_new.xml") + _TEMPLATE_DB + _TEMPLATE_RUNS,
+    },
+    "example_time_slices": {
+        "example_slices_from_json_2": _FROM_JSON,
+        "example_slices_from_json_5": _FROM_JSON,
+        "example_times_from_json": _FROM_JSON,
     },
 }
 
