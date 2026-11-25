@@ -155,7 +155,7 @@ class Direct_Beam:  # noqa: N801 -- public API name; rename deferred (imported b
             roi_mask = (ypix >= self.y_ROI[0]) & (ypix < self.y_ROI[1])
             y_crop = y_tof_corr[roi_mask, :]
             I = np.sum(y_crop, axis=0)
-            E = np.sum(error_array_corr[roi_mask, :], axis=0)
+            E = np.sqrt(np.sum(error_array_corr[roi_mask, :]**2, axis=0))
 
             # TODO: can this be outside the loop, but need the time.
             if mu_file is None:

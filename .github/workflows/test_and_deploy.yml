@@ -109,15 +109,42 @@ jobs:
           local-channel: ./local-channel
           extra-channels: neutrons mantid
 
+      # Same checks as neutrons/gh-actions/pkg-verify@v2, except that the versions are compared
+      # without their local part (after "+"). The dev version ends in "+g<sha>", and conda drops
+      # leading zeros from digit runs inside it (+ge0429f0 -> +ge429f0), so an exact string
+      # compare fails for about one commit in nine. Revert to the shared action once it compares
+      # this way itself.
       - name: Verify Conda Package
-        uses: neutrons/gh-actions/pkg-verify@eb7a7c6fcfd0cda1a7b238329afc0afd09a4f4af # v2
-        with:
-          package-name: ${{ env.PKG_NAME }}
-          conda-env-name: ${{ steps.install.outputs.conda-env }}
-          extra-commands: |
-            python -c "import lr_reduction"
-            python -c "import lr_autoreduce"
-            python -c "import mantid"
+        env:
+          CONDA_TEST_ENV_NAME: ${{ steps.install.outputs.conda-env }}
+        run: |
+          echo "Verifying conda package in environment '${CONDA_TEST_ENV_NAME}'"
+          micromamba activate "${CONDA_TEST_ENV_NAME}"
+
+          conda_version=$(micromamba list "${PKG_NAME}" | awk -v pkg="${PKG_NAME}" '$1 == pkg { print $2 }')
+          if [ -z "${conda_version}" ]; then
+            echo "Failed to find version of ${PKG_NAME} from conda environment '${CONDA_TEST_ENV_NAME}'"
+            exit 1
+          fi
+          python_version=$(python -c "import ${PKG_NAME}; print(${PKG_NAME}.__version__)" | tail -n 1)
+          if [ -z "${python_version}" ]; then
+            echo "Failed to find version of ${PKG_NAME} from python module"
+            exit 1
+          fi
+
+          echo "------------------------"
+          echo "Conda version: ${conda_version}"
+          echo "Python version: ${python_version}"
+          if [ "${conda_version%%+*}" != "${python_version%%+*}" ]; then
+            echo -e "\nVersion mismatch: ${conda_version%%+*} != ${python_version%%+*}"
+            exit 1
+          fi
+          echo "Versions match (compared without the local part after '+')."
+
+          echo "------------------------"
+          python -c "import lr_reduction"
+          python -c "import lr_autoreduce"
+          python -c "import mantid"
 
       - name: upload conda package as artifact
         uses: actions/upload-artifact@v7
